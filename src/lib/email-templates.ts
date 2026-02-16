@@ -179,7 +179,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
                 Sent with
               </p>
               <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">ECard</span><span style="color:#7c3aed;">App</span>
+                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
               </p>
             </td>
           </tr>
@@ -299,7 +299,7 @@ export function buildReminderEmail(params: ReminderEmailParams): {
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
               <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Sent with</p>
               <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">ECard</span><span style="color:#7c3aed;">App</span>
+                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
               </p>
             </td>
           </tr>
@@ -380,7 +380,7 @@ export function buildAnnouncementEmail(params: AnnouncementEmailParams): {
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
               <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Sent with</p>
               <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">ECard</span><span style="color:#7c3aed;">App</span>
+                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
               </p>
             </td>
           </tr>

@@ -5,7 +5,7 @@ import FeaturesGrid from "@/components/marketing/FeaturesGrid";
 import CTASection from "@/components/marketing/CTASection";
 
 export const metadata = createMetadata({
-  title: "How ECardApp Works — Create Digital Invitations in 3 Steps",
+  title: "How Seal and Send Works — Create Digital Invitations in 3 Steps",
   description:
     "Learn how to create beautiful digital invitations in three simple steps: design your invitation, add your guests, and track RSVPs in real-time.",
   path: "/how-it-works",
@@ -13,7 +13,7 @@ export const metadata = createMetadata({
     "how to create digital invitations",
     "digital invitation steps",
     "online invitation tutorial",
-    "eCard creation guide",
+    "invitation creation guide",
   ],
 });
 
@@ -21,7 +21,7 @@ export default function HowItWorksPage() {
   const howToJsonLd = {
     "@context": "https://schema.org",
     "@type": "HowTo",
-    name: "How to Create Digital Invitations with ECardApp",
+    name: "How to Create Digital Invitations with Seal and Send",
     description:
       "Create and send beautiful digital invitations in three simple steps.",
     step: [
@@ -62,7 +62,7 @@ export default function HowItWorksPage() {
             Create Digital Invitations in 3 Simple Steps
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 sm:text-xl">
-            ECardApp makes it easy to design, share, and manage beautiful
+            Seal and Send makes it easy to design, share, and manage beautiful
             digital invitations — no design skills required.
           </p>
         </div>

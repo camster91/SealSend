@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone", // Added for optimized Docker/Coolify deployments
   images: {
     remotePatterns: [
       {

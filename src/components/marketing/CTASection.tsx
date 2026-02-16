@@ -6,7 +6,7 @@ export default function CTASection() {
     <section className="gradient-brand px-4 py-20 text-white">
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Ready to create your first eCard?
+          Ready to create your first invitation?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
           Join thousands of hosts who trust us to make their events

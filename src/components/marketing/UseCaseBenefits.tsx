@@ -50,7 +50,7 @@ export default function UseCaseBenefits({
     <section className="px-4 py-20">
       <div className="mx-auto max-w-5xl">
         <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
-          Why Choose ECardApp
+          Why Choose Seal and Send
         </h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-2">
           {benefits.map((b) => {

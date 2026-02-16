@@ -11,20 +11,24 @@ import PricingFAQ from "@/components/marketing/PricingFAQ";
 import CTASection from "@/components/marketing/CTASection";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { createMetadata, SITE_URL, SITE_NAME } from "@/lib/metadata";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = createMetadata({
-  title: "ECardApp — Beautiful Digital Invitations & RSVP Management",
+  title: "Seal and Send — Beautiful Digital Invitations & RSVP Management",
   path: "",
   keywords: [
     "digital invitations",
-    "eCard",
+    "invitation",
     "online invitations",
     "RSVP management",
     "free digital invitations",
   ],
 });
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+
   return (
     <>
       <JsonLd
@@ -54,7 +58,7 @@ export default function HomePage() {
         ]}
       />
 
-      <Navbar />
+      <Navbar user={session?.user || null} />
 
       <main>
         <Hero />

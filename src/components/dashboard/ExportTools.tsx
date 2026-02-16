@@ -21,7 +21,7 @@ export function ExportTools({
 }: ExportToolsProps) {
   const [copied, setCopied] = useState(false);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ecard.ashbi.ca';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const rsvpUrl = `${siteUrl}/e/${eventSlug}`;
 
   function handleDownloadDesign() {

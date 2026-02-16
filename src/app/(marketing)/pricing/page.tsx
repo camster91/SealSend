@@ -11,7 +11,7 @@ export const metadata = createMetadata({
     "Simple, transparent pricing for every event size. Start free with 15 guest replies. Upgrade to Standard ($5) or Premium ($10) per event when you need more.",
   path: "/pricing",
   keywords: [
-    "eCard pricing",
+    "invitation pricing",
     "digital invitation cost",
     "free digital invitations",
     "event invitation pricing",
@@ -24,7 +24,7 @@ export default function PricingPage() {
     {
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "ECardApp Free",
+      name: "Seal and Send Free",
       description:
         "Everything you need to create and send invites — free forever. 15 guest replies per event.",
       offers: {
@@ -38,7 +38,7 @@ export default function PricingPage() {
     {
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "ECardApp Standard",
+      name: "Seal and Send Standard",
       description:
         "50 guest replies, SMS invites, guest tags, branding removal — $5 per event.",
       offers: {
@@ -52,7 +52,7 @@ export default function PricingPage() {
     {
       "@context": "https://schema.org",
       "@type": "Product",
-      name: "ECardApp Premium",
+      name: "Seal and Send Premium",
       description:
         "Unlimited replies, sign-up board, priority support — $10 per event.",
       offers: {

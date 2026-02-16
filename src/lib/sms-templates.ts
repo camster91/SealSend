@@ -33,7 +33,7 @@ export function buildInviteSms(params: InviteSmsParams): string {
   }
 
   lines.push(`\nRSVP here: ${rsvpUrl}`);
-  lines.push(`\n- Sent via ECardApp`);
+  lines.push(`\n- Sent via Seal and Send`);
 
   return lines.join("\n");
 }
@@ -58,7 +58,7 @@ export function buildReminderSms(params: ReminderSmsParams): string {
   }
 
   lines.push(`\nView event: ${rsvpUrl}`);
-  lines.push(`\n- Sent via ECardApp`);
+  lines.push(`\n- Sent via Seal and Send`);
 
   return lines.join("\n");
 }
@@ -76,5 +76,5 @@ export function buildAnnouncementSms(params: AnnouncementSmsParams): string {
   const subject = sanitize(params.subject);
   const { rsvpUrl } = params;
 
-  return `Hi ${guestName}, update for ${eventTitle}: ${subject}\n\nDetails: ${rsvpUrl}\n\n- Sent via ECardApp`;
+  return `Hi ${guestName}, update for ${eventTitle}: ${subject}\n\nDetails: ${rsvpUrl}\n\n- Sent via Seal and Send`;
 }

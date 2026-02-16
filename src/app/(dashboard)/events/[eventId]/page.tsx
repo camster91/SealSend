@@ -49,7 +49,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
     .eq('event_id', eventId);
 
   const isPublished = event.status === 'published';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ecard.ashbi.ca';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const publicUrl = `${siteUrl}/e/${event.slug}`;
 
   const formatDate = (dateStr: string | null) => {

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
 
 export const metadata: Metadata = {
-  title: "Admin Login - ECardApp",
+  title: "Admin Login - Seal and Send",
 };
 
 export default function LoginPage() {
@@ -28,7 +28,7 @@ export default function LoginPage() {
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            New to ECardApp?{" "}
+            New to Seal and Send?{" "}
             <a 
               href="/signup" 
               className="font-medium text-blue-600 hover:text-blue-500"

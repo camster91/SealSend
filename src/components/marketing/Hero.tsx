@@ -18,7 +18,7 @@ export default function Hero() {
 
         {/* Subheading */}
         <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 sm:text-xl">
-          Design stunning eCards, collect RSVPs instantly, and manage your event
+          Design stunning invitations, collect RSVPs instantly, and manage your event
           &mdash; all in one place. No stamps, no stress.
         </p>
 

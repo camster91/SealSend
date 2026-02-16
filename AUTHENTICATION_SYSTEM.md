@@ -1,4 +1,4 @@
-# ECardApp Enhanced Authentication System
+# Seal and Send Enhanced Authentication System
 
 ## Overview
 We've built a comprehensive authentication system with multiple login methods for both admins and guests.

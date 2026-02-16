@@ -87,7 +87,3 @@ body {
   }
 }
 
-/* Prevent overscroll bounce on iOS */
-html {
-  overscroll-behavior: none;
-}

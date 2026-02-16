@@ -15,17 +15,17 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://ecard.ashbi.ca"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app"),
   title: {
     default:
-      "ECardApp — Beautiful Digital Invitations & RSVP Management",
-    template: "%s | ECardApp",
+      "Seal & Send — Beautiful Digital Invitations & RSVP Management",
+    template: "%s | Seal & Send",
   },
   description:
     "Create beautiful digital invitations, collect RSVPs instantly, and manage your event — all in one place. No stamps, no stress.",
   keywords: [
     "digital invitations",
-    "eCard",
+    "invitation",
     "RSVP",
     "online invitations",
     "event management",

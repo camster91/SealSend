@@ -8,8 +8,8 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <span className="text-xl font-bold">
-              <span className="text-foreground">ECard</span>
-              <span className="text-brand-600">App</span>
+              <span className="text-foreground">Seal</span>
+              <span className="text-brand-600">Send</span>
             </span>
             <p className="mt-3 text-sm text-muted-foreground">
               Create beautiful digital invitations, collect RSVPs, and manage
@@ -108,7 +108,7 @@ export function Footer() {
             <ul className="mt-3 space-y-2">
               <li>
                 <span className="text-sm text-muted-foreground">
-                  support@ecardapp.com
+                  support@sealsend.com
                 </span>
               </li>
             </ul>
@@ -117,7 +117,7 @@ export function Footer() {
 
         <div className="mt-8 border-t border-border pt-8">
           <p className="text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} ECardApp. All rights reserved.
+            &copy; {new Date().getFullYear()} Seal and Send. All rights reserved.
           </p>
         </div>
       </div>

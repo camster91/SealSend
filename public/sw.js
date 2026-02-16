@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ecardapp-v1';
+const CACHE_NAME = 'sealsend-v1';
 const PRECACHE_URLS = ['/', '/dashboard'];
 
 self.addEventListener('install', (event) => {

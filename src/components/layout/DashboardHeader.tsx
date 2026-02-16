@@ -20,8 +20,8 @@ export function DashboardHeader() {
       {/* Mobile logo */}
       <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
         <span className="text-lg font-bold">
-          <span className="text-foreground">ECard</span>
-          <span className="text-brand-600">App</span>
+          <span className="text-foreground">Seal</span>
+          <span className="text-brand-600">Send</span>
         </span>
       </Link>
       <div className="hidden md:block" />

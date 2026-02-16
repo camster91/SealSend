@@ -1,0 +1,62 @@
+# Supabase Configuration
+# https://supabase.com/docs/reference/cli/configuration
+
+[project]
+id = "vtbreowxqfcvwegpfnwn"
+
+[auth]
+site_url = "https://sealsend.ai"
+additional_redirect_urls = ["https://sealsend.ai/*"]
+# Email templates are configured in Supabase Dashboard
+# Authentication -> URL Configuration -> Email templates
+
+[auth.email]
+# These are configured in the dashboard
+# Magic link and confirm signup templates
+enable_confirmations = true
+enable_otp = true
+
+[smtp]
+# SMTP configuration for Edge Functions (Titan)
+# These values are set via environment variables
+host = "smtp.titan.email"
+port = 465
+user = "contact@sealsend.app"
+pass = "${env.TITAN_SMTP_PASSWORD}"
+
+[api]
+# Maximum size of an incoming request body in bytes
+body_limit = "2mb"
+
+[db]
+# Database pooling configuration
+pool_mode = "transaction"
+pool_size = 10
+
+[studio]
+enabled = true
+
+[edge_functions]
+# Directory where Edge Functions are located
+dir = "functions"
+
+# Deno runtime options
+[edge_functions.deno]
+permissions = ["net", "env"]
+
+[realtime]
+# Realtime broadcast configuration
+enabled = true
+blob_limit = "5MB"
+
+[storage]
+# Storage bucket configuration
+sizes = [1, 5, 10, 50, 100]
+
+[analytics]
+enabled = true
+provider = "postgrest"
+
+# Custom domains (configure in dashboard)
+[custom_domains]
+enabled = false

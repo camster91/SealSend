@@ -68,7 +68,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     const resend = getResendClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ecard.ashbi.ca";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured();
 
     const BATCH_SIZE = 10;
@@ -101,7 +101,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
             try {
               await resend.emails.send({
-                from: "ECardApp <noreply@ashbi.ca>",
+                from: "Seal and Send <noreply@ashbi.ca>",
                 to: guest.email,
                 subject,
                 html,

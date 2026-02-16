@@ -1,6 +1,6 @@
 {
-  "name": "ECardApp - Digital Invitations",
-  "short_name": "ECardApp",
+  "name": "Seal and Send - Digital Invitations",
+  "short_name": "Seal and Send",
   "description": "Create beautiful digital invitations, collect RSVPs, and manage your event guests.",
   "start_url": "/dashboard",
   "display": "standalone",

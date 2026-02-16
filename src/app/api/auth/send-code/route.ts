@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Send code via appropriate channel
     if (method === 'email' && email) {
       const { error: emailError } = await getResend().emails.send({
-        from: 'ECardApp <noreply@ashbi.ca>',
+        from: 'Seal and Send <noreply@ashbi.ca>',
         to: email,
         subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
         html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId)
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     } else if (method === 'phone' && phone) {
       try {
         await getTwilioClient().messages.create({
-          body: `Your ECardApp ${role} access code: ${code}. This code expires in 15 minutes.`,
+          body: `Your Seal and Send ${role} access code: ${code}. This code expires in 15 minutes.`,
           from: process.env.TWILIO_MESSAGING_SERVICE_SID!,
           to: phone
         });
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
 function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: string): string {
   const isAdmin = role === 'admin';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://ecard.ashbi.ca';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const loginUrl = isAdmin ? `${siteUrl}/login` : eventId ? `${siteUrl}/events/${eventId}/guest` : `${siteUrl}/login`;
 
   return `<!DOCTYPE html>
@@ -138,7 +138,7 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
                 ${isAdmin ? 'Admin Login Code' : 'Guest Access Code'}
               </h1>
               <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.8);">
-                <span style="font-weight:600;">ECard</span><span style="color:#c4b5fd;">App</span>
+                <span style="font-weight:600;">Seal</span><span style="color:#c4b5fd;">Send</span>
               </p>
             </td>
           </tr>
@@ -189,7 +189,7 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
                 <tr>
                   <td style="padding:14px 16px;">
                     <p style="margin:0;font-size:13px;color:#854d0e;line-height:1.5;">
-                      &#128274; <strong>Security tip:</strong> Never share this code with anyone. ECardApp will never ask for your code via phone or chat.
+                      &#128274; <strong>Security tip:</strong> Never share this code with anyone. Seal and Send will never ask for your code via phone or chat.
                     </p>
                   </td>
                 </tr>
@@ -204,7 +204,7 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
                 If you didn't request this code, you can safely ignore this email.
               </p>
               <p style="margin:8px 0 0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">ECard</span><span style="color:#7c3aed;">App</span>
+                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
               </p>
               <p style="margin:4px 0 0;font-size:11px;color:#d1d5db;">
                 Beautiful Digital Invitations &amp; RSVP Management

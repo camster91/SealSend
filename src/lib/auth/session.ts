@@ -3,7 +3,7 @@ import { AuthUser } from './types';
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
-  const userCookie = cookieStore.get('ecardapp_user');
+  const userCookie = cookieStore.get('sealsend_user');
   
   if (!userCookie?.value) {
     return null;
@@ -48,6 +48,6 @@ export async function logout() {
   const cookieStore = await cookies();
   
   // Clear session cookies
-  cookieStore.delete('ecardapp_session');
-  cookieStore.delete('ecardapp_user');
+  cookieStore.delete('sealsend_session');
+  cookieStore.delete('sealsend_user');
 }

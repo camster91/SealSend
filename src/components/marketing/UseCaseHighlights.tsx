@@ -37,7 +37,7 @@ export default function UseCaseHighlights() {
             Perfect for Every Occasion
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            From intimate gatherings to large celebrations, ECardApp has you covered.
+            From intimate gatherings to large celebrations, Seal and Send has you covered.
           </p>
         </div>
 

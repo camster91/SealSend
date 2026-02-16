@@ -37,8 +37,8 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
       <div className="flex h-16 items-center border-b border-border px-6">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-bold">
-            <span className="text-foreground">ECard</span>
-            <span className="text-brand-600">App</span>
+            <span className="text-foreground">Seal</span>
+            <span className="text-brand-600">Send</span>
           </span>
         </Link>
       </div>

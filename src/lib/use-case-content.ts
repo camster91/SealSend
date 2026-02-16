@@ -60,7 +60,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     ],
     testimonial: {
       quote:
-        "ECardApp made our wedding planning so much easier. We saved money on postage and the RSVP tracking was incredibly helpful. Our guests loved the interactive invitation!",
+        "Seal and Send made our wedding planning so much easier. We saved money on postage and the RSVP tracking was incredibly helpful. Our guests loved the interactive invitation!",
       name: "Twyla Tyler",
       role: "Bride, Summer 2025",
     },
@@ -68,7 +68,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       {
         question: "Can I customize the design to match my wedding theme?",
         answer:
-          "Yes! You have full control over colors, backgrounds, logos, and images. Upload your own design or customize directly in ECardApp to match your wedding palette.",
+          "Yes! You have full control over colors, backgrounds, logos, and images. Upload your own design or customize directly in Seal and Send to match your wedding palette.",
       },
       {
         question: "How do guests RSVP?",
@@ -78,7 +78,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       {
         question: "Can I send reminders to guests who haven't responded?",
         answer:
-          "Yes! You can send follow-up emails and announcements directly from ECardApp to remind guests to RSVP.",
+          "Yes! You can send follow-up emails and announcements directly from Seal and Send to remind guests to RSVP.",
       },
       {
         question: "Is there a limit on the number of guests I can invite?",
@@ -141,7 +141,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       {
         question: "Can I add a gift registry link to the invitation?",
         answer:
-          "Absolutely! ECardApp lets you add gift registry links directly to your event page so guests can easily find your wishlist.",
+          "Absolutely! Seal and Send lets you add gift registry links directly to your event page so guests can easily find your wishlist.",
       },
       {
         question: "Can I include a map or directions to the venue?",
@@ -206,7 +206,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     ],
     testimonial: {
       quote:
-        "My daughter's birthday invitations were a huge hit! The video eCard feature blew everyone away. So much easier than paper invites and way more fun.",
+        "My daughter's birthday invitations were a huge hit! The video invitation feature blew everyone away. So much easier than paper invites and way more fun.",
       name: "Ashley Corbett",
       role: "Parent, kids' birthday party",
     },
@@ -214,13 +214,13 @@ export const USE_CASES: Record<string, UseCaseData> = {
       {
         question: "Can I create video or animated birthday invitations?",
         answer:
-          "Yes! ECardApp lets you turn your design into a video or slideshow with music, making your birthday invitation truly stand out.",
+          "Yes! Seal and Send lets you turn your design into a video or slideshow with music, making your birthday invitation truly stand out.",
       },
       {
         question:
           "Is this suitable for kids' birthday parties?",
         answer:
-          "Absolutely! ECardApp works great for kids' parties. Parents love the easy RSVP system and the ability to collect headcounts for party planning.",
+          "Absolutely! Seal and Send works great for kids' parties. Parents love the easy RSVP system and the ability to collect headcounts for party planning.",
       },
       {
         question: "Can guests RSVP for multiple people?",
@@ -280,7 +280,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     ],
     testimonial: {
       quote:
-        "We used ECardApp for our annual company gala and it streamlined everything. The branding options made it look incredibly professional, and tracking RSVPs was effortless.",
+        "We used Seal and Send for our annual company gala and it streamlined everything. The branding options made it look incredibly professional, and tracking RSVPs was effortless.",
       name: "Brian Stuart",
       role: "Event Manager, Tech Corp",
     },
@@ -288,7 +288,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       {
         question: "Can I use my company's branding on the invitations?",
         answer:
-          "Yes! Upload your logo, set your brand colors, and add custom backgrounds. Standard and Premium plans also remove the ECardApp branding for a fully professional look.",
+          "Yes! Upload your logo, set your brand colors, and add custom backgrounds. Standard and Premium plans also remove the Seal and Send branding for a fully professional look.",
       },
       {
         question: "Can I collect specific attendee information?",

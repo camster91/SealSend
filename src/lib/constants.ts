@@ -13,7 +13,7 @@ export const TIERS = {
       { title: "Unlimited events", description: null },
       { title: "Design, send & manage invites", description: null },
       { title: "Email invitations", description: null },
-      { title: "ECardApp branding shown", description: null },
+      { title: "Seal and Send branding shown", description: null },
     ],
   },
   standard: {
@@ -28,7 +28,7 @@ export const TIERS = {
     badge: "Most popular",
     features: [
       { title: "50 guest replies", description: null },
-      { title: "Remove ECardApp branding", description: null },
+      { title: "Remove Seal and Send branding", description: null },
       { title: "Guest tags", description: null },
       { title: "SMS invites", description: null },
       { title: "Announcements", description: null },
@@ -46,7 +46,7 @@ export const TIERS = {
     badge: "Best value",
     features: [
       { title: "Unlimited replies*", description: null },
-      { title: "Remove ECardApp branding", description: null },
+      { title: "Remove Seal and Send branding", description: null },
       { title: "Guest tags & SMS invites", description: null },
       { title: "Announcements", description: null },
       { title: "Sign-up board", description: null },
@@ -155,7 +155,7 @@ export const FAQ_ITEMS = [
   {
     question: "What is included in the Free plan?",
     answer:
-      "The Free plan includes all essential features to design, send, and manage your event invites. You can manage up to 15 guest replies per event at no cost. Your eCard will always collect all replies, even on the Free plan.",
+      "The Free plan includes all essential features to design, send, and manage your event invites. You can manage up to 15 guest replies per event at no cost. Your invitation will always collect all replies, even on the Free plan.",
   },
   {
     question: "How does per-event pricing work?",
@@ -185,7 +185,7 @@ export const FAQ_ITEMS = [
   {
     question: "What features are unlocked with Standard?",
     answer:
-      "Standard ($5/event) gives you 50 replies, removes ECardApp branding, and unlocks guest tags, SMS invites, and announcements.",
+      "Standard ($5/event) gives you 50 replies, removes Seal and Send branding, and unlocks guest tags, SMS invites, and announcements.",
   },
   {
     question: "What extra features does Premium include?",
@@ -196,24 +196,24 @@ export const FAQ_ITEMS = [
 
 export const FEATURES_LIST = [
   {
-    title: "Video and Slideshow eCards",
+    title: "Video and Slideshow invitations",
     subtitle: "Transform static designs dynamically",
     description:
-      "Turn your design into a video or slideshow to create an interactive eCard. Engage your recipients with movement, storytelling, and audio.",
+      "Turn your design into a video or slideshow to create an interactive invitation. Engage your recipients with movement, storytelling, and audio.",
     icon: "Play",
   },
   {
     title: "Branded Invitations",
     subtitle: "Maintain brand consistency",
     description:
-      "Customize your invitations with your logo, photos, and colors. Ensure cohesive branding across your designs and your eCard webpage.",
+      "Customize your invitations with your logo, photos, and colors. Ensure cohesive branding across your designs and your invitation webpage.",
     icon: "Palette",
   },
   {
     title: "Customizable Page Colors",
     subtitle: "Match event theme perfectly",
     description:
-      "Full control over page backgrounds and button colors to align your eCard with your theme or brand.",
+      "Full control over page backgrounds and button colors to align your invitation with your theme or brand.",
     icon: "Paintbrush",
   },
   {
@@ -227,7 +227,7 @@ export const FEATURES_LIST = [
     title: "Music and Sounds",
     subtitle: "Create immersive experiences",
     description:
-      "Add music or audio to your video eCard, enhancing emotional impact and making the invitation engaging.",
+      "Add music or audio to your video invitation, enhancing emotional impact and making the invitation engaging.",
     icon: "Music",
   },
   {
@@ -241,14 +241,14 @@ export const FEATURES_LIST = [
     title: "Marketing Tools",
     subtitle: "Send professionally from your domain",
     description:
-      "Easily transfer event assets to your email marketing provider and send your eCard out professionally.",
+      "Easily transfer event assets to your email marketing provider and send your invitation out professionally.",
     icon: "Megaphone",
   },
   {
     title: "Shareable Links",
     subtitle: "Flexible sharing options",
     description:
-      "Share your eCard via any chat app, text, iMessage or social platform making it easy for guests to receive and respond.",
+      "Share your invitation via any chat app, text, iMessage or social platform making it easy for guests to receive and respond.",
     icon: "Share2",
   },
   {
@@ -297,14 +297,14 @@ export const FEATURES_LIST = [
     title: "Location and Time Blocks",
     subtitle: "Provide essential details",
     description:
-      "Add location and time details to your eCard webpage, ensuring recipients have all necessary information to attend.",
+      "Add location and time details to your invitation webpage, ensuring recipients have all necessary information to attend.",
     icon: "MapPin",
   },
   {
     title: "Gift Registries",
     subtitle: "Make gifting effortless",
     description:
-      "Add gift registry links to your eCard webpage, simplifying the gifting process for guests and enhancing their experience.",
+      "Add gift registry links to your invitation webpage, simplifying the gifting process for guests and enhancing their experience.",
     icon: "Gift",
   },
   {

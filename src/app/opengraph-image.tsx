@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "ECardApp — Beautiful Digital Invitations & RSVP Management";
+export const alt = "Seal and Send — Beautiful Digital Invitations & RSVP Management";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -28,8 +28,8 @@ export default function Image() {
             marginBottom: 24,
           }}
         >
-          <span style={{ fontSize: 72, fontWeight: 800 }}>ECard</span>
-          <span style={{ fontSize: 72, fontWeight: 800, color: "#e9d5ff" }}>App</span>
+          <span style={{ fontSize: 72, fontWeight: 800 }}>Seal</span>
+          <span style={{ fontSize: 72, fontWeight: 800, color: "#e9d5ff" }}>Send</span>
         </div>
         <div
           style={{

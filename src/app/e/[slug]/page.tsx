@@ -8,6 +8,7 @@ import { CommentsSection } from "@/components/public-event/CommentsSection";
 import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
+import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
 import { isValidHexColor } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -113,68 +114,76 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   };
 
   return (
-    <div className="min-h-screen" style={pageStyle}>
+    <div className="min-h-screen pb-12 overflow-x-hidden" style={pageStyle}>
       <ConfettiEffect />
 
-      {/* Hero — full width */}
-      <div className="mx-auto max-w-4xl px-4 pt-8">
-        <EventHero event={event} />
-      </div>
+      <AnimatedEventLayout>
+        {/* Hero — full width */}
+        <AnimatedSection className="mx-auto max-w-4xl px-4 pt-8 md:pt-12">
+          <EventHero event={event} />
+        </AnimatedSection>
 
-      {/* Two-column layout on desktop */}
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
-          {/* Left column: Details + Map */}
-          <div className="space-y-8 lg:col-span-3">
-            <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-              <EventDetails event={event} />
+        {/* Two-column layout on desktop */}
+        <div className="mx-auto max-w-4xl px-4 py-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+            {/* Left column: Details + Map */}
+            <div className="space-y-8 lg:col-span-3">
+              <AnimatedSection className="rounded-xl border border-border bg-white/95 backdrop-blur-sm p-6 shadow-sm transition-all hover:shadow-md">
+                <EventDetails event={event} />
+              </AnimatedSection>
+
+              {event.location_address && (
+                <AnimatedSection>
+                  <LocationMap
+                    address={event.location_address}
+                    name={event.location_name || undefined}
+                  />
+                </AnimatedSection>
+              )}
+
+              {/* Sign-up board */}
+              <AnimatedSection>
+                <SignupBoard eventSlug={slug} />
+              </AnimatedSection>
+
+              {/* Comments / Message Board */}
+              <AnimatedSection>
+                <CommentsSection eventSlug={slug} />
+              </AnimatedSection>
             </div>
 
-            {event.location_address && (
-              <LocationMap
-                address={event.location_address}
-                name={event.location_name || undefined}
-              />
-            )}
-
-            {/* Sign-up board */}
-            <SignupBoard eventSlug={slug} />
-
-            {/* Comments / Message Board */}
-            <CommentsSection eventSlug={slug} />
-          </div>
-
-          {/* Right column: RSVP Form */}
-          <div className="lg:col-span-2">
-            <div className="sticky top-8 rounded-xl border border-border bg-white p-6 shadow-sm">
-              <RSVPForm
-                eventSlug={slug}
-                fields={rsvpFields || []}
-                primaryColor={safePrimaryColor}
-                buttonStyle={buttonStyle}
-                allowPlusOnes={event.allow_plus_ones !== undefined ? event.allow_plus_ones : true}
-                maxGuestsPerRsvp={event.max_guests_per_rsvp || 10}
-                spotsRemaining={spotsRemaining}
-                inviteGuestId={inviteGuest?.id}
-                inviteGuestName={inviteGuest?.name}
-                inviteGuestEmail={inviteGuest?.email}
-              />
+            {/* Right column: RSVP Form */}
+            <div className="lg:col-span-2">
+              <AnimatedSection className="sticky top-8 rounded-xl border border-border bg-white/95 backdrop-blur-sm p-6 shadow-sm transition-all hover:shadow-md">
+                <RSVPForm
+                  eventSlug={slug}
+                  fields={rsvpFields || []}
+                  primaryColor={safePrimaryColor}
+                  buttonStyle={buttonStyle}
+                  allowPlusOnes={event.allow_plus_ones !== undefined ? event.allow_plus_ones : true}
+                  maxGuestsPerRsvp={event.max_guests_per_rsvp || 10}
+                  spotsRemaining={spotsRemaining}
+                  inviteGuestId={inviteGuest?.id}
+                  inviteGuestName={inviteGuest?.name}
+                  inviteGuestEmail={inviteGuest?.email}
+                />
+              </AnimatedSection>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Footer branding (free tier) */}
-      {event.tier === "free" && (
-        <div className="pb-8 text-center">
-          <p className="text-xs text-muted-foreground">
-            Powered by{" "}
-            <span className="font-semibold">
-              ECard<span className="text-brand-600">App</span>
-            </span>
-          </p>
-        </div>
-      )}
+        {/* Footer branding (free tier) */}
+        {event.tier === "free" && (
+          <AnimatedSection className="pb-8 text-center">
+            <p className="text-xs text-muted-foreground bg-white/80 inline-block px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">
+              Powered by{" "}
+              <span className="font-semibold">
+                Seal and Send
+              </span>
+            </p>
+          </AnimatedSection>
+        )}
+      </AnimatedEventLayout>
 
       {/* Audio player */}
       {audioUrl && <AudioPlayer audioUrl={audioUrl} />}

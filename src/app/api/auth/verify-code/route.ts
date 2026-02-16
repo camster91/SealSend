@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Set session cookie
     const cookieStore = await cookies();
-    cookieStore.set('ecardapp_session', sessionToken, {
+    cookieStore.set('sealsend_session', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       eventId: authCode.event_id
     };
     
-    cookieStore.set('ecardapp_user', JSON.stringify(userInfo), {
+    cookieStore.set('sealsend_user', JSON.stringify(userInfo), {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       expires: expiresAt,

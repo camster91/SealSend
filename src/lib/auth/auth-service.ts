@@ -99,7 +99,7 @@ export class AuthService {
         
         // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ecardapp_user', JSON.stringify(user));
+          localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
         
         return { success: true, user, message: result.message };
@@ -134,7 +134,7 @@ export class AuthService {
         
         // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ecardapp_user', JSON.stringify(user));
+          localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
         
         return { success: true, user, message: result.message };

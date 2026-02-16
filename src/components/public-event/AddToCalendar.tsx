@@ -64,7 +64,7 @@ function downloadICS(event: Event) {
   const ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//ECardApp//EN',
+    'PRODID:-//Seal and Send//EN',
     'BEGIN:VEVENT',
     `DTSTART:${start}`,
     `DTEND:${end}`,
