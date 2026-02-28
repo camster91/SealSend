@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
@@ -14,8 +14,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-    
+    // Use admin client to bypass RLS - auth operations happen before user is authenticated
+    const supabase = createAdminClient();
+
     // Verify code
     const { data: authCode, error: codeError } = await supabase
       .from('auth_codes')
@@ -35,14 +36,30 @@ export async function POST(request: NextRequest) {
     // Delete used code
     await supabase.from('auth_codes').delete().eq('id', authCode.id);
 
+    // Determine the correct user_id for the session
+    let userId = authCode.id; // Default to auth_code id for guests
+
+    if (authCode.role === 'admin' && authCode.email) {
+      // For admin users, look up their actual admin_users ID for FK constraint
+      const { data: adminUser } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('email', authCode.email)
+        .single();
+
+      if (adminUser) {
+        userId = adminUser.id;
+      }
+    }
+
     // Create session
     const sessionToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    
+
     const { error: sessionError } = await supabase
       .from('user_sessions')
       .insert({
-        user_id: authCode.id,
+        user_id: userId,
         user_role: authCode.role,
         session_token: sessionToken,
         expires_at: expiresAt.toISOString()
@@ -68,13 +85,13 @@ export async function POST(request: NextRequest) {
 
     // Set user info cookie (non-httpOnly for client-side access)
     const userInfo = {
-      id: authCode.id,
+      id: userId,
       email: authCode.email,
       phone: authCode.phone,
       role: authCode.role,
       eventId: authCode.event_id
     };
-    
+
     cookieStore.set('sealsend_user', JSON.stringify(userInfo), {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
