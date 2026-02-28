@@ -9,43 +9,39 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Check for custom session cookie (sealsend_session) for custom auth
-  const customSession = request.cookies.get('sealsend_session')?.value;
-  const hasCustomSession = !!customSession;
-
-  let supabaseUser = null;
-  if (supabaseUrl && supabaseAnonKey) {
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-            supabaseResponse = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, {
-                ...options,
-                maxAge: 60 * 60 * 24 * 30, // 30 days
-              })
-            );
-          },
-        },
-      }
-    );
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    supabaseUser = user;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse;
   }
+
+  const supabase = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              maxAge: 60 * 60 * 24 * 30, // 30 days
+            })
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -66,11 +62,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/e/") ||                             // Public event pages
     /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);      // Guest/public event access
 
-  // Determine if user is authenticated (either via Supabase or custom session)
-  const isAuthenticated = !!supabaseUser || hasCustomSession;
+  // Check for custom session cookie (sealsend_session) for custom auth
+  const customSession = request.cookies.get('sealsend_session')?.value;
+  const hasCustomSession = !!customSession;
 
   // Protected routes - redirect to login if not authenticated
-  if (!isPublicRoute && !isAuthenticated) {
+  // Allow either Supabase auth OR custom session
+  if (!isPublicRoute && !user && !hasCustomSession) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
@@ -81,7 +79,8 @@ export async function updateSession(request: NextRequest) {
   const authPaths = ["/login", "/signup", "/forgot-password"];
   const isAuthRoute = authPaths.some((path) => pathname === path);
 
-  if (isAuthRoute && isAuthenticated) {
+  // If user is authenticated via either Supabase or custom session, redirect from auth pages
+  if (isAuthRoute && (user || hasCustomSession)) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

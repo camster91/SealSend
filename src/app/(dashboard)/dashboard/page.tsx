@@ -1,10 +1,26 @@
-import { getCurrentUser, requireAdmin } from '@/lib/auth/session';
+import { getCurrentUser } from '@/lib/auth/session';
 import { getEventsByUser } from '@/lib/events';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
 export default async function DashboardPage() {
-  await requireAdmin();
   const user = await getCurrentUser();
+  
+  // Redirect to login if no user
+  if (!user) {
+    redirect('/login?redirect=/dashboard');
+  }
+  
+  // Check if user is admin, redirect if not
+  if (user.role !== 'admin') {
+    // Guest users should be redirected to their event page or home
+    if (user.eventId) {
+      redirect(`/events/${user.eventId}/guest`);
+    } else {
+      redirect('/');
+    }
+  }
+  
   const events = user ? await getEventsByUser(user.id) : [];
 
   return (
