@@ -35,38 +35,46 @@ export class AuthService {
   }
 
   private async sendEmailCode(email: string, eventId?: string): Promise<{ success: boolean; message: string }> {
-    // Call API route instead of direct implementation
     try {
       const response = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'email', email, eventId })
       });
-      
+
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        return { success: false, message: 'Server configuration error. Please try again later.' };
+      }
+
       const result = await response.json();
-      return result.success 
+      return result.success
         ? { success: true, message: result.message }
         : { success: false, message: result.error || 'Failed to send code' };
     } catch (error) {
-      return { success: false, message: 'Network error' };
+      console.error('Send email code error:', error);
+      return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
     }
   }
 
   private async sendSMSCode(phone: string, eventId?: string): Promise<{ success: boolean; message: string }> {
-    // Call API route instead of direct implementation
     try {
       const response = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'phone', phone, eventId })
       });
-      
+
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        return { success: false, message: 'Server configuration error. Please try again later.' };
+      }
+
       const result = await response.json();
-      return result.success 
+      return result.success
         ? { success: true, message: result.message }
         : { success: false, message: result.error || 'Failed to send code' };
     } catch (error) {
-      return { success: false, message: 'Network error' };
+      console.error('Send SMS code error:', error);
+      return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
     }
   }
 
@@ -76,18 +84,22 @@ export class AuthService {
     return { success: false, message: 'Password login not implemented yet' };
   }
 
-  private async verifyEmailCode(email: string, code: string, eventId?: string): 
+  private async verifyEmailCode(email: string, code: string, eventId?: string):
     Promise<{ success: boolean; user?: AuthUser; message: string }> {
-    
+
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'email', email, code, eventId })
       });
-      
+
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        return { success: false, message: 'Server configuration error. Please try again later.' };
+      }
+
       const result = await response.json();
-      
+
       if (result.success && result.user) {
         const user: AuthUser = {
           id: result.user.id,
@@ -96,33 +108,38 @@ export class AuthService {
           role: result.user.role,
           eventId: result.user.eventId
         };
-        
+
         // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
           localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
-        
+
         return { success: true, user, message: result.message };
       } else {
         return { success: false, message: result.error || 'Verification failed' };
       }
     } catch (error) {
-      return { success: false, message: 'Network error' };
+      console.error('Verify email code error:', error);
+      return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
     }
   }
 
-  private async verifySMSCode(phone: string, code: string, eventId?: string): 
+  private async verifySMSCode(phone: string, code: string, eventId?: string):
     Promise<{ success: boolean; user?: AuthUser; message: string }> {
-    
+
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method: 'phone', phone, code, eventId })
       });
-      
+
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        return { success: false, message: 'Server configuration error. Please try again later.' };
+      }
+
       const result = await response.json();
-      
+
       if (result.success && result.user) {
         const user: AuthUser = {
           id: result.user.id,
@@ -131,18 +148,19 @@ export class AuthService {
           role: result.user.role,
           eventId: result.user.eventId
         };
-        
+
         // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
           localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
-        
+
         return { success: true, user, message: result.message };
       } else {
         return { success: false, message: result.error || 'Verification failed' };
       }
     } catch (error) {
-      return { success: false, message: 'Network error' };
+      console.error('Verify SMS code error:', error);
+      return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
     }
   }
 
