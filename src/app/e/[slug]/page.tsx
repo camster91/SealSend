@@ -97,8 +97,14 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     ? event.customization.primaryColor
     : "#7c3aed";
 
-  const fontFamily = event.customization?.fontFamily || "Inter";
-  const backgroundImage = event.customization?.backgroundImage || null;
+  const ALLOWED_FONTS = ["Inter", "Poppins", "Georgia", "Times New Roman", "Arial", "Helvetica", "serif", "sans-serif", "monospace"];
+  const rawFont = event.customization?.fontFamily || "Inter";
+  const fontFamily = ALLOWED_FONTS.includes(rawFont) ? rawFont : "Inter";
+
+  const rawBgImage = event.customization?.backgroundImage || null;
+  // Sanitize backgroundImage: only allow https URLs, no special chars that could break CSS
+  const backgroundImage = rawBgImage && /^https:\/\/[^\s"')};]+$/.test(rawBgImage) ? rawBgImage : null;
+
   const audioUrl = event.customization?.audioUrl || null;
   const buttonStyle = (event.customization?.buttonStyle as "rounded" | "pill" | "square") || "rounded";
 
@@ -106,7 +112,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     backgroundColor: safeBgColor,
     fontFamily,
     ...(backgroundImage && {
-      backgroundImage: `url(${backgroundImage})`,
+      backgroundImage: `url(${encodeURI(backgroundImage)})`,
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundAttachment: "fixed",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
@@ -16,8 +16,7 @@ const signupItemSchema = z.object({
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const admin = createAdminClient();
@@ -47,8 +46,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const admin = createAdminClient();
@@ -108,8 +106,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const { itemId } = await request.json();
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const admin = createAdminClient();

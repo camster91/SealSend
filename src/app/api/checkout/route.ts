@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
@@ -11,14 +11,13 @@ const checkoutSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getApiUser();
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();

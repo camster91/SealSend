@@ -12,6 +12,7 @@ import CTASection from "@/components/marketing/CTASection";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { createMetadata, SITE_URL, SITE_NAME } from "@/lib/metadata";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export const metadata = createMetadata({
   title: "Seal and Send — Beautiful Digital Invitations & RSVP Management",
@@ -27,7 +28,12 @@ export const metadata = createMetadata({
 
 export default async function HomePage() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Also check for custom session cookie
+  const cookieStore = await cookies();
+  const hasCustomSession = !!cookieStore.get("sealsend_session")?.value;
+  const isAuthenticated = !!user || hasCustomSession;
 
   return (
     <>
@@ -58,7 +64,7 @@ export default async function HomePage() {
         ]}
       />
 
-      <Navbar user={session?.user || null} />
+      <Navbar user={isAuthenticated ? (user || {} as any) : null} />
 
       <main>
         <Hero />

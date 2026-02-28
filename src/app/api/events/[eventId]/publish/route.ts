@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -10,14 +10,9 @@ export async function POST(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

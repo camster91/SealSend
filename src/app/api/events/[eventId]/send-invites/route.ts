@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResendClient } from "@/lib/resend";
 import { buildInvitationEmail } from "@/lib/email-templates";
@@ -13,15 +13,9 @@ type RouteParams = { params: Promise<{ eventId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    // Auth check first, then rate limit by user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

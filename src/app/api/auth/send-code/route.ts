@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { Resend } from 'resend';
 import twilio from 'twilio';
 
@@ -21,6 +22,15 @@ function getTwilioClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const { success: rateLimitOk } = rateLimit(`send-code:${ip}`, { max: 5, windowSeconds: 600 });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a few minutes before trying again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { method, email, phone, eventId } = body;
 

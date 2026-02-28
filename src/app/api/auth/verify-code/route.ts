@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const { success: rateLimitOk } = rateLimit(`verify-code:${ip}`, { max: 10, windowSeconds: 600 });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many attempts. Please wait a few minutes before trying again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { method, email, phone, code, eventId } = body;
 

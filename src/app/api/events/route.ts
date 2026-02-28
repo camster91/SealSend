@@ -1,27 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getApiUser } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
 import { DEFAULT_RSVP_FIELDS } from '@/lib/constants';
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Use admin client with manual user_id filter (bypasses RLS)
     const adminSupabase = createAdminClient();
 
     const { data: events, error } = await adminSupabase
@@ -48,14 +42,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
