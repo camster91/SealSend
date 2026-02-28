@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { AuthService } from "@/lib/auth/auth-service";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 
 export function SignupForm() {
   const [email, setEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
+  const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const authService = new AuthService();
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -22,21 +23,18 @@ export function SignupForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const { error: otpError } = await supabase.auth.signInWithOtp({
+      const result = await authService.sendLoginCode({
+        method: "email",
         email: email.trim(),
-        options: {
-          emailRedirectTo: `${siteUrl}/callback`,
-        },
       });
 
-      if (otpError) {
-        setError(otpError.message);
-        return;
+      if (result.success) {
+        setStep("code");
+      } else {
+        setError(result.message);
       }
-
-      setStep("code");
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -44,25 +42,25 @@ export function SignupForm() {
 
   async function handleVerifyCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!otpCode.trim()) return;
+    if (!code.trim()) return;
     setError(null);
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
+      const result = await authService.verifyCode({
+        method: "email",
         email: email.trim(),
-        token: otpCode.trim(),
-        type: "email",
+        code: code.trim(),
       });
 
-      if (verifyError) {
-        setError(verifyError.message);
-        return;
+      if (result.success) {
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        setError(result.message);
       }
-
-      router.push("/dashboard");
-      router.refresh();
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -79,12 +77,12 @@ export function SignupForm() {
           </div>
           <p className="text-sm font-medium text-indigo-700">Check your email</p>
           <p className="mt-1 text-xs text-indigo-600">
-            We sent a login link and code to <strong>{email}</strong>
+            We sent a verification code to <strong>{email}</strong>
           </p>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Click the magic link in your email, or enter the 6-digit code below:
+          Enter the 6-digit code below:
         </p>
 
         <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -95,8 +93,8 @@ export function SignupForm() {
             inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="Enter 6-digit code"
-            value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value)}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
             maxLength={6}
           />
 
@@ -114,7 +112,7 @@ export function SignupForm() {
         <div className="flex items-center justify-between text-sm">
           <button
             type="button"
-            onClick={() => { setStep("email"); setError(null); setOtpCode(""); }}
+            onClick={() => { setStep("email"); setError(null); setCode(""); }}
             className="text-brand-600 hover:text-brand-700"
           >
             Use a different email
@@ -156,7 +154,7 @@ export function SignupForm() {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        No password needed. We&apos;ll email you a magic link to sign in.
+        No password needed. We&apos;ll email you a secure code to sign in.
       </p>
 
       <p className="text-center text-sm text-muted-foreground">

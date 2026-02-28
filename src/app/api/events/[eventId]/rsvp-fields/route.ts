@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { rsvpFieldSchema } from '@/lib/validations';
 
@@ -11,14 +11,9 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -70,14 +65,9 @@ export async function PUT(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -110,7 +100,30 @@ export async function PUT(
       );
     }
 
-    // Delete existing RSVP fields for this event
+    // Validate ALL fields BEFORE deleting existing ones (atomic approach)
+    const fields = [];
+    for (let index = 0; index < body.length; index++) {
+      const parsed = rsvpFieldSchema.safeParse(body[index]);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: `Invalid field at index ${index}`, details: parsed.error.flatten() },
+          { status: 400 }
+        );
+      }
+      fields.push({
+        event_id: eventId,
+        field_name: parsed.data.field_name,
+        field_type: parsed.data.field_type,
+        field_label: parsed.data.field_label,
+        is_required: parsed.data.is_required,
+        is_enabled: parsed.data.is_enabled,
+        sort_order: index,
+        options: parsed.data.options ?? null,
+        placeholder: parsed.data.placeholder ?? null,
+      });
+    }
+
+    // Delete existing RSVP fields for this event (only after validation passes)
     const { error: deleteError } = await adminSupabase
       .from('rsvp_fields')
       .delete()
@@ -123,30 +136,8 @@ export async function PUT(
       );
     }
 
-    // Validate and insert new RSVP fields
-    if (body.length > 0) {
-      const fields = [];
-      for (let index = 0; index < body.length; index++) {
-        const parsed = rsvpFieldSchema.safeParse(body[index]);
-        if (!parsed.success) {
-          return NextResponse.json(
-            { error: `Invalid field at index ${index}`, details: parsed.error.flatten() },
-            { status: 400 }
-          );
-        }
-        fields.push({
-          event_id: eventId,
-          field_name: parsed.data.field_name,
-          field_type: parsed.data.field_type,
-          field_label: parsed.data.field_label,
-          is_required: parsed.data.is_required,
-          is_enabled: parsed.data.is_enabled,
-          sort_order: index,
-          options: parsed.data.options ?? null,
-          placeholder: parsed.data.placeholder ?? null,
-        });
-      }
-
+    // Insert validated fields
+    if (fields.length > 0) {
       const { error: insertError } = await adminSupabase
         .from('rsvp_fields')
         .insert(fields);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getApiUser } from '@/lib/auth/api-auth';
 import { eventUpdateSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -11,14 +11,9 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -56,14 +51,9 @@ export async function PATCH(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -127,14 +117,9 @@ export async function DELETE(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
+    const user = await getApiUser();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

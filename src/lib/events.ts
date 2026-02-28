@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function getEvent(eventId: string) {
-  const supabase = await createClient();
-  
+  const supabase = createAdminClient();
+
   const { data, error } = await supabase
     .from('events')
     .select('*')
@@ -18,8 +18,8 @@ export async function getEvent(eventId: string) {
 }
 
 export async function getEventsByUser(userId: string) {
-  const supabase = await createClient();
-  
+  const supabase = createAdminClient();
+
   const { data, error } = await supabase
     .from('events')
     .select('*')
@@ -35,8 +35,8 @@ export async function getEventsByUser(userId: string) {
 }
 
 export async function getEventGuests(eventId: string) {
-  const supabase = await createClient();
-  
+  const supabase = createAdminClient();
+
   const { data, error } = await supabase
     .from('guests')
     .select('*')

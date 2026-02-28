@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
@@ -24,7 +24,14 @@ function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
   if (contentType === 'image/png') return h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4E && h[3] === 0x47;
   if (contentType === 'image/gif') return h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46;
   if (contentType === 'image/webp') return h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46;
-  if (contentType === 'image/svg+xml') return true;
+  if (contentType === 'image/svg+xml') {
+    // Basic SVG validation: must start with XML or SVG tag, reject script tags
+    const text = buffer.slice(0, 1024).toString('utf-8').toLowerCase();
+    if (text.includes('<script') || text.includes('javascript:') || text.includes('onerror') || text.includes('onload')) {
+      return false;
+    }
+    return text.includes('<svg') || text.includes('<?xml');
+  }
 
   // Video
   if (contentType === 'video/mp4') return h[4] === 0x66 && h[5] === 0x74 && h[6] === 0x79 && h[7] === 0x70;
@@ -78,10 +85,9 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = await getApiUser();
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
@@ -8,8 +8,7 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const adminSupabase = createAdminClient();
@@ -64,7 +63,12 @@ export async function GET(
           r.submitted_at,
           ...dataKeysList.map((k) => String(rd[k] || "")),
         ]
-          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .map((v) => {
+            let s = String(v).replace(/"/g, '""');
+            // Prevent CSV formula injection
+            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+            return `"${s}"`;
+          })
           .join(",");
       });
 

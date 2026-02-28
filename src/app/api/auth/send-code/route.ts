@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { Resend } from 'resend';
 import twilio from 'twilio';
 
 function getResend() {
-  return new Resend(process.env.RESEND_API_KEY!);
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey === 'your-resend-api-key') {
+    throw new Error('RESEND_API_KEY is not configured. Please set a valid Resend API key in your environment variables.');
+  }
+  return new Resend(apiKey);
 }
 
 function getTwilioClient() {
   return twilio(
-    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_API_KEY_SID,
     process.env.TWILIO_API_KEY_SECRET,
     { accountSid: process.env.TWILIO_ACCOUNT_SID }
   );
@@ -17,6 +22,15 @@ function getTwilioClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const { success: rateLimitOk } = rateLimit(`send-code:${ip}`, { max: 5, windowSeconds: 600 });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a few minutes before trying again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { method, email, phone, eventId } = body;
 
@@ -27,11 +41,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-    
+    // Use admin client to bypass RLS - auth operations happen before user is authenticated
+    const supabase = createAdminClient();
+
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Determine role
     let role = 'guest';
     if (method === 'email' && email) {
@@ -41,21 +56,28 @@ export async function POST(request: NextRequest) {
         .select('id')
         .eq('email', email)
         .single();
-      
+
       if (admin) {
         role = 'admin';
       }
     }
 
+    // Delete any existing codes for this email/phone to avoid stale entries
+    if (method === 'email' && email) {
+      await supabase.from('auth_codes').delete().eq('email', email);
+    } else if (method === 'phone' && phone) {
+      await supabase.from('auth_codes').delete().eq('phone', phone);
+    }
+
     // Store code in database
     const { error: dbError } = await supabase
       .from('auth_codes')
-      .upsert({
+      .insert({
         email: email || null,
         phone: phone || null,
         code,
         role,
-        event_id: eventId,
+        event_id: eventId || null,
         expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
       });
 
@@ -69,17 +91,26 @@ export async function POST(request: NextRequest) {
 
     // Send code via appropriate channel
     if (method === 'email' && email) {
-      const { error: emailError } = await getResend().emails.send({
-        from: 'Seal and Send <noreply@ashbi.ca>',
-        to: email,
-        subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
-        html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId)
-      });
+      try {
+        const resend = getResend();
+        const { error: emailError } = await resend.emails.send({
+          from: 'Seal and Send <noreply@ashbi.ca>',
+          to: email,
+          subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
+          html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId)
+        });
 
-      if (emailError) {
-        console.error('Email error:', emailError);
+        if (emailError) {
+          console.error('Email error:', emailError);
+          return NextResponse.json(
+            { error: 'Failed to send email. Please try again.' },
+            { status: 500 }
+          );
+        }
+      } catch (error) {
+        console.error('Email service error:', error);
         return NextResponse.json(
-          { error: 'Failed to send email' },
+          { error: error instanceof Error ? error.message : 'Email service is not configured' },
           { status: 500 }
         );
       }
@@ -87,7 +118,7 @@ export async function POST(request: NextRequest) {
       try {
         await getTwilioClient().messages.create({
           body: `Your Seal and Send ${role} access code: ${code}. This code expires in 15 minutes.`,
-          from: process.env.TWILIO_MESSAGING_SERVICE_SID!,
+          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID!,
           to: phone
         });
       } catch (error) {
