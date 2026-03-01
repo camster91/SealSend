@@ -1,48 +1,59 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Poppins } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 const inter = Inter({
-  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
 });
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-space-grotesk",
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app"),
-  title: {
-    default:
-      "Seal & Send — Beautiful Digital Invitations & RSVP Management",
-    template: "%s | Seal & Send",
+  title: "SealSend - Beautiful Digital Invitations & RSVP Management",
+  description: "Create stunning digital invitations, collect RSVPs instantly, and manage your events with ease. The modern way to invite and track guests.",
+  keywords: ["digital invitations", "RSVP", "event management", "online invitations", "wedding invitations", "party invitations"],
+  authors: [{ name: "SealSend" }],
+  creator: "SealSend",
+  metadataBase: new URL("https://sealsend.app"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://sealsend.app",
+    siteName: "SealSend",
+    title: "SealSend - Beautiful Digital Invitations",
+    description: "Create stunning digital invitations and manage RSVPs with ease.",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "SealSend - Digital Invitations",
+      },
+    ],
   },
-  description:
-    "Create beautiful digital invitations, collect RSVPs instantly, and manage your event — all in one place. No stamps, no stress.",
-  keywords: [
-    "digital invitations",
-    "invitation",
-    "RSVP",
-    "online invitations",
-    "event management",
-    "digital wedding invitations",
-    "baby shower invitations",
-    "birthday invitations",
-    "corporate event invitations",
-    "RSVP management",
-    "free digital invitations",
-  ],
-  manifest: "/manifest.json",
-  formatDetection: {
-    telephone: false,
+  twitter: {
+    card: "summary_large_image",
+    title: "SealSend - Beautiful Digital Invitations",
+    description: "Create stunning digital invitations and manage RSVPs with ease.",
+    images: ["/og-image.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
 export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1917" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -53,23 +64,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <meta name="theme-color" content="#7c3aed" />
-        <link rel="apple-touch-icon" href="/icons/icon.svg" />
-      </head>
-      <body
-        className={`${inter.variable} ${poppins.variable} font-sans antialiased`}
-      >
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg"
-        >
-          Skip to main content
-        </a>
-        <ServiceWorkerRegistration />
-        {children}
-      </body>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <body className="font-sans min-h-screen">{children}</body>
     </html>
   );
 }

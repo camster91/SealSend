@@ -1,322 +1,361 @@
-// ── Beta Mode ──────────────────────────────────────────────────────────
-// When true, all features are unlocked for free. Set to false to re-enable paid tiers.
-export const BETA_MODE = true;
-export const BETA_RESPONSE_LIMIT = 1200; // All events get premium-level limits during beta
+import { Palette, Mail, BarChart3, Users, Sparkles, Share2, Bell, Gift } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
+// ========================================
+// SAAS CONFIGURATION
+// ========================================
+
+/** 
+ * BETA MODE - When true, all features are free and unlimited
+ * Set to false when launching paid tiers
+ */
+export const BETA_MODE = true;
+
+/** 
+ * Feature flags for gradual rollout
+ */
+export const FEATURE_FLAGS = {
+  subscriptions: false,     // Enable subscription billing
+  teams: false,            // Enable team/organization features
+  templates: false,        // Enable template gallery
+  analytics: false,        // Enable advanced analytics
+  aiAssistant: false,      // Enable AI design assistant
+} as const;
+
+// ========================================
+// SUBSCRIPTION TIERS (User-Level)
+// ========================================
+
+export interface SubscriptionTier {
+  id: string;
+  name: string;
+  description: string;
+  price: {
+    monthly: number;
+    yearly: number;
+  };
+  stripePriceId?: {
+    monthly?: string;
+    yearly?: string;
+  };
+  features: {
+    name: string;
+    included: boolean;
+    tooltip?: string;
+  }[];
+  limits: {
+    events: number | "unlimited";
+    guestsPerEvent: number | "unlimited";
+    responses: number | "unlimited";
+    teamMembers: number;
+    storageGB: number;
+  };
+  badges?: string[];
+  popular?: boolean;
+  cta: {
+    text: string;
+    href: string;
+  };
+}
+
+export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
+  {
+    id: "free",
+    name: "Free",
+    description: "Perfect for trying out SealSend",
+    price: {
+      monthly: 0,
+      yearly: 0,
+    },
+    limits: {
+      events: 3,
+      guestsPerEvent: 50,
+      responses: 100,
+      teamMembers: 1,
+      storageGB: 0.5,
+    },
+    features: [
+      { name: "Digital invitations", included: true },
+      { name: "RSVP tracking", included: true },
+      { name: "Guest management", included: true },
+      { name: "Basic customization", included: true },
+      { name: "Email notifications", included: true },
+      { name: "Custom domain", included: false },
+      { name: "Remove branding", included: false },
+      { name: "SMS notifications", included: false },
+      { name: "Advanced analytics", included: false },
+      { name: "Priority support", included: false },
+    ],
+    cta: {
+      text: "Get Started Free",
+      href: "/signup",
+    },
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    description: "For hosts who want more flexibility",
+    price: {
+      monthly: 12,
+      yearly: 99,
+    },
+    stripePriceId: {
+      monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
+      yearly: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
+    },
+    limits: {
+      events: 10,
+      guestsPerEvent: 200,
+      responses: 1000,
+      teamMembers: 3,
+      storageGB: 5,
+    },
+    features: [
+      { name: "Everything in Free", included: true },
+      { name: "Remove SealSend branding", included: true },
+      { name: "Custom domain", included: true },
+      { name: "SMS notifications", included: true },
+      { name: "Guest tags & groups", included: true },
+      { name: "Advanced RSVP fields", included: true },
+      { name: "Export to CSV/Excel", included: true },
+      { name: "Message board", included: true },
+      { name: "Advanced analytics", included: false },
+      { name: "Priority support", included: false },
+    ],
+    popular: true,
+    badges: ["Most Popular"],
+    cta: {
+      text: "Start Pro Trial",
+      href: "/signup?plan=pro",
+    },
+  },
+  {
+    id: "business",
+    name: "Business",
+    description: "For professional event planners",
+    price: {
+      monthly: 39,
+      yearly: 349,
+    },
+    stripePriceId: {
+      monthly: process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID,
+      yearly: process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID,
+    },
+    limits: {
+      events: "unlimited",
+      guestsPerEvent: "unlimited",
+      responses: "unlimited",
+      teamMembers: 10,
+      storageGB: 50,
+    },
+    features: [
+      { name: "Everything in Pro", included: true },
+      { name: "Unlimited events", included: true },
+      { name: "Unlimited guests", included: true },
+      { name: "Advanced analytics", included: true },
+      { name: "Team collaboration", included: true },
+      { name: "API access", included: true },
+      { name: "White-label options", included: true },
+      { name: "Priority support", included: true },
+      { name: "Custom integrations", included: true },
+      { name: "Dedicated account manager", included: true },
+    ],
+    badges: ["Best Value"],
+    cta: {
+      text: "Start Business Trial",
+      href: "/signup?plan=business",
+    },
+  },
+];
+
+// ========================================
+// LEGACY EVENT TIERS (Per-Event - Deprecated)
+// ========================================
+
+/** 
+ * @deprecated Use SUBSCRIPTION_TIERS instead
+ * Event-level tiers - only used when BETA_MODE is false and subscriptions not enabled
+ */
 export const TIERS = {
   free: {
-    name: "Free",
-    tagline: "Get started",
-    description:
-      "Everything you need to create and send invites\u2014free forever.",
     price: 0,
     maxResponses: 15,
-    replyLabel: "15 replies",
-    stripePriceId: null,
-    features: [
-      { title: "15 guest replies", description: null },
-      { title: "Unlimited events", description: null },
-      { title: "Design, send & manage invites", description: null },
-      { title: "Email invitations", description: null },
-      { title: "Seal and Send branding shown", description: null },
-    ],
+    features: ["emailInvites", "basicRsvp"],
   },
   standard: {
-    name: "Standard",
-    tagline: "Most popular",
-    description:
-      "More replies, guest tags, SMS invites, and no branding.",
     price: 5,
     maxResponses: 50,
-    replyLabel: "50 replies",
-    stripePriceId: process.env.STRIPE_STANDARD_PRICE_ID ?? null,
-    badge: "Most popular",
-    features: [
-      { title: "50 guest replies", description: null },
-      { title: "Remove Seal and Send branding", description: null },
-      { title: "Guest tags", description: null },
-      { title: "SMS invites", description: null },
-      { title: "Announcements", description: null },
-    ],
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements"],
   },
   premium: {
-    name: "Premium",
-    tagline: "Full power",
-    description:
-      "Unlimited replies, sign-up board, and priority support.",
     price: 10,
     maxResponses: 1200,
-    replyLabel: "Unlimited replies*",
-    stripePriceId: process.env.STRIPE_PREMIUM_PRICE_ID ?? null,
-    badge: "Best value",
-    features: [
-      { title: "Unlimited replies*", description: null },
-      { title: "Remove Seal and Send branding", description: null },
-      { title: "Guest tags & SMS invites", description: null },
-      { title: "Announcements", description: null },
-      { title: "Sign-up board", description: null },
-      { title: "Priority support", description: null },
-    ],
-    footnote: "*Subject to our fair use policy of 1,200 guest replies.",
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard"],
   },
 } as const;
 
-export type TierKey = keyof typeof TIERS;
+/** Beta uses premium limits for all events */
+export const BETA_RESPONSE_LIMIT = TIERS.premium.maxResponses;
+
+// ========================================
+// FEATURES LIST (Marketing)
+// ========================================
+
+export interface Feature {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+  description: string;
+}
+
+export const FEATURES_LIST: Feature[] = [
+  {
+    icon: Palette,
+    subtitle: "Design",
+    title: "Beautiful Templates",
+    description: "Start with professionally designed templates or upload your own custom invitation design.",
+  },
+  {
+    icon: Mail,
+    subtitle: "Delivery",
+    title: "Email & SMS Invites",
+    description: "Send invitations via email or text message. Track deliveries and opens in real-time.",
+  },
+  {
+    icon: BarChart3,
+    subtitle: "Analytics",
+    title: "RSVP Tracking",
+    description: "Watch responses roll in with beautiful charts. Track headcounts, meal choices, and more.",
+  },
+  {
+    icon: Users,
+    subtitle: "Management",
+    title: "Guest Management",
+    description: "Organize guests with tags, plus-ones, and custom fields. Import from CSV or add manually.",
+  },
+  {
+    icon: Sparkles,
+    subtitle: "Experience",
+    title: "Magical Experience",
+    description: "Guests get a stunning invitation page with RSVP form, event details, and message board.",
+  },
+  {
+    icon: Share2,
+    subtitle: "Sharing",
+    title: "Easy Sharing",
+    description: "Share via custom link, QR code, or social media. No app download required for guests.",
+  },
+  {
+    icon: Bell,
+    subtitle: "Communication",
+    title: "Announcements",
+    description: "Send updates to all guests instantly. Perfect for last-minute changes or reminders.",
+  },
+  {
+    icon: Gift,
+    subtitle: "Extras",
+    title: "Registry Integration",
+    description: "Link to your gift registry, donation page, or any external site your guests need.",
+  },
+];
+
+// ========================================
+// DEFAULT RSVP FIELDS
+// ========================================
 
 export const DEFAULT_RSVP_FIELDS = [
   {
-    field_name: "attendance",
-    field_label: "Will you be attending?",
-    field_type: "attendance" as const,
+    field_name: "name",
+    field_type: "text",
+    field_label: "Full Name",
     is_required: true,
     is_enabled: true,
-    sort_order: 0,
+    placeholder: "Enter your full name",
   },
   {
     field_name: "email",
+    field_type: "email",
     field_label: "Email Address",
-    field_type: "email" as const,
+    is_required: true,
+    is_enabled: true,
+    placeholder: "your@email.com",
+  },
+  {
+    field_name: "attending",
+    field_type: "select",
+    field_label: "Will you be attending?",
+    is_required: true,
+    is_enabled: true,
+    options: ["Joyfully Accepts", "Regretfully Declines"],
+  },
+  {
+    field_name: "guests",
+    field_type: "number",
+    field_label: "Number of Guests",
     is_required: false,
     is_enabled: true,
-    sort_order: 1,
-  },
-  {
-    field_name: "headcount",
-    field_label: "Total Guests (including yourself)",
-    field_type: "number" as const,
-    placeholder: "1",
-    is_required: false,
-    is_enabled: true,
-    sort_order: 2,
-  },
-  {
-    field_name: "adult_count",
-    field_label: "Number of Adults",
-    field_type: "number" as const,
-    placeholder: "0",
-    is_required: false,
-    is_enabled: false,
-    sort_order: 3,
-  },
-  {
-    field_name: "child_count",
-    field_label: "Number of Children",
-    field_type: "number" as const,
-    placeholder: "0",
-    is_required: false,
-    is_enabled: false,
-    sort_order: 4,
-  },
-  {
-    field_name: "meal_choice",
-    field_label: "Meal Preference",
-    field_type: "select" as const,
-    options: ["No preference", "Vegetarian", "Vegan", "Gluten-free", "Halal", "Kosher"],
-    is_required: false,
-    is_enabled: false,
-    sort_order: 5,
+    placeholder: "Including yourself",
   },
   {
     field_name: "dietary",
+    field_type: "textarea",
     field_label: "Dietary Requirements",
-    field_type: "text" as const,
-    placeholder: "Any allergies or dietary needs?",
     is_required: false,
-    is_enabled: false,
-    sort_order: 6,
-  },
-  {
-    field_name: "plus_one",
-    field_label: "Names of Additional Guests",
-    field_type: "text" as const,
-    placeholder: "Enter names of your guests (one per line)",
-    is_required: false,
-    is_enabled: false,
-    sort_order: 7,
+    is_enabled: true,
+    placeholder: "Any allergies or dietary restrictions?",
   },
   {
     field_name: "message",
+    field_type: "textarea",
     field_label: "Message to Host",
-    field_type: "text" as const,
-    placeholder: "Leave a message for the host...",
     is_required: false,
-    is_enabled: false,
-    sort_order: 8,
+    is_enabled: true,
+    placeholder: "Leave a nice message for the host...",
   },
 ];
 
-export const DEFAULT_CUSTOMIZATION = {
-  primaryColor: "#7c3aed",
-  backgroundColor: "#ffffff",
-  backgroundImage: null as string | null,
-  fontFamily: "Inter",
-  buttonStyle: "rounded" as "rounded" | "pill" | "square",
-  showCountdown: true,
-  audioUrl: null as string | null,
-  logoUrl: null as string | null,
-};
+// ========================================
+// USE CASES
+// ========================================
 
-export const FAQ_ITEMS = [
+export const USE_CASES = [
   {
-    question: "What is included in the Free plan?",
-    answer:
-      "The Free plan includes all essential features to design, send, and manage your event invites. You can manage up to 15 guest replies per event at no cost. Your invitation will always collect all replies, even on the Free plan.",
+    slug: "weddings",
+    title: "Weddings",
+    description: "Create elegant wedding invitations with RSVP tracking, meal preferences, and plus-one management.",
+    image: "/use-cases/wedding.jpg",
+    features: ["Registry integration", "Meal preferences", "Plus-one tracking", "Save the dates"],
   },
   {
-    question: "How does per-event pricing work?",
-    answer:
-      "Each event starts on the Free tier. When you need more features or replies, you can upgrade that specific event to Standard ($5) or Premium ($10). The upgrade is a one-time payment per event\u2014no subscriptions.",
+    slug: "baby-showers",
+    title: "Baby Showers",
+    description: "Celebrate the upcoming arrival with adorable invitations and gift registry links.",
+    image: "/use-cases/baby-shower.jpg",
+    features: ["Registry links", "Gender reveal option", "Gift tracking", "Photo sharing"],
   },
   {
-    question: "Can I upgrade an event after it\u2019s been created?",
-    answer:
-      "Yes! You can upgrade your event at any time from the event dashboard. All your existing data, responses, and settings will be preserved when you upgrade.",
+    slug: "birthday-parties",
+    title: "Birthday Parties",
+    description: "From first birthdays to milestone celebrations, make every birthday special.",
+    image: "/use-cases/birthday.jpg",
+    features: ["Age-appropriate themes", "RSVP by date", "Gift preferences", "Photo gallery"],
   },
   {
-    question: "Will I be charged in my local currency?",
-    answer:
-      "Prices are displayed in USD. Your payment provider may convert the amount to your local currency at the current exchange rate.",
+    slug: "corporate-events",
+    title: "Corporate Events",
+    description: "Professional invitations for company events, conferences, and team gatherings.",
+    image: "/use-cases/corporate.jpg",
+    features: ["Branded templates", "Calendar invites", "Attendee tracking", "Polls & surveys"],
   },
-  {
-    question: "What is counted as a reply?",
-    answer:
-      "A reply is counted each time a unique guest submits an RSVP response through your event page. Each guest submission counts as one reply, regardless of headcount.",
-  },
-  {
-    question: "Can I downgrade or get a refund?",
-    answer:
-      "Event upgrades are one-time purchases per event and are non-refundable. However, you can always create new events on the Free plan.",
-  },
-  {
-    question: "What features are unlocked with Standard?",
-    answer:
-      "Standard ($5/event) gives you 50 replies, removes Seal and Send branding, and unlocks guest tags, SMS invites, and announcements.",
-  },
-  {
-    question: "What extra features does Premium include?",
-    answer:
-      "Premium ($10/event) includes everything in Standard plus unlimited replies (up to 1,200 fair use), a sign-up board for coordinating contributions, and priority support.",
-  },
-];
+] as const;
 
-export const FEATURES_LIST = [
-  {
-    title: "Video and Slideshow invitations",
-    subtitle: "Transform static designs dynamically",
-    description:
-      "Turn your design into a video or slideshow to create an interactive invitation. Engage your recipients with movement, storytelling, and audio.",
-    icon: "Play",
-  },
-  {
-    title: "Branded Invitations",
-    subtitle: "Maintain brand consistency",
-    description:
-      "Customize your invitations with your logo, photos, and colors. Ensure cohesive branding across your designs and your invitation webpage.",
-    icon: "Palette",
-  },
-  {
-    title: "Customizable Page Colors",
-    subtitle: "Match event theme perfectly",
-    description:
-      "Full control over page backgrounds and button colors to align your invitation with your theme or brand.",
-    icon: "Paintbrush",
-  },
-  {
-    title: "Custom Backgrounds and Logos",
-    subtitle: "Add a personal touch",
-    description:
-      "Upload your logo and photos or use high-quality wallpapers to add unique flair to your event page.",
-    icon: "Image",
-  },
-  {
-    title: "Music and Sounds",
-    subtitle: "Create immersive experiences",
-    description:
-      "Add music or audio to your video invitation, enhancing emotional impact and making the invitation engaging.",
-    icon: "Music",
-  },
-  {
-    title: "Email Builder Integration",
-    subtitle: "Reach guests with ease",
-    description:
-      "Send pretty invite, update, and reminder emails via your own Gmail, Outlook, Yahoo or any other email client.",
-    icon: "Mail",
-  },
-  {
-    title: "Marketing Tools",
-    subtitle: "Send professionally from your domain",
-    description:
-      "Easily transfer event assets to your email marketing provider and send your invitation out professionally.",
-    icon: "Megaphone",
-  },
-  {
-    title: "Shareable Links",
-    subtitle: "Flexible sharing options",
-    description:
-      "Share your invitation via any chat app, text, iMessage or social platform making it easy for guests to receive and respond.",
-    icon: "Share2",
-  },
-  {
-    title: "Add Events to Calendars",
-    subtitle: "Make attending convenient",
-    description:
-      "Recipients can sync events to their calendars in just one click, ensuring they won't miss the event.",
-    icon: "Calendar",
-  },
-  {
-    title: "Custom URLs",
-    subtitle: "Create memorable links",
-    description:
-      "Generate a personalized, easy-to-share link for your event, making it more convenient for recipients.",
-    icon: "Link",
-  },
-  {
-    title: "Event Analytics",
-    subtitle: "Gain guest engagement insights",
-    description:
-      "Track replies with easy-to-use mobile friendly dashboards, tables, and graphs, keeping you informed as you plan.",
-    icon: "BarChart3",
-  },
-  {
-    title: "Collect Recipient Info",
-    subtitle: "Tailor event to guest needs",
-    description:
-      "Use customizable forms to gather meal choices and dietary preferences, making guests feel cared for.",
-    icon: "ClipboardList",
-  },
-  {
-    title: "Adult and Child Headcounts",
-    subtitle: "Plan with precision",
-    description:
-      "Collect information to get accurate adult and child headcounts, ensuring proper resources for the event.",
-    icon: "Users",
-  },
-  {
-    title: "Guest Tags",
-    subtitle: "Organize guest lists efficiently",
-    description:
-      "Group recipients by adding tags, making it easy to manage and communicate with specific groups.",
-    icon: "Tag",
-  },
-  {
-    title: "Location and Time Blocks",
-    subtitle: "Provide essential details",
-    description:
-      "Add location and time details to your invitation webpage, ensuring recipients have all necessary information to attend.",
-    icon: "MapPin",
-  },
-  {
-    title: "Gift Registries",
-    subtitle: "Make gifting effortless",
-    description:
-      "Add gift registry links to your invitation webpage, simplifying the gifting process for guests and enhancing their experience.",
-    icon: "Gift",
-  },
-  {
-    title: "AI EventScribe",
-    subtitle: "Write compelling event details",
-    description:
-      "Use AI EventScribe to craft the perfect event description, ensuring your message is clear and engaging.",
-    icon: "Sparkles",
-  },
-];
+// ========================================
+// NAVIGATION
+// ========================================
+
+export const NAV_LINKS = [
+  { label: "Features", href: "#features" },
+  { label: "How It Works", href: "/how-it-works" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Use Cases", href: "#use-cases", children: USE_CASES.map(u => ({ label: u.title, href: `/use-cases/${u.slug}` })) },
+] as const;
