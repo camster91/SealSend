@@ -99,7 +99,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
             try {
               await resend.emails.send({
-                from: "Seal and Send <noreply@ashbi.ca>",
+                from: "Seal and Send <contact@sealsend.app>",
                 to: guest.email,
                 subject,
                 html,

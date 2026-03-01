@@ -144,7 +144,7 @@ export async function POST(
 
             try {
               await resend.emails.send({
-                from: "Seal and Send <noreply@ashbi.ca>",
+                from: "Seal and Send <contact@sealsend.app>",
                 to: guest.email,
                 subject,
                 html,

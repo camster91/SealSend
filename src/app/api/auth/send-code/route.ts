@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       try {
         const resend = getResend();
         const { error: emailError } = await resend.emails.send({
-          from: 'Seal and Send <noreply@ashbi.ca>',
+          from: 'Seal and Send <contact@sealsend.app>',
           to: email,
           subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
           html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId)
