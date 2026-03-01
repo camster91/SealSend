@@ -97,11 +97,11 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
   }, [watchedValues, data, onUpdate]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 pb-20">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Event Details</h2>
-        <p className="mt-2 text-base text-gray-500">
+      <div className="pb-4">
+        <h2 className="text-3xl font-bold text-gray-900">Event Details</h2>
+        <p className="mt-3 text-lg text-gray-500">
           Tell us about your event — these details will appear on your invitation.
         </p>
       </div>
@@ -116,10 +116,10 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <h3 className="text-sm font-semibold text-gray-900">The Basics</h3>
         </div>
-        <div className="space-y-5 p-5">
+        <div className="space-y-6 p-6">
           {/* Title */}
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="title" className="block text-base font-semibold text-gray-800">
               Event Title <span className="text-red-500">*</span>
             </label>
             <input
@@ -131,16 +131,16 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
                 maxLength: { value: 200, message: 'Title must be less than 200 characters' },
               })}
               placeholder="e.g. Sarah & Tom's Wedding Reception"
-              className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-base font-medium outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
+              className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-4 text-lg font-medium outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
             />
             {errors.title && (
-              <p className="mt-1.5 text-xs text-red-600">{errors.title.message}</p>
+              <p className="mt-2 text-sm text-red-600">{errors.title.message}</p>
             )}
           </div>
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="description" className="block text-base font-semibold text-gray-800">
               Description
             </label>
             <textarea
@@ -148,23 +148,23 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               {...register('description', {
                 maxLength: { value: 2000, message: 'Description must be less than 2000 characters' },
               })}
-              rows={3}
+              rows={4}
               placeholder="Tell your guests what to expect — share the vibe, the plan, or a personal message..."
-              className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
+              className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
             />
             {errors.description && (
-              <p className="mt-1.5 text-xs text-red-600">{errors.description.message}</p>
+              <p className="mt-2 text-sm text-red-600">{errors.description.message}</p>
             )}
           </div>
 
           {/* Hosted By */}
           <div>
-            <label htmlFor="host_name" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="host_name" className="block text-base font-semibold text-gray-800">
               Hosted By
             </label>
-            <div className="relative mt-1.5">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="relative mt-2">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
               </div>
@@ -173,7 +173,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
                 type="text"
                 {...register('host_name')}
                 placeholder="e.g. Sarah & Tom, The Smith Family"
-                className="w-full rounded-xl border border-gray-300 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
+                className="w-full rounded-xl border border-gray-300 py-4 pl-11 pr-4 text-base outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-gray-400"
               />
             </div>
           </div>
