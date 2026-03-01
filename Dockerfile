@@ -33,6 +33,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Runtime environment variables
+ARG MAILGUN_API_KEY
+ARG MAILGUN_DOMAIN
+ARG FROM_EMAIL
+ENV MAILGUN_API_KEY=$MAILGUN_API_KEY
+ENV MAILGUN_DOMAIN=$MAILGUN_DOMAIN
+ENV FROM_EMAIL=$FROM_EMAIL
+
 # Install curl for healthchecks (required by Coolify)
 RUN apk add --no-cache curl
 
