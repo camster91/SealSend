@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo ECardApp Deployment Script
+echo SealSend Deployment Script
 echo ========================================
 echo.
 echo This script will rebuild and restart the Docker container
@@ -10,7 +10,7 @@ echo.
 REM Check if docker-compose.yml exists
 if not exist docker-compose.yml (
     echo ERROR: docker-compose.yml not found!
-    echo Please run this script from the ECardApp directory.
+    echo Please run this script from the SealSend directory.
     pause
     exit /b 1
 )
@@ -43,6 +43,6 @@ docker-compose logs -f web
 echo.
 echo Deployment complete!
 echo.
-echo IMPORTANT: Clear browser cookies for ecard.ashbi.ca before testing.
+echo IMPORTANT: Clear browser cookies for sealsend.app before testing.
 echo.
 pause

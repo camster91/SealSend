@@ -1,7 +1,7 @@
 # Dashboard Not Loading - Root Cause & Fix
 
 ## Problem Analysis
-The dashboard at `https://ecard.ashbi.ca/dashboard` is not loading due to an authentication mismatch between the middleware and custom auth system.
+The dashboard at `https://sealsend.app/dashboard` is not loading due to an authentication mismatch between the middleware and custom auth system.
 
 ### Root Cause
 1. **Authentication System Mismatch**: The application uses a **custom authentication system** with `auth_codes` and `user_sessions` tables, but the middleware only checks for **Supabase Auth sessions**.
@@ -34,7 +34,7 @@ The middleware now recognizes **both authentication methods**:
 
 ### Option A: Docker Compose (Local/Production)
 ```bash
-cd /path/to/ECardApp
+cd /path/to/SealSend
 
 # Rebuild the Docker image
 docker-compose down
@@ -47,7 +47,7 @@ docker-compose logs -f web
 
 ### Option B: Coolify Deployment
 1. **Connect to your server** via SSH
-2. **Navigate to the app directory** (likely `/home/username/apps/ecard`)
+2. **Navigate to the app directory** (likely `/home/username/apps/sealsend`)
 3. **Pull the latest changes** (if using Git):
    ```bash
    git pull origin main
@@ -59,7 +59,7 @@ docker-compose logs -f web
 
 ### Option C: Manual Node.js Deployment
 ```bash
-cd /path/to/ECardApp
+cd /path/to/SealSend
 
 # Install dependencies
 npm ci
@@ -68,15 +68,15 @@ npm ci
 npm run build
 
 # Restart the PM2 process or systemd service
-pm2 restart ecard-app
+pm2 restart sealsend
 ```
 
 ## Verification Steps
 
 After deploying the fix:
 
-1. **Clear browser cookies** for `ecard.ashbi.ca`
-2. **Visit** `https://ecard.ashbi.ca/login`
+1. **Clear browser cookies** for `sealsend.app`
+2. **Visit** `https://sealsend.app/login`
 3. **Login with admin email** (must be in `admin_users` table)
 4. **Verify dashboard loads** without redirects
 

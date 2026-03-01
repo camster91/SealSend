@@ -28,14 +28,14 @@ const emailHtml = `<!DOCTYPE html>
           <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Go to <a href="https://supabase.com/dashboard/project/vtbreowxqfcvwegpfnwn/auth/url-configuration" style="color:#7c3aed;font-weight:600;">Auth &rarr; URL Configuration</a></p>
           <div style="background:#f8f5ff;border-radius:8px;padding:12px 16px;margin:0 0 20px;">
             <p style="margin:0;font-size:13px;color:#374151;"><strong>Site URL:</strong> Change from <code style="background:#fee2e2;padding:2px 6px;border-radius:4px;color:#dc2626;">http://localhost:3000</code> to:</p>
-            <p style="margin:8px 0 0;"><code style="background:#dcfce7;padding:4px 10px;border-radius:4px;font-size:14px;color:#16a34a;font-weight:600;">https://ecard.ashbi.ca</code></p>
+            <p style="margin:8px 0 0;"><code style="background:#dcfce7;padding:4px 10px;border-radius:4px;font-size:14px;color:#16a34a;font-weight:600;">https://sealsend.app</code></p>
           </div>
 
           <!-- Step 2 -->
           <h2 style="margin:0 0 12px;font-size:18px;color:#7c3aed;">Step 2: Fix Redirect URLs</h2>
           <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Same page &mdash; under <strong>Redirect URLs</strong>:</p>
           <div style="background:#f8f5ff;border-radius:8px;padding:12px 16px;margin:0 0 20px;">
-            <p style="margin:0;font-size:13px;color:#374151;"><strong>Add:</strong> <code style="background:#dcfce7;padding:4px 10px;border-radius:4px;font-size:14px;color:#16a34a;font-weight:600;">https://ecard.ashbi.ca/**</code></p>
+            <p style="margin:0;font-size:13px;color:#374151;"><strong>Add:</strong> <code style="background:#dcfce7;padding:4px 10px;border-radius:4px;font-size:14px;color:#16a34a;font-weight:600;">https://sealsend.app/**</code></p>
             <p style="margin:8px 0 0;font-size:13px;color:#374151;"><strong>Remove</strong> any <code style="background:#fee2e2;padding:2px 6px;border-radius:4px;color:#dc2626;">http://localhost</code> entries</p>
           </div>
 
@@ -45,12 +45,12 @@ const emailHtml = `<!DOCTYPE html>
           <p style="margin:0 0 12px;font-size:14px;color:#6b7280;">Update the <strong>Magic Link</strong> and <strong>Confirm Signup</strong> templates:</p>
 
           <div style="background:#fefce8;border-radius:8px;padding:12px 16px;margin:0 0 16px;border-left:4px solid #f59e0b;">
-            <p style="margin:0 0 8px;font-size:13px;color:#854d0e;"><strong>Magic Link subject:</strong> Your ECardApp Login Link</p>
-            <p style="margin:0;font-size:13px;color:#854d0e;"><strong>Confirm Signup subject:</strong> Welcome to ECardApp</p>
+            <p style="margin:0 0 8px;font-size:13px;color:#854d0e;"><strong>Magic Link subject:</strong> Your SealSend Login Link</p>
+            <p style="margin:0;font-size:13px;color:#854d0e;"><strong>Confirm Signup subject:</strong> Welcome to SealSend</p>
           </div>
 
           <p style="margin:0 0 8px;font-size:14px;color:#374151;font-weight:600;">Paste this HTML into both templates:</p>
-          <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">(For Confirm Signup, change heading to "Welcome to ECardApp" and button to "Confirm Email")</p>
+          <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">(For Confirm Signup, change heading to "Welcome to SealSend" and button to "Confirm Email")</p>
 
           <div style="background:#1f2937;border-radius:8px;padding:16px;margin:12px 0 20px;overflow-x:auto;">
             <pre style="margin:0;font-size:10.5px;color:#e5e7eb;white-space:pre-wrap;word-break:break-all;font-family:'Courier New',monospace;line-height:1.5;">&lt;!DOCTYPE html&gt;
@@ -64,7 +64,7 @@ const emailHtml = `<!DOCTYPE html>
       &lt;/table&gt;
       &lt;table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:0 0 16px 16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);"&gt;
         &lt;tr&gt;&lt;td style="background:linear-gradient(135deg,#7c3aed 0%,#6366f1 50%,#3b82f6 100%);padding:40px 32px;text-align:center;"&gt;
-          &lt;h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;"&gt;Sign In to ECardApp&lt;/h1&gt;
+          &lt;h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;"&gt;Sign In to SealSend&lt;/h1&gt;
           &lt;p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.8);"&gt;&lt;span style="font-weight:600;"&gt;ECard&lt;/span&gt;&lt;span style="color:#c4b5fd;"&gt;App&lt;/span&gt;&lt;/p&gt;
         &lt;/td&gt;&lt;/tr&gt;
         &lt;tr&gt;&lt;td style="padding:32px 24px 16px;"&gt;
@@ -105,7 +105,7 @@ const emailHtml = `<!DOCTYPE html>
 
         <!-- Footer -->
         <tr><td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-          <p style="margin:0;font-size:13px;font-weight:600;"><span style="color:#374151;">ECard</span><span style="color:#7c3aed;">App</span></p>
+          <p style="margin:0;font-size:13px;font-weight:600;">SealSend</p>
           <p style="margin:4px 0 0;font-size:11px;color:#d1d5db;">Beautiful Digital Invitations &amp; RSVP Management</p>
         </td></tr>
       </table>
@@ -115,7 +115,7 @@ const emailHtml = `<!DOCTYPE html>
 </html>`;
 
 const data = JSON.stringify({
-  from: 'ECardApp <onboarding@resend.dev>',
+  from: 'SealSend <onboarding@resend.dev>',
   to: 'cameron@ashbi.ca',
   subject: 'TODO: Supabase Dashboard Settings to Fix Magic Links',
   html: emailHtml,
