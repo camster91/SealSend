@@ -1,71 +1,70 @@
+#!/usr/bin/env tsx
 /**
- * Admin user creation script
- * Usage: npx tsx scripts/create-admin.ts email@example.com "Full Name" "password"
+ * Create an admin user in the database
+ * Usage: npx tsx scripts/create-admin.ts <email>
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { hashPassword } from '../src/lib/password';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Error: Missing Supabase environment variables');
+  console.error('Make sure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set');
+  process.exit(1);
+}
+
+const email = process.argv[2];
+
+if (!email) {
+  console.error('Usage: npx tsx scripts/create-admin.ts <email>');
+  process.exit(1);
+}
 
 async function createAdmin() {
-  const args = process.argv.slice(2);
-  
-  if (args.length < 3) {
-    console.log('Usage: npx tsx scripts/create-admin.ts <email> "<full name>" "<password>"');
-    console.log('Example: npx tsx scripts/create-admin.ts admin@example.com "John Doe" "SecurePass123!"');
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  console.log(`Creating admin user: ${email}`);
+
+  // Check if admin already exists
+  const { data: existing, error: checkError } = await supabase
+    .from('admin_users')
+    .select('id, email')
+    .eq('email', email)
+    .single();
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('Error checking existing admin:', checkError);
     process.exit(1);
   }
 
-  const [email, name, password] = args;
+  if (existing) {
+    console.log(`Admin user already exists: ${existing.email}`);
+    process.exit(0);
+  }
 
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.error('Error: Missing Supabase environment variables');
-    console.error('Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  // Create admin user
+  const { data, error } = await supabase
+    .from('admin_users')
+    .insert({ email })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating admin:', error);
     process.exit(1);
   }
 
-  // Validate password strength
-  if (password.length < 8) {
-    console.error('Error: Password must be at least 8 characters');
-    process.exit(1);
-  }
-
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    
-    // Hash the password
-    const hashedPassword = await hashPassword(password);
-    
-    // Insert admin user
-    const { data, error } = await supabase
-      .from('admin_users')
-      .insert({
-        email,
-        name,
-        password: hashedPassword,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.message.includes('duplicate')) {
-        console.error(`Error: Admin with email ${email} already exists`);
-      } else {
-        console.error('Error creating admin:', error.message);
-      }
-      process.exit(1);
-    }
-
-    console.log('✅ Admin user created successfully!');
-    console.log(`   Email: ${data.email}`);
-    console.log(`   Name: ${data.name}`);
-    console.log(`   ID: ${data.id}`);
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    process.exit(1);
-  }
+  console.log(`✅ Admin user created successfully!`);
+  console.log(`   ID: ${data.id}`);
+  console.log(`   Email: ${data.email}`);
+  console.log(`   Created: ${data.created_at}`);
 }
 
 createAdmin();

@@ -5,7 +5,13 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Menu, X, ChevronDown, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { User } from "@supabase/supabase-js";
+
+interface NavbarUser {
+  id: string;
+  email?: string | null;
+  role?: 'admin' | 'guest';
+  eventId?: string;
+}
 
 const useCaseLinks = [
   { label: "Weddings", href: "/use-cases/weddings" },
@@ -14,7 +20,7 @@ const useCaseLinks = [
   { label: "Corporate Events", href: "/use-cases/corporate-events" },
 ];
 
-export function Navbar({ user }: { user?: User | null }) {
+export function Navbar({ user }: { user?: NavbarUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

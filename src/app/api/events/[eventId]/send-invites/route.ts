@@ -96,7 +96,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               .eq("id", guest.id);
           }
 
-          const rsvpUrl = `${siteUrl}/e/${event.slug}?t=${token}`;
+          // Create a seamless magic invite link that auto-logs the guest in
+          const magicInviteUrl = `${siteUrl}/invite/accept?token=${token}&event=${event.slug}`;
+          const rsvpUrl = magicInviteUrl;
           let emailOk = false;
           let smsOk = false;
           const errors: Array<{ type: 'email' | 'sms'; message: string }> = [];

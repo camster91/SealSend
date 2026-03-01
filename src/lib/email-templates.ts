@@ -165,10 +165,17 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
 
           <!-- CTA Button -->
           <tr>
-            <td style="padding:16px 24px 32px;" align="center">
+            <td style="padding:16px 24px 8px;" align="center">
               <a href="${rsvpUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:12px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(99,102,241,0.35);">
-                RSVP Now
+                View Your Invitation ↗
               </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 24px 24px;" align="center">
+              <p style="margin:0;font-size:12px;color:#6b7280;">
+                No password needed — click to view your invitation instantly
+              </p>
             </td>
           </tr>
 
