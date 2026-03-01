@@ -56,14 +56,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-USER nextjs
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Copy start script
-COPY start.sh ./
+# Copy start script and set permissions before switching to non-root user
+COPY --chown=nextjs:nodejs start.sh ./
 RUN chmod +x start.sh
+
+USER nextjs
 
 # Run the standalone server with runtime env vars
 CMD ["./start.sh"]
