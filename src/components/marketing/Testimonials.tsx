@@ -1,113 +1,158 @@
-import { Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+"use client";
 
-interface Testimonial {
-  name: string;
-  quote: string;
-  rating: number;
-  color: string;
-}
+import { Star, Quote } from "lucide-react";
+import { motion } from "framer-motion";
 
-const testimonials: Testimonial[] = [
+const testimonials = [
   {
-    name: "Twyla Tyler",
+    name: "Sarah Mitchell",
+    role: "Bride",
+    event: "Wedding",
     quote:
-      "I was blown away by how easy it was to create a gorgeous invitation for my daughter's baby shower. The RSVP tracking saved me so much time!",
+      "SealSend made our wedding invitations absolutely magical. The RSVP tracking saved us so much time, and our guests loved the beautiful design!",
     rating: 5,
-    color: "bg-pink-500",
+    image: "https://i.pravatar.cc/150?img=5",
   },
   {
-    name: "Monica W",
+    name: "David Chen",
+    role: "Event Planner",
+    event: "Corporate Gala",
     quote:
-      "We used this for our wedding and the response was incredible. Guests loved the digital invites and we loved not licking envelopes!",
+      "I use SealSend for all my corporate events. The guest management features are incredible, and my clients are always impressed with the results.",
     rating: 5,
-    color: "bg-violet-500",
+    image: "https://i.pravatar.cc/150?img=11",
   },
   {
-    name: "Ashley Corbett",
+    name: "Emily Rodriguez",
+    role: "Mom-to-be",
+    event: "Baby Shower",
     quote:
-      "Perfect for corporate events. I manage dozens of events a year and the dashboard makes it effortless to keep everything organized.",
+      "So easy to use! I created my baby shower invitation in minutes and tracking RSVPs was a breeze. Highly recommend!",
     rating: 5,
-    color: "bg-brand-600",
-  },
-  {
-    name: "Brian Stuart",
-    quote:
-      "The free tier is genuinely generous. I tested it for a small birthday party and upgraded for my company holiday party. Worth every penny.",
-    rating: 5,
-    color: "bg-emerald-500",
-  },
-  {
-    name: "Lise Lumb",
-    quote:
-      "Beautiful templates, super intuitive editor, and the cards looked amazing on every phone. I've recommended it to all my friends.",
-    rating: 5,
-    color: "bg-amber-500",
-  },
-  {
-    name: "Thomas Reinhard",
-    quote:
-      "As someone who designs for a living, I appreciate the attention to detail. The customization options are top-notch and the output is polished.",
-    rating: 5,
-    color: "bg-sky-500",
+    image: "https://i.pravatar.cc/150?img=9",
   },
 ];
 
-function StarRating({ count }: { count: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: count }).map((_, i) => (
-        <Star
-          key={i}
-          className="h-4 w-4 fill-yellow-400 text-yellow-400"
-        />
-      ))}
-    </div>
-  );
-}
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5 },
+  },
+};
 
 export default function Testimonials() {
   return (
-    <section className="px-4 py-20">
-      <div className="mx-auto max-w-6xl">
-        {/* Heading */}
-        <div className="mb-12 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-brand-600">
-            Over 500 5-star reviews
-          </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Loved by event organizers everywhere
+    <section className="bg-primary-50/50 px-4 py-24">
+      <div className="mx-auto max-w-7xl">
+        {/* Section header */}
+        <motion.div
+          className="mb-16 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <span className="inline-flex items-center rounded-full bg-primary-100 px-4 py-1.5 text-sm font-medium text-primary-700">
+            Testimonials
+          </span>
+          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl lg:text-5xl">
+            Loved by hosts everywhere
           </h2>
-        </div>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
+            See what our users are saying about their experience with SealSend.
+          </p>
+        </motion.div>
 
-        {/* Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {testimonials.map((t, idx) => (
-            <div
+        {/* Testimonials grid */}
+        <motion.div
+          className="grid gap-8 md:grid-cols-3"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+        >
+          {testimonials.map((testimonial, idx) => (
+            <motion.div
               key={idx}
-              className="flex flex-col rounded-xl border border-neutral-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+              variants={itemVariants}
+              className="relative rounded-2xl bg-white p-8 shadow-sm transition-shadow hover:shadow-md"
             >
-              <StarRating count={t.rating} />
-
-              <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">
-                &ldquo;{t.quote}&rdquo;
-              </blockquote>
-
-              <div className="mt-5 flex items-center gap-3">
-                {/* Initial avatar */}
-                <span
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white",
-                    t.color
-                  )}
-                >
-                  {t.name.charAt(0)}
-                </span>
-                <span className="text-sm font-medium">{t.name}</span>
+              {/* Quote icon */}
+              <div className="absolute -top-4 left-8 flex h-8 w-8 items-center justify-center rounded-full bg-primary-100">
+                <Quote className="h-4 w-4 text-primary-600" />
               </div>
-            </div>
+
+              {/* Rating */}
+              <div className="mb-4 flex gap-1">
+                {Array.from({ length: testimonial.rating }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className="h-5 w-5 fill-accent-400 text-accent-400"
+                  />
+                ))}
+              </div>
+
+              {/* Quote */}
+              <p className="mb-6 text-neutral-700 leading-relaxed">
+                &ldquo;{testimonial.quote}&rdquo;
+              </p>
+
+              {/* Author */}
+              <div className="flex items-center gap-4">
+                <img
+                  src={testimonial.image}
+                  alt={testimonial.name}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+                <div>
+                  <p className="font-semibold text-neutral-900">
+                    {testimonial.name}
+                  </p>
+                  <p className="text-sm text-neutral-500">
+                    {testimonial.role} • {testimonial.event}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
+
+        {/* Trust badges */}
+        <motion.div
+          className="mt-16 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {[
+              { value: "10K+", label: "Events Created" },
+              { value: "500K+", label: "Guests Invited" },
+              { value: "4.9/5", label: "Average Rating" },
+              { value: "99%", label: "Satisfaction" },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <p className="font-display text-3xl font-bold text-primary-600">
+                  {stat.value}
+                </p>
+                <p className="text-sm text-neutral-600">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
     </section>
   );
