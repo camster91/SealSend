@@ -306,7 +306,8 @@ async function runIntegrationTests(): Promise<void> {
   console.log('✅ Cleanup complete');
 }
 
-async function cleanup(context: TestContext, supabase: ReturnType<typeof createClient>): Promise<void> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function cleanup(context: TestContext, supabase: any): Promise<void> {
   if (context.eventId) {
     await supabase.from('guests').delete().eq('event_id', context.eventId);
     await supabase.from('rsvp_fields').delete().eq('event_id', context.eventId);

@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
  * Email Test Script
- * Tests Resend email functionality including templates
+ * Tests Mailgun email functionality including templates
  * 
  * Usage:
  *   npx tsx scripts/test/test-email.ts <email@example.com>
  * 
  * Environment:
- *   RESEND_API_KEY - Required
+ *   MAILGUN_API_KEY - Required
+ *   MAILGUN_DOMAIN - Required
  *   FROM_EMAIL - Optional
  */
 
@@ -32,22 +33,23 @@ async function delay(ms: number): Promise<void> {
 }
 
 async function runEmailTests(recipientEmail: string): Promise<void> {
-  console.log('🧪 SealSend Resend Email Test Suite\n');
+  console.log('🧪 SealSend Mailgun Email Test Suite\n');
   console.log(`Testing with recipient: ${recipientEmail}\n`);
 
   const results: TestResult[] = [];
 
   // Check environment
   if (!isEmailConfigured()) {
-    console.error('❌ Resend not configured');
+    console.error('❌ Mailgun not configured');
     console.log('\nRequired environment variables:');
-    console.log('  RESEND_API_KEY=re_xxxxxxxxxxxxxxx');
-    console.log('  FROM_EMAIL="SealSend <onboarding@resend.dev>"');
-    console.log('\nGet your credentials at https://resend.com/api-keys');
+    console.log('  MAILGUN_API_KEY=your-mailgun-api-key');
+    console.log('  MAILGUN_DOMAIN=your-mailgun-domain');
+    console.log('  FROM_EMAIL="SealSend <noreply@sealsend.app>"');
+    console.log('\nGet your credentials at https://app.mailgun.com/settings/api_security');
     process.exit(1);
   }
 
-  const fromEmail = process.env.FROM_EMAIL || 'SealSend <onboarding@resend.dev>';
+  const fromEmail = process.env.FROM_EMAIL || 'SealSend <noreply@sealsend.app>';
   console.log(`From: ${fromEmail}\n`);
 
   // Test 1: Simple test email
@@ -56,8 +58,8 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
     const result = await sendEmail({
       to: recipientEmail,
       subject: 'SealSend Test - Simple Email',
-      html: '<h1>Test Successful!</h1><p>Your Resend integration is working.</p>',
-      text: 'Test Successful! Your Resend integration is working.',
+      html: '<h1>Test Successful!</h1><p>Your Mailgun integration is working.</p>',
+      text: 'Test Successful! Your Mailgun integration is working.',
     });
 
     results.push({
@@ -218,18 +220,18 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
   if (failed > 0) {
     console.log(`\n⚠️ ${failed} test(s) failed`);
     console.log('\nTroubleshooting:');
-    console.log('  1. Check Resend dashboard for error details');
+    console.log('  1. Check Mailgun dashboard for error details');
     console.log('  2. Verify your API key is valid');
     console.log('  3. Check if the recipient email is valid');
-    console.log('  4. Ensure your domain is verified in Resend');
+    console.log('  4. Ensure your domain is verified in Mailgun');
     process.exit(1);
   } else {
     console.log('\n🎉 All tests passed!');
     console.log('\n📋 Next steps:');
     console.log('   1. Check your inbox for the test emails');
     console.log('   2. Verify the templates render correctly');
-    console.log('   3. Check Resend dashboard for delivery status');
-    console.log('   4. Visit https://resend.com/emails');
+    console.log('   3. Check Mailgun dashboard for delivery status');
+    console.log('   4. Visit https://app.mailgun.com/sending/domains');
   }
 }
 

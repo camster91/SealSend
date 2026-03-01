@@ -112,10 +112,11 @@ export async function sendEmail(params: SendEmailParams): Promise<MailgunRespons
   }
 
   try {
-    const response = await client.messages.create(domain, messageData);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await client.messages.create(domain, messageData as any);
     return {
-      id: response.id,
-      message: response.message,
+      id: response.id || '',
+      message: response.message || '',
     };
   } catch (error) {
     console.error('Mailgun send error:', error);

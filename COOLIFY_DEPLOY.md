@@ -32,39 +32,39 @@ The project includes a `Dockerfile` optimized for Next.js standalone output.
 
 ### 4. Environment Variables
 
-Set these in Coolify's Environment Variables section:
+**IMPORTANT**: `NEXT_PUBLIC_*` vars must be set as **Build Arguments** in Coolify
+(they get baked into the client JS at build time). All other vars are **runtime**
+and should be set as regular Environment Variables.
+
+#### Build Arguments (Coolify → Settings → Build Args)
 
 ```bash
-# Supabase (Required)
 NEXT_PUBLIC_SUPABASE_URL=https://vtbreowxqfcvwegpfnwn.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YnJlb3d4cWZjdndlZ3BmbnduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NDA4NTMsImV4cCI6MjA4NjQxNjg1M30.eFcnSP-sNXJq7TOsnu2bQ-hI0_-IibQZsruNNugQV3E
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-
-# App URL (Required)
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YnJlb3d4cWZjdndlZ3BmbnduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NDA4NTMsImV4cCI6MjA4NjQxNjg1M30.eFcnSP-sNXJq7TOsnu2bQ-hI0_-IibQZsruRNugQV3E
 NEXT_PUBLIC_SITE_URL=https://sealsend.app
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your-stripe-publishable-key
+```
 
-# Email - Titan (Primary)
-TITAN_IMAP_HOST=imap.titan.email
-TITAN_IMAP_USER=contact@sealsend.app
-TITAN_IMAP_PASSWORD=your-titan-app-password
-TITAN_SMTP_HOST=smtp.titan.email
-TITAN_SMTP_PORT=465
-TITAN_SMTP_USER=contact@sealsend.app
-TITAN_SMTP_PASSWORD=your-titan-app-password
-TITAN_DEFAULT_FROM=Seal and Send <contact@sealsend.app>
+#### Runtime Environment Variables (Coolify → Environment Variables)
 
-# Email - Resend (Fallback/Optional)
-RESEND_API_KEY=your-resend-api-key
+```bash
+# Supabase (Required - server-side)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Twilio (SMS)
+# Email - Mailgun (Required)
+MAILGUN_API_KEY=your-mailgun-sending-key
+MAILGUN_DOMAIN=sealsend.app
+MAILGUN_URL=https://api.mailgun.net
+FROM_EMAIL=SealSend <noreply@sealsend.app>
+
+# Twilio SMS (Required for SMS features)
 TWILIO_ACCOUNT_SID=your-twilio-account-sid
 TWILIO_API_KEY_SID=your-twilio-api-key-sid
 TWILIO_API_KEY_SECRET=your-twilio-api-key-secret
 TWILIO_MESSAGING_SERVICE_SID=your-twilio-messaging-service-sid
 
-# Stripe (Payments)
+# Stripe Payments (Required for paid tiers)
 STRIPE_SECRET_KEY=sk_live_your-stripe-secret-key
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your-stripe-publishable-key
 STRIPE_WEBHOOK_SECRET=whsec_your-stripe-webhook-secret
 STRIPE_STANDARD_PRICE_ID=price_your-standard-price-id
 STRIPE_PREMIUM_PRICE_ID=price_your-premium-price-id
@@ -111,9 +111,9 @@ Check build logs in Coolify for missing env vars or build errors.
 Check that all required environment variables are set.
 
 ### Emails Not Sending
-- Verify Titan email credentials
-- Check Resend API key as fallback
-- Ensure `contact@sealsend.app` is verified with email provider
+- Verify Mailgun API key and domain
+- Check Mailgun dashboard for delivery logs
+- Ensure `sealsend.app` domain is verified in Mailgun (DNS: SPF, DKIM, MX)
 
 ### Domain Not Working
 - Check DNS A record points to 187.77.26.99

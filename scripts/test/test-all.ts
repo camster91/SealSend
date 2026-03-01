@@ -16,7 +16,7 @@
 
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+import path, { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -84,8 +84,8 @@ Examples:
 }
 
 function runTest(script: string, args: string[]): Promise<{ success: boolean; output: string }> {
-  return new Promise((resolve) => {
-    const fullPath = resolve(__dirname, script);
+  return new Promise((promiseResolve) => {
+    const fullPath = path.resolve(__dirname, script);
     const child = spawn('npx', ['tsx', fullPath, ...args], {
       stdio: 'pipe',
       shell: true,
@@ -107,7 +107,7 @@ function runTest(script: string, args: string[]): Promise<{ success: boolean; ou
     });
 
     child.on('close', (code) => {
-      resolve({
+      promiseResolve({
         success: code === 0,
         output: output + errorOutput,
       });

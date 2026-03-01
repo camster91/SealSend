@@ -16,7 +16,7 @@ export interface SendLogEntry {
   recipient: string; // email or phone
   subject?: string;
   error_message?: string;
-  provider?: string; // 'resend' | 'twilio'
+  provider?: string; // 'mailgun' | 'twilio'
   provider_message_id?: string;
   metadata?: Record<string, unknown>;
 }
@@ -154,10 +154,10 @@ export async function getEventSendStats(eventId: string): Promise<{
     
     if (log.status === 'sent' || log.status === 'delivered') {
       stats.sent++;
-      stats.byType[log.send_type].sent++;
+      stats.byType[log.send_type as SendType].sent++;
     } else if (log.status === 'failed') {
       stats.failed++;
-      stats.byType[log.send_type].failed++;
+      stats.byType[log.send_type as SendType].failed++;
     } else if (log.status === 'pending') {
       stats.pending++;
     }

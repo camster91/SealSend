@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     // Twilio sends form-encoded data, not JSON
     const formData = await request.formData();
-    const data = Object.fromEntries(formData.entries()) as TwilioWebhookData;
+    const data = Object.fromEntries(formData.entries()) as unknown as TwilioWebhookData;
 
     // Verify the request is from Twilio (in production, validate the signature)
     // See: https://www.twilio.com/docs/usage/security#validating-requests

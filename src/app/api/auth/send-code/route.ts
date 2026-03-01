@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      formattedPhone = phoneValidation.formatted;
+      formattedPhone = phoneValidation.formatted ?? null;
     }
 
     // Use admin client to bypass RLS - auth operations happen before user is authenticated

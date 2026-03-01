@@ -1,14 +1,14 @@
 /**
- * Email client using Resend
- * All email functionality goes through Resend
+ * Email client using Mailgun
+ * All email functionality goes through Mailgun
  */
 
-import { sendEmail as sendResendEmail, isResendConfigured } from './resend';
+import { sendEmail as sendMailgunEmail, isMailgunConfigured } from './mailgun';
 
-export { isResendConfigured } from './resend';
+export { isMailgunConfigured };
 
 export function isEmailConfigured(): boolean {
-  return isResendConfigured();
+  return isMailgunConfigured();
 }
 
 interface SendEmailParams {
@@ -20,9 +20,9 @@ interface SendEmailParams {
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ id: string }> {
-  if (!isResendConfigured()) {
+  if (!isMailgunConfigured()) {
     throw new Error(
-      'Resend not configured. Set RESEND_API_KEY environment variable.'
+      'Mailgun not configured. Set MAILGUN_API_KEY and MAILGUN_DOMAIN environment variables.'
     );
   }
 
@@ -32,7 +32,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ id: string }
     throw new Error('FROM_EMAIL not configured');
   }
 
-  const result = await sendResendEmail({
+  const result = await sendMailgunEmail({
     from: fromEmail,
     to: params.to,
     subject: params.subject,
