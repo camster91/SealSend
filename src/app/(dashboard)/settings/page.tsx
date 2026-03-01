@@ -141,7 +141,7 @@ export default function SettingsPage() {
                             : "bg-brand-100 text-brand-700"
                         }`}
                       >
-                        {tierInfo?.name ?? evt.tier} &middot; ${tierInfo?.price ?? "?"}
+                        {evt.tier.charAt(0).toUpperCase() + evt.tier.slice(1)} &middot; ${tierInfo?.price ?? "0"}
                       </span>
                     </div>
                   );

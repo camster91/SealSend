@@ -85,7 +85,7 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             )}
-            {tierInfo.name} ${tierInfo.price}
+            {tier.charAt(0).toUpperCase() + tier.slice(1)} ${tierInfo.price}
           </button>
         );
       })}

@@ -134,7 +134,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                   ? 'bg-brand-100 text-brand-700'
                   : 'bg-gray-100 text-gray-600'
             }`}>
-              {TIERS[event.tier as keyof typeof TIERS]?.name ?? 'Free'} tier
+              {event.tier.charAt(0).toUpperCase() + event.tier.slice(1)} tier
             </span>
             <UpgradeButton eventId={eventId} currentTier={event.tier} />
           </div>

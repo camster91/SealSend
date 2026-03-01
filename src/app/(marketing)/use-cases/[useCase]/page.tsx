@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/marketing/JsonLd";
 import UseCaseHero from "@/components/marketing/UseCaseHero";
 import UseCaseBenefits from "@/components/marketing/UseCaseBenefits";
 import UseCaseTestimonial from "@/components/marketing/UseCaseTestimonial";
-import PricingCards from "@/components/marketing/PricingCards";
+import { PricingCards } from "@/components/pricing/PricingCards";
 import UseCaseFAQ from "@/components/marketing/UseCaseFAQ";
 import CTASection from "@/components/marketing/CTASection";
 

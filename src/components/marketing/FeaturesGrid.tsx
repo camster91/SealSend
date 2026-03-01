@@ -19,8 +19,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Map icon name strings from constants to actual Lucide components. */
-const iconMap: Record<string, LucideIcon> = {
+// Map icon components from constants
+const iconComponents = {
   Palette,
   Mail,
   BarChart3,
@@ -87,7 +87,7 @@ export default function FeaturesGrid() {
           viewport={{ once: true }}
         >
           {FEATURES_LIST.map((feature, idx) => {
-            const Icon = iconMap[feature.icon] ?? Sparkles;
+            const Icon = (iconComponents as Record<string, React.ComponentType<{className?: string}>>)[feature.icon as unknown as string] ?? Sparkles;
 
             return (
               <motion.div
