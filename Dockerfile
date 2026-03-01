@@ -61,5 +61,9 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Run the standalone server
-CMD ["node", "server.js"]
+# Copy start script
+COPY start.sh ./
+RUN chmod +x start.sh
+
+# Run the standalone server with runtime env vars
+CMD ["./start.sh"]

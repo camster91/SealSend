@@ -86,7 +86,7 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="max-h-[70vh] overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   );
