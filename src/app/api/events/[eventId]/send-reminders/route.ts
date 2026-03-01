@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit } from "@/lib/rate-limit";
-import { getResendClient } from "@/lib/resend";
+import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
+import { validateAndFormatPhone } from "@/lib/phone-validation";
+import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -65,7 +67,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
 
-    const resend = getResendClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured() && event.tier !== "free";
 
@@ -87,6 +88,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
           let emailOk = false;
           let smsOk = false;
+          const errors: Array<{ type: 'email' | 'sms'; message: string }> = [];
 
           if (guest.email) {
             const { subject, html } = buildReminderEmail({
@@ -98,47 +100,108 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              await resend.emails.send({
-                from: "Seal and Send <contact@sealsend.app>",
+              const result = await sendEmail({
                 to: guest.email,
                 subject,
                 html,
               });
               emailOk = true;
-            } catch {}
+              
+              await logSendSuccess(eventId, 'email', guest.email, {
+                guestId: guest.id,
+                subject,
+                provider: 'mailgun',
+                providerMessageId: result.id,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Email send failed';
+              errors.push({ type: 'email', message });
+              console.error(`[REMINDER EMAIL FAILED] ${guest.email}:`, message);
+              
+              await logSendFailure(eventId, 'email', guest.email, message, {
+                guestId: guest.id,
+                subject: `Reminder: ${event.title}`,
+                provider: 'mailgun',
+              });
+            }
           }
 
           if (guest.phone && smsEnabled) {
-            const smsBody = buildReminderSms({
-              guestName: guest.name,
-              eventTitle: event.title,
-              eventDate: event.event_date,
-              rsvpUrl,
-            });
-
-            try {
-              const twilioClient = getTwilioClient();
-              await twilioClient.messages.create({
-                body: smsBody,
-                to: guest.phone,
-                ...getTwilioSendOptions(),
+            // Validate and format phone number
+            const phoneValidation = validateAndFormatPhone(guest.phone);
+            
+            if (!phoneValidation.valid) {
+              errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
+              console.error(`[REMINDER SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              
+              await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
+                guestId: guest.id,
               });
-              smsOk = true;
-            } catch {}
+            } else {
+              const formattedPhone = phoneValidation.formatted!;
+              const smsBody = buildReminderSms({
+                guestName: guest.name,
+                eventTitle: event.title,
+                eventDate: event.event_date,
+                rsvpUrl,
+              });
+
+              try {
+                const twilioClient = getTwilioClient();
+                const result = await twilioClient.messages.create({
+                  body: smsBody,
+                  to: formattedPhone,
+                  ...getTwilioSendOptions(),
+                });
+                smsOk = true;
+                
+                await logSendSuccess(eventId, 'sms', formattedPhone, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                  providerMessageId: result.sid,
+                });
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'SMS send failed';
+                errors.push({ type: 'sms', message });
+                console.error(`[REMINDER SMS FAILED] ${guest.phone}:`, message);
+                
+                await logSendFailure(eventId, 'sms', guest.phone, message, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                });
+              }
+            }
           }
 
-          return { guestId: guest.id, emailOk, smsOk, hasEmail: !!guest.email, hasPhone: !!guest.phone };
+          return { guestId: guest.id, emailOk, smsOk, hasEmail: !!guest.email, hasPhone: !!guest.phone, errors };
         })
       );
 
       for (const result of results) {
         if (result.status === "fulfilled") {
-          const { guestId, emailOk, smsOk, hasEmail, hasPhone } = result.value;
-          if (emailOk) sent++;
-          else if (hasEmail) failed++;
-          if (smsOk) smsSent++;
-          else if (smsEnabled && hasPhone) smsFailed++;
+          const { guestId, emailOk, smsOk, hasEmail, hasPhone, errors } = result.value;
+          
+          if (emailOk) {
+            sent++;
+          } else if (hasEmail) {
+            failed++;
+            console.error(`[REMINDER FAILED] Guest ${guestId} email failed:`,
+              errors.filter(e => e.type === 'email').map(e => e.message).join(', '));
+          }
+          
+          if (smsOk) {
+            smsSent++;
+          } else if (smsEnabled && hasPhone) {
+            smsFailed++;
+            const smsErrors = errors.filter(e => e.type === 'sms').map(e => e.message).join(', ');
+            if (smsErrors) {
+              console.error(`[REMINDER SMS FAILED] Guest ${guestId}:`, smsErrors);
+            }
+          }
+          
           if (emailOk || smsOk) successIds.push(guestId);
+        } else {
+          console.error('[REMINDER BATCH ERROR] Promise rejected:', result.reason);
         }
       }
     }
@@ -151,7 +214,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });
-  } catch {
+  } catch (error) {
+    console.error('[REMINDER SEND ERROR]', error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

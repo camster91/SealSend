@@ -9,7 +9,15 @@ import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
 import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
-import { isValidHexColor } from "@/lib/utils";
+import { 
+  sanitizeCustomization, 
+  sanitizeInviteToken,
+  sanitizeColor,
+  sanitizeFontFamily,
+  sanitizeBackgroundImage,
+  sanitizeAudioUrl,
+  sanitizeButtonStyle
+} from "@/lib/sanitize";
 import type { Metadata } from "next";
 
 interface Props {
@@ -79,7 +87,9 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
 
   // Resolve invite token for magic link pre-filling
   let inviteGuest: { id: string; name: string; email: string | null } | null = null;
-  const token = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
+  const rawToken = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
+  const token = sanitizeInviteToken(rawToken);
+  
   if (token) {
     const { data: guest } = await supabase
       .from("guests")
@@ -90,23 +100,14 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     if (guest) inviteGuest = guest;
   }
 
-  const safeBgColor = isValidHexColor(event.customization?.backgroundColor ?? "")
-    ? event.customization.backgroundColor
-    : "#ffffff";
-  const safePrimaryColor = isValidHexColor(event.customization?.primaryColor ?? "")
-    ? event.customization.primaryColor
-    : "#7c3aed";
-
-  const ALLOWED_FONTS = ["Inter", "Poppins", "Georgia", "Times New Roman", "Arial", "Helvetica", "serif", "sans-serif", "monospace"];
-  const rawFont = event.customization?.fontFamily || "Inter";
-  const fontFamily = ALLOWED_FONTS.includes(rawFont) ? rawFont : "Inter";
-
-  const rawBgImage = event.customization?.backgroundImage || null;
-  // Sanitize backgroundImage: only allow https URLs, no special chars that could break CSS
-  const backgroundImage = rawBgImage && /^https:\/\/[^\s"')};]+$/.test(rawBgImage) ? rawBgImage : null;
-
-  const audioUrl = event.customization?.audioUrl || null;
-  const buttonStyle = (event.customization?.buttonStyle as "rounded" | "pill" | "square") || "rounded";
+  // Sanitize all customization values
+  const customization = sanitizeCustomization(event.customization);
+  const safeBgColor = customization.backgroundColor;
+  const safePrimaryColor = customization.primaryColor;
+  const fontFamily = customization.fontFamily;
+  const backgroundImage = customization.backgroundImage;
+  const audioUrl = customization.audioUrl;
+  const buttonStyle = customization.buttonStyle;
 
   const pageStyle: React.CSSProperties = {
     backgroundColor: safeBgColor,

@@ -1,23 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
-import { Resend } from 'resend';
+import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
-
-function getResend() {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || apiKey === 'your-resend-api-key') {
-    throw new Error('RESEND_API_KEY is not configured. Please set a valid Resend API key in your environment variables.');
-  }
-  return new Resend(apiKey);
-}
+import { validateAndFormatPhone } from '@/lib/phone-validation';
+import { getTwilioSendOptions } from '@/lib/twilio';
 
 function getTwilioClient() {
-  return twilio(
-    process.env.TWILIO_API_KEY_SID,
-    process.env.TWILIO_API_KEY_SECRET,
-    { accountSid: process.env.TWILIO_ACCOUNT_SID }
-  );
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const apiKeySid = process.env.TWILIO_API_KEY_SID;
+  const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (accountSid && apiKeySid && apiKeySecret) {
+    return twilio(apiKeySid, apiKeySecret, { accountSid });
+  } else if (accountSid && authToken) {
+    return twilio(accountSid, authToken);
+  } else {
+    throw new Error(
+      'Missing Twilio credentials. Set TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN, or TWILIO_ACCOUNT_SID + TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET'
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -39,6 +42,19 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    // Validate and format phone number if using SMS
+    let formattedPhone: string | null = null;
+    if (method === 'phone' && phone) {
+      const phoneValidation = validateAndFormatPhone(phone);
+      if (!phoneValidation.valid) {
+        return NextResponse.json(
+          { error: phoneValidation.error || 'Invalid phone number' },
+          { status: 400 }
+        );
+      }
+      formattedPhone = phoneValidation.formatted;
     }
 
     // Use admin client to bypass RLS - auth operations happen before user is authenticated
@@ -65,8 +81,8 @@ export async function POST(request: NextRequest) {
     // Delete any existing codes for this email/phone to avoid stale entries
     if (method === 'email' && email) {
       await supabase.from('auth_codes').delete().eq('email', email);
-    } else if (method === 'phone' && phone) {
-      await supabase.from('auth_codes').delete().eq('phone', phone);
+    } else if (method === 'phone' && formattedPhone) {
+      await supabase.from('auth_codes').delete().eq('phone', formattedPhone);
     }
 
     // Store code in database
@@ -74,7 +90,7 @@ export async function POST(request: NextRequest) {
       .from('auth_codes')
       .insert({
         email: email || null,
-        phone: phone || null,
+        phone: formattedPhone || null,
         code,
         role,
         event_id: eventId || null,
@@ -92,39 +108,31 @@ export async function POST(request: NextRequest) {
     // Send code via appropriate channel
     if (method === 'email' && email) {
       try {
-        const resend = getResend();
-        const { error: emailError } = await resend.emails.send({
-          from: 'Seal and Send <contact@sealsend.app>',
+        await sendEmail({
           to: email,
           subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
-          html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId)
+          html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId),
         });
-
-        if (emailError) {
-          console.error('Email error:', emailError);
-          return NextResponse.json(
-            { error: 'Failed to send email. Please try again.' },
-            { status: 500 }
-          );
-        }
       } catch (error) {
-        console.error('Email service error:', error);
+        console.error('Email error:', error);
         return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Email service is not configured' },
+          { error: error instanceof Error ? error.message : 'Failed to send email' },
           { status: 500 }
         );
       }
-    } else if (method === 'phone' && phone) {
+    } else if (method === 'phone' && formattedPhone) {
       try {
-        await getTwilioClient().messages.create({
+        const twilioClient = getTwilioClient();
+        await twilioClient.messages.create({
           body: `Your Seal and Send ${role} access code: ${code}. This code expires in 15 minutes.`,
-          messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID!,
-          to: phone
+          to: formattedPhone,
+          ...getTwilioSendOptions(),
         });
       } catch (error) {
         console.error('SMS error:', error);
+        const message = error instanceof Error ? error.message : 'Failed to send SMS';
         return NextResponse.json(
-          { error: 'Failed to send SMS' },
+          { error: message },
           { status: 500 }
         );
       }

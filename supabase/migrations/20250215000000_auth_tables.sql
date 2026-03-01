@@ -25,7 +25,7 @@ CREATE INDEX idx_auth_codes_expires ON auth_codes(expires_at);
 CREATE TABLE IF NOT EXISTS admin_users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL, -- In production, store hashed passwords
+  password TEXT NOT NULL, -- bcrypt hashed password - never store plaintext
   name TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -90,7 +90,12 @@ $$ LANGUAGE plpgsql;
 -- Schedule cleanup job (run every hour)
 SELECT cron.schedule('cleanup-auth-codes', '0 * * * *', 'SELECT cleanup_expired_auth_codes()');
 
--- Insert a sample admin user (password: admin123)
-INSERT INTO admin_users (email, password, name) 
-VALUES ('admin@example.com', 'admin123', 'Admin User')
-ON CONFLICT (email) DO NOTHING;
+-- Note: Admin users should be created via the admin registration API
+-- which properly hashes passwords using bcrypt.
+-- Example (for manual insertion only):
+-- INSERT INTO admin_users (email, password, name) 
+-- VALUES ('admin@example.com', '$2a$12$...hashed_password...', 'Admin User')
+-- ON CONFLICT (email) DO NOTHING;
+-- 
+-- To create an admin, use the signup API or run:
+-- npm run create-admin -- email@example.com "Full Name" "securePassword123!"

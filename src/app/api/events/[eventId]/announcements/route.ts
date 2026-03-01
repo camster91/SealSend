@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rateLimit } from "@/lib/rate-limit";
-import { getResendClient } from "@/lib/resend";
+import { sendEmail } from "@/lib/email";
 import { buildAnnouncementEmail } from "@/lib/email-templates";
 import { buildAnnouncementSms } from "@/lib/sms-templates";
 import { announcementSchema } from "@/lib/validations";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
+import { validateAndFormatPhone } from "@/lib/phone-validation";
+import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -40,7 +42,8 @@ export async function GET(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json(announcements);
-  } catch {
+  } catch (error) {
+    console.error('[ANNOUNCEMENTS GET ERROR]', error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -113,7 +116,6 @@ export async function POST(
       return NextResponse.json({ error: guestsError.message }, { status: 500 });
     }
 
-    const resend = getResendClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured();
 
@@ -143,33 +145,74 @@ export async function POST(
             });
 
             try {
-              await resend.emails.send({
-                from: "Seal and Send <contact@sealsend.app>",
+              const result = await sendEmail({
                 to: guest.email,
                 subject,
                 html,
               });
               ok = true;
-            } catch {}
+              
+              await logSendSuccess(eventId, 'email', guest.email, {
+                guestId: guest.id,
+                subject,
+                provider: 'mailgun',
+                providerMessageId: result.id,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Email send failed';
+              console.error(`[ANNOUNCEMENT EMAIL FAILED] ${guest.email}:`, message);
+              
+              await logSendFailure(eventId, 'email', guest.email, message, {
+                guestId: guest.id,
+                subject: parsed.data.subject,
+                provider: 'mailgun',
+              });
+            }
           }
 
           if (guest.phone && smsEnabled) {
-            const smsBody = buildAnnouncementSms({
-              guestName: guest.name,
-              eventTitle: event.title,
-              subject: parsed.data.subject,
-              rsvpUrl,
-            });
-
-            try {
-              const twilioClient = getTwilioClient();
-              await twilioClient.messages.create({
-                body: smsBody,
-                to: guest.phone,
-                ...getTwilioSendOptions(),
+            // Validate and format phone number
+            const phoneValidation = validateAndFormatPhone(guest.phone);
+            
+            if (!phoneValidation.valid) {
+              console.error(`[ANNOUNCEMENT SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              
+              await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
+                guestId: guest.id,
               });
-              ok = true;
-            } catch {}
+            } else {
+              const formattedPhone = phoneValidation.formatted!;
+              const smsBody = buildAnnouncementSms({
+                guestName: guest.name,
+                eventTitle: event.title,
+                subject: parsed.data.subject,
+                rsvpUrl,
+              });
+
+              try {
+                const twilioClient = getTwilioClient();
+                const result = await twilioClient.messages.create({
+                  body: smsBody,
+                  to: formattedPhone,
+                  ...getTwilioSendOptions(),
+                });
+                ok = true;
+                
+                await logSendSuccess(eventId, 'sms', formattedPhone, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                  providerMessageId: result.sid,
+                });
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'SMS send failed';
+                console.error(`[ANNOUNCEMENT SMS FAILED] ${guest.phone}:`, message);
+                
+                await logSendFailure(eventId, 'sms', guest.phone, message, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                });
+              }
+            }
           }
 
           return ok;
@@ -198,7 +241,8 @@ export async function POST(
     }
 
     return NextResponse.json(announcement, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error('[ANNOUNCEMENT POST ERROR]', error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getResendClient } from "@/lib/resend";
+import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
 import { generateInviteToken } from "@/lib/utils";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
 import { rateLimit } from "@/lib/rate-limit";
+import { validateAndFormatPhone } from "@/lib/phone-validation";
+import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -65,7 +67,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
 
-    const resend = getResendClient();
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     // SMS requires standard or premium tier
     const smsEnabled = isTwilioConfigured() && event.tier !== "free";
@@ -97,6 +98,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           const rsvpUrl = `${siteUrl}/e/${event.slug}?t=${token}`;
           let emailOk = false;
           let smsOk = false;
+          const errors: Array<{ type: 'email' | 'sms'; message: string }> = [];
 
           // Send email if guest has email
           if (guest.email) {
@@ -113,60 +115,119 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              await resend.emails.send({
-                from: "Seal and Send <contact@sealsend.app>",
+              const result = await sendEmail({
                 to: guest.email,
                 subject,
                 html,
               });
               emailOk = true;
-            } catch {
-              // email failed
+              
+              // Log successful send
+              await logSendSuccess(eventId, 'email', guest.email, {
+                guestId: guest.id,
+                subject,
+                provider: 'mailgun',
+                providerMessageId: result.id,
+              });
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Email send failed';
+              errors.push({ type: 'email', message });
+              console.error(`[EMAIL FAILED] ${guest.email}:`, message);
+              
+              await logSendFailure(eventId, 'email', guest.email, message, {
+                guestId: guest.id,
+                subject: event.title,
+              });
             }
           }
 
           // Send SMS if guest has phone and Twilio is configured
           if (guest.phone && smsEnabled) {
-            const smsBody = buildInviteSms({
-              guestName: guest.name,
-              eventTitle: event.title,
-              eventDate: event.event_date,
-              locationName: event.location_name,
-              hostName: event.host_name || undefined,
-              rsvpUrl,
-            });
-
-            try {
-              const twilioClient = getTwilioClient();
-              await twilioClient.messages.create({
-                body: smsBody,
-                to: guest.phone,
-                ...getTwilioSendOptions(),
+            // Validate and format phone number
+            const phoneValidation = validateAndFormatPhone(guest.phone);
+            
+            if (!phoneValidation.valid) {
+              errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
+              console.error(`[SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              
+              await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
+                guestId: guest.id,
               });
-              smsOk = true;
-            } catch {
-              // sms failed
+            } else {
+              const formattedPhone = phoneValidation.formatted!;
+              const smsBody = buildInviteSms({
+                guestName: guest.name,
+                eventTitle: event.title,
+                eventDate: event.event_date,
+                locationName: event.location_name,
+                hostName: event.host_name || undefined,
+                rsvpUrl,
+              });
+
+              try {
+                const twilioClient = getTwilioClient();
+                const result = await twilioClient.messages.create({
+                  body: smsBody,
+                  to: formattedPhone,
+                  ...getTwilioSendOptions(),
+                });
+                smsOk = true;
+                
+                // Log successful SMS
+                await logSendSuccess(eventId, 'sms', formattedPhone, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                  providerMessageId: result.sid,
+                });
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'SMS send failed';
+                errors.push({ type: 'sms', message });
+                console.error(`[SMS FAILED] ${guest.phone}:`, message);
+                
+                await logSendFailure(eventId, 'sms', guest.phone, message, {
+                  guestId: guest.id,
+                  provider: 'twilio',
+                });
+              }
             }
           }
 
-          return { guestId: guest.id, emailOk, smsOk };
+          return { guestId: guest.id, emailOk, smsOk, errors };
         })
       );
 
       // Aggregate results
       for (const result of results) {
         if (result.status === "fulfilled") {
-          const { guestId, emailOk, smsOk } = result.value;
-          if (emailOk) sent++;
-          else if (batch.find((g) => g.id === guestId)?.email) failed++;
-          if (smsOk) smsSent++;
-          else if (smsEnabled && batch.find((g) => g.id === guestId)?.phone) smsFailed++;
+          const { guestId, emailOk, smsOk, errors } = result.value;
+          const guest = batch.find((g) => g.id === guestId);
+          
+          if (emailOk) {
+            sent++;
+          } else if (guest?.email) {
+            failed++;
+            console.error(`[INVITE FAILED] Guest ${guestId} email failed:`, 
+              errors.filter(e => e.type === 'email').map(e => e.message).join(', '));
+          }
+          
+          if (smsOk) {
+            smsSent++;
+          } else if (smsEnabled && guest?.phone) {
+            smsFailed++;
+            const smsErrors = errors.filter(e => e.type === 'sms').map(e => e.message).join(', ');
+            if (smsErrors) {
+              console.error(`[INVITE SMS FAILED] Guest ${guestId}:`, smsErrors);
+            }
+          }
 
           if (emailOk || smsOk) {
             successIds.push(guestId);
           } else {
             failedIds.push(guestId);
           }
+        } else {
+          // Promise was rejected (shouldn't happen with our try/catch, but handle just in case)
+          console.error('[BATCH ERROR] Promise rejected:', result.reason);
         }
       }
     }

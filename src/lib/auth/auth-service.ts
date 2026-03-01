@@ -79,9 +79,32 @@ export class AuthService {
   }
 
   private async verifyPassword(email: string, password: string): Promise<{ success: boolean; message: string }> {
-    // For now, we'll use the API route approach
-    // In a real implementation, this would be a separate API endpoint
-    return { success: false, message: 'Password login not implemented yet' };
+    try {
+      const response = await fetch('/api/auth/login-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {
+        return { success: false, message: 'Server configuration error. Please try again later.' };
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Store user in localStorage for client-side access
+        if (typeof window !== 'undefined' && result.user) {
+          localStorage.setItem('sealsend_user', JSON.stringify(result.user));
+        }
+        return { success: true, message: result.message };
+      }
+      
+      return { success: false, message: result.error || 'Invalid email or password' };
+    } catch (error) {
+      console.error('Password login error:', error);
+      return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
+    }
   }
 
   private async verifyEmailCode(email: string, code: string, eventId?: string):
