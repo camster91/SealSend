@@ -1,4 +1,4 @@
-import { TIERS } from "@/lib/constants";
+import { TIERS, BETA_MODE } from "@/lib/constants";
 import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
@@ -7,6 +7,67 @@ import Link from "next/link";
 const tierOrder = ["free", "standard", "premium"] as const;
 
 export default function PricingCards() {
+  if (BETA_MODE) {
+    return (
+      <section className="py-16 px-4">
+        <div className="mx-auto max-w-3xl">
+          {/* Beta banner */}
+          <div className="mb-8 rounded-2xl border-2 border-brand-200 bg-gradient-to-r from-brand-50 to-indigo-50 p-8 text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-brand-600 px-4 py-1.5 text-sm font-bold text-white">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              BETA — Everything Free
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900">
+              All Premium Features, Completely Free
+            </h3>
+            <p className="mx-auto mt-3 max-w-xl text-gray-600">
+              We&apos;re in beta! Enjoy unlimited events, SMS invites, guest tags,
+              announcements, sign-up boards, and up to 1,200 replies per event
+              &mdash; all at no cost while we refine the experience.
+            </p>
+            <Link
+              href="/signup"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-8 py-3 text-base font-semibold text-white shadow-lg transition hover:bg-brand-700"
+            >
+              Get Started Free
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
+          </div>
+
+          {/* What's included */}
+          <div className="rounded-2xl bg-neutral-900 p-6 sm:p-10">
+            <h4 className="mb-6 text-center text-lg font-bold text-white">Everything included during Beta</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                "Unlimited events",
+                "Up to 1,200 guest replies per event",
+                "Email invitations via Mailgun",
+                "SMS invitations via Twilio",
+                "Guest tags & organization",
+                "Announcements to all guests",
+                "Sign-up board for contributions",
+                "Custom colors, fonts & branding",
+                "Video & slideshow invitations",
+                "Add-to-calendar buttons",
+                "RSVP tracking & analytics",
+                "No SealSend branding",
+              ].map((feature, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm text-white">
+                  <Check className="h-4 w-4 shrink-0 text-green-400" />
+                  {feature}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16 px-4">
       <div className="mx-auto max-w-6xl rounded-2xl bg-neutral-900 p-6 sm:p-10">

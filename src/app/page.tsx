@@ -78,10 +78,10 @@ export default async function HomePage() {
         <section className="bg-neutral-50 py-20">
           <div className="mx-auto max-w-6xl px-4 text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Simple, transparent pricing
+              Free During Beta
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Start free. Upgrade when your event grows.
+              All premium features are free while we&apos;re in beta. No credit card required.
             </p>
           </div>
           <PricingCards />

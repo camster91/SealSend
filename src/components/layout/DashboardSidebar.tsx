@@ -40,6 +40,9 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
             <span className="text-foreground">Seal</span>
             <span className="text-brand-600">Send</span>
           </span>
+          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700">
+            Beta
+          </span>
         </Link>
       </div>
 

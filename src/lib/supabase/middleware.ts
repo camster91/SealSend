@@ -64,6 +64,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/")) ||
     pathname.startsWith("/e/") ||                             // Public event pages
+    pathname.startsWith("/api/") ||                           // API routes handle their own auth
     /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);      // Guest/public event access
 
   // Determine if user is authenticated (either via Supabase or custom session)

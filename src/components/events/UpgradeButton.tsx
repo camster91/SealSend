@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TIERS } from "@/lib/constants";
+import { TIERS, BETA_MODE } from "@/lib/constants";
 
 type UpgradeTier = "standard" | "premium";
 
@@ -12,6 +12,18 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   const [loading, setLoading] = useState<UpgradeTier | null>(null);
+
+  // During beta, all features are free — hide upgrade buttons
+  if (BETA_MODE) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        All features unlocked (Beta)
+      </span>
+    );
+  }
 
   const tierRank = { free: 0, standard: 1, premium: 2 } as const;
   const currentRank = tierRank[currentTier as keyof typeof tierRank] ?? 0;

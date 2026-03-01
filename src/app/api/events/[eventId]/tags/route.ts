@@ -69,8 +69,9 @@ export async function POST(
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Tier gate: tags require standard or premium
-    if (event.tier === "free") {
+    // Tier gate: tags require standard or premium (unlocked in beta)
+    const { BETA_MODE } = await import("@/lib/constants");
+    if (!BETA_MODE && event.tier === "free") {
       return NextResponse.json(
         { error: "Guest tags require a Standard or Premium upgrade" },
         { status: 403 }

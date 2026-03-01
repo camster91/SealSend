@@ -60,8 +60,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Tier gate: sign-up board requires premium
-    if (event.tier !== "premium") {
+    // Tier gate: sign-up board requires premium (unlocked in beta)
+    const { BETA_MODE } = await import("@/lib/constants");
+    if (!BETA_MODE && event.tier !== "premium") {
       return NextResponse.json(
         { error: "Sign-up board requires a Premium upgrade" },
         { status: 403 }

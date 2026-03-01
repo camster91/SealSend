@@ -1,3 +1,8 @@
+// ── Beta Mode ──────────────────────────────────────────────────────────
+// When true, all features are unlocked for free. Set to false to re-enable paid tiers.
+export const BETA_MODE = true;
+export const BETA_RESPONSE_LIMIT = 1200; // All events get premium-level limits during beta
+
 export const TIERS = {
   free: {
     name: "Free",

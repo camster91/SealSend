@@ -39,7 +39,9 @@ export async function POST(
       .select("*", { count: "exact", head: true })
       .eq("event_id", event.id);
 
-    if (count !== null && count >= event.max_responses) {
+    const { BETA_MODE, BETA_RESPONSE_LIMIT } = await import("@/lib/constants");
+    const effectiveLimit = BETA_MODE ? BETA_RESPONSE_LIMIT : event.max_responses;
+    if (count !== null && effectiveLimit && count >= effectiveLimit) {
       return NextResponse.json(
         {
           error: "This event has reached its maximum number of responses. The host may need to upgrade their plan.",

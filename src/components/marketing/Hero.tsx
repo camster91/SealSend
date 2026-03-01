@@ -5,10 +5,10 @@ export default function Hero() {
   return (
     <section className="gradient-brand relative overflow-hidden px-4 py-24 text-white sm:py-32">
       <div className="mx-auto max-w-4xl text-center">
-        {/* Social proof badge */}
+        {/* Beta badge */}
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-          <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
-          Trusted by 10,000+ event organizers
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-400" />
+          Now in Beta &mdash; All features free!
         </div>
 
         {/* Heading */}

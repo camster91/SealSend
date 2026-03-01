@@ -68,8 +68,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
-    // SMS requires standard or premium tier
-    const smsEnabled = isTwilioConfigured() && event.tier !== "free";
+    // SMS requires standard or premium tier (unlocked in beta)
+    const { BETA_MODE } = await import("@/lib/constants");
+    const smsEnabled = isTwilioConfigured() && (BETA_MODE || event.tier !== "free");
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
     const BATCH_SIZE = 10;

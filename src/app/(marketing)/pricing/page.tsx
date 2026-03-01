@@ -73,12 +73,16 @@ export default function PricingPage() {
         {/* Hero header */}
         <section className="gradient-brand px-4 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-green-400" />
+              Beta &mdash; Everything Free
+            </div>
             <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-              Simple, Pay-Per-Event Pricing
+              Free While We&apos;re in Beta
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
-              Start free and upgrade only when you need to. No subscriptions, no
-              hidden fees — just one-time pricing per event.
+              All premium features are completely free during our beta period.
+              No credit card needed. No hidden fees. Just create and send.
             </p>
           </div>
         </section>

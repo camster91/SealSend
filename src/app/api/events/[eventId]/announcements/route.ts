@@ -90,8 +90,9 @@ export async function POST(
       );
     }
 
-    // Tier gate: announcements require standard or premium
-    if (event.tier === "free") {
+    // Tier gate: announcements require standard or premium (unlocked in beta)
+    const { BETA_MODE } = await import("@/lib/constants");
+    if (!BETA_MODE && event.tier === "free") {
       return NextResponse.json(
         { error: "Announcements require a Standard or Premium upgrade" },
         { status: 403 }
