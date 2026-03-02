@@ -63,4 +63,5 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 
 # Run the standalone server
+ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]
