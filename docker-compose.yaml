@@ -1,0 +1,65 @@
+services:
+    x8okwogw0so8s08oss04s088-011248616962:
+        image: 'x8okwogw0so8s08oss04s088:39a208532449049bc4391cefac7e6f7c9c402696'
+        container_name: x8okwogw0so8s08oss04s088-011248616962
+        restart: unless-stopped
+        expose:
+            - '3000'
+        networks:
+            coolify:
+                aliases:
+                    - x8okwogw0so8s08oss04s088-011248616962
+        mem_limit: '0'
+        memswap_limit: '0'
+        mem_swappiness: 60
+        mem_reservation: '0'
+        cpus: 0.0
+        cpu_shares: 1024
+        env_file:
+            - .env
+        healthcheck:
+            test:
+                - CMD-SHELL
+                - 'curl -s -X GET -f http://localhost:3000/ > /dev/null || wget -q -O- http://localhost:3000/ > /dev/null || exit 1'
+            interval: 5s
+            timeout: 5s
+            retries: 10
+            start_period: 5s
+        labels:
+            - traefik.enable=true
+            - traefik.http.middlewares.gzip.compress=true
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            - traefik.http.routers.http-0-x8okwogw0so8s08oss04s088.entryPoints=http
+            - traefik.http.routers.http-0-x8okwogw0so8s08oss04s088.middlewares=redirect-to-https
+            - 'traefik.http.routers.http-0-x8okwogw0so8s08oss04s088.rule=Host(`sealsend.app`) && PathPrefix(`/`)'
+            - traefik.http.routers.http-0-x8okwogw0so8s08oss04s088.service=http-0-x8okwogw0so8s08oss04s088
+            - traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.entryPoints=https
+            - traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.middlewares=gzip
+            - 'traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.rule=Host(`sealsend.app`) && PathPrefix(`/`)'
+            - traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.service=https-0-x8okwogw0so8s08oss04s088
+            - traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.tls.certresolver=letsencrypt
+            - traefik.http.routers.https-0-x8okwogw0so8s08oss04s088.tls=true
+            - traefik.http.services.http-0-x8okwogw0so8s08oss04s088.loadbalancer.server.port=3000
+            - traefik.http.services.https-0-x8okwogw0so8s08oss04s088.loadbalancer.server.port=3000
+            - 'caddy_0.encode=zstd gzip'
+            - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}'
+            - 'caddy_0.handle_path=/*'
+            - caddy_0.header=-Server
+            - 'caddy_0.try_files={path} /index.html /index.php'
+            - 'caddy_0=https://sealsend.app'
+            - caddy_ingress_network=coolify
+            - coolify.managed=true
+            - coolify.version=4.0.0-beta.463
+            - coolify.applicationId=3
+            - coolify.type=application
+            - coolify.name=x8okwogw0so8s08oss04s088
+            - coolify.resourceName=seal-send
+            - coolify.projectName=ecard-app
+            - coolify.serviceName=seal-send
+            - coolify.environmentName=production
+            - coolify.pullRequestId=0
+networks:
+    coolify:
+        external: true
+        name: coolify
+        attachable: true

@@ -230,11 +230,6 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           </div>
         </div>
 
-        {/* Auto Reminders */}
-        <div className="mt-6">
-          <AutoRemindersToggle eventId={eventId} />
-        </div>
-
         {/* Marketing Tools */}
         <div className="mt-6">
           <ExportTools
