@@ -99,6 +99,26 @@ export interface GuestTagAssignment {
   tag_id: string;
 }
 
+export interface PlusOneData {
+  name: string;
+  email?: string;
+}
+
+export interface PlusOne {
+  id: string;
+  event_id: string;
+  rsvp_response_id: string;
+  guest_id: string | null;
+  name: string;
+  email: string | null;
+  status: RSVPStatus;
+  invite_token: string | null;
+  invite_status: InviteStatus;
+  invite_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RSVPResponse {
   id: string;
   event_id: string;
@@ -108,7 +128,12 @@ export interface RSVPResponse {
   status: RSVPStatus;
   response_data: Record<string, unknown>;
   headcount: number;
+  plus_ones_data: PlusOneData[];
   submitted_at: string;
+}
+
+export interface RSVPResponseWithPlusOnes extends RSVPResponse {
+  plus_ones: PlusOne[];
 }
 
 export interface EventComment {

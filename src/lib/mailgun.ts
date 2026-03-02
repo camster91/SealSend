@@ -31,7 +31,7 @@ export function getMailgunClient() {
     client = mailgun.client({
       username: 'api',
       key: apiKey,
-      url: process.env.MAILGUN_URL || 'https://api.mailgun.net', // Use https://api.eu.mailgun.net for EU region
+      url: 'https://api.mailgun.net',
     });
   }
 

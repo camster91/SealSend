@@ -1,17 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useCallback } from 'react';
+import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { X, Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
-
-interface ParsedGuest {
-  name: string;
-  email: string;
-  phone: string;
-  notes: string;
-  valid: boolean;
-  error?: string;
-}
+import { Upload, Download, AlertCircle, Check } from 'lucide-react';
 
 interface ImportCSVModalProps {
   open: boolean;
@@ -20,262 +12,287 @@ interface ImportCSVModalProps {
   onSuccess: () => void;
 }
 
-type Step = 'upload' | 'preview' | 'importing' | 'done';
-
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        fields.push(current.trim());
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
+interface ParsedGuest {
+  name: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  row: number;
 }
 
-function detectColumns(headers: string[]): { name: number; email: number; phone: number; notes: number } {
-  const lower = headers.map((h) => h.toLowerCase().replace(/[^a-z]/g, ''));
-  const find = (keywords: string[]) =>
-    lower.findIndex((h) => keywords.some((k) => h.includes(k)));
-
-  return {
-    name: Math.max(0, find(['name', 'fullname', 'guest'])),
-    email: find(['email', 'mail']),
-    phone: find(['phone', 'tel', 'mobile', 'cell']),
-    notes: find(['note', 'comment', 'memo', 'message']),
-  };
+interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
 }
 
 export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVModalProps) {
-  const [step, setStep] = useState<Step>('upload');
-  const [guests, setGuests] = useState<ParsedGuest[]>([]);
-  const [result, setResult] = useState<{ imported: number } | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<ParsedGuest[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  function reset() {
-    setStep('upload');
-    setGuests([]);
-    setResult(null);
-    setError(null);
-  }
-
-  function handleClose() {
-    reset();
-    onClose();
-  }
-
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const lines = text.split(/\r?\n/).filter((l) => l.trim());
-      if (lines.length < 2) {
-        setError('CSV must have a header row and at least one data row.');
-        return;
-      }
-
-      const headers = parseCSVLine(lines[0]);
-      const cols = detectColumns(headers);
-      const parsed: ParsedGuest[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const fields = parseCSVLine(lines[i]);
-        const name = (fields[cols.name] || '').trim();
-        const email = cols.email >= 0 ? (fields[cols.email] || '').trim() : '';
-        const phone = cols.phone >= 0 ? (fields[cols.phone] || '').trim() : '';
-        const notes = cols.notes >= 0 ? (fields[cols.notes] || '').trim() : '';
-
-        if (!name) {
-          parsed.push({ name, email, phone, notes, valid: false, error: 'Name is required' });
-        } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          parsed.push({ name, email, phone, notes, valid: false, error: 'Invalid email' });
+  const parseCSV = useCallback((text: string): ParsedGuest[] => {
+    const lines = text.split('\n').filter(line => line.trim());
+    const guests: ParsedGuest[] = [];
+    
+    // Skip header if present
+    const startIndex = lines[0].toLowerCase().includes('name') ? 1 : 0;
+    
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i];
+      // Handle quoted fields
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (const char of line) {
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          fields.push(current.trim());
+          current = '';
         } else {
-          parsed.push({ name, email, phone, notes, valid: true });
+          current += char;
         }
       }
+      fields.push(current.trim());
+      
+      const [name, email, phone, notes] = fields;
+      if (name?.trim()) {
+        guests.push({
+          name: name.trim(),
+          email: email?.trim() || undefined,
+          phone: phone?.trim() || undefined,
+          notes: notes?.trim() || undefined,
+          row: i + 1,
+        });
+      }
+    }
+    
+    return guests;
+  }, []);
 
-      setGuests(parsed);
-      setError(null);
-      setStep('preview');
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    
+    setFile(selectedFile);
+    setError(null);
+    setResult(null);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      try {
+        const guests = parseCSV(text);
+        if (guests.length === 0) {
+          setError('No valid guests found in CSV. Make sure to include a "name" column.');
+        } else {
+          setPreview(guests.slice(0, 10)); // Show first 10 for preview
+        }
+      } catch (err) {
+        setError('Failed to parse CSV file. Please check the format.');
+      }
+    };
+    reader.readAsText(selectedFile);
+  }, [parseCSV]);
+
+  const handleImport = useCallback(async () => {
+    if (!file) return;
+    
+    setImporting(true);
+    setError(null);
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const guests = parseCSV(text);
+      
+      try {
+        const res = await fetch(`/api/events/${eventId}/guests/bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(guests),
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+          setResult({
+            imported: data.imported || 0,
+            skipped: data.skipped || 0,
+            errors: data.errors?.map((e: { index: number; message: string }) => 
+              `Row ${e.index + 1}: ${e.message}`
+            ) || [],
+          });
+          onSuccess();
+        } else {
+          setError(data.error || 'Failed to import guests');
+        }
+      } catch (err) {
+        setError('Network error. Please try again.');
+      } finally {
+        setImporting(false);
+      }
     };
     reader.readAsText(file);
-  }
+  }, [file, eventId, onSuccess, parseCSV]);
 
-  async function handleImport() {
-    const validGuests = guests.filter((g) => g.valid);
-    if (validGuests.length === 0) return;
+  const downloadTemplate = () => {
+    const csv = 'name,email,phone,notes\n"John Doe",john@example.com,"(555) 123-4567","VIP guest"\n"Jane Smith",jane@example.com,"(555) 987-6543","Vegetarian"\n"Bob Wilson",,,"+1 welcome"';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'guest-import-template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
-    setStep('importing');
+  const reset = () => {
+    setFile(null);
+    setPreview([]);
+    setResult(null);
     setError(null);
-
-    try {
-      const res = await fetch(`/api/events/${eventId}/guests/bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          validGuests.map(({ name, email, phone, notes }) => ({ name, email, phone, notes }))
-        ),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Import failed');
-      }
-
-      const data = await res.json();
-      setResult(data);
-      setStep('done');
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed');
-      setStep('preview');
-    }
-  }
-
-  if (!open) return null;
-
-  const validCount = guests.filter((g) => g.valid).length;
-  const invalidCount = guests.filter((g) => !g.valid).length;
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Import Guests from CSV</h2>
-          <button onClick={handleClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="px-6 py-5">
-          {/* Upload step */}
-          {step === 'upload' && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Upload a CSV file with columns: <strong>name</strong>, <strong>email</strong>, <strong>phone</strong>, <strong>notes</strong>.
-                Only &quot;name&quot; is required.
+    <Modal open={open} onClose={onClose} title="Import Guests from CSV">
+      <div className="space-y-4">
+        {!result && (
+          <>
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+              <h4 className="text-sm font-semibold text-blue-900 mb-2">CSV Format</h4>
+              <p className="text-sm text-blue-700 mb-3">
+                Your CSV should have columns: <strong>name, email, phone, notes</strong>
               </p>
-              <div
-                onClick={() => fileRef.current?.click()}
-                className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-gray-300 p-8 transition-colors hover:border-indigo-400 hover:bg-indigo-50/30"
+              <button
+                onClick={downloadTemplate}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"
               >
-                <Upload className="h-10 w-10 text-gray-400" />
-                <p className="text-sm font-medium text-gray-600">Click to select a CSV file</p>
-              </div>
+                <Download className="h-4 w-4" />
+                Download template
+              </button>
+            </div>
+
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
               <input
-                ref={fileRef}
                 type="file"
-                accept=".csv,text/csv"
-                onChange={handleFile}
+                accept=".csv,.txt"
+                onChange={handleFileChange}
                 className="hidden"
+                id="csv-upload"
               />
-              {error && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
-                </div>
-              )}
+              <label
+                htmlFor="csv-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="h-8 w-8 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">
+                  {file ? file.name : 'Click to upload CSV file'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  or drag and drop
+                </span>
+              </label>
             </div>
-          )}
 
-          {/* Preview step */}
-          {step === 'preview' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-green-700">{validCount} valid</span>
-                {invalidCount > 0 && (
-                  <span className="text-red-600">{invalidCount} invalid (will be skipped)</span>
-                )}
+            {error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-700">{error}</p>
               </div>
+            )}
 
-              <div className="max-h-64 overflow-auto rounded-lg border border-gray-200">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {guests.map((g, i) => (
-                      <tr key={i} className={g.valid ? '' : 'bg-red-50'}>
-                        <td className="px-3 py-1.5">{g.name || '—'}</td>
-                        <td className="px-3 py-1.5 text-gray-500">{g.email || '—'}</td>
-                        <td className="px-3 py-1.5">
-                          {g.valid ? (
-                            <span className="text-green-600">OK</span>
-                          ) : (
-                            <span className="text-red-600">{g.error}</span>
-                          )}
-                        </td>
+            {preview.length > 0 && (
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <p className="text-sm font-medium text-gray-700">
+                    Preview ({preview.length} of {preview.length}+ guests)
+                  </p>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium text-gray-700">Name</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-700">Email</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-700">Phone</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  {error}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {preview.map((guest, i) => (
+                        <tr key={i}>
+                          <td className="px-4 py-2 font-medium text-gray-900">{guest.name}</td>
+                          <td className="px-4 py-2 text-gray-600">{guest.email || '-'}</td>
+                          <td className="px-4 py-2 text-gray-600">{guest.phone || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={reset}>Back</Button>
-                <Button onClick={handleImport} disabled={validCount === 0}>
-                  Import {validCount} Guest{validCount !== 1 ? 's' : ''}
-                </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Importing step */}
-          {step === 'importing' && (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-              <p className="text-sm text-gray-600">Importing guests...</p>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImport}
+                loading={importing}
+                disabled={!file || preview.length === 0}
+              >
+                Import {preview.length > 0 && `(${preview.length}+ guests)`}
+              </Button>
             </div>
-          )}
+          </>
+        )}
 
-          {/* Done step */}
-          {step === 'done' && result && (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <CheckCircle2 className="h-10 w-10 text-green-500" />
-              <p className="text-lg font-semibold text-gray-900">
-                {result.imported} guest{result.imported !== 1 ? 's' : ''} imported!
+        {result && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-center">
+              <Check className="h-8 w-8 text-green-500 mx-auto mb-2" />
+              <h4 className="text-lg font-semibold text-green-900">Import Complete!</h4>
+              <p className="text-green-700 mt-1">
+                {result.imported} guests imported successfully
               </p>
-              <Button onClick={handleClose}>Done</Button>
+              {result.skipped > 0 && (
+                <p className="text-amber-600 text-sm mt-1">
+                  {result.skipped} duplicates skipped
+                </p>
+              )}
             </div>
-          )}
-        </div>
+
+            {result.errors.length > 0 && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+                <h5 className="text-sm font-semibold text-amber-900 mb-2">
+                  Warnings ({result.errors.length})
+                </h5>
+                <ul className="text-sm text-amber-700 space-y-1 max-h-32 overflow-y-auto">
+                  {result.errors.slice(0, 5).map((err, i) => (
+                    <li key={i}>• {err}</li>
+                  ))}
+                  {result.errors.length > 5 && (
+                    <li>... and {result.errors.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button type="button" variant="outline" onClick={() => { reset(); onClose(); }}>
+                Close
+              </Button>
+              <Button onClick={reset}>
+                Import Another File
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
