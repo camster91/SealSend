@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useState, useCallback } from 'react';
+import { useReducer, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { DEFAULT_RSVP_FIELDS } from '@/lib/constants';
@@ -159,6 +159,10 @@ function wizardReducer(state: WizardFormData, action: WizardAction): WizardFormD
   }
 }
 
+// ── localStorage Key ───────────────────────────────────────────────────
+
+const STORAGE_KEY = 'sealsend_event_wizard_draft';
+
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function WizardContainer({
@@ -171,6 +175,37 @@ export default function WizardContainer({
   const [formData, dispatch] = useReducer(wizardReducer, getInitialState(initialData));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load from localStorage on mount (only for create mode)
+  useEffect(() => {
+    if (mode === 'create' && typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          dispatch({ type: 'LOAD_DATA', data: parsed });
+        } catch {
+          // Invalid JSON, ignore
+        }
+      }
+    }
+    setIsHydrated(true);
+  }, [mode]);
+
+  // Save to localStorage whenever formData changes (only for create mode)
+  useEffect(() => {
+    if (mode === 'create' && isHydrated && typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    }
+  }, [formData, mode, isHydrated]);
+
+  // Clear localStorage on successful submit
+  const clearStorage = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
 
   const updateField = useCallback(
     (field: keyof WizardFormData, value: unknown) => {
@@ -372,26 +407,26 @@ export default function WizardContainer({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl px-4 py-6">
       {/* ── Stepper ─────────────────────────────────────────────────── */}
-      <nav aria-label="Wizard steps" className="mb-8">
-        <ol className="flex items-center justify-between">
+      <nav aria-label="Wizard steps" className="mb-10">
+        <ol className="flex items-center justify-between gap-2">
           {STEPS.map((step) => {
             const isActive = currentStep === step.number;
             const isCompleted = currentStep > step.number;
             return (
               <li key={step.number} className="flex flex-1 items-center">
-                <div className="flex flex-col items-center gap-1.5 w-full">
+                <div className="flex flex-col items-center gap-2 w-full">
                   <div
                     className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors',
+                      'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors',
                       isActive && 'border-brand-600 bg-brand-600 text-white',
                       isCompleted && 'border-brand-600 bg-brand-100 text-brand-700',
                       !isActive && !isCompleted && 'border-neutral-300 bg-white text-neutral-400'
                     )}
                   >
                     {isCompleted ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
@@ -400,7 +435,7 @@ export default function WizardContainer({
                   </div>
                   <span
                     className={cn(
-                      'text-xs font-medium',
+                      'text-xs font-medium whitespace-nowrap',
                       isActive && 'text-brand-600',
                       isCompleted && 'text-brand-600',
                       !isActive && !isCompleted && 'text-neutral-400'
@@ -412,7 +447,7 @@ export default function WizardContainer({
                 {step.number < 6 && (
                   <div
                     className={cn(
-                      'h-0.5 w-full -mt-4',
+                      'h-0.5 flex-1 mx-2 -mt-5',
                       currentStep > step.number ? 'bg-brand-600' : 'bg-neutral-200'
                     )}
                   />
@@ -431,7 +466,7 @@ export default function WizardContainer({
       )}
 
       {/* ── Step content ────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm">
         {renderStep()}
       </div>
 
