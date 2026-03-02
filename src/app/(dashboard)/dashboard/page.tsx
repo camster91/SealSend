@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { getEventsByUser, getInvitedEvents } from '@/lib/events';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -111,8 +112,8 @@ export default async function DashboardPage() {
             </div>
             <ul className="divide-y divide-gray-200">
               {myEvents.map((event) => (
-                <li key={event.id}>
-                  <Link href={`/events/${event.id}`} className="block hover:bg-gray-50">
+                <li key={event.id} className="flex items-center justify-between hover:bg-gray-50">
+                  <Link href={`/events/${event.id}`} className="block flex-1">
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -156,6 +157,9 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                   </Link>
+                  <div className="px-4 py-4 sm:px-2">
+                    <EventActionsMenu eventId={event.id} eventTitle={event.title} />
+                  </div>
                 </li>
               ))}
             </ul>

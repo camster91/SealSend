@@ -59,7 +59,7 @@ export async function POST(
       );
     }
 
-    let { respondent_name, respondent_email, status, headcount, response_data, guest_id } =
+    let { respondent_name, respondent_email, status, headcount, response_data, guest_id, plus_ones } =
       parsed.data;
 
     // Enforce +1 restrictions (default: allow)
@@ -73,6 +73,16 @@ export async function POST(
     if (headcount > maxPerRsvp) {
       return NextResponse.json(
         { error: `Maximum ${maxPerRsvp} guest${maxPerRsvp !== 1 ? "s" : ""} per RSVP.` },
+        { status: 400 }
+      );
+    }
+
+    // Validate plus_ones count matches headcount - 1 (main respondent)
+    const expectedPlusOnes = Math.max(0, headcount - 1);
+    const actualPlusOnes = (plus_ones || []).length;
+    if (actualPlusOnes > expectedPlusOnes) {
+      return NextResponse.json(
+        { error: `You can only add ${expectedPlusOnes} additional guest${expectedPlusOnes !== 1 ? "s" : ""}.` },
         { status: 400 }
       );
     }
@@ -114,6 +124,7 @@ export async function POST(
         status,
         headcount,
         response_data,
+        plus_ones_data: plus_ones || [],
         ...(guest_id && { guest_id }),
       })
       .select()
@@ -124,6 +135,26 @@ export async function POST(
         { error: "Failed to submit RSVP" },
         { status: 500 }
       );
+    }
+
+    // Create plus_ones records if provided
+    if (plus_ones && plus_ones.length > 0 && response) {
+      const plusOnesToInsert = plus_ones.map((po) => ({
+        event_id: event.id,
+        rsvp_response_id: response.id,
+        name: po.name,
+        email: po.email || null,
+        status: status, // Inherit status from main RSVP
+      }));
+
+      const { error: plusOnesError } = await supabase
+        .from("plus_ones")
+        .insert(plusOnesToInsert);
+
+      if (plusOnesError) {
+        console.error("Failed to create plus_ones:", plusOnesError);
+        // Don't fail the RSVP if plus_ones creation fails
+      }
     }
 
     return NextResponse.json({ success: true, response });

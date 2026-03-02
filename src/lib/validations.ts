@@ -94,12 +94,18 @@ export const announcementSchema = z.object({
   message: z.string().min(1, "Message is required").max(5000),
 });
 
+export const plusOneDataSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email().optional().or(z.literal("")),
+});
+
 export const rsvpSubmissionSchema = z.object({
   respondent_name: z.string().min(1, "Your name is required"),
   respondent_email: z.string().email().optional().or(z.literal("")),
   status: z.enum(["attending", "not_attending", "maybe"]),
   headcount: z.number().min(1).max(50).default(1),
   response_data: z.record(z.string(), z.unknown()).default({}),
+  plus_ones: z.array(plusOneDataSchema).default([]),
   guest_id: z.string().uuid().optional(),
 });
 
@@ -112,3 +118,4 @@ export type GuestBulkInput = z.infer<typeof guestBulkSchema>;
 export type CommentInput = z.infer<typeof commentSchema>;
 export type AnnouncementInput = z.infer<typeof announcementSchema>;
 export type RSVPSubmissionInput = z.infer<typeof rsvpSubmissionSchema>;
+export type PlusOneDataInput = z.infer<typeof plusOneDataSchema>;

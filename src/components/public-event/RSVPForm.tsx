@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
-import type { RSVPField } from "@/types/database";
+import type { RSVPField, PlusOneData } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { UserPlus, X } from "lucide-react";
 
 interface RSVPFormProps {
   eventSlug: string;
@@ -24,9 +25,14 @@ interface RSVPFormProps {
 
 export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [plusOnes, setPlusOnes] = useState<PlusOneData[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Calculate current headcount
+  const headcount = parseInt(formData["headcount"] || "1", 10) || 1;
+  const expectedPlusOnes = Math.max(0, headcount - 1);
 
   // Pre-fill from invite link (magic link) or signed-in user
   useEffect(() => {
@@ -68,12 +74,43 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync plusOnes array with headcount
+  useEffect(() => {
+    setPlusOnes((prev) => {
+      const newPlusOnes = [...prev];
+      // Add empty slots if needed
+      while (newPlusOnes.length < expectedPlusOnes) {
+        newPlusOnes.push({ name: "" });
+      }
+      // Remove excess slots
+      while (newPlusOnes.length > expectedPlusOnes) {
+        newPlusOnes.pop();
+      }
+      return newPlusOnes;
+    });
+  }, [expectedPlusOnes]);
+
   const enabledFields = fields
     .filter((f) => f.is_enabled)
     .sort((a, b) => a.sort_order - b.sort_order);
 
   function updateField(name: string, value: string) {
     setFormData((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function updatePlusOne(index: number, field: keyof PlusOneData, value: string) {
+    setPlusOnes((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  }
+
+  function removePlusOne(index: number) {
+    setPlusOnes((prev) => prev.filter((_, i) => i !== index));
+    // Also reduce headcount
+    const newHeadcount = Math.max(1, headcount - 1);
+    updateField("headcount", String(newHeadcount));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -99,6 +136,9 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       }
     });
 
+    // Filter out empty plus ones
+    const validPlusOnes = plusOnes.filter((po) => po.name.trim() !== "");
+
     try {
       const res = await fetch(`/api/rsvp/${eventSlug}`, {
         method: "POST",
@@ -107,8 +147,9 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           respondent_name: formData["name"] || formData["respondent_name"] || "Guest",
           respondent_email: formData["email"] || "",
           status,
-          headcount: parseInt(formData["headcount"] || "1", 10) || 1,
+          headcount,
           response_data: responseData,
+          plus_ones: validPlusOnes,
           ...(inviteGuestId && { guest_id: inviteGuestId }),
         }),
       });
@@ -323,6 +364,53 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           }
         }
       })}
+
+      {/* Plus One Names Section */}
+      {allowPlusOnes && expectedPlusOnes > 0 && (
+        <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-neutral-500" />
+            <h3 className="text-sm font-medium text-neutral-700">
+              Additional Guest{expectedPlusOnes !== 1 ? "s" : ""} ({expectedPlusOnes})
+            </h3>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Please provide the name{expectedPlusOnes !== 1 ? "s" : ""} of your additional guest{expectedPlusOnes !== 1 ? "s" : ""}.
+          </p>
+          
+          {plusOnes.map((plusOne, index) => (
+            <div key={index} className="space-y-2 bg-white rounded-md p-3 border border-neutral-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-neutral-500">Guest {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removePlusOne(index)}
+                  className="text-neutral-400 hover:text-red-500 transition-colors"
+                  title="Remove guest"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <Input
+                label="Name"
+                placeholder="Enter guest name"
+                value={plusOne.name}
+                onChange={(e) => updatePlusOne(index, "name", e.target.value)}
+                required
+                className="text-sm"
+              />
+              <Input
+                label="Email (optional)"
+                type="email"
+                placeholder="guest@email.com"
+                value={plusOne.email || ""}
+                onChange={(e) => updatePlusOne(index, "email", e.target.value)}
+                className="text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
