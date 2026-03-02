@@ -30,7 +30,7 @@ interface GuestWithResponse {
   phone: string | null;
   invite_token: string | null;
   reminder_sent_at: string | null;
-  rsvp_status: string | null;
+
 }
 
 interface EventWithGuests {
@@ -258,7 +258,6 @@ export async function GET(request: NextRequest) {
                   subject,
                   provider: "mailgun",
                   providerMessageId: result.id,
-                  source: "cron_reminder",
                 });
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Email send failed";
@@ -267,7 +266,6 @@ export async function GET(request: NextRequest) {
                   guestId: guest.id,
                   subject: `Reminder: ${event.title}`,
                   provider: "mailgun",
-                  source: "cron_reminder",
                 });
               }
             }
@@ -297,7 +295,6 @@ export async function GET(request: NextRequest) {
                     guestId: guest.id,
                     provider: "twilio",
                     providerMessageId: result.sid,
-                    source: "cron_reminder",
                   });
                 } catch (error) {
                   const message = error instanceof Error ? error.message : "SMS send failed";
@@ -305,7 +302,6 @@ export async function GET(request: NextRequest) {
                   await logSendFailure(event.id, "sms", guest.phone, message, {
                     guestId: guest.id,
                     provider: "twilio",
-                    source: "cron_reminder",
                   });
                 }
               } else {
@@ -313,7 +309,6 @@ export async function GET(request: NextRequest) {
                 console.error(`[CRON] Invalid phone for guest ${guest.id}:`, errorMsg);
                 await logSendFailure(event.id, "sms", guest.phone, errorMsg, {
                   guestId: guest.id,
-                  source: "cron_reminder",
                 });
               }
             }

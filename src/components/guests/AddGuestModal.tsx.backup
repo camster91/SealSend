@@ -176,7 +176,7 @@ export function AddGuestModal({
           />
           {watch("notes") && (
             <p className="mt-1 text-xs text-gray-400">
-              {watch("notes")!.length}/500 characters
+              {watch("notes").length}/500 characters
             </p>
           )}
         </div>
