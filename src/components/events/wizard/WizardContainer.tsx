@@ -200,6 +200,14 @@ export default function WizardContainer({
     }
   }, [formData, mode, isHydrated]);
 
+  // Auto-save indicator
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  useEffect(() => {
+    if (isHydrated && mode === 'create') {
+      setLastSaved(new Date());
+    }
+  }, [formData, isHydrated, mode]);
+
   // Clear localStorage on successful submit
   const clearStorage = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -469,6 +477,13 @@ export default function WizardContainer({
       <div className="rounded-xl border border-neutral-200 bg-white p-6 sm:p-8 shadow-sm">
         {renderStep()}
       </div>
+
+      {/* ── Auto-save indicator ─────────────────────────────────────── */}
+      {mode === 'create' && lastSaved && (
+        <div className="mt-4 text-center text-xs text-gray-400">
+          ✓ Auto-saved at {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      )}
 
       {/* ── Navigation buttons ──────────────────────────────────────── */}
       {currentStep < 6 && (
