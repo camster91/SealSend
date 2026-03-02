@@ -67,40 +67,38 @@ export function AddGuestModal({
       onClose={onClose}
       title={isEdit ? "Edit Guest" : "Add Guest"}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <div className="space-y-4">
-          <Input
-            id="name"
-            label="Name *"
-            placeholder="Guest name"
-            error={errors.name?.message}
-            {...register("name")}
-          />
-          <Input
-            id="email"
-            label="Email"
-            type="email"
-            placeholder="guest@example.com"
-            error={errors.email?.message}
-            {...register("email")}
-          />
-          <Input
-            id="phone"
-            label="Phone Number"
-            type="tel"
-            placeholder="+1 (555) 000-0000"
-            error={errors.phone?.message}
-            {...register("phone")}
-          />
-          <Textarea
-            id="notes"
-            label="Notes"
-            placeholder="Any notes about this guest..."
-            error={errors.notes?.message}
-            {...register("notes")}
-          />
-        </div>
-        <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input
+          id="name"
+          label="Name *"
+          placeholder="Guest name"
+          error={errors.name?.message}
+          {...register("name")}
+        />
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          placeholder="guest@example.com"
+          error={errors.email?.message}
+          {...register("email")}
+        />
+        <Input
+          id="phone"
+          label="Phone Number"
+          type="tel"
+          placeholder="+1 (555) 000-0000"
+          error={errors.phone?.message}
+          {...register("phone")}
+        />
+        <Textarea
+          id="notes"
+          label="Notes"
+          placeholder="Any notes about this guest..."
+          error={errors.notes?.message}
+          {...register("notes")}
+        />
+        <div className="flex justify-end gap-2 pt-4 border-t">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
