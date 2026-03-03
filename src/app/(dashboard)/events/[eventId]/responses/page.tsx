@@ -8,12 +8,12 @@ import { ExportCSVButton } from "@/components/responses/ExportCSVButton";
 import { Button } from "@/components/ui/Button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import type { RSVPResponse } from "@/types/database";
+import type { RSVPResponseWithPlusOnes } from "@/types/database";
 
 export default function ResponsesPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  const [responses, setResponses] = useState<RSVPResponse[]>([]);
+  const [responses, setResponses] = useState<RSVPResponseWithPlusOnes[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
 
