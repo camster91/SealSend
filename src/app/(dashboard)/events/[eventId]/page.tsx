@@ -192,14 +192,6 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
               <CloneEventButton eventId={eventId} eventTitle={event.title} />
               <DeleteEventButton eventId={eventId} eventTitle={event.title} />
             </div>
-
-            {/* Auto Reminders Toggle */}
-            <AutoRemindersToggle 
-              eventId={eventId}
-              initialEnabled={event.auto_reminders ?? false}
-              eventDate={event.event_date}
-              isPublished={isPublished}
-            />
           </div>
 
           {/* Details */}

@@ -44,6 +44,7 @@ export const eventCreateSchema = z.object({
     })
     .optional(),
   status: z.enum(["draft", "published"]).default("draft"),
+  auto_reminders: z.boolean().optional(),
 });
 
 export const eventUpdateSchema = eventCreateSchema.partial();

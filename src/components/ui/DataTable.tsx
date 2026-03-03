@@ -19,6 +19,7 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   className?: string;
   onRowClick?: (item: T) => void;
+  renderExpandedRow?: (item: T) => React.ReactNode;
 }
 
 function DataTable<T extends Record<string, unknown>>({
@@ -28,6 +29,7 @@ function DataTable<T extends Record<string, unknown>>({
   emptyMessage = "No data found",
   className,
   onRowClick,
+  renderExpandedRow,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -94,22 +96,26 @@ function DataTable<T extends Record<string, unknown>>({
             </tr>
           ) : (
             sortedData.map((item) => (
-              <tr
-                key={keyExtractor(item)}
-                onClick={() => onRowClick?.(item)}
-                className={cn(
-                  "border-b border-border last:border-0",
-                  onRowClick && "cursor-pointer hover:bg-neutral-50"
-                )}
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className={cn("px-4 py-3", col.className)}>
-                    {col.render
-                      ? col.render(item)
-                      : (item[col.key] as React.ReactNode) ?? "\u2014"}
-                  </td>
-                ))}
-              </tr>
+              <>
+                <tr
+                  key={keyExtractor(item)}
+                  onClick={() => onRowClick?.(item)}
+                  className={cn(
+                    "border-b border-border last:border-0",
+                    onRowClick && "cursor-pointer hover:bg-neutral-50",
+                    renderExpandedRow && "cursor-pointer"
+                  )}
+                >
+                  {columns.map((col) => (
+                    <td key={col.key} className={cn("px-4 py-3", col.className)}>
+                      {col.render
+                        ? col.render(item)
+                        : (item[col.key] as React.ReactNode) ?? "\u2014"}
+                    </td>
+                  ))}
+                </tr>
+                {renderExpandedRow?.(item)}
+              </>
             ))
           )}
         </tbody>
