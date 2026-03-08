@@ -1,4 +1,3 @@
-import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import { EventHero } from "@/components/public-event/EventHero";
 import { EventDetails } from "@/components/public-event/EventDetails";
@@ -9,14 +8,10 @@ import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
 import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
+import { getPublicEventBySlug, getRsvpFields, getRemainingSpots, getInviteGuest } from "@/lib/repositories/publicEventRepository";
 import { 
   sanitizeCustomization, 
   sanitizeInviteToken,
-  sanitizeColor,
-  sanitizeFontFamily,
-  sanitizeBackgroundImage,
-  sanitizeAudioUrl,
-  sanitizeButtonStyle
 } from "@/lib/sanitize";
 import type { Metadata } from "next";
 
@@ -27,13 +22,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = createAdminClient();
-  const { data: event } = await supabase
-    .from("events")
-    .select("title, description, design_url")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+  const { data: event } = await getPublicEventBySlug(slug);
 
   if (!event) return { title: "Event Not Found" };
 
@@ -51,56 +40,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicEventPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
-  const supabase = createAdminClient();
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
-
+  const { data: event } = await getPublicEventBySlug(slug);
   if (!event) notFound();
 
-  const { data: rsvpFields } = await supabase
-    .from("rsvp_fields")
-    .select("*")
-    .eq("event_id", event.id)
-    .order("sort_order", { ascending: true });
+  const { data: rsvpFields } = await getRsvpFields(event.id);
+  const spotsRemaining = await getRemainingSpots(event.id, event.max_attendees);
 
-  // Calculate spots remaining for guest limits
-  let spotsRemaining: number | null = null;
-  const maxAttendees = event.max_attendees || null;
-  if (maxAttendees) {
-    const { data: attendingResponses } = await supabase
-      .from("rsvp_responses")
-      .select("headcount")
-      .eq("event_id", event.id)
-      .eq("status", "attending");
-
-    const currentTotal = (attendingResponses || []).reduce(
-      (sum: number, r: { headcount: number }) => sum + (r.headcount || 1),
-      0
-    );
-    spotsRemaining = Math.max(0, maxAttendees - currentTotal);
-  }
-
-  // Resolve invite token for magic link pre-filling
   let inviteGuest: { id: string; name: string; email: string | null } | null = null;
   const rawToken = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
   const token = sanitizeInviteToken(rawToken);
   
   if (token) {
-    const { data: guest } = await supabase
-      .from("guests")
-      .select("id, name, email")
-      .eq("invite_token", token)
-      .eq("event_id", event.id)
-      .single();
+    const { data: guest } = await getInviteGuest(event.id, token);
     if (guest) inviteGuest = guest;
   }
 
-  // Sanitize all customization values
+  
   const customization = sanitizeCustomization(event.customization);
   const safeBgColor = customization.backgroundColor;
   const safePrimaryColor = customization.primaryColor;

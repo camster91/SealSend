@@ -9,10 +9,6 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Check for custom session cookie (sealsend_session) for custom auth
-  const customSession = request.cookies.get('sealsend_session')?.value;
-  const hasCustomSession = !!customSession;
-
   let supabaseUser = null;
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createServerClient(
@@ -33,7 +29,7 @@ export async function updateSession(request: NextRequest) {
             cookiesToSet.forEach(({ name, value, options }) =>
               supabaseResponse.cookies.set(name, value, {
                 ...options,
-                maxAge: 60 * 60 * 24 * 30, // 30 days
+                maxAge: 60 * 60 * 24 * 30,
               })
             );
           },
@@ -49,7 +45,6 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require authentication
   const publicPaths = [
     "/",
     "/login",
@@ -63,14 +58,12 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/")) ||
-    pathname.startsWith("/e/") ||                             // Public event pages
-    pathname.startsWith("/api/") ||                           // API routes handle their own auth
-    /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);      // Guest/public event access
+    pathname.startsWith("/e/") ||
+    pathname.startsWith("/api/") ||
+    /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);
 
-  // Determine if user is authenticated (either via Supabase or custom session)
-  const isAuthenticated = !!supabaseUser || hasCustomSession;
+  const isAuthenticated = !!supabaseUser;
 
-  // Protected routes - redirect to login if not authenticated
   if (!isPublicRoute && !isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -78,7 +71,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
   const authPaths = ["/login", "/signup", "/forgot-password"];
   const isAuthRoute = authPaths.some((path) => pathname === path);
 
