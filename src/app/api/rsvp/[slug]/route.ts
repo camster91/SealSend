@@ -9,7 +9,7 @@ export async function POST(
 ) {
   try {
     const ip = getClientIp(request);
-    const { success } = rateLimit(`rsvp:${ip}`, { max: 10, windowSeconds: 600 });
+    const { success } = await rateLimit(`rsvp:${ip}`, { max: 10, windowSeconds: 600 });
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
@@ -18,7 +18,7 @@ export async function POST(
     const body = await request.json();
     const supabase = createAdminClient();
 
-    // Find the published event by slug
+    // Fetch the event
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("*")
@@ -33,7 +33,7 @@ export async function POST(
       );
     }
 
-    // Check response limit
+    // Check if event has reached response limit
     const { count } = await supabase
       .from("rsvp_responses")
       .select("*", { count: "exact", head: true })
@@ -62,13 +62,13 @@ export async function POST(
     let { respondent_name, respondent_email, status, headcount, response_data, guest_id, plus_ones } =
       parsed.data;
 
-    // Enforce +1 restrictions (default: allow)
+    // Enforce no plus ones if event doesn't allow them
     const allowPlusOnes = event.allow_plus_ones !== undefined ? event.allow_plus_ones : true;
     if (!allowPlusOnes) {
       headcount = 1;
     }
 
-    // Enforce per-RSVP guest limit (default: 10)
+    // Enforce max guests per RSVP
     const maxPerRsvp = event.max_guests_per_rsvp || 10;
     if (headcount > maxPerRsvp) {
       return NextResponse.json(
@@ -77,7 +77,7 @@ export async function POST(
       );
     }
 
-    // Validate plus_ones count matches headcount - 1 (main respondent)
+    // Validate plus_ones count matches headcount
     const expectedPlusOnes = Math.max(0, headcount - 1);
     const actualPlusOnes = (plus_ones || []).length;
     if (actualPlusOnes > expectedPlusOnes) {
@@ -87,7 +87,7 @@ export async function POST(
       );
     }
 
-    // Enforce total attendee limit (default: no limit)
+    // Check event capacity
     const maxAttendees = event.max_attendees || null;
     if (maxAttendees && status === "attending") {
       const { data: attendingResponses } = await supabase
@@ -137,14 +137,14 @@ export async function POST(
       );
     }
 
-    // Create plus_ones records if provided
+    // Create plus_ones records if any
     if (plus_ones && plus_ones.length > 0 && response) {
       const plusOnesToInsert = plus_ones.map((po) => ({
         event_id: event.id,
         rsvp_response_id: response.id,
         name: po.name,
         email: po.email || null,
-        status: status, // Inherit status from main RSVP
+        status: status, // Inherit the main respondent's status
       }));
 
       const { error: plusOnesError } = await supabase
@@ -153,7 +153,7 @@ export async function POST(
 
       if (plusOnesError) {
         console.error("Failed to create plus_ones:", plusOnesError);
-        // Don't fail the RSVP if plus_ones creation fails
+        // Continue anyway - the main RSVP is already created
       }
     }
 

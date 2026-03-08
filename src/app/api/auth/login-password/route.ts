@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = rateLimit(`login-password:${ip}`, { 
+    const { success: rateLimitOk } = await rateLimit(`login-password:${ip}`, { 
       max: 5, 
       windowSeconds: 600 
     });

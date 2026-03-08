@@ -26,7 +26,7 @@ function getTwilioClient() {
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = rateLimit(`send-code:${ip}`, { max: 5, windowSeconds: 600 });
+    const { success: rateLimitOk } = await rateLimit(`send-code:${ip}`, { max: 5, windowSeconds: 600 });
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait a few minutes before trying again.' },
