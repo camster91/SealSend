@@ -1,10 +1,5 @@
-/**
- * Server-side session validation
- * Validates session tokens against the database
- */
-
 import { cookies } from 'next/headers';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { AuthUser } from './types';
 
 export interface SessionValidationResult {
@@ -13,26 +8,17 @@ export interface SessionValidationResult {
   error?: string;
 }
 
-/**
- * Validate a session token against the database
- * This should be used for sensitive operations
- */
 export async function validateSession(token: string): Promise<SessionValidationResult> {
   try {
-    const adminSupabase = createAdminClient();
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: token },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    const { data: session, error } = await adminSupabase
-      .from('user_sessions')
-      .select('user_id, user_role, expires_at')
-      .eq('session_token', token)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    if (error || !session) {
+    if (!session || session.expires_at < new Date()) {
       return { valid: false, error: 'Invalid or expired session' };
     }
 
-    // Get additional user info from cookie for convenience
     const cookieStore = await cookies();
     const userCookie = cookieStore.get('sealsend_user')?.value;
     let userInfo: Partial<AuthUser> = {};
@@ -63,9 +49,6 @@ export async function validateSession(token: string): Promise<SessionValidationR
   }
 }
 
-/**
- * Get and validate the current session from cookies
- */
 export async function getValidatedSession(): Promise<SessionValidationResult> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
@@ -77,26 +60,14 @@ export async function getValidatedSession(): Promise<SessionValidationResult> {
   return validateSession(sessionToken);
 }
 
-/**
- * Invalidate (delete) a session
- */
 export async function invalidateSession(token: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('session_token', token);
+  await prisma.userSession.deleteMany({
+    where: { session_token: token },
+  });
 }
 
-/**
- * Invalidate all sessions for a user
- */
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('user_id', userId);
+  await prisma.userSession.deleteMany({
+    where: { user_id: userId },
+  });
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -19,17 +19,13 @@ export async function POST(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Fetch the current event to get its status
-    const { data: event, error: fetchError } = await adminSupabase
-      .from('events')
-      .select('id, status')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, status: true },
+    });
 
-    if (fetchError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -39,20 +35,10 @@ export async function POST(
     // Toggle status between draft and published
     const newStatus = event.status === 'published' ? 'draft' : 'published';
 
-    const { data: updatedEvent, error: updateError } = await adminSupabase
-      .from('events')
-      .update({ status: newStatus })
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: updateError.message },
-        { status: 500 }
-      );
-    }
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: { status: newStatus },
+    });
 
     return NextResponse.json(updatedEvent);
   } catch {

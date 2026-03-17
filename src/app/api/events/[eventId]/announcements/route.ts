@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 import { buildAnnouncementEmail } from "@/lib/email-templates";
@@ -21,25 +21,18 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { data: announcements, error } = await adminSupabase
-      .from("event_announcements")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const announcements = await prisma.eventAnnouncement.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(announcements);
   } catch (error) {
@@ -69,17 +62,13 @@ export async function POST(
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }
 
-    const adminSupabase = createAdminClient();
-
     // Ownership + status check
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, title, slug, status, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, slug: true, status: true, tier: true },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -108,14 +97,10 @@ export async function POST(
     }
 
     // Fetch all guests with email or phone
-    const { data: guests, error: guestsError } = await adminSupabase
-      .from("guests")
-      .select("id, name, email, phone, invite_token")
-      .eq("event_id", eventId);
-
-    if (guestsError) {
-      return NextResponse.json({ error: guestsError.message }, { status: 500 });
-    }
+    const guests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      select: { id: true, name: true, email: true, phone: true, invite_token: true },
+    });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured();
@@ -152,7 +137,7 @@ export async function POST(
                 html,
               });
               ok = true;
-              
+
               await logSendSuccess(eventId, 'email', guest.email, {
                 guestId: guest.id,
                 subject,
@@ -162,7 +147,7 @@ export async function POST(
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               console.error(`[ANNOUNCEMENT EMAIL FAILED] ${guest.email}:`, message);
-              
+
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
                 subject: parsed.data.subject,
@@ -174,10 +159,10 @@ export async function POST(
           if (guest.phone && smsEnabled) {
             // Validate and format phone number
             const phoneValidation = validateAndFormatPhone(guest.phone);
-            
+
             if (!phoneValidation.valid) {
               console.error(`[ANNOUNCEMENT SMS INVALID] ${guest.phone}:`, phoneValidation.error);
-              
+
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
               });
@@ -198,7 +183,7 @@ export async function POST(
                   ...getTwilioSendOptions(),
                 });
                 ok = true;
-                
+
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -207,7 +192,7 @@ export async function POST(
               } catch (error) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 console.error(`[ANNOUNCEMENT SMS FAILED] ${guest.phone}:`, message);
-                
+
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -226,20 +211,14 @@ export async function POST(
     }
 
     // Save the announcement record
-    const { data: announcement, error: insertError } = await adminSupabase
-      .from("event_announcements")
-      .insert({
+    const announcement = await prisma.eventAnnouncement.create({
+      data: {
         event_id: eventId,
         subject: parsed.data.subject,
         message: parsed.data.message,
         sent_to_count: sentCount,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
+      },
+    });
 
     return NextResponse.json(announcement, { status: 201 });
   } catch (error) {

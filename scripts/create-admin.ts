@@ -1,70 +1,58 @@
 #!/usr/bin/env tsx
 /**
  * Create an admin user in the database
- * Usage: npx tsx scripts/create-admin.ts <email>
+ * Usage: npx tsx scripts/create-admin.ts <email> [password]
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Error: Missing Supabase environment variables');
-  console.error('Make sure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set');
+if (!DATABASE_URL) {
+  console.error('Error: Missing DATABASE_URL environment variable');
   process.exit(1);
 }
 
 const email = process.argv[2];
+const password = process.argv[3];
 
 if (!email) {
-  console.error('Usage: npx tsx scripts/create-admin.ts <email>');
+  console.error('Usage: npx tsx scripts/create-admin.ts <email> [password]');
   process.exit(1);
 }
 
 async function createAdmin() {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+  const prisma = new PrismaClient({ datasourceUrl: DATABASE_URL });
 
-  console.log(`Creating admin user: ${email}`);
+  try {
+    console.log(`Creating admin user: ${email}`);
 
-  // Check if admin already exists
-  const { data: existing, error: checkError } = await supabase
-    .from('admin_users')
-    .select('id, email')
-    .eq('email', email)
-    .single();
+    const existing = await prisma.adminUser.findUnique({ where: { email } });
 
-  if (checkError && checkError.code !== 'PGRST116') {
-    console.error('Error checking existing admin:', checkError);
-    process.exit(1);
+    if (existing) {
+      console.log(`Admin user already exists: ${existing.email}`);
+      process.exit(0);
+    }
+
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 12)
+      : await bcrypt.hash(crypto.randomUUID(), 12);
+
+    const data = await prisma.adminUser.create({
+      data: { email, password: hashedPassword },
+    });
+
+    console.log(`Admin user created successfully!`);
+    console.log(`   ID: ${data.id}`);
+    console.log(`   Email: ${data.email}`);
+    console.log(`   Created: ${data.created_at}`);
+    if (!password) {
+      console.log(`   Note: Random password set. Use the app to set a real password.`);
+    }
+  } finally {
+    await prisma.$disconnect();
   }
-
-  if (existing) {
-    console.log(`Admin user already exists: ${existing.email}`);
-    process.exit(0);
-  }
-
-  // Create admin user
-  const { data, error } = await supabase
-    .from('admin_users')
-    .insert({ email })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating admin:', error);
-    process.exit(1);
-  }
-
-  console.log(`✅ Admin user created successfully!`);
-  console.log(`   ID: ${data.id}`);
-  console.log(`   Email: ${data.email}`);
-  console.log(`   Created: ${data.created_at}`);
 }
 
 createAdmin();

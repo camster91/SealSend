@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { z } from "zod";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -15,22 +15,19 @@ const claimSchema = z.object({
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { slug } = await params;
-    const supabase = createAdminClient();
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { slug, status: "published" },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json([], { status: 200 });
 
-    const { data: items } = await supabase
-      .from("event_signup_items")
-      .select("*, claims:event_signup_claims(*)")
-      .eq("event_id", event.id)
-      .order("sort_order", { ascending: true });
+    const items = await prisma.eventSignupItem.findMany({
+      where: { event_id: event.id },
+      include: { claims: true },
+      orderBy: { sort_order: 'asc' },
+    });
 
     return NextResponse.json(items ?? []);
   } catch {
@@ -49,14 +46,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const { slug } = await params;
     const body = await request.json();
-    const supabase = createAdminClient();
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { slug, status: "published" },
+      select: { id: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -68,41 +62,32 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Verify item exists and belongs to this event
-    const { data: item } = await supabase
-      .from("event_signup_items")
-      .select("id, slots")
-      .eq("id", parsed.data.item_id)
-      .eq("event_id", event.id)
-      .single();
+    const item = await prisma.eventSignupItem.findFirst({
+      where: { id: parsed.data.item_id, event_id: event.id },
+      select: { id: true, slots: true },
+    });
 
     if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
     // Check if slots are available
-    const { count } = await supabase
-      .from("event_signup_claims")
-      .select("*", { count: "exact", head: true })
-      .eq("item_id", item.id);
+    const count = await prisma.eventSignupClaim.count({
+      where: { item_id: item.id },
+    });
 
     if (count !== null && count >= item.slots) {
       return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
     }
 
-    const { data: claim, error } = await supabase
-      .from("event_signup_claims")
-      .insert({
+    const claim = await prisma.eventSignupClaim.create({
+      data: {
         item_id: parsed.data.item_id,
         event_id: event.id,
         claimant_name: parsed.data.claimant_name,
         claimant_email: parsed.data.claimant_email || null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+      },
+    });
 
     return NextResponse.json(claim, { status: 201 });
   } catch {

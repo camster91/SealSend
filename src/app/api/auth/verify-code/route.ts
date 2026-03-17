@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
 
@@ -24,19 +24,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use admin client to bypass RLS - auth operations happen before user is authenticated
-    const supabase = createAdminClient();
-
     // Verify code
-    const { data: authCode, error: codeError } = await supabase
-      .from('auth_codes')
-      .select('*')
-      .eq(method === 'email' ? 'email' : 'phone', method === 'email' ? email : phone)
-      .eq('code', code)
-      .gt('expires_at', new Date().toISOString())
-      .single();
+    const whereClause: Record<string, unknown> = {
+      code,
+      expires_at: { gt: new Date() },
+    };
+    if (method === 'email') {
+      whereClause.email = email;
+    } else {
+      whereClause.phone = phone;
+    }
 
-    if (codeError || !authCode) {
+    const authCode = await prisma.authCode.findFirst({ where: whereClause });
+
+    if (!authCode) {
       return NextResponse.json(
         { error: 'Invalid or expired code' },
         { status: 401 }
@@ -44,19 +45,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete used code
-    await supabase.from('auth_codes').delete().eq('id', authCode.id);
+    await prisma.authCode.delete({ where: { id: authCode.id } });
 
     // Determine the correct user_id for the session
     let userId = authCode.id; // Default to auth_code id for guests
 
     if (authCode.role === 'admin' && authCode.email) {
-      // For admin users, look up their actual admin_users ID for FK constraint
-      const { data: adminUser } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', authCode.email)
-        .single();
-
+      const adminUser = await prisma.adminUser.findUnique({
+        where: { email: authCode.email },
+        select: { id: true },
+      });
       if (adminUser) {
         userId = adminUser.id;
       }
@@ -64,24 +62,16 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const { error: sessionError } = await supabase
-      .from('user_sessions')
-      .insert({
+    await prisma.userSession.create({
+      data: {
         user_id: userId,
         user_role: authCode.role,
         session_token: sessionToken,
-        expires_at: expiresAt.toISOString()
-      });
-
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 }
-      );
-    }
+        expires_at: expiresAt,
+      },
+    });
 
     // Set session cookie
     const cookieStore = await cookies();

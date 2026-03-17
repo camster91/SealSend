@@ -1,84 +1,63 @@
-import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from 'next/server';
+import { prisma } from '@/lib/db';
 
+/**
+ * Session check using JWT cookie / DB session instead of Supabase.
+ */
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  let supabaseUser = null;
-  if (supabaseUrl && supabaseAnonKey) {
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-            supabaseResponse = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, {
-                ...options,
-                maxAge: 60 * 60 * 24 * 30,
-              })
-            );
-          },
-        },
-      }
-    );
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    supabaseUser = user;
-  }
-
+  const response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
 
   const publicPaths = [
-    "/",
-    "/login",
-    "/signup",
-    "/forgot-password",
-    "/callback",
-    "/how-it-works",
-    "/pricing",
-    "/use-cases",
+    '/',
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/callback',
+    '/how-it-works',
+    '/pricing',
+    '/use-cases',
   ];
 
   const isPublicRoute =
-    publicPaths.some((path) => pathname === path || pathname.startsWith(path + "/")) ||
-    pathname.startsWith("/e/") ||
-    pathname.startsWith("/api/") ||
+    publicPaths.some(
+      (path) => pathname === path || pathname.startsWith(path + '/'),
+    ) ||
+    pathname.startsWith('/e/') ||
+    pathname.startsWith('/api/') ||
     /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);
 
-  const isAuthenticated = !!supabaseUser;
+  // Check authentication via session cookie
+  const sessionToken = request.cookies.get('sealsend_session')?.value;
+  let isAuthenticated = false;
+
+  if (sessionToken) {
+    try {
+      const session = await prisma.userSession.findUnique({
+        where: { session_token: sessionToken },
+        select: { expires_at: true },
+      });
+      isAuthenticated = !!session && session.expires_at > new Date();
+    } catch {
+      // DB error — treat as unauthenticated
+    }
+  }
 
   if (!isPublicRoute && !isAuthenticated) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    url.pathname = '/login';
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
-  const authPaths = ["/login", "/signup", "/forgot-password"];
+  const authPaths = ['/login', '/signup', '/forgot-password'];
   const isAuthRoute = authPaths.some((path) => pathname === path);
 
   if (isAuthRoute && isAuthenticated) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  return response;
 }

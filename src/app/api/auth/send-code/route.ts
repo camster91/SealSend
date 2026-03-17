@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
@@ -57,53 +57,39 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
-    // Use admin client to bypass RLS - auth operations happen before user is authenticated
-    const supabase = createAdminClient();
-
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Determine role
     let role = 'guest';
     if (method === 'email' && email) {
-      // Check if this is an admin email
-      const { data: admin } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', email)
-        .single();
-
+      const admin = await prisma.adminUser.findUnique({
+        where: { email },
+        select: { id: true },
+      });
       if (admin) {
         role = 'admin';
       }
     }
 
-    // Delete any existing codes for this email/phone to avoid stale entries
+    // Delete any existing codes for this email/phone
     if (method === 'email' && email) {
-      await supabase.from('auth_codes').delete().eq('email', email);
+      await prisma.authCode.deleteMany({ where: { email } });
     } else if (method === 'phone' && formattedPhone) {
-      await supabase.from('auth_codes').delete().eq('phone', formattedPhone);
+      await prisma.authCode.deleteMany({ where: { phone: formattedPhone } });
     }
 
     // Store code in database
-    const { error: dbError } = await supabase
-      .from('auth_codes')
-      .insert({
+    await prisma.authCode.create({
+      data: {
         email: email || null,
         phone: formattedPhone || null,
         code,
         role,
         event_id: eventId || null,
-        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-      });
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to generate code' },
-        { status: 500 }
-      );
-    }
+        expires_at: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
 
     // Send code via appropriate channel
     if (method === 'email' && email) {

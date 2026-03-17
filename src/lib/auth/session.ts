@@ -1,27 +1,22 @@
 import { cookies } from 'next/headers';
 import { AuthUser } from './types';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
-  
+
   if (!sessionToken) {
     return null;
   }
 
   try {
-    // Validate session against database
-    const adminSupabase = createAdminClient();
-    const { data: session, error: sessionError } = await adminSupabase
-      .from('user_sessions')
-      .select('user_id, user_role, expires_at')
-      .eq('session_token', sessionToken)
-      .gt('expires_at', new Date().toISOString())
-      .single();
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: sessionToken },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    if (sessionError || !session) {
-      // Clear invalid cookie
+    if (!session || session.expires_at < new Date()) {
       cookieStore.delete('sealsend_session');
       cookieStore.delete('sealsend_user');
       return null;
@@ -30,7 +25,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     // Get user info from the cookie
     const userCookie = cookieStore.get('sealsend_user')?.value;
     let userInfo: Partial<AuthUser> = {};
-    
+
     if (userCookie) {
       try {
         userInfo = JSON.parse(userCookie);
@@ -67,7 +62,7 @@ export async function requireAdmin() {
 
 export async function requireGuestAccess(eventId?: string) {
   const user = await getCurrentUser();
-  
+
   if (!user) {
     throw new Error('Authentication required');
   }
@@ -84,49 +79,37 @@ export async function requireGuestAccess(eventId?: string) {
 export async function logout() {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
-  
-  // Delete session from database if it exists
+
   if (sessionToken) {
     try {
-      const adminSupabase = createAdminClient();
-      await adminSupabase
-        .from('user_sessions')
-        .delete()
-        .eq('session_token', sessionToken);
+      await prisma.userSession.deleteMany({
+        where: { session_token: sessionToken },
+      });
     } catch (error) {
       console.error('Error deleting session:', error);
     }
   }
-  
-  // Clear session cookies
+
   cookieStore.delete('sealsend_session');
+  cookieStore.delete('sealsend_token');
   cookieStore.delete('sealsend_user');
 }
 
-/**
- * Validate a session token against the database
- * This is a more thorough validation than getCurrentUser
- */
 export async function validateSessionToken(token: string): Promise<{
   valid: boolean;
   user?: AuthUser;
   error?: string;
 }> {
   try {
-    const adminSupabase = createAdminClient();
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: token },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    const { data: session, error } = await adminSupabase
-      .from('user_sessions')
-      .select('user_id, user_role, expires_at')
-      .eq('session_token', token)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    if (error || !session) {
+    if (!session || session.expires_at < new Date()) {
       return { valid: false, error: 'Invalid or expired session' };
     }
 
-    // Get additional user info from cookie for convenience
     const cookieStore = await cookies();
     const userCookie = cookieStore.get('sealsend_user')?.value;
     let userInfo: Partial<AuthUser> = {};
@@ -157,26 +140,14 @@ export async function validateSessionToken(token: string): Promise<{
   }
 }
 
-/**
- * Invalidate (delete) a session
- */
 export async function invalidateSession(token: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('session_token', token);
+  await prisma.userSession.deleteMany({
+    where: { session_token: token },
+  });
 }
 
-/**
- * Invalidate all sessions for a user
- */
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('user_id', userId);
+  await prisma.userSession.deleteMany({
+    where: { user_id: userId },
+  });
 }

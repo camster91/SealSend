@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { prisma } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth/session';
 import WizardContainer from '@/components/events/wizard/WizardContainer';
 import type { Metadata } from 'next';
 
@@ -13,34 +14,26 @@ interface EditEventPageProps {
 
 export default async function EditEventPage({ params }: EditEventPageProps) {
   const { eventId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
   // Fetch the event
-  const { data: event, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .eq('user_id', user.id)
-    .single();
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, user_id: user.id },
+  });
 
-  if (error || !event) {
+  if (!event) {
     notFound();
   }
 
   // Fetch RSVP fields for this event
-  const { data: rsvpFields } = await supabase
-    .from('rsvp_fields')
-    .select('*')
-    .eq('event_id', eventId)
-    .order('sort_order', { ascending: true });
+  const rsvpFields = await prisma.rsvpField.findMany({
+    where: { event_id: eventId },
+    orderBy: { sort_order: 'asc' },
+  });
 
   // Transform the event data into wizard form data shape
   const initialData = {

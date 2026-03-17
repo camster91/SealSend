@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { getApiUser } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
@@ -16,20 +16,10 @@ export async function GET() {
       );
     }
 
-    const adminSupabase = createAdminClient();
-
-    const { data: events, error } = await adminSupabase
-      .from('events')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+    const events = await prisma.event.findMany({
+      where: { user_id: user.id },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(events);
   } catch {
@@ -63,52 +53,45 @@ export async function POST(request: NextRequest) {
 
     const { title, description, event_date, event_end_date, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
 
-    // Use admin client for DB writes (auth verified above via getUser)
-    const adminSupabase = createAdminClient();
-
     // Retry slug generation on collision (unique constraint)
     let event = null;
     let insertError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       const slug = generateSlug(title);
-      const { data, error } = await adminSupabase
-        .from('events')
-        .insert({
-          user_id: user.id,
-          title,
-          slug,
-          description: description ?? null,
-          event_date: event_date ?? null,
-          event_end_date: event_end_date ?? null,
-          location_name: location_name ?? null,
-          location_address: location_address ?? null,
-          host_name: host_name ?? null,
-          dress_code: dress_code ?? null,
-          rsvp_deadline: rsvp_deadline ?? null,
-          registry_links: registry_links ?? [],
-          ...(max_attendees !== undefined && { max_attendees: max_attendees }),
-          ...(allow_plus_ones !== undefined && { allow_plus_ones }),
-          ...(max_guests_per_rsvp !== undefined && { max_guests_per_rsvp }),
-          design_url: design_url ?? null,
-          design_type: design_type ?? 'upload',
-          customization: customization ?? {},
-          status: status ?? 'draft',
-        })
-        .select()
-        .single();
-
-      if (!error) {
-        event = data;
+      try {
+        event = await prisma.event.create({
+          data: {
+            user_id: user.id,
+            title,
+            slug,
+            description: description ?? null,
+            event_date: event_date ?? null,
+            event_end_date: event_end_date ?? null,
+            location_name: location_name ?? null,
+            location_address: location_address ?? null,
+            host_name: host_name ?? null,
+            dress_code: dress_code ?? null,
+            rsvp_deadline: rsvp_deadline ?? null,
+            registry_links: registry_links ?? [],
+            ...(max_attendees !== undefined && { max_attendees: max_attendees }),
+            ...(allow_plus_ones !== undefined && { allow_plus_ones }),
+            ...(max_guests_per_rsvp !== undefined && { max_guests_per_rsvp }),
+            design_url: design_url ?? null,
+            design_type: design_type ?? 'upload',
+            customization: customization ?? {},
+            status: status ?? 'draft',
+          },
+        });
         insertError = null;
         break;
-      }
-
-      // If not a unique constraint violation, don't retry
-      if (error.code !== '23505') {
+      } catch (error: any) {
+        // If not a unique constraint violation, don't retry
+        if (error?.code !== 'P2002') {
+          insertError = error;
+          break;
+        }
         insertError = error;
-        break;
       }
-      insertError = error;
     }
 
     if (insertError) {
@@ -131,11 +114,9 @@ export async function POST(request: NextRequest) {
       placeholder: field.placeholder ?? null,
     }));
 
-    const { error: rsvpError } = await adminSupabase
-      .from('rsvp_fields')
-      .insert(rsvpFields);
-
-    if (rsvpError) {
+    try {
+      await prisma.rsvpField.createMany({ data: rsvpFields });
+    } catch (rsvpError: any) {
       console.error('Failed to insert default RSVP fields:', rsvpError.message);
     }
 

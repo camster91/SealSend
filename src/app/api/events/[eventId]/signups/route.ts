@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { z } from "zod";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -19,22 +19,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { data: items } = await admin
-      .from("event_signup_items")
-      .select("*, claims:event_signup_claims(*)")
-      .eq("event_id", eventId)
-      .order("sort_order", { ascending: true });
+    const items = await prisma.eventSignupItem.findMany({
+      where: { event_id: eventId },
+      include: { claims: true },
+      orderBy: { sort_order: 'asc' },
+    });
 
     return NextResponse.json(items ?? []);
   } catch {
@@ -49,14 +45,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, tier: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -76,25 +68,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get next sort_order
-    const { count } = await admin
-      .from("event_signup_items")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", eventId);
+    const count = await prisma.eventSignupItem.count({
+      where: { event_id: eventId },
+    });
 
-    const { data: item, error } = await admin
-      .from("event_signup_items")
-      .insert({
+    const item = await prisma.eventSignupItem.create({
+      data: {
         event_id: eventId,
         title: parsed.data.title,
         description: parsed.data.description || null,
         category: parsed.data.category || null,
         slots: parsed.data.slots,
         sort_order: count ?? 0,
-      })
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      },
+    });
 
     return NextResponse.json(item, { status: 201 });
   } catch {
@@ -110,24 +97,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { error } = await admin
-      .from("event_signup_items")
-      .delete()
-      .eq("id", itemId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await prisma.eventSignupItem.deleteMany({
+      where: { id: itemId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

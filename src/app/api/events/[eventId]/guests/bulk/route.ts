@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 
@@ -13,15 +13,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -34,15 +30,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Check for existing guests to avoid duplicates
-    const { data: existingGuests } = await adminSupabase
-      .from("guests")
-      .select("email, phone")
-      .eq("event_id", eventId);
+    const existingGuests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      select: { email: true, phone: true },
+    });
 
     const existingEmails = new Set((existingGuests || [])
       .map(g => g.email?.toLowerCase())
       .filter(Boolean));
-    
+
     const existingPhones = new Set((existingGuests || [])
       .map(g => g.phone)
       .filter(Boolean));
@@ -57,7 +53,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           duplicates.push({ name: g.name, reason: `Email ${g.email} already exists` });
           return null;
         }
-        
+
         if (g.phone) {
           const phoneValidation = validateAndFormatPhone(g.phone);
           if (phoneValidation.valid && existingPhones.has(phoneValidation.formatted)) {
@@ -107,23 +103,31 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 200 });
     }
 
-    const { error, data: insertedGuests } = await adminSupabase
-      .from("guests")
-      .insert(guests)
-      .select('id, name, email, phone');
+    try {
+      await prisma.guest.createMany({ data: guests });
 
-    if (error) {
+      // Fetch the inserted guests to return them
+      const insertedGuests = await prisma.guest.findMany({
+        where: {
+          event_id: eventId,
+          name: { in: guests.map(g => g.name) },
+        },
+        select: { id: true, name: true, email: true, phone: true },
+        orderBy: { created_at: 'desc' },
+        take: guests.length,
+      });
+
+      return NextResponse.json({
+        imported: insertedGuests?.length || 0,
+        skipped: duplicates.length,
+        errors: validationErrors,
+        duplicates: duplicates.length > 0 ? duplicates : undefined,
+        guests: insertedGuests,
+      }, { status: 201 });
+    } catch (error: any) {
       console.error('Bulk insert error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    return NextResponse.json({
-      imported: insertedGuests?.length || 0,
-      skipped: duplicates.length,
-      errors: validationErrors,
-      duplicates: duplicates.length > 0 ? duplicates : undefined,
-      guests: insertedGuests,
-    }, { status: 201 });
   } catch (error) {
     console.error('Bulk import error:', error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

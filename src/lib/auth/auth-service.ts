@@ -1,9 +1,6 @@
-import { createClient } from '@/lib/supabase/client';
-import { LoginRequest, VerifyRequest, AuthUser, UserRole } from './types';
+import { LoginRequest, VerifyRequest, AuthUser } from './types';
 
 export class AuthService {
-  private supabase = createClient();
-
   async sendLoginCode(request: LoginRequest): Promise<{ success: boolean; message: string }> {
     try {
       if (request.method === 'email' && request.email) {
@@ -91,15 +88,14 @@ export class AuthService {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
-        // Store user in localStorage for client-side access
         if (typeof window !== 'undefined' && result.user) {
           localStorage.setItem('sealsend_user', JSON.stringify(result.user));
         }
         return { success: true, message: result.message };
       }
-      
+
       return { success: false, message: result.error || 'Invalid email or password' };
     } catch (error) {
       console.error('Password login error:', error);
@@ -132,7 +128,6 @@ export class AuthService {
           eventId: result.user.eventId
         };
 
-        // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
           localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
@@ -172,7 +167,6 @@ export class AuthService {
           eventId: result.user.eventId
         };
 
-        // Store in localStorage for client-side access
         if (typeof window !== 'undefined') {
           localStorage.setItem('sealsend_user', JSON.stringify(user));
         }
@@ -185,10 +179,5 @@ export class AuthService {
       console.error('Verify SMS code error:', error);
       return { success: false, message: 'Unable to connect to the server. Please check your connection and try again.' };
     }
-  }
-
-  private async isAdminEmail(email: string): Promise<boolean> {
-    // This will be determined by the API
-    return false;
   }
 }

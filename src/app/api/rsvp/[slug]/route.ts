@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { rsvpSubmissionSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -16,17 +16,13 @@ export async function POST(
 
     const { slug } = await params;
     const body = await request.json();
-    const supabase = createAdminClient();
 
     // Fetch the event
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { slug, status: "published" },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: "Event not found or not published" },
         { status: 404 }
@@ -34,10 +30,9 @@ export async function POST(
     }
 
     // Check if event has reached response limit
-    const { count } = await supabase
-      .from("rsvp_responses")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", event.id);
+    const count = await prisma.rsvpResponse.count({
+      where: { event_id: event.id },
+    });
 
     const { BETA_MODE, BETA_RESPONSE_LIMIT } = await import("@/lib/constants");
     const effectiveLimit = BETA_MODE ? BETA_RESPONSE_LIMIT : event.max_responses;
@@ -90,11 +85,10 @@ export async function POST(
     // Check event capacity
     const maxAttendees = event.max_attendees || null;
     if (maxAttendees && status === "attending") {
-      const { data: attendingResponses } = await supabase
-        .from("rsvp_responses")
-        .select("headcount")
-        .eq("event_id", event.id)
-        .eq("status", "attending");
+      const attendingResponses = await prisma.rsvpResponse.findMany({
+        where: { event_id: event.id, status: "attending" },
+        select: { headcount: true },
+      });
 
       const currentTotal = (attendingResponses || []).reduce(
         (sum, r) => sum + (r.headcount || 1),
@@ -115,9 +109,8 @@ export async function POST(
     }
 
     // Insert RSVP response
-    const { data: response, error: insertError } = await supabase
-      .from("rsvp_responses")
-      .insert({
+    const response = await prisma.rsvpResponse.create({
+      data: {
         event_id: event.id,
         respondent_name,
         respondent_email: respondent_email || null,
@@ -126,16 +119,8 @@ export async function POST(
         response_data,
         plus_ones_data: plus_ones || [],
         ...(guest_id && { guest_id }),
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      return NextResponse.json(
-        { error: "Failed to submit RSVP" },
-        { status: 500 }
-      );
-    }
+      },
+    });
 
     // Create plus_ones records if any
     if (plus_ones && plus_ones.length > 0 && response) {
@@ -147,11 +132,9 @@ export async function POST(
         status: status, // Inherit the main respondent's status
       }));
 
-      const { error: plusOnesError } = await supabase
-        .from("plus_ones")
-        .insert(plusOnesToInsert);
-
-      if (plusOnesError) {
+      try {
+        await prisma.plusOne.createMany({ data: plusOnesToInsert });
+      } catch (plusOnesError) {
         console.error("Failed to create plus_ones:", plusOnesError);
         // Continue anyway - the main RSVP is already created
       }

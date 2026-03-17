@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { createClient } from "@/lib/supabase/client";
 import type { RSVPField, PlusOneData } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
@@ -50,13 +49,12 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     if (!inviteGuestName) {
       async function prefill() {
         try {
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (cancelled || !user) return;
-          const name = user.user_metadata?.full_name
-            || user.user_metadata?.name
-            || user.email?.split("@")[0]
-            || "";
+          const res = await fetch("/api/auth/me");
+          if (!res.ok || cancelled) return;
+          const data = await res.json();
+          const user = data.user;
+          if (!user) return;
+          const name = user.name || user.email?.split("@")[0] || "";
           if (name) {
             setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
           }

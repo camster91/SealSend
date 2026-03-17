@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -25,17 +24,15 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: `${siteUrl}/callback?next=${encodeURIComponent(redirect)}`,
-        },
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "email", email: email.trim() }),
       });
 
-      if (otpError) {
-        setError(otpError.message);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to send code");
         return;
       }
 
@@ -52,15 +49,19 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otpCode.trim(),
-        type: "email",
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          method: "email",
+          email: email.trim(),
+          code: otpCode.trim(),
+        }),
       });
 
-      if (verifyError) {
-        setError(verifyError.message);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Invalid or expired code");
         return;
       }
 
@@ -82,12 +83,12 @@ export function LoginForm() {
           </div>
           <p className="text-sm font-medium text-indigo-700">Check your email</p>
           <p className="mt-1 text-xs text-indigo-600">
-            We sent a login link and code to <strong>{email}</strong>
+            We sent a login code to <strong>{email}</strong>
           </p>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Click the magic link in your email, or enter the 6-digit code below:
+          Enter the 6-digit code from your email:
         </p>
 
         <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -155,11 +156,11 @@ export function LoginForm() {
       )}
 
       <Button type="submit" loading={loading} className="w-full">
-        Send Login Link
+        Send Login Code
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        No password needed. We&apos;ll email you a magic link to sign in.
+        No password needed. We&apos;ll email you a code to sign in.
       </p>
     </form>
   );

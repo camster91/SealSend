@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatRelative } from '@/lib/utils';
-import { createClient } from '@/lib/supabase/client';
 import type { EventComment } from '@/types/database';
 
 interface CommentsSectionProps {
@@ -41,13 +40,12 @@ export function CommentsSection({ eventSlug }: CommentsSectionProps) {
   useEffect(() => {
     async function prefill() {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user;
         if (user && !authorName) {
-          const name = user.user_metadata?.full_name
-            || user.user_metadata?.name
-            || user.email?.split('@')[0]
-            || '';
+          const name = user.name || user.email?.split('@')[0] || '';
           if (name) setAuthorName(name);
         }
       } catch {

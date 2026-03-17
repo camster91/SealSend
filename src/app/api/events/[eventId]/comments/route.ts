@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -13,25 +13,18 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { data: comments, error } = await adminSupabase
-      .from("event_comments")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const comments = await prisma.eventComment.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(comments);
   } catch {
@@ -49,25 +42,17 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { error } = await adminSupabase
-      .from("event_comments")
-      .delete()
-      .eq("id", commentId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await prisma.eventComment.deleteMany({
+      where: { id: commentId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

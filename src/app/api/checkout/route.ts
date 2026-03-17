@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
 
@@ -30,17 +30,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { eventId, tier } = parsed.data;
-    const adminSupabase = createAdminClient();
 
     // Verify user owns the event
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, title, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, tier: true },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 

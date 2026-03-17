@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
 import { getEventById, getEventMetrics } from '@/lib/repositories/eventRepository';
 import { toggleEventStatus } from '@/actions/eventActions';
 import { useTransition } from 'react';
@@ -23,11 +23,7 @@ interface EventDetailPageProps {
 export default async function EventDetailPage({ params, searchParams }: EventDetailPageProps) {
   const { eventId } = await params;
   const { upgraded } = await searchParams;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');

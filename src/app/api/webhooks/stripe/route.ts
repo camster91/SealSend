@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
@@ -42,18 +42,17 @@ export async function POST(request: NextRequest) {
     }
 
     const maxResponses = TIERS[tierKey].maxResponses;
-    const adminSupabase = createAdminClient();
 
-    const { error } = await adminSupabase
-      .from("events")
-      .update({
-        tier: tierKey,
-        max_responses: maxResponses,
-        payment_id: session.id,
-      })
-      .eq("id", eventId);
-
-    if (error) {
+    try {
+      await prisma.event.update({
+        where: { id: eventId },
+        data: {
+          tier: tierKey,
+          max_responses: maxResponses,
+          payment_id: session.id,
+        },
+      });
+    } catch (error) {
       console.error("Failed to update event after payment:", error);
       return NextResponse.json(
         { error: "Failed to update event" },

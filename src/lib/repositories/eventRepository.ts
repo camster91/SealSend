@@ -1,31 +1,33 @@
-import { createClient } from '@/lib/supabase/server';
+import { prisma } from '@/lib/db';
 
 export async function getEventById(eventId: string, userId: string) {
-  const supabase = await createClient();
-  return await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .eq('user_id', userId)
-    .single();
+  try {
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: userId },
+    });
+
+    if (!event) {
+      return { data: null, error: 'Event not found' };
+    }
+
+    return { data: event, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Failed to fetch event' };
+  }
 }
 
 export async function getEventMetrics(eventId: string) {
-  const supabase = await createClient();
-  
-  const [responses, guests] = await Promise.all([
-    supabase
-      .from('rsvp_responses')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId),
-    supabase
-      .from('guests')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
+  const [responseCount, guestCount] = await Promise.all([
+    prisma.rsvpResponse.count({
+      where: { event_id: eventId },
+    }),
+    prisma.guest.count({
+      where: { event_id: eventId },
+    }),
   ]);
 
   return {
-    responseCount: responses.count || 0,
-    guestCount: guests.count || 0
+    responseCount,
+    guestCount,
   };
 }

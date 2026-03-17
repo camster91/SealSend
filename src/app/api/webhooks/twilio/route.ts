@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { updateSendStatus } from '@/lib/email-logger';
 
 /**
  * Twilio webhook handler for SMS status callbacks
  * Handles: queued, sending, sent, failed, delivered, undelivered
- * 
+ *
  * Configure in Twilio Console > Phone Numbers > Manage > Active Numbers
  * Set "Messaging" > "Webhook" for status callbacks:
  * URL: https://yourdomain.com/api/webhooks/twilio
  * HTTP POST
- * 
+ *
  * Or set on individual messages via statusCallback parameter
  */
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     // See: https://www.twilio.com/docs/usage/security#validating-requests
     const twilioSignature = request.headers.get('x-twilio-signature');
     const authToken = process.env.TWILIO_AUTH_TOKEN;
-    
+
     if (twilioSignature && authToken) {
       // In production, implement signature validation
       // const isValid = validateTwilioSignature(request.url, data, authToken, twilioSignature);
@@ -73,7 +73,7 @@ function mapTwilioStatus(twilioStatus: string): 'sent' | 'delivered' | 'failed' 
 
 function getErrorMessage(errorCode?: string): string | undefined {
   if (!errorCode) return undefined;
-  
+
   // Common Twilio error codes
   const errorMessages: Record<string, string> = {
     '30001': 'Queue overflow',
@@ -128,14 +128,11 @@ async function updateSmsStatus(
   }
 ) {
   try {
-    const adminSupabase = createAdminClient();
-    
     // Find the send log by provider message ID (Twilio SID)
-    const { data: sendLog } = await adminSupabase
-      .from('send_logs')
-      .select('id, metadata')
-      .eq('provider_message_id', messageSid)
-      .single();
+    const sendLog = await prisma.sendLog.findFirst({
+      where: { provider_message_id: messageSid },
+      select: { id: true, metadata: true },
+    });
 
     if (!sendLog) {
       console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
@@ -143,13 +140,13 @@ async function updateSmsStatus(
     }
 
     // Update the send log
-    await adminSupabase
-      .from('send_logs')
-      .update({
+    await prisma.sendLog.update({
+      where: { id: sendLog.id },
+      data: {
         status,
         error_message: metadata.errorMessage,
         metadata: {
-          ...(sendLog.metadata || {}),
+          ...((sendLog.metadata as Record<string, unknown>) || {}),
           twilioStatus: status,
           errorCode: metadata.errorCode,
           to: metadata.to,
@@ -157,8 +154,8 @@ async function updateSmsStatus(
           updatedAt: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', sendLog.id);
+      },
+    });
 
     // If failed or bounced, mark the phone as invalid
     if (status === 'failed' || status === 'bounced') {
@@ -171,15 +168,13 @@ async function updateSmsStatus(
 
 async function markPhoneInvalid(phone: string) {
   try {
-    const adminSupabase = createAdminClient();
-    
-    await adminSupabase
-      .from('guests')
-      .update({
+    await prisma.guest.updateMany({
+      where: { phone },
+      data: {
         phone_invalid_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .eq('phone', phone);
+      },
+    });
   } catch (error) {
     console.error('[Twilio Webhook] Error marking phone invalid:', error);
   }

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   const startTime = Date.now();
   const healthChecks: Record<string, { status: 'healthy' | 'unhealthy'; details?: string; duration?: number }> = {};
-  
+
   // App info
   const appInfo = {
     name: 'SealSend',
@@ -16,18 +16,12 @@ export async function GET() {
   // Check 1: Database connectivity
   try {
     const dbStart = Date.now();
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.from('events').select('count').limit(1).single();
+    await prisma.$queryRaw`SELECT 1`;
     const dbDuration = Date.now() - dbStart;
-    
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "no rows returned" - that's fine for empty table
-      throw error;
-    }
-    
+
     healthChecks.database = {
       status: 'healthy',
-      details: 'Connected to Supabase',
+      details: 'Connected to database',
       duration: dbDuration,
     };
   } catch (error: any) {
@@ -39,16 +33,14 @@ export async function GET() {
 
   // Check 2: Environment variables
   const requiredEnvVars = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'SUPABASE_SERVICE_ROLE_KEY',
+    'DATABASE_URL',
   ];
-  
+
   const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
-  
+
   healthChecks.environment = {
     status: missingEnvVars.length === 0 ? 'healthy' : 'unhealthy',
-    details: missingEnvVars.length === 0 
+    details: missingEnvVars.length === 0
       ? 'All required environment variables present'
       : `Missing: ${missingEnvVars.join(', ')}`,
   };

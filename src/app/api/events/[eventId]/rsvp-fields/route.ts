@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 import { rsvpFieldSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -20,35 +20,23 @@ export async function GET(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event, error: eventError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
       );
     }
 
-    const { data: fields, error } = await adminSupabase
-      .from('rsvp_fields')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('sort_order', { ascending: true });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+    const fields = await prisma.rsvpField.findMany({
+      where: { event_id: eventId },
+      orderBy: { sort_order: 'asc' },
+    });
 
     return NextResponse.json(fields);
   } catch {
@@ -74,17 +62,13 @@ export async function PUT(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event, error: eventError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -124,45 +108,20 @@ export async function PUT(
     }
 
     // Delete existing RSVP fields for this event (only after validation passes)
-    const { error: deleteError } = await adminSupabase
-      .from('rsvp_fields')
-      .delete()
-      .eq('event_id', eventId);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { error: deleteError.message },
-        { status: 500 }
-      );
-    }
+    await prisma.rsvpField.deleteMany({
+      where: { event_id: eventId },
+    });
 
     // Insert validated fields
     if (fields.length > 0) {
-      const { error: insertError } = await adminSupabase
-        .from('rsvp_fields')
-        .insert(fields);
-
-      if (insertError) {
-        return NextResponse.json(
-          { error: insertError.message },
-          { status: 500 }
-        );
-      }
+      await prisma.rsvpField.createMany({ data: fields });
     }
 
     // Return the newly inserted fields
-    const { data: updatedFields, error: fetchError } = await adminSupabase
-      .from('rsvp_fields')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('sort_order', { ascending: true });
-
-    if (fetchError) {
-      return NextResponse.json(
-        { error: fetchError.message },
-        { status: 500 }
-      );
-    }
+    const updatedFields = await prisma.rsvpField.findMany({
+      where: { event_id: eventId },
+      orderBy: { sort_order: 'asc' },
+    });
 
     return NextResponse.json(updatedFields);
   } catch {

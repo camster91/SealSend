@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import type { PlusOne } from "@/types/database";
 
 export async function GET(
@@ -12,14 +12,10 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -27,26 +23,22 @@ export async function GET(
     const format = url.searchParams.get("format");
 
     // Fetch responses with their plus_ones
-    const { data: responses, error } = await adminSupabase
-      .from("rsvp_responses")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("submitted_at", { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const responses = await prisma.rsvpResponse.findMany({
+      where: { event_id: eventId },
+      orderBy: { submitted_at: 'desc' },
+    });
 
     // Fetch plus_ones for these responses
     const responseIds = responses?.map(r => r.id) || [];
     let plusOnes: PlusOne[] = [];
-    
+
     if (responseIds.length > 0) {
-      const { data: plusOnesData, error: plusOnesError } = await adminSupabase
-        .from("plus_ones")
-        .select("*")
-        .in("rsvp_response_id", responseIds);
-      
-      if (!plusOnesError && plusOnesData) {
-        plusOnes = plusOnesData;
+      const plusOnesData = await prisma.plusOne.findMany({
+        where: { rsvp_response_id: { in: responseIds } },
+      });
+
+      if (plusOnesData) {
+        plusOnes = plusOnesData as unknown as PlusOne[];
       }
     }
 
@@ -93,7 +85,7 @@ export async function GET(
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");
         const plusOneEmails = plusOnesList.map((po: PlusOne) => po.email || "").filter(Boolean).join("; ");
-        
+
         return [
           r.respondent_name,
           r.respondent_email || "",

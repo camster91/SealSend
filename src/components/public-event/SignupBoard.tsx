@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import type { SignupItemWithClaims } from '@/types/database';
 
 interface SignupBoardProps {
@@ -33,13 +32,12 @@ export function SignupBoard({ eventSlug }: SignupBoardProps) {
   useEffect(() => {
     async function prefill() {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user;
         if (user && !claimName) {
-          const name = user.user_metadata?.full_name
-            || user.user_metadata?.name
-            || user.email?.split('@')[0]
-            || '';
+          const name = user.name || user.email?.split('@')[0] || '';
           if (name) setClaimName(name);
         }
       } catch {

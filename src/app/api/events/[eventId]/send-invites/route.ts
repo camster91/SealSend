@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { prisma } from '@/lib/db';
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
@@ -26,17 +26,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }
 
-    const adminSupabase = createAdminClient();
-
     // Ownership + status check
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, event_date: true, location_name: true, slug: true, status: true, design_url: true, host_name: true, dress_code: true, rsvp_deadline: true, tier: true },
+    });
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -48,18 +44,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that need invitations (email OR phone)
-    const { data: guests, error: guestsError } = await adminSupabase
-      .from("guests")
-      .select("id, name, email, phone, invite_status, invite_token")
-      .eq("event_id", eventId)
-      .in("invite_status", ["not_sent", "failed"]);
-
-    if (guestsError) {
-      return NextResponse.json(
-        { error: guestsError.message },
-        { status: 500 }
-      );
-    }
+    const guests = await prisma.guest.findMany({
+      where: {
+        event_id: eventId,
+        invite_status: { in: ["not_sent", "failed"] },
+      },
+      select: { id: true, name: true, email: true, phone: true, invite_status: true, invite_token: true },
+    });
 
     // Filter to guests that have email or phone
     const sendableGuests = (guests || []).filter((g) => g.email || g.phone);
@@ -90,10 +81,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           let token = guest.invite_token;
           if (!token) {
             token = generateInviteToken();
-            await adminSupabase
-              .from("guests")
-              .update({ invite_token: token })
-              .eq("id", guest.id);
+            await prisma.guest.update({
+              where: { id: guest.id },
+              data: { invite_token: token },
+            });
           }
 
           // Create a seamless magic invite link that auto-logs the guest in
@@ -124,7 +115,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                 html,
               });
               emailOk = true;
-              
+
               // Log successful send
               await logSendSuccess(eventId, 'email', guest.email, {
                 guestId: guest.id,
@@ -136,7 +127,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               errors.push({ type: 'email', message });
               console.error(`[EMAIL FAILED] ${guest.email}:`, message);
-              
+
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
                 subject: event.title,
@@ -148,11 +139,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           if (guest.phone && smsEnabled) {
             // Validate and format phone number
             const phoneValidation = validateAndFormatPhone(guest.phone);
-            
+
             if (!phoneValidation.valid) {
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[SMS INVALID] ${guest.phone}:`, phoneValidation.error);
-              
+
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
               });
@@ -175,7 +166,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 });
                 smsOk = true;
-                
+
                 // Log successful SMS
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,
@@ -186,7 +177,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
                 console.error(`[SMS FAILED] ${guest.phone}:`, message);
-                
+
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -204,15 +195,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         if (result.status === "fulfilled") {
           const { guestId, emailOk, smsOk, errors } = result.value;
           const guest = batch.find((g) => g.id === guestId);
-          
+
           if (emailOk) {
             sent++;
           } else if (guest?.email) {
             failed++;
-            console.error(`[INVITE FAILED] Guest ${guestId} email failed:`, 
+            console.error(`[INVITE FAILED] Guest ${guestId} email failed:`,
               errors.filter(e => e.type === 'email').map(e => e.message).join(', '));
           }
-          
+
           if (smsOk) {
             smsSent++;
           } else if (smsEnabled && guest?.phone) {
@@ -237,16 +228,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Batch update statuses
     if (successIds.length > 0) {
-      await adminSupabase
-        .from("guests")
-        .update({ invite_status: "sent", invite_sent_at: new Date().toISOString() })
-        .in("id", successIds);
+      await prisma.guest.updateMany({
+        where: { id: { in: successIds } },
+        data: { invite_status: "sent", invite_sent_at: new Date().toISOString() },
+      });
     }
     if (failedIds.length > 0) {
-      await adminSupabase
-        .from("guests")
-        .update({ invite_status: "failed" })
-        .in("id", failedIds);
+      await prisma.guest.updateMany({
+        where: { id: { in: failedIds } },
+        data: { invite_status: "failed" },
+      });
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });

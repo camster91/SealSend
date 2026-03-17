@@ -1,36 +1,43 @@
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/db';
 
 export async function getPublicEventBySlug(slug: string) {
-  const supabase = createAdminClient();
-  return await supabase
-    .from("events")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+  try {
+    const event = await prisma.event.findFirst({
+      where: { slug, status: 'published' },
+    });
+
+    if (!event) {
+      return { data: null, error: 'Event not found' };
+    }
+
+    return { data: event, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Failed to fetch event' };
+  }
 }
 
 export async function getRsvpFields(eventId: string) {
-  const supabase = createAdminClient();
-  return await supabase
-    .from("rsvp_fields")
-    .select("*")
-    .eq("event_id", eventId)
-    .order("sort_order", { ascending: true });
+  try {
+    const fields = await prisma.rsvpField.findMany({
+      where: { event_id: eventId },
+      orderBy: { sort_order: 'asc' },
+    });
+
+    return { data: fields, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Failed to fetch RSVP fields' };
+  }
 }
 
 export async function getRemainingSpots(eventId: string, maxAttendees: number | null) {
   if (!maxAttendees) return null;
-  const supabase = createAdminClient();
 
-  const { data: attendingResponses } = await supabase
-    .from("rsvp_responses")
-    .select("headcount")
-    .eq("event_id", eventId)
-    .eq("status", "attending");
+  const attendingResponses = await prisma.rsvpResponse.findMany({
+    where: { event_id: eventId, status: 'attending' },
+    select: { headcount: true },
+  });
 
-  const currentTotal = (attendingResponses || []).reduce(
+  const currentTotal = attendingResponses.reduce(
     (sum: number, r: { headcount: number }) => sum + (r.headcount || 1),
     0
   );
@@ -38,11 +45,18 @@ export async function getRemainingSpots(eventId: string, maxAttendees: number | 
 }
 
 export async function getInviteGuest(eventId: string, token: string) {
-  const supabase = createAdminClient();
-  return await supabase
-    .from("guests")
-    .select("id, name, email")
-    .eq("invite_token", token)
-    .eq("event_id", eventId)
-    .single();
+  try {
+    const guest = await prisma.guest.findFirst({
+      where: { invite_token: token, event_id: eventId },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!guest) {
+      return { data: null, error: 'Guest not found' };
+    }
+
+    return { data: guest, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Failed to fetch guest' };
+  }
 }
