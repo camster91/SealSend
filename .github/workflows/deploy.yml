@@ -1,4 +1,4 @@
-name: Deploy to Coolify
+﻿name: Build & Deploy to Coolify
 
 on:
   push:
@@ -6,34 +6,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+        env:
+          SKIP_ENV_VALIDATION: 'true'
+          NODE_ENV: production
+
       - name: Trigger Coolify Deployment
         run: |
-          curl -X POST "${{ secrets.COOLIFY_URL }}/api/v1/applications/${{ secrets.COOLIFY_APP_ID }}/restart" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"force_rebuild": true}'
-        env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
-          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          COOLIFY_APP_ID: ${{ secrets.COOLIFY_APP_ID }}
-
-      - name: Wait for deployment
-        run: |
-          echo "Waiting for deployment to complete..."
-          sleep 120
-          
-      - name: Verify deployment
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://sealsend.app")
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ Deployment successful!"
+          echo "Triggering Coolify redeploy for $COOLIFY_APP_UUID"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            "$COOLIFY_URL/api/v1/deploy?uuid=$COOLIFY_APP_UUID&force=true" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Deployment triggered!"
           else
-            echo "❌ Deployment failed with status $STATUS"
+            echo "Failed (HTTP $HTTP_CODE)"
             exit 1
           fi
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
