@@ -33,9 +33,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Rate limit: 10 magic link generations per user per hour
-    const { success: rateLimitOk } = rateLimit(`magic-link:${user.id}`, { 
-      max: 10, 
-      windowSeconds: 3600 
+    const { success: rateLimitOk } = await rateLimit(`magic-link:${user.id}`, {
+      max: 10,
+      windowSeconds: 3600
     });
     
     if (!rateLimitOk) {

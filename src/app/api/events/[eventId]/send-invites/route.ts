@@ -21,7 +21,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { success: rateLimitOk } = rateLimit(`send-invites:${user.id}`, { max: 5, windowSeconds: 3600 });
+    const { success: rateLimitOk } = await rateLimit(`send-invites:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }

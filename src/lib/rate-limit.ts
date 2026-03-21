@@ -1,24 +1,4 @@
-/**
- * Simple in-memory rate limiter.
- * For production at scale, replace with Redis (e.g. @upstash/ratelimit).
- */
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const store = new Map<string, RateLimitEntry>();
-
-// Clean up expired entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of store) {
-    if (now > entry.resetAt) {
-      store.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface RateLimitOptions {
   /** Max requests allowed in the window */
@@ -33,29 +13,42 @@ interface RateLimitResult {
   resetAt: number;
 }
 
-export function rateLimit(
+export async function rateLimit(
   key: string,
   options: RateLimitOptions
-): RateLimitResult {
-  const now = Date.now();
-  const entry = store.get(key);
+): Promise<RateLimitResult> {
+  const supabase = createAdminClient();
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - options.windowSeconds * 1000);
+  const resetAt = now.getTime() + options.windowSeconds * 1000;
 
-  if (!entry || now > entry.resetAt) {
-    // New window
-    const resetAt = now + options.windowSeconds * 1000;
-    store.set(key, { count: 1, resetAt });
-    return { success: true, remaining: options.max - 1, resetAt };
+  // Delete old entries older than window
+  await supabase
+    .from("rate_limit_attempts")
+    .delete()
+    .eq("key", key)
+    .lt("created_at", windowStart.toISOString());
+
+  // Count recent entries for the key
+  const { count } = await supabase
+    .from("rate_limit_attempts")
+    .select("*", { count: "exact", head: true })
+    .eq("key", key)
+    .gte("created_at", windowStart.toISOString());
+
+  const currentCount = count ?? 0;
+
+  if (currentCount >= options.max) {
+    return { success: false, remaining: 0, resetAt };
   }
 
-  if (entry.count >= options.max) {
-    return { success: false, remaining: 0, resetAt: entry.resetAt };
-  }
+  // Insert new entry
+  await supabase.from("rate_limit_attempts").insert({ key });
 
-  entry.count++;
   return {
     success: true,
-    remaining: options.max - entry.count,
-    resetAt: entry.resetAt,
+    remaining: options.max - currentCount - 1,
+    resetAt,
   };
 }
 

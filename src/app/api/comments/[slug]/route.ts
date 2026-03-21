@@ -49,7 +49,7 @@ export async function POST(
 ) {
   try {
     const ip = getClientIp(request);
-    const { success } = rateLimit(`comment:${ip}`, { max: 15, windowSeconds: 600 });
+    const { success } = await rateLimit(`comment:${ip}`, { max: 15, windowSeconds: 600 });
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }

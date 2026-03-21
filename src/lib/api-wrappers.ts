@@ -38,7 +38,7 @@ export function withErrorHandling<T>(
       if (options.rateLimit) {
         const ip = getClientIp(request);
         const key = `${options.rateLimit.keyPrefix || 'api'}:${ip}`;
-        const { success } = rateLimit(key, {
+        const { success } = await rateLimit(key, {
           max: options.rateLimit.max,
           windowSeconds: options.rateLimit.windowSeconds,
         });

@@ -8,13 +8,13 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const { slug } = await params;
     const ip = getClientIp(request);
-    const { success } = rateLimit(`rsvp:${ip}`, { max: 10, windowSeconds: 600 });
+    const { success } = await rateLimit(`rsvp:${slug}:${ip}`, { max: 5, windowSeconds: 3600 });
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }
 
-    const { slug } = await params;
     const body = await request.json();
     const supabase = createAdminClient();
 

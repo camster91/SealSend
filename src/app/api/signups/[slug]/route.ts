@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const ip = getClientIp(request);
-    const { success } = rateLimit(`signup:${ip}`, { max: 20, windowSeconds: 600 });
+    const { success } = await rateLimit(`signup:${ip}`, { max: 20, windowSeconds: 600 });
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }

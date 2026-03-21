@@ -53,16 +53,15 @@ export async function getApiUser(): Promise<AuthenticatedUser | null> {
 
     if (!session) return null;
 
-    // Get user info from the cookie (faster than DB lookup)
-    const userCookie = cookieStore.get("sealsend_user")?.value;
+    // Look up email from DB using the validated session's user_id
     let email: string | null = null;
-    if (userCookie) {
-      try {
-        const parsed = JSON.parse(userCookie);
-        email = parsed.email || null;
-      } catch {
-        // ignore parse errors
-      }
+    if (session.user_role === "admin") {
+      const { data: adminUser } = await adminSupabase
+        .from("admin_users")
+        .select("email")
+        .eq("id", session.user_id)
+        .single();
+      email = adminUser?.email || null;
     }
 
     return {

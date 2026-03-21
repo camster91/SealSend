@@ -64,7 +64,7 @@ export async function POST(
       );
     }
 
-    const { success: rateLimitOk } = rateLimit(`announcements:${user.id}`, { max: 5, windowSeconds: 3600 });
+    const { success: rateLimitOk } = await rateLimit(`announcements:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }

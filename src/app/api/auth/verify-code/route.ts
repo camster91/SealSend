@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = rateLimit(`verify-code:${ip}`, { max: 10, windowSeconds: 600 });
+    const { success: rateLimitOk } = await rateLimit(`verify-code:${ip}`, { max: 10, windowSeconds: 600 });
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: 'Too many attempts. Please wait a few minutes before trying again.' },
