@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { getApiUser } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
@@ -16,20 +16,10 @@ export async function GET() {
       );
     }
 
-    const adminSupabase = createAdminClient();
-
-    const { data: events, error } = await adminSupabase
-      .from('events')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+    const events = await query(
+      'SELECT * FROM events WHERE user_id = $1 ORDER BY created_at DESC',
+      [user.id]
+    );
 
     return NextResponse.json(events);
   } catch {
@@ -63,52 +53,54 @@ export async function POST(request: NextRequest) {
 
     const { title, description, event_date, event_end_date, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
 
-    // Use admin client for DB writes (auth verified above via getUser)
-    const adminSupabase = createAdminClient();
-
     // Retry slug generation on collision (unique constraint)
     let event = null;
     let insertError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       const slug = generateSlug(title);
-      const { data, error } = await adminSupabase
-        .from('events')
-        .insert({
-          user_id: user.id,
-          title,
-          slug,
-          description: description ?? null,
-          event_date: event_date ?? null,
-          event_end_date: event_end_date ?? null,
-          location_name: location_name ?? null,
-          location_address: location_address ?? null,
-          host_name: host_name ?? null,
-          dress_code: dress_code ?? null,
-          rsvp_deadline: rsvp_deadline ?? null,
-          registry_links: registry_links ?? [],
-          ...(max_attendees !== undefined && { max_attendees: max_attendees }),
-          ...(allow_plus_ones !== undefined && { allow_plus_ones }),
-          ...(max_guests_per_rsvp !== undefined && { max_guests_per_rsvp }),
-          design_url: design_url ?? null,
-          design_type: design_type ?? 'upload',
-          customization: customization ?? {},
-          status: status ?? 'draft',
-        })
-        .select()
-        .single();
-
-      if (!error) {
-        event = data;
+      try {
+        event = await queryOne(
+          `INSERT INTO events (
+            user_id, title, slug, description, event_date, event_end_date,
+            location_name, location_address, host_name, dress_code,
+            rsvp_deadline, registry_links, max_attendees, allow_plus_ones,
+            max_guests_per_rsvp, design_url, design_type, customization, status
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+          ) RETURNING *`,
+          [
+            user.id,
+            title,
+            slug,
+            description ?? null,
+            event_date ?? null,
+            event_end_date ?? null,
+            location_name ?? null,
+            location_address ?? null,
+            host_name ?? null,
+            dress_code ?? null,
+            rsvp_deadline ?? null,
+            JSON.stringify(registry_links ?? []),
+            max_attendees ?? null,
+            allow_plus_ones ?? null,
+            max_guests_per_rsvp ?? null,
+            design_url ?? null,
+            design_type ?? 'upload',
+            JSON.stringify(customization ?? {}),
+            status ?? 'draft',
+          ]
+        );
         insertError = null;
         break;
+      } catch (err: unknown) {
+        const pgError = err as { code?: string; message?: string };
+        // If not a unique constraint violation, don't retry
+        if (pgError.code !== '23505') {
+          insertError = pgError;
+          break;
+        }
+        insertError = pgError;
       }
-
-      // If not a unique constraint violation, don't retry
-      if (error.code !== '23505') {
-        insertError = error;
-        break;
-      }
-      insertError = error;
     }
 
     if (insertError) {
@@ -119,24 +111,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert default RSVP fields for the new event
-    const rsvpFields = DEFAULT_RSVP_FIELDS.map((field, index) => ({
-      event_id: event.id,
-      field_name: field.field_name,
-      field_type: field.field_type,
-      field_label: field.field_label,
-      is_required: field.is_required,
-      is_enabled: field.is_enabled,
-      sort_order: index,
-      options: field.options ?? null,
-      placeholder: field.placeholder ?? null,
-    }));
+    if (event && DEFAULT_RSVP_FIELDS.length > 0) {
+      const placeholders: string[] = [];
+      const values: unknown[] = [];
+      let paramIdx = 1;
 
-    const { error: rsvpError } = await adminSupabase
-      .from('rsvp_fields')
-      .insert(rsvpFields);
+      DEFAULT_RSVP_FIELDS.forEach((field, index) => {
+        placeholders.push(
+          `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8})`
+        );
+        values.push(
+          (event as Record<string, unknown>).id,
+          field.field_name,
+          field.field_type,
+          field.field_label,
+          field.is_required,
+          field.is_enabled,
+          index,
+          field.options ?? null,
+          field.placeholder ?? null,
+        );
+        paramIdx += 9;
+      });
 
-    if (rsvpError) {
-      console.error('Failed to insert default RSVP fields:', rsvpError.message);
+      try {
+        await query(
+          `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder) VALUES ${placeholders.join(', ')}`,
+          values
+        );
+      } catch (rsvpErr: unknown) {
+        const rsvpError = rsvpErr as { message?: string };
+        console.error('Failed to insert default RSVP fields:', rsvpError.message);
+      }
     }
 
     return NextResponse.json(event, { status: 201 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -19,24 +19,35 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { data: items } = await admin
-      .from("event_signup_items")
-      .select("*, claims:event_signup_claims(*)")
-      .eq("event_id", eventId)
-      .order("sort_order", { ascending: true });
+    const items = await query(
+      'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
+      [eventId]
+    );
 
-    return NextResponse.json(items ?? []);
+    // Fetch claims for all items
+    const itemIds = items.map((i: any) => i.id);
+    let claims: any[] = [];
+    if (itemIds.length > 0) {
+      claims = await query(
+        'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
+        [itemIds]
+      );
+    }
+
+    // Attach claims to items
+    const itemsWithClaims = items.map((item: any) => ({
+      ...item,
+      claims: claims.filter((c: any) => c.item_id === item.id),
+    }));
+
+    return NextResponse.json(itemsWithClaims);
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -49,14 +60,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne<{ id: string; tier: string }>(
+      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -76,25 +83,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get next sort_order
-    const { count } = await admin
-      .from("event_signup_items")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", eventId);
+    const countResult = await queryOne<{ count: string }>(
+      'SELECT COUNT(*) as count FROM event_signup_items WHERE event_id = $1',
+      [eventId]
+    );
+    const sortOrder = countResult ? parseInt(countResult.count, 10) : 0;
 
-    const { data: item, error } = await admin
-      .from("event_signup_items")
-      .insert({
-        event_id: eventId,
-        title: parsed.data.title,
-        description: parsed.data.description || null,
-        category: parsed.data.category || null,
-        slots: parsed.data.slots,
-        sort_order: count ?? 0,
-      })
-      .select()
-      .single();
+    const item = await queryOne(
+      `INSERT INTO event_signup_items (event_id, title, description, category, slots, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [eventId, parsed.data.title, parsed.data.description || null, parsed.data.category || null, parsed.data.slots, sortOrder]
+    );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!item) return NextResponse.json({ error: "Failed to create item" }, { status: 500 });
 
     return NextResponse.json(item, { status: 201 });
   } catch {
@@ -110,24 +112,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const admin = createAdminClient();
-
-    const { data: event } = await admin
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { error } = await admin
-      .from("event_signup_items")
-      .delete()
-      .eq("id", itemId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await query(
+      'DELETE FROM event_signup_items WHERE id = $1 AND event_id = $2',
+      [itemId, eventId]
+    );
 
     return NextResponse.json({ success: true });
   } catch {

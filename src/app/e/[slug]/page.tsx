@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { notFound } from "next/navigation";
 import { EventHero } from "@/components/public-event/EventHero";
 import { EventDetails } from "@/components/public-event/EventDetails";
@@ -9,8 +9,8 @@ import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
 import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
-import { 
-  sanitizeCustomization, 
+import {
+  sanitizeCustomization,
   sanitizeInviteToken,
   sanitizeColor,
   sanitizeFontFamily,
@@ -18,6 +18,7 @@ import {
   sanitizeAudioUrl,
   sanitizeButtonStyle
 } from "@/lib/sanitize";
+import type { Event, RSVPField } from "@/types/database";
 import type { Metadata } from "next";
 
 interface Props {
@@ -27,13 +28,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = createAdminClient();
-  const { data: event } = await supabase
-    .from("events")
-    .select("title, description, design_url")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+  const event = await queryOne<{ title: string; description: string | null; design_url: string | null }>(
+    'SELECT title, description, design_url FROM events WHERE slug = $1 AND status = $2',
+    [slug, 'published']
+  );
 
   if (!event) return { title: "Event Not Found" };
 
@@ -51,32 +49,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicEventPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
-  const supabase = createAdminClient();
 
-  const { data: event } = await supabase
-    .from("events")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .single();
+  const event = await queryOne<Event>(
+    'SELECT * FROM events WHERE slug = $1 AND status = $2',
+    [slug, 'published']
+  );
 
   if (!event) notFound();
 
-  const { data: rsvpFields } = await supabase
-    .from("rsvp_fields")
-    .select("*")
-    .eq("event_id", event.id)
-    .order("sort_order", { ascending: true });
+  const rsvpFields = await query<RSVPField>(
+    'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+    [event.id]
+  );
 
   // Calculate spots remaining for guest limits
   let spotsRemaining: number | null = null;
-  const maxAttendees = event.max_attendees || null;
+  const maxAttendees = (event.max_attendees as number) || null;
   if (maxAttendees) {
-    const { data: attendingResponses } = await supabase
-      .from("rsvp_responses")
-      .select("headcount")
-      .eq("event_id", event.id)
-      .eq("status", "attending");
+    const attendingResponses = await query<{ headcount: number }>(
+      'SELECT headcount FROM rsvp_responses WHERE event_id = $1 AND status = $2',
+      [event.id, 'attending']
+    );
 
     const currentTotal = (attendingResponses || []).reduce(
       (sum: number, r: { headcount: number }) => sum + (r.headcount || 1),
@@ -89,19 +82,17 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   let inviteGuest: { id: string; name: string; email: string | null } | null = null;
   const rawToken = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
   const token = sanitizeInviteToken(rawToken);
-  
+
   if (token) {
-    const { data: guest } = await supabase
-      .from("guests")
-      .select("id, name, email")
-      .eq("invite_token", token)
-      .eq("event_id", event.id)
-      .single();
+    const guest = await queryOne<{ id: string; name: string; email: string | null }>(
+      'SELECT id, name, email FROM guests WHERE invite_token = $1 AND event_id = $2',
+      [token, event.id]
+    );
     if (guest) inviteGuest = guest;
   }
 
   // Sanitize all customization values
-  const customization = sanitizeCustomization(event.customization);
+  const customization = sanitizeCustomization(event.customization as unknown as Record<string, unknown>);
   const safeBgColor = customization.backgroundColor;
   const safePrimaryColor = customization.primaryColor;
   const fontFamily = customization.fontFamily;
@@ -142,8 +133,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
               {event.location_address && (
                 <AnimatedSection>
                   <LocationMap
-                    address={event.location_address}
-                    name={event.location_name || undefined}
+                    address={event.location_address as string}
+                    name={(event.location_name as string) || undefined}
                   />
                 </AnimatedSection>
               )}
@@ -167,8 +158,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
                   fields={rsvpFields || []}
                   primaryColor={safePrimaryColor}
                   buttonStyle={buttonStyle}
-                  allowPlusOnes={event.allow_plus_ones !== undefined ? event.allow_plus_ones : true}
-                  maxGuestsPerRsvp={event.max_guests_per_rsvp || 10}
+                  allowPlusOnes={event.allow_plus_ones !== undefined ? (event.allow_plus_ones as boolean) : true}
+                  maxGuestsPerRsvp={(event.max_guests_per_rsvp as number) || 10}
                   spotsRemaining={spotsRemaining}
                   inviteGuestId={inviteGuest?.id}
                   inviteGuestName={inviteGuest?.name}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { getApiUser } from '@/lib/auth/api-auth';
 import { eventUpdateSchema } from '@/lib/validations';
 
@@ -20,16 +20,12 @@ export async function GET(
       );
     }
 
-    const adminSupabase = createAdminClient();
+    const event = await queryOne(
+      'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    const { data: event, error } = await adminSupabase
-      .from('events')
-      .select('*')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -60,17 +56,13 @@ export async function PATCH(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: existing, error: fetchError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const existing = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (fetchError || !existing) {
+    if (!existing) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -87,17 +79,34 @@ export async function PATCH(
       );
     }
 
-    const { data: event, error: updateError } = await adminSupabase
-      .from('events')
-      .update(parsed.data)
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+    const updates = parsed.data as Record<string, unknown>;
+    const keys = Object.keys(updates);
 
-    if (updateError) {
+    if (keys.length === 0) {
+      return NextResponse.json(existing);
+    }
+
+    const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
+    const values = keys.map((key) => {
+      const val = updates[key];
+      // JSON columns need to be stringified
+      if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+        return JSON.stringify(val);
+      }
+      if (Array.isArray(val)) {
+        return JSON.stringify(val);
+      }
+      return val;
+    });
+
+    const event = await queryOne(
+      `UPDATE events SET ${setClauses.join(', ')} WHERE id = $${keys.length + 1} AND user_id = $${keys.length + 2} RETURNING *`,
+      [...values, eventId, user.id]
+    );
+
+    if (!event) {
       return NextResponse.json(
-        { error: updateError.message },
+        { error: 'Failed to update event' },
         { status: 500 }
       );
     }
@@ -126,35 +135,23 @@ export async function DELETE(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: existing, error: fetchError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const existing = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (fetchError || !existing) {
+    if (!existing) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
       );
     }
 
-    const { error: deleteError } = await adminSupabase
-      .from('events')
-      .delete()
-      .eq('id', eventId)
-      .eq('user_id', user.id);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { error: deleteError.message },
-        { status: 500 }
-      );
-    }
+    await query(
+      'DELETE FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     return NextResponse.json({ success: true });
   } catch {

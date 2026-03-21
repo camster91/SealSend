@@ -1,16 +1,13 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { queryOne } from "@/lib/db/client";
 import { BETA_MODE, SUBSCRIPTION_TIERS } from "@/lib/constants";
 
 export async function getUserTier(userId: string): Promise<string> {
   if (BETA_MODE) return "business";
 
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("user_subscriptions")
-    .select("tier, status")
-    .eq("user_id", userId)
-    .in("status", ["active", "trialing"])
-    .single();
+  const data = await queryOne<{ tier: string; status: string }>(
+    "SELECT tier, status FROM user_subscriptions WHERE user_id = $1 AND status IN ('active', 'trialing') LIMIT 1",
+    [userId]
+  );
 
   return data?.tier ?? "free";
 }

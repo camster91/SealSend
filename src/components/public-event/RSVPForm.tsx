@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { createClient } from "@/lib/supabase/client";
+import { getClientUser } from "@/lib/auth/client-auth";
 import type { RSVPField, PlusOneData } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
@@ -46,28 +46,18 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       setFormData((prev) => ({ ...prev, email: inviteGuestEmail }));
     }
 
-    // Fall back to auth session if no invite data
-    if (!inviteGuestName) {
-      async function prefill() {
-        try {
-          const supabase = createClient();
-          const { data: { user } } = await supabase.auth.getUser();
-          if (cancelled || !user) return;
-          const name = user.user_metadata?.full_name
-            || user.user_metadata?.name
-            || user.email?.split("@")[0]
-            || "";
-          if (name) {
-            setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
-          }
-          if (user.email) {
-            setFormData((prev) => ({ ...prev, email: prev.email || user.email || "" }));
-          }
-        } catch {
-          // Not signed in, that's fine
+    // Fall back to session cookie if no invite data
+    if (!inviteGuestName && !cancelled) {
+      const user = getClientUser();
+      if (user) {
+        const name = user.name || user.email?.split("@")[0] || "";
+        if (name) {
+          setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
+        }
+        if (user.email) {
+          setFormData((prev) => ({ ...prev, email: prev.email || user.email || "" }));
         }
       }
-      prefill();
     }
 
     return () => { cancelled = true; };

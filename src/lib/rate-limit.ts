@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db/client";
 
 interface RateLimitOptions {
   /** Max requests allowed in the window */
@@ -17,33 +17,30 @@ export async function rateLimit(
   key: string,
   options: RateLimitOptions
 ): Promise<RateLimitResult> {
-  const supabase = createAdminClient();
   const now = new Date();
   const windowStart = new Date(now.getTime() - options.windowSeconds * 1000);
   const resetAt = now.getTime() + options.windowSeconds * 1000;
 
   // Delete old entries older than window
-  await supabase
-    .from("rate_limit_attempts")
-    .delete()
-    .eq("key", key)
-    .lt("created_at", windowStart.toISOString());
+  await query(
+    'DELETE FROM rate_limit_attempts WHERE key = $1 AND created_at < $2',
+    [key, windowStart.toISOString()]
+  );
 
   // Count recent entries for the key
-  const { count } = await supabase
-    .from("rate_limit_attempts")
-    .select("*", { count: "exact", head: true })
-    .eq("key", key)
-    .gte("created_at", windowStart.toISOString());
+  const rows = await query<{ count: string }>(
+    'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
+    [key, windowStart.toISOString()]
+  );
 
-  const currentCount = count ?? 0;
+  const currentCount = parseInt(rows[0]?.count ?? '0', 10);
 
   if (currentCount >= options.max) {
     return { success: false, remaining: 0, resetAt };
   }
 
   // Insert new entry
-  await supabase.from("rate_limit_attempts").insert({ key });
+  await query('INSERT INTO rate_limit_attempts (key) VALUES ($1)', [key]);
 
   return {
     success: true,

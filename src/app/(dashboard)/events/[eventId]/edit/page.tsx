@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
+import { query, queryOne } from '@/lib/db/client';
 import WizardContainer from '@/components/events/wizard/WizardContainer';
+import type { Event, RSVPField } from '@/types/database';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -13,34 +15,28 @@ interface EditEventPageProps {
 
 export default async function EditEventPage({ params }: EditEventPageProps) {
   const { eventId } = await params;
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
   // Fetch the event
-  const { data: event, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .eq('user_id', user.id)
-    .single();
+  const event = await queryOne<Event>(
+    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+    [eventId, user.id]
+  );
 
-  if (error || !event) {
+  if (!event) {
     notFound();
   }
 
   // Fetch RSVP fields for this event
-  const { data: rsvpFields } = await supabase
-    .from('rsvp_fields')
-    .select('*')
-    .eq('event_id', eventId)
-    .order('sort_order', { ascending: true });
+  const rsvpFields = await query<RSVPField>(
+    'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+    [eventId]
+  );
 
   // Transform the event data into wizard form data shape
   const initialData = {
@@ -56,13 +52,15 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     location_address: event.location_address ?? '',
     design_url: event.design_url ?? '',
     design_type: event.design_type ?? 'upload',
-    customization: event.customization ?? {
-      primaryColor: '#6366f1',
-      backgroundColor: '#ffffff',
-      backgroundImage: '',
-      fontFamily: 'Inter',
-      buttonStyle: 'rounded',
-      showCountdown: true,
+    customization: {
+      primaryColor: event.customization?.primaryColor ?? '#6366f1',
+      backgroundColor: event.customization?.backgroundColor ?? '#ffffff',
+      backgroundImage: event.customization?.backgroundImage ?? '',
+      fontFamily: event.customization?.fontFamily ?? 'Inter',
+      buttonStyle: event.customization?.buttonStyle ?? 'rounded',
+      showCountdown: event.customization?.showCountdown ?? true,
+      audioUrl: event.customization?.audioUrl ?? '',
+      logoUrl: event.customization?.logoUrl ?? '',
     },
     rsvp_fields: (rsvpFields ?? []).map((f) => ({
       field_name: f.field_name,

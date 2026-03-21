@@ -1,10 +1,10 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { nanoid } from "nanoid";
 
 interface AcceptInvitePageProps {
-  searchParams: Promise<{ 
+  searchParams: Promise<{
     token?: string;
     event?: string;
   }>;
@@ -14,34 +14,30 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   const params = await searchParams;
   const token = params.token;
   const eventSlug = params.event;
-  
+
   if (!token || !eventSlug) {
     redirect("/login?error=invalid_invite");
   }
 
-  const adminSupabase = createAdminClient();
-
   // Find the guest by invite token
-  const { data: guest, error: guestError } = await adminSupabase
-    .from("guests")
-    .select("id, name, email, phone, event_id, invite_token")
-    .eq("invite_token", token)
-    .single();
+  const guest = await queryOne<{ id: string; name: string; email: string | null; phone: string | null; event_id: string; invite_token: string }>(
+    'SELECT id, name, email, phone, event_id, invite_token FROM guests WHERE invite_token = $1',
+    [token]
+  );
 
-  if (guestError || !guest) {
-    console.error("Invalid invite token:", guestError);
+  if (!guest) {
+    console.error("Invalid invite token");
     redirect("/login?error=invalid_invite");
   }
 
   // Verify the event slug matches
-  const { data: event, error: eventError } = await adminSupabase
-    .from("events")
-    .select("id, slug")
-    .eq("id", guest.event_id)
-    .single();
+  const event = await queryOne<{ id: string; slug: string }>(
+    'SELECT id, slug FROM events WHERE id = $1',
+    [guest.event_id]
+  );
 
-  if (eventError || !event || event.slug !== eventSlug) {
-    console.error("Event mismatch:", eventError);
+  if (!event || event.slug !== eventSlug) {
+    console.error("Event mismatch");
     redirect("/login?error=invalid_invite");
   }
 
@@ -51,23 +47,19 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
   // Create user session
-  const { error: sessionError } = await adminSupabase
-    .from("user_sessions")
-    .insert({
-      user_id: guest.id,
-      session_token: sessionToken,
-      user_role: "guest",
-      expires_at: expiresAt.toISOString(),
-    });
-
-  if (sessionError) {
+  try {
+    await query(
+      'INSERT INTO user_sessions (user_id, session_token, user_role, expires_at) VALUES ($1, $2, $3, $4)',
+      [guest.id, sessionToken, 'guest', expiresAt.toISOString()]
+    );
+  } catch (sessionError) {
     console.error("Failed to create session:", sessionError);
     redirect("/login?error=session_failed");
   }
 
   // Set cookies
   const cookieStore = await cookies();
-  
+
   cookieStore.set("sealsend_session", sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -94,12 +86,10 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   );
 
   // Update guest's invite status to accepted
-  await adminSupabase
-    .from("guests")
-    .update({ 
-      invite_status: "accepted"
-    })
-    .eq("id", guest.id);
+  await query(
+    'UPDATE guests SET invite_status = $1 WHERE id = $2',
+    ['accepted', guest.id]
+  );
 
   // Redirect to the event page
   redirect(`/events/${guest.event_id}/guest`);

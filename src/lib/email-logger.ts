@@ -3,7 +3,7 @@
  * Logs send attempts, successes, and failures for debugging and analytics
  */
 
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query } from '@/lib/db/client';
 
 export type SendType = 'email' | 'sms';
 export type SendStatus = 'pending' | 'sent' | 'failed' | 'delivered' | 'bounced';
@@ -27,14 +27,23 @@ export interface SendLogEntry {
  */
 export async function logSendAttempt(entry: SendLogEntry): Promise<void> {
   try {
-    const adminSupabase = createAdminClient();
-    
-    await adminSupabase
-      .from('send_logs')
-      .insert({
-        ...entry,
-        created_at: new Date().toISOString(),
-      });
+    await query(
+      `INSERT INTO send_logs (guest_id, event_id, send_type, status, recipient, subject, error_message, provider, provider_message_id, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        entry.guest_id ?? null,
+        entry.event_id,
+        entry.send_type,
+        entry.status,
+        entry.recipient,
+        entry.subject ?? null,
+        entry.error_message ?? null,
+        entry.provider ?? null,
+        entry.provider_message_id ?? null,
+        entry.metadata ? JSON.stringify(entry.metadata) : null,
+        new Date().toISOString(),
+      ]
+    );
   } catch (error) {
     // Don't throw - logging failures shouldn't break the main flow
     console.error('Failed to log send attempt:', error);
@@ -50,16 +59,10 @@ export async function updateSendStatus(
   errorMessage?: string
 ): Promise<void> {
   try {
-    const adminSupabase = createAdminClient();
-    
-    await adminSupabase
-      .from('send_logs')
-      .update({
-        status,
-        error_message: errorMessage,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', logId);
+    await query(
+      'UPDATE send_logs SET status = $1, error_message = $2, updated_at = $3 WHERE id = $4',
+      [status, errorMessage ?? null, new Date().toISOString(), logId]
+    );
   } catch (error) {
     console.error('Failed to update send status:', error);
   }
@@ -108,7 +111,7 @@ export async function logSendFailure(
   } = {}
 ): Promise<void> {
   console.error(`[${sendType.toUpperCase()} FAILED] ${recipient}: ${errorMessage}`);
-  
+
   await logSendAttempt({
     event_id: eventId,
     guest_id: options.guestId,
@@ -131,12 +134,10 @@ export async function getEventSendStats(eventId: string): Promise<{
   pending: number;
   byType: Record<SendType, { sent: number; failed: number }>;
 }> {
-  const adminSupabase = createAdminClient();
-  
-  const { data: logs } = await adminSupabase
-    .from('send_logs')
-    .select('send_type, status')
-    .eq('event_id', eventId);
+  const logs = await query<{ send_type: string; status: string }>(
+    'SELECT send_type, status FROM send_logs WHERE event_id = $1',
+    [eventId]
+  );
 
   const stats = {
     total: 0,
@@ -151,7 +152,7 @@ export async function getEventSendStats(eventId: string): Promise<{
 
   for (const log of logs || []) {
     stats.total++;
-    
+
     if (log.status === 'sent' || log.status === 'delivered') {
       stats.sent++;
       stats.byType[log.send_type as SendType].sent++;
@@ -168,7 +169,7 @@ export async function getEventSendStats(eventId: string): Promise<{
 
 /**
  * Migration to create send_logs table:
- * 
+ *
  * ```sql
  * CREATE TABLE send_logs (
  *   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -185,14 +186,14 @@ export async function getEventSendStats(eventId: string): Promise<{
  *   created_at TIMESTAMPTZ DEFAULT NOW(),
  *   updated_at TIMESTAMPTZ DEFAULT NOW()
  * );
- * 
+ *
  * CREATE INDEX idx_send_logs_event ON send_logs(event_id);
  * CREATE INDEX idx_send_logs_guest ON send_logs(guest_id);
  * CREATE INDEX idx_send_logs_status ON send_logs(status);
  * CREATE INDEX idx_send_logs_created ON send_logs(created_at);
- * 
+ *
  * ALTER TABLE send_logs ENABLE ROW LEVEL SECURITY;
- * 
+ *
  * CREATE POLICY "Users can view own event send logs" ON send_logs
  *   FOR SELECT USING (
  *     event_id IN (SELECT id FROM events WHERE user_id = auth.uid())

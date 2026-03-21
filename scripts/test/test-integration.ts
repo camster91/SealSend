@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Integration Test Script
- * Tests the complete flow: create event → add guests → send invites
- * 
+ * Tests the complete flow: create event -> add guests -> send invites
+ *
  * Usage:
  *   npx tsx scripts/test/test-integration.ts
- * 
+ *
  * This creates a test event and sends real emails/SMS.
  * Requires all environment variables to be configured.
  */
@@ -16,11 +16,10 @@ import { resolve } from 'path';
 // Load environment variables from .env.local
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
-import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 import { hashPassword } from '../../src/lib/password';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DATABASE_URL = process.env.DATABASE_URL;
 
 interface TestContext {
   userId?: string;
@@ -29,130 +28,139 @@ interface TestContext {
   sessionToken?: string;
 }
 
+interface AdminUser {
+  id: string;
+  email: string;
+}
+
+interface Event {
+  id: string;
+  title: string;
+  slug: string;
+}
+
+interface Guest {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  invite_status: string;
+  invite_token: string | null;
+}
+
+interface SendLog {
+  send_type: string;
+  recipient: string;
+  status: string;
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function runIntegrationTests(): Promise<void> {
-  console.log('🔗 SealSend Integration Test Suite\n');
-  console.log('⚠️  This will create real data in your database and send actual emails/SMS\n');
+  console.log('SealSend Integration Test Suite\n');
+  console.log('WARNING: This will create real data in your database and send actual emails/SMS\n');
 
   const context: TestContext = {};
 
   // Check environment
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    console.error('❌ Missing Supabase environment variables');
+  if (!DATABASE_URL) {
+    console.error('Missing DATABASE_URL environment variable');
     process.exit(1);
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
 
   // Test 1: Create test admin user
-  console.log('🧪 Test 1: Creating test admin user...');
+  console.log('Test 1: Creating test admin user...');
   try {
     const hashedPassword = await hashPassword('TestPassword123!');
-    const { data: user, error } = await supabase
-      .from('admin_users')
-      .insert({
-        email: `test-${Date.now()}@sealsend.test`,
-        name: 'Test User',
-        password: hashedPassword,
-      })
-      .select()
-      .single();
+    const result = await pool.query<AdminUser>(
+      `INSERT INTO admin_users (email, name, password)
+       VALUES ($1, $2, $3)
+       RETURNING id, email`,
+      [`test-${Date.now()}@sealsend.test`, 'Test User', hashedPassword]
+    );
 
-    if (error) throw error;
+    const user = result.rows[0];
     context.userId = user.id;
-    console.log(`   ✅ Created user: ${user.email} (ID: ${user.id})\n`);
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
+    console.log(`   Created user: ${user.email} (ID: ${user.id})\n`);
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
+    await pool.end();
     process.exit(1);
   }
 
   // Test 2: Create test event
-  console.log('🧪 Test 2: Creating test event...');
+  console.log('Test 2: Creating test event...');
   try {
-    const { data: event, error } = await supabase
-      .from('events')
-      .insert({
-        user_id: context.userId,
-        title: 'Integration Test Event',
-        description: 'This is a test event created by the integration test suite.',
-        event_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        location_name: 'Test Venue',
-        location_address: '123 Test Street, Test City, TC 12345',
-        host_name: 'Test Host',
-        dress_code: 'Casual',
-        tier: 'premium', // Enable all features
-        status: 'published',
-        slug: `test-event-${Date.now()}`,
-        max_responses: 100,
-        customization: {
+    const result = await pool.query<Event>(
+      `INSERT INTO events (
+        user_id, title, description, event_date, location_name,
+        location_address, host_name, dress_code, tier, status,
+        slug, max_responses, customization
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id, title, slug`,
+      [
+        context.userId,
+        'Integration Test Event',
+        'This is a test event created by the integration test suite.',
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        'Test Venue',
+        '123 Test Street, Test City, TC 12345',
+        'Test Host',
+        'Casual',
+        'premium',
+        'published',
+        `test-event-${Date.now()}`,
+        100,
+        JSON.stringify({
           primaryColor: '#7c3aed',
           backgroundColor: '#ffffff',
           fontFamily: 'Inter',
           buttonStyle: 'rounded',
           showCountdown: true,
-        },
-      })
-      .select()
-      .single();
+        }),
+      ]
+    );
 
-    if (error) throw error;
+    const event = result.rows[0];
     context.eventId = event.id;
-    console.log(`   ✅ Created event: ${event.title} (ID: ${event.id})`);
+    console.log(`   Created event: ${event.title} (ID: ${event.id})`);
     console.log(`   Slug: ${event.slug}\n`);
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
-    await cleanup(context, supabase);
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
+    await cleanup(context, pool);
     process.exit(1);
   }
 
   // Test 3: Create RSVP fields
-  console.log('🧪 Test 3: Creating RSVP fields...');
+  console.log('Test 3: Creating RSVP fields...');
   try {
-    const { error } = await supabase
-      .from('rsvp_fields')
-      .insert([
-        {
-          event_id: context.eventId,
-          field_name: 'attendance',
-          field_label: 'Will you be attending?',
-          field_type: 'attendance',
-          is_required: true,
-          is_enabled: true,
-          sort_order: 0,
-        },
-        {
-          event_id: context.eventId,
-          field_name: 'email',
-          field_label: 'Email Address',
-          field_type: 'email',
-          is_required: false,
-          is_enabled: true,
-          sort_order: 1,
-        },
-        {
-          event_id: context.eventId,
-          field_name: 'dietary',
-          field_label: 'Dietary Requirements',
-          field_type: 'text',
-          is_required: false,
-          is_enabled: true,
-          sort_order: 2,
-        },
-      ]);
+    await pool.query(
+      `INSERT INTO rsvp_fields (event_id, field_name, field_label, field_type, is_required, is_enabled, sort_order)
+       VALUES
+         ($1, 'attendance', 'Will you be attending?', 'attendance', true, true, 0),
+         ($1, 'email', 'Email Address', 'email', false, true, 1),
+         ($1, 'dietary', 'Dietary Requirements', 'text', false, true, 2)`,
+      [context.eventId]
+    );
 
-    if (error) throw error;
-    console.log('   ✅ Created RSVP fields\n');
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
-    await cleanup(context, supabase);
+    console.log('   Created RSVP fields\n');
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
+    await cleanup(context, pool);
     process.exit(1);
   }
 
   // Test 4: Add test guests
-  console.log('🧪 Test 4: Adding test guests...');
+  console.log('Test 4: Adding test guests...');
   const testGuests = [
     {
       name: 'Test Guest Email Only',
@@ -169,53 +177,51 @@ async function runIntegrationTests(): Promise<void> {
       email: `test-guest-both-${Date.now()}@example.com`,
       phone: process.env.TEST_PHONE_NUMBER || null,
     },
-  ].filter(g => g.email || g.phone); // Filter out if no phone configured
+  ].filter((g): g is { name: string; email: string | null; phone: string | null } => !!(g.email || g.phone));
 
   try {
-    const guestsToInsert = testGuests.map(g => ({
-      event_id: context.eventId,
-      name: g.name,
-      email: g.email,
-      phone: g.phone,
-    }));
+    const guestIds: string[] = [];
+    const insertedGuests: Guest[] = [];
 
-    const { data: guests, error } = await supabase
-      .from('guests')
-      .insert(guestsToInsert)
-      .select();
+    for (const g of testGuests) {
+      const result = await pool.query<Guest>(
+        `INSERT INTO guests (event_id, name, email, phone)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, email, phone, invite_status, invite_token`,
+        [context.eventId, g.name, g.email, g.phone]
+      );
+      const guest = result.rows[0];
+      guestIds.push(guest.id);
+      insertedGuests.push(guest);
+    }
 
-    if (error) throw error;
-    context.guestIds = guests.map(g => g.id);
-    console.log(`   ✅ Added ${guests.length} test guests:`);
-    guests.forEach(g => {
+    context.guestIds = guestIds;
+    console.log(`   Added ${insertedGuests.length} test guests:`);
+    insertedGuests.forEach((g: Guest) => {
       console.log(`      - ${g.name} (${g.email || g.phone || 'no contact'})`);
     });
     console.log('');
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
-    await cleanup(context, supabase);
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
+    await cleanup(context, pool);
     process.exit(1);
   }
 
   // Test 5: Send invites via API
-  console.log('🧪 Test 5: Sending invites via API...');
+  console.log('Test 5: Sending invites via API...');
   console.log('   Creating admin session...');
-  
+
   try {
     // Create a session
     const sessionToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    
-    const { error: sessionError } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: context.userId,
-        user_role: 'admin',
-        session_token: sessionToken,
-        expires_at: expiresAt.toISOString(),
-      });
 
-    if (sessionError) throw sessionError;
+    await pool.query(
+      `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [context.userId, 'admin', sessionToken, expiresAt.toISOString()]
+    );
+
     context.sessionToken = sessionToken;
 
     // Send invites via API
@@ -236,8 +242,13 @@ async function runIntegrationTests(): Promise<void> {
       throw new Error(`API returned ${response.status}: ${errorText}`);
     }
 
-    const result = await response.json();
-    console.log(`   ✅ Invites sent:`);
+    const result = await response.json() as {
+      sent: number;
+      failed: number;
+      sms_sent: number;
+      sms_failed: number;
+    };
+    console.log(`   Invites sent:`);
     console.log(`      - Emails sent: ${result.sent}`);
     console.log(`      - Emails failed: ${result.failed}`);
     console.log(`      - SMS sent: ${result.sms_sent}`);
@@ -245,53 +256,55 @@ async function runIntegrationTests(): Promise<void> {
     console.log('');
 
     // Wait for async operations
-    console.log('   ⏳ Waiting for sends to process...');
+    console.log('   Waiting for sends to process...');
     await sleep(3000);
 
     // Check send_logs
-    const { data: sendLogs } = await supabase
-      .from('send_logs')
-      .select('*')
-      .eq('event_id', context.eventId);
+    const logResult = await pool.query<SendLog>(
+      'SELECT send_type, recipient, status FROM send_logs WHERE event_id = $1',
+      [context.eventId]
+    );
 
-    console.log(`   📊 Send logs created: ${sendLogs?.length || 0}`);
-    sendLogs?.forEach(log => {
+    const sendLogs = logResult.rows;
+    console.log(`   Send logs created: ${sendLogs.length}`);
+    sendLogs.forEach((log: SendLog) => {
       console.log(`      - ${log.send_type.toUpperCase()} to ${log.recipient}: ${log.status}`);
     });
     console.log('');
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
-    console.log('   ℹ️  This is expected if the server is not running locally');
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
+    console.log('   Note: This is expected if the server is not running locally');
     console.log('      You can still test the send functionality via the dashboard\n');
   }
 
   // Test 6: Check guest invite status
-  console.log('🧪 Test 6: Checking guest invite status...');
+  console.log('Test 6: Checking guest invite status...');
   try {
-    const { data: guests } = await supabase
-      .from('guests')
-      .select('name, invite_status, invite_token')
-      .eq('event_id', context.eventId);
+    const result = await pool.query<Guest>(
+      'SELECT name, invite_status, invite_token FROM guests WHERE event_id = $1',
+      [context.eventId]
+    );
 
+    const guests = result.rows;
     console.log('   Guest invite status:');
-    guests?.forEach(g => {
+    guests.forEach((g: Guest) => {
       console.log(`      - ${g.name}: ${g.invite_status} (token: ${g.invite_token?.slice(0, 10)}...)`);
     });
     console.log('');
-  } catch (error) {
-    console.error('   ❌ Failed:', error);
+  } catch (error: unknown) {
+    console.error('   Failed:', error);
   }
 
   // Summary
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📊 Integration Test Summary\n');
-  console.log(`✅ Created admin user: ${context.userId}`);
-  console.log(`✅ Created event: ${context.eventId}`);
-  console.log(`✅ Added ${context.guestIds?.length || 0} guests`);
-  console.log(`\n🔗 Event URL: ${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/e/test-event-${context.eventId?.slice(0, 8)}`);
+  console.log('-----------------------------------');
+  console.log('Integration Test Summary\n');
+  console.log(`Created admin user: ${context.userId}`);
+  console.log(`Created event: ${context.eventId}`);
+  console.log(`Added ${context.guestIds?.length || 0} guests`);
+  console.log(`\nEvent URL: ${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/e/test-event-${context.eventId?.slice(0, 8)}`);
 
   // Cleanup prompt
-  console.log('\n🧹 Cleanup');
+  console.log('\nCleanup');
   console.log('Run this SQL to clean up test data:');
   console.log(`\n-- Remove test data`);
   console.log(`DELETE FROM guests WHERE event_id = '${context.eventId}';`);
@@ -301,29 +314,32 @@ async function runIntegrationTests(): Promise<void> {
   console.log(`DELETE FROM send_logs WHERE event_id = '${context.eventId}';`);
 
   // Auto-cleanup
-  console.log('\n🧹 Auto-cleaning up test data...');
-  await cleanup(context, supabase);
-  console.log('✅ Cleanup complete');
+  console.log('\nAuto-cleaning up test data...');
+  await cleanup(context, pool);
+  console.log('Cleanup complete');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function cleanup(context: TestContext, supabase: any): Promise<void> {
-  if (context.eventId) {
-    await supabase.from('guests').delete().eq('event_id', context.eventId);
-    await supabase.from('rsvp_fields').delete().eq('event_id', context.eventId);
-    await supabase.from('event_announcements').delete().eq('event_id', context.eventId);
-    await supabase.from('send_logs').delete().eq('event_id', context.eventId);
-    await supabase.from('events').delete().eq('id', context.eventId);
-  }
-  
-  if (context.userId) {
-    await supabase.from('user_sessions').delete().eq('user_id', context.userId);
-    await supabase.from('admin_users').delete().eq('id', context.userId);
+async function cleanup(context: TestContext, pool: Pool): Promise<void> {
+  try {
+    if (context.eventId) {
+      await pool.query('DELETE FROM guests WHERE event_id = $1', [context.eventId]);
+      await pool.query('DELETE FROM rsvp_fields WHERE event_id = $1', [context.eventId]);
+      await pool.query('DELETE FROM event_announcements WHERE event_id = $1', [context.eventId]);
+      await pool.query('DELETE FROM send_logs WHERE event_id = $1', [context.eventId]);
+      await pool.query('DELETE FROM events WHERE id = $1', [context.eventId]);
+    }
+
+    if (context.userId) {
+      await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [context.userId]);
+      await pool.query('DELETE FROM admin_users WHERE id = $1', [context.userId]);
+    }
+  } finally {
+    await pool.end();
   }
 }
 
 // Run tests
-runIntegrationTests().catch(error => {
-  console.error('💥 Test suite failed:', error);
+runIntegrationTests().catch((error: unknown) => {
+  console.error('Test suite failed:', error);
   process.exit(1);
 });

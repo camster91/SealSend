@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -15,24 +15,36 @@ const claimSchema = z.object({
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { slug } = await params;
-    const supabase = createAdminClient();
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await queryOne<{ id: string }>(
+      'SELECT id FROM events WHERE slug = $1 AND status = $2',
+      [slug, "published"]
+    );
 
     if (!event) return NextResponse.json([], { status: 200 });
 
-    const { data: items } = await supabase
-      .from("event_signup_items")
-      .select("*, claims:event_signup_claims(*)")
-      .eq("event_id", event.id)
-      .order("sort_order", { ascending: true });
+    const items = await query(
+      'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
+      [event.id]
+    );
 
-    return NextResponse.json(items ?? []);
+    // Fetch claims for all items
+    const itemIds = items.map((i: any) => i.id);
+    let claims: any[] = [];
+    if (itemIds.length > 0) {
+      claims = await query(
+        'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
+        [itemIds]
+      );
+    }
+
+    // Attach claims to items
+    const itemsWithClaims = items.map((item: any) => ({
+      ...item,
+      claims: claims.filter((c: any) => c.item_id === item.id),
+    }));
+
+    return NextResponse.json(itemsWithClaims);
   } catch {
     return NextResponse.json([], { status: 200 });
   }
@@ -49,14 +61,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const { slug } = await params;
     const body = await request.json();
-    const supabase = createAdminClient();
 
-    const { data: event } = await supabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await queryOne<{ id: string }>(
+      'SELECT id FROM events WHERE slug = $1 AND status = $2',
+      [slug, "published"]
+    );
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -68,40 +77,35 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Verify item exists and belongs to this event
-    const { data: item } = await supabase
-      .from("event_signup_items")
-      .select("id, slots")
-      .eq("id", parsed.data.item_id)
-      .eq("event_id", event.id)
-      .single();
+    const item = await queryOne<{ id: string; slots: number }>(
+      'SELECT id, slots FROM event_signup_items WHERE id = $1 AND event_id = $2',
+      [parsed.data.item_id, event.id]
+    );
 
     if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
     // Check if slots are available
-    const { count } = await supabase
-      .from("event_signup_claims")
-      .select("*", { count: "exact", head: true })
-      .eq("item_id", item.id);
+    const countResult = await queryOne<{ count: string }>(
+      'SELECT COUNT(*) as count FROM event_signup_claims WHERE item_id = $1',
+      [item.id]
+    );
+    const count = countResult ? parseInt(countResult.count, 10) : 0;
 
-    if (count !== null && count >= item.slots) {
+    if (count >= item.slots) {
       return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
     }
 
-    const { data: claim, error } = await supabase
-      .from("event_signup_claims")
-      .insert({
-        item_id: parsed.data.item_id,
-        event_id: event.id,
-        claimant_name: parsed.data.claimant_name,
-        claimant_email: parsed.data.claimant_email || null,
-      })
-      .select()
-      .single();
+    const claim = await queryOne(
+      `INSERT INTO event_signup_claims (item_id, event_id, claimant_name, claimant_email)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [parsed.data.item_id, event.id, parsed.data.claimant_name, parsed.data.claimant_email || null]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!claim) {
+      return NextResponse.json({ error: "Failed to create claim" }, { status: 500 });
     }
 
     return NextResponse.json(claim, { status: 201 });

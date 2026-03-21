@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
@@ -13,59 +13,44 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
   if (tierKey !== "standard" && tierKey !== "premium") return;
 
   const maxResponses = TIERS[tierKey].maxResponses;
-  const adminSupabase = createAdminClient();
 
-  const { error } = await adminSupabase
-    .from("events")
-    .update({
-      tier: tierKey,
-      max_responses: maxResponses,
-      payment_id: session.id,
-    })
-    .eq("id", eventId);
-
-  if (error) {
-    console.error("Failed to update event after payment:", error);
-  }
+  await query(
+    'UPDATE events SET tier = $1, max_responses = $2, payment_id = $3 WHERE id = $4',
+    [tierKey, maxResponses, session.id, eventId]
+  );
 }
 
 async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   const { userId, tier, billing } = session.metadata || {};
   if (!userId || !tier) return;
 
-  const adminSupabase = createAdminClient();
+  const stripeCustomerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id ?? null;
+  const stripeSubscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : (session.subscription as Stripe.Subscription | null)?.id ?? null;
 
-  const { error } = await adminSupabase.from("user_subscriptions").upsert(
-    {
-      user_id: userId,
-      stripe_customer_id:
-        typeof session.customer === "string"
-          ? session.customer
-          : session.customer?.id ?? null,
-      stripe_subscription_id:
-        typeof session.subscription === "string"
-          ? session.subscription
-          : (session.subscription as Stripe.Subscription | null)?.id ?? null,
-      tier,
-      billing_cycle: billing ?? null,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "stripe_subscription_id" }
+  await query(
+    `INSERT INTO user_subscriptions (user_id, stripe_customer_id, stripe_subscription_id, tier, billing_cycle, status, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
+       stripe_customer_id = EXCLUDED.stripe_customer_id,
+       tier = EXCLUDED.tier,
+       billing_cycle = EXCLUDED.billing_cycle,
+       status = EXCLUDED.status,
+       updated_at = EXCLUDED.updated_at`,
+    [userId, stripeCustomerId, stripeSubscriptionId, tier, billing ?? null, "active", new Date().toISOString()]
   );
-
-  if (error) {
-    console.error("Failed to upsert subscription after checkout:", error);
-  }
 }
 
 async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription
 ) {
-  const adminSupabase = createAdminClient();
-
   // Determine tier from price metadata or current DB record
-  const priceId = subscription.items.data[0]?.price?.id;
   let tier: string | undefined;
 
   // Try to find tier from subscription metadata
@@ -73,50 +58,35 @@ async function handleSubscriptionUpdated(
     tier = subscription.metadata.tier;
   }
 
-  const updateData: Record<string, unknown> = {
-    status: subscription.status === "active" ? "active" : subscription.status,
-    current_period_end: new Date(
-      ((subscription as unknown as { current_period_end: number }).current_period_end ?? 0) * 1000
-    ).toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  const status = subscription.status === "active" ? "active" : subscription.status;
+  const currentPeriodEnd = new Date(
+    ((subscription as unknown as { current_period_end: number }).current_period_end ?? 0) * 1000
+  ).toISOString();
+  const updatedAt = new Date().toISOString();
 
   if (tier) {
-    updateData.tier = tier;
-  }
-
-  if (priceId) {
-    // Store price ID info for reference
-    updateData.stripe_subscription_id = subscription.id;
-  }
-
-  const { error } = await adminSupabase
-    .from("user_subscriptions")
-    .update(updateData)
-    .eq("stripe_subscription_id", subscription.id);
-
-  if (error) {
-    console.error("Failed to update subscription:", error);
+    await query(
+      `UPDATE user_subscriptions SET status = $1, current_period_end = $2, updated_at = $3, tier = $4, stripe_subscription_id = $5
+       WHERE stripe_subscription_id = $5`,
+      [status, currentPeriodEnd, updatedAt, tier, subscription.id]
+    );
+  } else {
+    await query(
+      `UPDATE user_subscriptions SET status = $1, current_period_end = $2, updated_at = $3, stripe_subscription_id = $4
+       WHERE stripe_subscription_id = $4`,
+      [status, currentPeriodEnd, updatedAt, subscription.id]
+    );
   }
 }
 
 async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription
 ) {
-  const adminSupabase = createAdminClient();
-
-  const { error } = await adminSupabase
-    .from("user_subscriptions")
-    .update({
-      tier: "free",
-      status: "canceled",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("stripe_subscription_id", subscription.id);
-
-  if (error) {
-    console.error("Failed to handle subscription deletion:", error);
-  }
+  await query(
+    `UPDATE user_subscriptions SET tier = $1, status = $2, updated_at = $3
+     WHERE stripe_subscription_id = $4`,
+    ["free", "canceled", new Date().toISOString(), subscription.id]
+  );
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
@@ -128,19 +98,11 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   if (!subscriptionId) return;
 
-  const adminSupabase = createAdminClient();
-
-  const { error } = await adminSupabase
-    .from("user_subscriptions")
-    .update({
-      status: "past_due",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("stripe_subscription_id", subscriptionId);
-
-  if (error) {
-    console.error("Failed to handle payment failure:", error);
-  }
+  await query(
+    `UPDATE user_subscriptions SET status = $1, updated_at = $2
+     WHERE stripe_subscription_id = $3`,
+    ["past_due", new Date().toISOString(), subscriptionId]
+  );
 }
 
 export async function POST(request: NextRequest) {

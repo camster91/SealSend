@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { rsvpFieldSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -20,35 +20,23 @@ export async function GET(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event, error: eventError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
       );
     }
 
-    const { data: fields, error } = await adminSupabase
-      .from('rsvp_fields')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('sort_order', { ascending: true });
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+    const fields = await query(
+      'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+      [eventId]
+    );
 
     return NextResponse.json(fields);
   } catch {
@@ -74,17 +62,13 @@ export async function PUT(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event, error: eventError } = await adminSupabase
-      .from('events')
-      .select('id')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -124,45 +108,37 @@ export async function PUT(
     }
 
     // Delete existing RSVP fields for this event (only after validation passes)
-    const { error: deleteError } = await adminSupabase
-      .from('rsvp_fields')
-      .delete()
-      .eq('event_id', eventId);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { error: deleteError.message },
-        { status: 500 }
-      );
-    }
+    await query('DELETE FROM rsvp_fields WHERE event_id = $1', [eventId]);
 
     // Insert validated fields
     if (fields.length > 0) {
-      const { error: insertError } = await adminSupabase
-        .from('rsvp_fields')
-        .insert(fields);
+      const valueClauses: string[] = [];
+      const allParams: unknown[] = [];
+      let paramIndex = 1;
 
-      if (insertError) {
-        return NextResponse.json(
-          { error: insertError.message },
-          { status: 500 }
+      for (const f of fields) {
+        valueClauses.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8})`
         );
+        allParams.push(
+          f.event_id, f.field_name, f.field_type, f.field_label,
+          f.is_required, f.is_enabled, f.sort_order, f.options, f.placeholder
+        );
+        paramIndex += 9;
       }
+
+      await query(
+        `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
+         VALUES ${valueClauses.join(', ')}`,
+        allParams
+      );
     }
 
     // Return the newly inserted fields
-    const { data: updatedFields, error: fetchError } = await adminSupabase
-      .from('rsvp_fields')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('sort_order', { ascending: true });
-
-    if (fetchError) {
-      return NextResponse.json(
-        { error: fetchError.message },
-        { status: 500 }
-      );
-    }
+    const updatedFields = await query(
+      'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+      [eventId]
+    );
 
     return NextResponse.json(updatedFields);
   } catch {

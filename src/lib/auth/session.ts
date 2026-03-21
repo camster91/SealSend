@@ -1,36 +1,30 @@
 import { cookies } from 'next/headers';
+import { queryOne } from '@/lib/db/client';
 import { AuthUser } from './types';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
-  
+
   if (!sessionToken) {
     return null;
   }
 
   try {
-    // Validate session against database
-    const adminSupabase = createAdminClient();
-    const { data: session, error: sessionError } = await adminSupabase
-      .from('user_sessions')
-      .select('user_id, user_role, expires_at')
-      .eq('session_token', sessionToken)
-      .gt('expires_at', new Date().toISOString())
-      .single();
+    const session = await queryOne<{ user_id: string; user_role: string }>(
+      'SELECT user_id, user_role FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
+      [sessionToken]
+    );
 
-    if (sessionError || !session) {
-      // Clear invalid cookie
+    if (!session) {
       cookieStore.delete('sealsend_session');
       cookieStore.delete('sealsend_user');
       return null;
     }
 
-    // Get user info from the cookie
     const userCookie = cookieStore.get('sealsend_user')?.value;
     let userInfo: Partial<AuthUser> = {};
-    
+
     if (userCookie) {
       try {
         userInfo = JSON.parse(userCookie);
@@ -67,7 +61,7 @@ export async function requireAdmin() {
 
 export async function requireGuestAccess(eventId?: string) {
   const user = await getCurrentUser();
-  
+
   if (!user) {
     throw new Error('Authentication required');
   }
@@ -84,49 +78,34 @@ export async function requireGuestAccess(eventId?: string) {
 export async function logout() {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
-  
-  // Delete session from database if it exists
+
   if (sessionToken) {
     try {
-      const adminSupabase = createAdminClient();
-      await adminSupabase
-        .from('user_sessions')
-        .delete()
-        .eq('session_token', sessionToken);
+      await queryOne('DELETE FROM user_sessions WHERE session_token = $1', [sessionToken]);
     } catch (error) {
       console.error('Error deleting session:', error);
     }
   }
-  
-  // Clear session cookies
+
   cookieStore.delete('sealsend_session');
   cookieStore.delete('sealsend_user');
 }
 
-/**
- * Validate a session token against the database
- * This is a more thorough validation than getCurrentUser
- */
 export async function validateSessionToken(token: string): Promise<{
   valid: boolean;
   user?: AuthUser;
   error?: string;
 }> {
   try {
-    const adminSupabase = createAdminClient();
+    const session = await queryOne<{ user_id: string; user_role: string; expires_at: string }>(
+      'SELECT user_id, user_role, expires_at FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
+      [token]
+    );
 
-    const { data: session, error } = await adminSupabase
-      .from('user_sessions')
-      .select('user_id, user_role, expires_at')
-      .eq('session_token', token)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-
-    if (error || !session) {
+    if (!session) {
       return { valid: false, error: 'Invalid or expired session' };
     }
 
-    // Get additional user info from cookie for convenience
     const cookieStore = await cookies();
     const userCookie = cookieStore.get('sealsend_user')?.value;
     let userInfo: Partial<AuthUser> = {};
@@ -157,26 +136,10 @@ export async function validateSessionToken(token: string): Promise<{
   }
 }
 
-/**
- * Invalidate (delete) a session
- */
 export async function invalidateSession(token: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('session_token', token);
+  await queryOne('DELETE FROM user_sessions WHERE session_token = $1', [token]);
 }
 
-/**
- * Invalidate all sessions for a user
- */
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  const adminSupabase = createAdminClient();
-  
-  await adminSupabase
-    .from('user_sessions')
-    .delete()
-    .eq('user_id', userId);
+  await queryOne('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
 }

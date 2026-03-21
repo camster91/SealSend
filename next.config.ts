@@ -3,13 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-    ],
+    remotePatterns: [],
   },
   // Add cache busting for static assets
   assetPrefix: process.env.NODE_ENV === 'production' ? undefined : undefined,
@@ -18,6 +12,14 @@ const nextConfig: NextConfig = {
     return 'build-' + Date.now();
   },
   // Add headers for cache control
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: '/api/uploads/:path*',
+      },
+    ];
+  },
   async headers() {
     return [
       {

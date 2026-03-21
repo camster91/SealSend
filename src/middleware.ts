@@ -1,21 +1,38 @@
-import { updateSession } from '@/lib/supabase/middleware';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+  const { pathname } = request.nextUrl;
+
+  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases'];
+
+  const isPublicRoute =
+    publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||
+    pathname.startsWith('/e/') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/uploads/') ||
+    /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);
+
+  const customSession = request.cookies.get('sealsend_session')?.value;
+  const isAuthenticated = !!customSession;
+
+  if (!isPublicRoute && !isAuthenticated) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const authPaths = ['/login', '/signup', '/forgot-password'];
+  const isAuthRoute = authPaths.some((path) => pathname === path);
+  if (isAuthRoute && isAuthenticated) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, icons, manifest
-     * - public assets
-     * - API routes (handled by their own auth)
-     * - Public event pages (/e/slug)
-     */
-    '/((?!_next/static|_next/image|favicon\\.ico|icons|manifest\\.json|opengraph-image|api/|e/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|icons|manifest\\.json|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };

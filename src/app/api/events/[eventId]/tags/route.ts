@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 
 const tagSchema = z.object({
@@ -21,25 +21,18 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { data: tags, error } = await adminSupabase
-      .from("guest_tags")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: true });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const tags = await query(
+      'SELECT * FROM guest_tags WHERE event_id = $1 ORDER BY created_at ASC',
+      [eventId]
+    );
 
     return NextResponse.json(tags);
   } catch {
@@ -57,15 +50,11 @@ export async function POST(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne<{ id: string; tier: string }>(
+      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -83,17 +72,10 @@ export async function POST(
       return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { data: tag, error } = await adminSupabase
-      .from("guest_tags")
-      .insert({
-        event_id: eventId,
-        tag_name: parsed.data.tag_name,
-        color: parsed.data.color,
-      })
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const tag = await queryOne(
+      'INSERT INTO guest_tags (event_id, tag_name, color) VALUES ($1, $2, $3) RETURNING *',
+      [eventId, parsed.data.tag_name, parsed.data.color]
+    );
 
     return NextResponse.json(tag, { status: 201 });
   } catch {
@@ -111,15 +93,11 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -128,13 +106,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid tag ID" }, { status: 400 });
     }
 
-    const { error } = await adminSupabase
-      .from("guest_tags")
-      .delete()
-      .eq("id", parsed.data.tagId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await query(
+      'DELETE FROM guest_tags WHERE id = $1 AND event_id = $2',
+      [parsed.data.tagId, eventId]
+    );
 
     return NextResponse.json({ success: true });
   } catch {

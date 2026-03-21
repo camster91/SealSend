@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -25,17 +24,15 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: `${siteUrl}/callback?next=${encodeURIComponent(redirect)}`,
-        },
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "email", email: email.trim() }),
       });
 
-      if (otpError) {
-        setError(otpError.message);
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to send code");
         return;
       }
 
@@ -52,15 +49,15 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otpCode.trim(),
-        type: "email",
+      const res = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "email", email: email.trim(), code: otpCode.trim() }),
       });
 
-      if (verifyError) {
-        setError(verifyError.message);
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Verification failed");
         return;
       }
 

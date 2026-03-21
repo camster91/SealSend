@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { queryOne } from '@/lib/db/client';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -19,17 +19,13 @@ export async function POST(
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Fetch the current event to get its status
-    const { data: event, error: fetchError } = await adminSupabase
-      .from('events')
-      .select('id, status')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await queryOne<{ id: string; status: string }>(
+      'SELECT id, status FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (fetchError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
@@ -39,17 +35,14 @@ export async function POST(
     // Toggle status between draft and published
     const newStatus = event.status === 'published' ? 'draft' : 'published';
 
-    const { data: updatedEvent, error: updateError } = await adminSupabase
-      .from('events')
-      .update({ status: newStatus })
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+    const updatedEvent = await queryOne(
+      'UPDATE events SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
+      [newStatus, eventId, user.id]
+    );
 
-    if (updateError) {
+    if (!updatedEvent) {
       return NextResponse.json(
-        { error: updateError.message },
+        { error: 'Failed to update event status' },
         { status: 500 }
       );
     }

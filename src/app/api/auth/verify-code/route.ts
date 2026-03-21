@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
 
@@ -24,19 +24,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use admin client to bypass RLS - auth operations happen before user is authenticated
-    const supabase = createAdminClient();
-
     // Verify code
-    const { data: authCode, error: codeError } = await supabase
-      .from('auth_codes')
-      .select('*')
-      .eq(method === 'email' ? 'email' : 'phone', method === 'email' ? email : phone)
-      .eq('code', code)
-      .gt('expires_at', new Date().toISOString())
-      .single();
+    const authCode = await queryOne<{
+      id: string;
+      email: string | null;
+      phone: string | null;
+      code: string;
+      role: string;
+      event_id: string | null;
+    }>(
+      `SELECT * FROM auth_codes
+       WHERE ${method === 'email' ? 'email' : 'phone'} = $1
+         AND code = $2
+         AND expires_at > $3`,
+      [method === 'email' ? email : phone, code, new Date().toISOString()]
+    );
 
-    if (codeError || !authCode) {
+    if (!authCode) {
       return NextResponse.json(
         { error: 'Invalid or expired code' },
         { status: 401 }
@@ -44,18 +48,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete used code
-    await supabase.from('auth_codes').delete().eq('id', authCode.id);
+    await query('DELETE FROM auth_codes WHERE id = $1', [authCode.id]);
 
     // Determine the correct user_id for the session
     let userId = authCode.id; // Default to auth_code id for guests
 
     if (authCode.role === 'admin' && authCode.email) {
       // For admin users, look up their actual admin_users ID for FK constraint
-      const { data: adminUser } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', authCode.email)
-        .single();
+      const adminUser = await queryOne<{ id: string }>(
+        'SELECT id FROM admin_users WHERE email = $1',
+        [authCode.email]
+      );
 
       if (adminUser) {
         userId = adminUser.id;
@@ -66,16 +69,13 @@ export async function POST(request: NextRequest) {
     const sessionToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const { error: sessionError } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: userId,
-        user_role: authCode.role,
-        session_token: sessionToken,
-        expires_at: expiresAt.toISOString()
-      });
-
-    if (sessionError) {
+    try {
+      await query(
+        `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+         VALUES ($1, $2, $3, $4)`,
+        [userId, authCode.role, sessionToken, expiresAt.toISOString()]
+      );
+    } catch (sessionError) {
       console.error('Session error:', sessionError);
       return NextResponse.json(
         { error: 'Failed to create session' },

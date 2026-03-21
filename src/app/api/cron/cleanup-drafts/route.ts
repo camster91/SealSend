@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query } from "@/lib/db/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,22 +8,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const adminSupabase = createAdminClient();
-
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await adminSupabase
-      .from("events")
-      .delete()
-      .eq("status", "draft")
-      .lt("created_at", thirtyDaysAgo)
-      .select("id");
+    const deleted = await query<{ id: string }>(
+      'DELETE FROM events WHERE status = $1 AND created_at < $2 RETURNING id',
+      ["draft", thirtyDaysAgo]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ deleted: data?.length || 0 });
+    return NextResponse.json({ deleted: deleted?.length || 0 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal server error" },

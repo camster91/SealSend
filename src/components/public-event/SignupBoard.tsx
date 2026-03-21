@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getClientUser } from '@/lib/auth/client-auth';
 import type { SignupItemWithClaims } from '@/types/database';
 
 interface SignupBoardProps {
@@ -29,24 +29,13 @@ export function SignupBoard({ eventSlug }: SignupBoardProps) {
     fetchItems();
   }, [fetchItems]);
 
-  // Auto-fill name from auth
+  // Auto-fill name from session cookie
   useEffect(() => {
-    async function prefill() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && !claimName) {
-          const name = user.user_metadata?.full_name
-            || user.user_metadata?.name
-            || user.email?.split('@')[0]
-            || '';
-          if (name) setClaimName(name);
-        }
-      } catch {
-        // Not signed in
-      }
+    const user = getClientUser();
+    if (user && !claimName) {
+      const name = user.name || user.email?.split('@')[0] || '';
+      if (name) setClaimName(name);
     }
-    prefill();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

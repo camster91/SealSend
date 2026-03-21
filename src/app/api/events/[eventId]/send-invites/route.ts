@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
@@ -38,17 +38,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }
 
-    const adminSupabase = createAdminClient();
-
     // Ownership + status check
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne<any>(
+      'SELECT id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -60,21 +56,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that need invitations (email OR phone)
-    const { data: guests, error: guestsError } = await adminSupabase
-      .from("guests")
-      .select("id, name, email, phone, invite_status, invite_token")
-      .eq("event_id", eventId)
-      .in("invite_status", ["not_sent", "failed"]);
-
-    if (guestsError) {
-      return NextResponse.json(
-        { error: guestsError.message },
-        { status: 500 }
-      );
-    }
+    const guests = await query<any>(
+      `SELECT id, name, email, phone, invite_status, invite_token FROM guests
+       WHERE event_id = $1 AND invite_status IN ('not_sent', 'failed')`,
+      [eventId]
+    );
 
     // Filter to guests that have email or phone
-    const sendableGuests = (guests || []).filter((g) => g.email || g.phone);
+    const sendableGuests = guests.filter((g) => g.email || g.phone);
     if (sendableGuests.length === 0) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
@@ -102,10 +91,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           let token = guest.invite_token;
           if (!token) {
             token = generateInviteToken();
-            await adminSupabase
-              .from("guests")
-              .update({ invite_token: token })
-              .eq("id", guest.id);
+            await query(
+              'UPDATE guests SET invite_token = $1 WHERE id = $2',
+              [token, guest.id]
+            );
           }
 
           // Create a seamless magic invite link that auto-logs the guest in
@@ -160,11 +149,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           if (guest.phone && smsEnabled) {
             // Validate and format phone number
             const phoneValidation = validateAndFormatPhone(guest.phone);
-            
+
             if (!phoneValidation.valid) {
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[SMS INVALID] ${guest.phone}:`, phoneValidation.error);
-              
+
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
               });
@@ -216,15 +205,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         if (result.status === "fulfilled") {
           const { guestId, emailOk, smsOk, errors } = result.value;
           const guest = batch.find((g) => g.id === guestId);
-          
+
           if (emailOk) {
             sent++;
           } else if (guest?.email) {
             failed++;
-            console.error(`[INVITE FAILED] Guest ${guestId} email failed:`, 
+            console.error(`[INVITE FAILED] Guest ${guestId} email failed:`,
               errors.filter(e => e.type === 'email').map(e => e.message).join(', '));
           }
-          
+
           if (smsOk) {
             smsSent++;
           } else if (smsEnabled && guest?.phone) {
@@ -250,18 +239,19 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Batch update statuses
     if (successIds.length > 0) {
-      await adminSupabase
-        .from("guests")
-        .update({ invite_status: "sent", invite_sent_at: new Date().toISOString() })
-        .in("id", successIds);
+      const placeholders = successIds.map((_, i) => `$${i + 3}`).join(', ');
+      await query(
+        `UPDATE guests SET invite_status = $1, invite_sent_at = $2 WHERE id IN (${placeholders})`,
+        ['sent', new Date().toISOString(), ...successIds]
+      );
     }
     if (failedGuests.length > 0) {
       // Update each failed guest with their specific error message
       await Promise.all(failedGuests.map(({ id, error }) =>
-        adminSupabase
-          .from("guests")
-          .update({ invite_status: "failed", invite_error: error })
-          .eq("id", id)
+        query(
+          'UPDATE guests SET invite_status = $1, invite_error = $2 WHERE id = $3',
+          ['failed', error, id]
+        )
       ));
     }
 

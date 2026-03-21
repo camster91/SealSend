@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";
@@ -12,11 +12,11 @@ import { BETA_MODE } from "@/lib/constants";
  * Cron job endpoint for sending automatic reminders
  * This endpoint is designed to be called by Coolify's cron feature
  * or any external cron service (e.g., cron-job.org, GitHub Actions)
- * 
+ *
  * Query params:
  * - secret: Cron secret for authentication (CRON_SECRET env var)
  * - dryRun: If true, only returns what would be sent without actually sending
- * 
+ *
  * Environment variables:
  * - CRON_SECRET: Secret key to authenticate cron requests
  * - REMINDER_HOURS_BEFORE: Hours before event to send reminders (default: 48)
@@ -30,10 +30,10 @@ interface GuestWithResponse {
   phone: string | null;
   invite_token: string | null;
   reminder_sent_at: string | null;
-
+  rsvp_status: string | null;
 }
 
-interface EventWithGuests {
+interface EventRow {
   id: string;
   title: string;
   event_date: string;
@@ -41,7 +41,6 @@ interface EventWithGuests {
   slug: string;
   tier: string;
   user_id: string;
-  guests: GuestWithResponse[];
 }
 
 export async function GET(request: NextRequest) {
@@ -50,7 +49,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get("secret");
     const dryRun = searchParams.get("dryRun") === "true";
-    
+
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
       console.error("[CRON] CRON_SECRET environment variable not set");
@@ -59,7 +58,7 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     if (secret !== cronSecret) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -70,40 +69,22 @@ export async function GET(request: NextRequest) {
     // Get reminder timing configuration
     const hoursBefore = parseInt(process.env.REMINDER_HOURS_BEFORE || "48", 10);
     const checkWindowHours = parseInt(process.env.REMINDER_CHECK_WINDOW_HOURS || "24", 10);
-    
+
     const now = new Date();
     const windowStart = new Date(now.getTime() + (hoursBefore - checkWindowHours) * 60 * 60 * 1000);
     const windowEnd = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000);
 
     console.log(`[CRON] Checking for events between ${windowStart.toISOString()} and ${windowEnd.toISOString()}`);
 
-    const adminSupabase = createAdminClient();
-
     // Find published events with auto_reminders enabled happening in the window
-    const { data: events, error: eventsError } = await adminSupabase
-      .from("events")
-      .select(`
-        id,
-        title,
-        event_date,
-        location_name,
-        slug,
-        tier,
-        user_id
-      `)
-      .eq("status", "published")
-      .eq("auto_reminders", true)
-      .gte("event_date", windowStart.toISOString())
-      .lte("event_date", windowEnd.toISOString())
-      .order("event_date", { ascending: true });
-
-    if (eventsError) {
-      console.error("[CRON] Error fetching events:", eventsError);
-      return NextResponse.json(
-        { error: "Failed to fetch events", details: eventsError.message },
-        { status: 500 }
-      );
-    }
+    const events = await query<EventRow>(
+      `SELECT id, title, event_date, location_name, slug, tier, user_id
+       FROM events
+       WHERE status = $1 AND auto_reminders = true
+         AND event_date >= $2 AND event_date <= $3
+       ORDER BY event_date ASC`,
+      ["published", windowStart.toISOString(), windowEnd.toISOString()]
+    );
 
     if (!events || events.length === 0) {
       console.log("[CRON] No events found requiring reminders");
@@ -134,39 +115,23 @@ export async function GET(request: NextRequest) {
     }> = [];
 
     // Process each event
-    for (const event of events as EventWithGuests[]) {
+    for (const event of events) {
       console.log(`[CRON] Processing event: ${event.title} (${event.id})`);
 
       // Fetch guests who:
       // 1. Haven't received a reminder yet (reminder_sent_at is null)
-      // 2. Have either not responded OR are attending (not declined)
-      const { data: guests, error: guestsError } = await adminSupabase
-        .from("guests")
-        .select(`
-          id,
-          name,
-          email,
-          phone,
-          invite_token,
-          reminder_sent_at,
-          rsvp_responses!left(status)
-        `)
-        .eq("event_id", event.id)
-        .is("reminder_sent_at", null)
-        .or("email.not.is.null,phone.not.is.null");
-
-      if (guestsError) {
-        console.error(`[CRON] Error fetching guests for event ${event.id}:`, guestsError);
-        results.push({
-          eventId: event.id,
-          eventTitle: event.title,
-          guestsNotified: 0,
-          emailsSent: 0,
-          smsSent: 0,
-          errors: [guestsError.message],
-        });
-        continue;
-      }
+      // 2. Have either email or phone
+      // Join with rsvp_responses to check status
+      const guests = await query<GuestWithResponse>(
+        `SELECT g.id, g.name, g.email, g.phone, g.invite_token, g.reminder_sent_at,
+                r.status as rsvp_status
+         FROM guests g
+         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
+         WHERE g.event_id = $1
+           AND g.reminder_sent_at IS NULL
+           AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
+        [event.id]
+      );
 
       if (!guests || guests.length === 0) {
         console.log(`[CRON] No guests to notify for event ${event.id}`);
@@ -182,11 +147,11 @@ export async function GET(request: NextRequest) {
       }
 
       // Filter guests who haven't declined (either no response or attending/maybe)
-      const guestsToNotify = guests.filter((g: GuestWithResponse & { rsvp_responses: { status: string }[] }) => {
+      const guestsToNotify = guests.filter((g) => {
         // If no response, include them
-        if (!g.rsvp_responses || g.rsvp_responses.length === 0) return true;
+        if (!g.rsvp_status) return true;
         // If response is not "not_attending", include them
-        return g.rsvp_responses[0]?.status !== "not_attending";
+        return g.rsvp_status !== "not_attending";
       });
 
       if (guestsToNotify.length === 0) {
@@ -209,8 +174,8 @@ export async function GET(request: NextRequest) {
           eventId: event.id,
           eventTitle: event.title,
           guestsNotified: guestsToNotify.length,
-          emailsSent: guestsToNotify.filter((g: GuestWithResponse) => g.email).length,
-          smsSent: guestsToNotify.filter((g: GuestWithResponse) => g.phone && (BETA_MODE || event.tier !== "free")).length,
+          emailsSent: guestsToNotify.filter((g) => g.email).length,
+          smsSent: guestsToNotify.filter((g) => g.phone && (BETA_MODE || event.tier !== "free")).length,
           errors: [],
         });
         continue;
@@ -227,7 +192,7 @@ export async function GET(request: NextRequest) {
         const batch = guestsToNotify.slice(i, i + BATCH_SIZE);
 
         const batchResults = await Promise.allSettled(
-          batch.map(async (guest: GuestWithResponse) => {
+          batch.map(async (guest) => {
             const rsvpUrl = guest.invite_token
               ? `${siteUrl}/e/${event.slug}?t=${guest.invite_token}`
               : `${siteUrl}/e/${event.slug}`;
@@ -334,12 +299,12 @@ export async function GET(request: NextRequest) {
 
       // Update reminder_sent_at for successful sends
       if (successIds.length > 0) {
-        const { error: updateError } = await adminSupabase
-          .from("guests")
-          .update({ reminder_sent_at: new Date().toISOString() })
-          .in("id", successIds);
-
-        if (updateError) {
+        try {
+          await query(
+            'UPDATE guests SET reminder_sent_at = $1 WHERE id = ANY($2)',
+            [new Date().toISOString(), successIds]
+          );
+        } catch (updateError: any) {
           console.error(`[CRON] Error updating reminder_sent_at for event ${event.id}:`, updateError);
           errors.push(updateError.message);
         }

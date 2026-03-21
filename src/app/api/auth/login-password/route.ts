@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 import { cookies } from 'next/headers';
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       max: 3,
       windowSeconds: 900
     });
-    
+
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: 'Too many login attempts. Please try again later.' },
@@ -29,16 +29,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
-
     // Find admin user by email
-    const { data: adminUser, error: userError } = await supabase
-      .from('admin_users')
-      .select('id, email, name, password')
-      .eq('email', email)
-      .single();
+    const adminUser = await queryOne<{
+      id: string;
+      email: string;
+      name: string;
+      password: string;
+    }>(
+      'SELECT id, email, name, password FROM admin_users WHERE email = $1',
+      [email]
+    );
 
-    if (userError || !adminUser) {
+    if (!adminUser) {
       // Don't reveal whether email exists
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Verify password
     const passwordValid = await verifyPassword(password, adminUser.password);
-    
+
     if (!passwordValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -60,16 +62,13 @@ export async function POST(request: NextRequest) {
     const sessionToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    const { error: sessionError } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: adminUser.id,
-        user_role: 'admin',
-        session_token: sessionToken,
-        expires_at: expiresAt.toISOString()
-      });
-
-    if (sessionError) {
+    try {
+      await query(
+        `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+         VALUES ($1, $2, $3, $4)`,
+        [adminUser.id, 'admin', sessionToken, expiresAt.toISOString()]
+      );
+    } catch (sessionError) {
       console.error('Session creation error:', sessionError);
       return NextResponse.json(
         { error: 'Failed to create session' },

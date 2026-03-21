@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
@@ -28,17 +28,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Too many send requests. Please wait before sending again." }, { status: 429 });
     }
 
-    const adminSupabase = createAdminClient();
-
     // Ownership + status check
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, title, event_date, location_name, slug, status, tier")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne<any>(
+      'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -50,19 +46,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that have been invited but not reminded
-    const { data: guests, error: guestsError } = await adminSupabase
-      .from("guests")
-      .select("id, name, email, phone, invite_status, invite_token, reminder_sent_at")
-      .eq("event_id", eventId)
-      .eq("invite_status", "sent")
-      .is("reminder_sent_at", null);
-
-    if (guestsError) {
-      return NextResponse.json({ error: guestsError.message }, { status: 500 });
-    }
+    const guests = await query<any>(
+      `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at
+       FROM guests
+       WHERE event_id = $1 AND invite_status = $2 AND reminder_sent_at IS NULL`,
+      [eventId, 'sent']
+    );
 
     // Filter to guests with email or phone
-    const sendableGuests = (guests || []).filter((g) => g.email || g.phone);
+    const sendableGuests = guests.filter((g) => g.email || g.phone);
     if (sendableGuests.length === 0) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
@@ -107,7 +99,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                 html,
               });
               emailOk = true;
-              
+
               await logSendSuccess(eventId, 'email', guest.email, {
                 guestId: guest.id,
                 subject,
@@ -118,7 +110,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               errors.push({ type: 'email', message });
               console.error(`[REMINDER EMAIL FAILED] ${guest.email}:`, message);
-              
+
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
                 subject: `Reminder: ${event.title}`,
@@ -130,11 +122,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           if (guest.phone && smsEnabled) {
             // Validate and format phone number
             const phoneValidation = validateAndFormatPhone(guest.phone);
-            
+
             if (!phoneValidation.valid) {
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[REMINDER SMS INVALID] ${guest.phone}:`, phoneValidation.error);
-              
+
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
               });
@@ -155,7 +147,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 });
                 smsOk = true;
-                
+
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -165,7 +157,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
                 console.error(`[REMINDER SMS FAILED] ${guest.phone}:`, message);
-                
+
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -181,7 +173,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       for (const result of results) {
         if (result.status === "fulfilled") {
           const { guestId, emailOk, smsOk, hasEmail, hasPhone, errors } = result.value;
-          
+
           if (emailOk) {
             sent++;
           } else if (hasEmail) {
@@ -189,7 +181,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             console.error(`[REMINDER FAILED] Guest ${guestId} email failed:`,
               errors.filter(e => e.type === 'email').map(e => e.message).join(', '));
           }
-          
+
           if (smsOk) {
             smsSent++;
           } else if (smsEnabled && hasPhone) {
@@ -199,7 +191,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               console.error(`[REMINDER SMS FAILED] Guest ${guestId}:`, smsErrors);
             }
           }
-          
+
           if (emailOk || smsOk) successIds.push(guestId);
         } else {
           console.error('[REMINDER BATCH ERROR] Promise rejected:', result.reason);
@@ -208,10 +200,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     if (successIds.length > 0) {
-      await adminSupabase
-        .from("guests")
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .in("id", successIds);
+      const placeholders = successIds.map((_, i) => `$${i + 2}`).join(', ');
+      await query(
+        `UPDATE guests SET reminder_sent_at = $1 WHERE id IN (${placeholders})`,
+        [new Date().toISOString(), ...successIds]
+      );
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getApiUser } from "@/lib/auth/api-auth";
+import { query, queryOne } from "@/lib/db/client";
 import { randomBytes, createHash } from "crypto";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -25,7 +25,7 @@ type RouteParams = { params: Promise<{ guestId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { guestId } = await params;
-    
+
     // Authenticate user
     const user = await getApiUser();
     if (!user) {
@@ -37,7 +37,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       max: 10,
       windowSeconds: 3600
     });
-    
+
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: "Too many magic link requests. Please try again later." },
@@ -45,27 +45,23 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const adminSupabase = createAdminClient();
-
     // Get guest and verify ownership through event
-    const { data: guest, error: guestError } = await adminSupabase
-      .from("guests")
-      .select("id, event_id, name, email, invite_token")
-      .eq("id", guestId)
-      .single();
+    const guest = await queryOne<{ id: string; event_id: string; name: string; email: string | null; invite_token: string | null }>(
+      'SELECT id, event_id, name, email, invite_token FROM guests WHERE id = $1',
+      [guestId]
+    );
 
-    if (guestError || !guest) {
+    if (!guest) {
       return NextResponse.json({ error: "Guest not found" }, { status: 404 });
     }
 
     // Verify user owns the event
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("id, user_id, slug")
-      .eq("id", guest.event_id)
-      .single();
+    const event = await queryOne<{ id: string; user_id: string; slug: string }>(
+      'SELECT id, user_id, slug FROM events WHERE id = $1',
+      [guest.event_id]
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
@@ -86,21 +82,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     // Store hashed token in database
-    const { data: magicToken, error: insertError } = await adminSupabase
-      .from("guest_magic_tokens")
-      .insert({
-        guest_id: guestId,
-        event_id: guest.event_id,
-        token_hash: tokenHash,
-        token_preview: tokenPreview,
-        expires_at: expiresAt.toISOString(),
-        created_by: user.id,
-      })
-      .select()
-      .single();
+    const magicToken = await queryOne(
+      'INSERT INTO guest_magic_tokens (guest_id, event_id, token_hash, token_preview, expires_at, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [guestId, guest.event_id, tokenHash, tokenPreview, expiresAt.toISOString(), user.id]
+    );
 
-    if (insertError) {
-      console.error("Failed to create magic token:", insertError);
+    if (!magicToken) {
+      console.error("Failed to create magic token");
       return NextResponse.json(
         { error: "Failed to generate magic link" },
         { status: 500 }
@@ -135,52 +123,37 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { guestId } = await params;
-    
+
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const adminSupabase = createAdminClient();
-
     // Get guest and verify ownership
-    const { data: guest, error: guestError } = await adminSupabase
-      .from("guests")
-      .select("id, event_id")
-      .eq("id", guestId)
-      .single();
+    const guest = await queryOne<{ id: string; event_id: string }>(
+      'SELECT id, event_id FROM guests WHERE id = $1',
+      [guestId]
+    );
 
-    if (guestError || !guest) {
+    if (!guest) {
       return NextResponse.json({ error: "Guest not found" }, { status: 404 });
     }
 
     // Verify user owns the event
-    const { data: event, error: eventError } = await adminSupabase
-      .from("events")
-      .select("user_id")
-      .eq("id", guest.event_id)
-      .single();
+    const event = await queryOne<{ user_id: string }>(
+      'SELECT user_id FROM events WHERE id = $1',
+      [guest.event_id]
+    );
 
-    if (eventError || !event || event.user_id !== user.id) {
+    if (!event || event.user_id !== user.id) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     // Get active (non-expired, non-used) magic tokens
-    const { data: tokens, error: tokensError } = await adminSupabase
-      .from("guest_magic_tokens")
-      .select("id, token_preview, expires_at, used_at, created_at")
-      .eq("guest_id", guestId)
-      .gt("expires_at", new Date().toISOString())
-      .is("used_at", null)
-      .order("created_at", { ascending: false });
-
-    if (tokensError) {
-      console.error("Failed to fetch magic tokens:", tokensError);
-      return NextResponse.json(
-        { error: "Failed to fetch magic links" },
-        { status: 500 }
-      );
-    }
+    const tokens = await query(
+      'SELECT id, token_preview, expires_at, used_at, created_at FROM guest_magic_tokens WHERE guest_id = $1 AND expires_at > $2 AND used_at IS NULL ORDER BY created_at DESC',
+      [guestId, new Date().toISOString()]
+    );
 
     return NextResponse.json({
       tokens: tokens || [],

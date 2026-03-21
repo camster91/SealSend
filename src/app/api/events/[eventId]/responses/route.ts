@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import type { PlusOne } from "@/types/database";
 
 export async function GET(
@@ -12,42 +12,32 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
 
-    // Fetch responses with their plus_ones
-    const { data: responses, error } = await adminSupabase
-      .from("rsvp_responses")
-      .select("*")
-      .eq("event_id", eventId)
-      .order("submitted_at", { ascending: false });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Fetch responses
+    const responses = await query(
+      'SELECT * FROM rsvp_responses WHERE event_id = $1 ORDER BY submitted_at DESC',
+      [eventId]
+    );
 
     // Fetch plus_ones for these responses
-    const responseIds = responses?.map(r => r.id) || [];
+    const responseIds = responses.map((r: any) => r.id);
     let plusOnes: PlusOne[] = [];
-    
+
     if (responseIds.length > 0) {
-      const { data: plusOnesData, error: plusOnesError } = await adminSupabase
-        .from("plus_ones")
-        .select("*")
-        .in("rsvp_response_id", responseIds);
-      
-      if (!plusOnesError && plusOnesData) {
-        plusOnes = plusOnesData;
-      }
+      const placeholders = responseIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
+      plusOnes = await query<PlusOne>(
+        `SELECT * FROM plus_ones WHERE rsvp_response_id IN (${placeholders})`,
+        responseIds
+      );
     }
 
     // Group plus_ones by response_id
@@ -60,10 +50,10 @@ export async function GET(
     }, {} as Record<string, PlusOne[]>);
 
     // Attach plus_ones to responses
-    const responsesWithPlusOnes = responses?.map(r => ({
+    const responsesWithPlusOnes = responses.map((r: any) => ({
       ...r,
       plus_ones: plusOnesByResponse[r.id] || [],
-    })) || [];
+    }));
 
     // CSV export
     if (format === "csv") {
@@ -80,7 +70,7 @@ export async function GET(
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
-      responses?.forEach((r) => {
+      responses.forEach((r: any) => {
         if (r.response_data && typeof r.response_data === "object") {
           Object.keys(r.response_data as Record<string, unknown>).forEach((k) => dataKeys.add(k));
         }
@@ -88,12 +78,12 @@ export async function GET(
       const dataKeysList = Array.from(dataKeys);
       headers.push(...dataKeysList);
 
-      const rows = (responsesWithPlusOnes ?? []).map((r) => {
+      const rows = responsesWithPlusOnes.map((r: any) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");
         const plusOneEmails = plusOnesList.map((po: PlusOne) => po.email || "").filter(Boolean).join("; ");
-        
+
         return [
           r.respondent_name,
           r.respondent_email || "",

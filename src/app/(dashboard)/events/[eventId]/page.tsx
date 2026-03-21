@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/session';
+import { query, queryOne } from '@/lib/db/client';
+import type { Event } from '@/types/database';
 import { AnnouncementSection } from '@/components/dashboard/AnnouncementSection';
 import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
 import { CopyLinkButton } from '@/components/dashboard/CopyLinkButton';
@@ -19,36 +21,33 @@ interface EventDetailPageProps {
 export default async function EventDetailPage({ params, searchParams }: EventDetailPageProps) {
   const { eventId } = await params;
   const { upgraded } = await searchParams;
-  const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
-  const { data: event, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .eq('user_id', user.id)
-    .single();
+  const event = await queryOne<Event>(
+    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+    [eventId, user.id]
+  );
 
-  if (error || !event) {
+  if (!event) {
     notFound();
   }
 
-  const { count: responseCount } = await supabase
-    .from('rsvp_responses')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId);
+  const responseCountResult = await queryOne<{ count: number }>(
+    'SELECT COUNT(*)::int AS count FROM rsvp_responses WHERE event_id = $1',
+    [eventId]
+  );
+  const responseCount = responseCountResult?.count ?? 0;
 
-  const { count: guestCount } = await supabase
-    .from('guests')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId);
+  const guestCountResult = await queryOne<{ count: number }>(
+    'SELECT COUNT(*)::int AS count FROM guests WHERE event_id = $1',
+    [eventId]
+  );
+  const guestCount = guestCountResult?.count ?? 0;
 
   const isPublished = event.status === 'published';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
@@ -87,7 +86,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             <div className="relative h-48 sm:h-56">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={event.design_url}
+                src={event.design_url as string}
                 alt=""
                 className="h-full w-full object-cover"
               />
@@ -104,7 +103,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                     >
                       {isPublished ? 'Published' : 'Draft'}
                     </span>
-                    <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title}</h1>
+                    <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
                   </div>
                 </div>
               </div>
@@ -120,9 +119,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
               >
                 {isPublished ? 'Published' : 'Draft'}
               </span>
-              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title}</h1>
+              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
               {event.description && (
-                <p className="mt-2 max-w-xl text-sm text-white/80">{event.description}</p>
+                <p className="mt-2 max-w-xl text-sm text-white/80">{event.description as string}</p>
               )}
             </div>
           )}
@@ -136,16 +135,16 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                   ? 'bg-brand-100 text-brand-700'
                   : 'bg-gray-100 text-gray-600'
             }`}>
-              {event.tier.charAt(0).toUpperCase() + event.tier.slice(1)} tier
+              {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
             </span>
-            <UpgradeButton eventId={eventId} currentTier={event.tier} />
+            <UpgradeButton eventId={eventId} currentTier={event.tier as string} />
           </div>
 
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-4 sm:flex sm:gap-2">
             <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />
-            <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount ?? 0} />
-            <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount ?? 0} />
+            <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />
+            <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount} />
             <ActionLink href={`/events/${eventId}/signups`} icon="signups" label="Sign-ups" />
             <ActionLink href={`/events/${eventId}/comments`} icon="comments" label="Comments" />
             <ActionLink href={`/events/${eventId}/analytics`} icon="analytics" label="Analytics" />
@@ -157,13 +156,13 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           {/* Stats */}
           <div className="space-y-4 lg:col-span-1">
             <StatBlock
-              value={responseCount ?? 0}
+              value={responseCount}
               label="Responses"
               color="from-blue-500 to-indigo-600"
               icon="responses"
             />
             <StatBlock
-              value={guestCount ?? 0}
+              value={guestCount}
               label="Guests"
               color="from-emerald-500 to-teal-600"
               icon="guests"
@@ -179,7 +178,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                     target="_blank"
                     className="min-w-0 flex-1 truncate rounded-lg bg-gray-50 px-3 py-2 text-sm font-mono text-brand-600 hover:text-brand-700 hover:underline"
                   >
-                    /e/{event.slug}
+                    /e/{event.slug as string}
                   </Link>
                   <CopyLinkButton url={publicUrl} />
                 </div>
@@ -199,8 +198,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             {/* Publish / delete / clone */}
             <div className="space-y-2">
               <PublishButton eventId={eventId} isPublished={isPublished} />
-              <CloneEventButton eventId={eventId} eventTitle={event.title} />
-              <DeleteEventButton eventId={eventId} eventTitle={event.title} />
+              <CloneEventButton eventId={eventId} eventTitle={event.title as string} />
+              <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />
             </div>
           </div>
 
@@ -211,22 +210,22 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <h2 className="text-sm font-semibold text-gray-900">Event Details</h2>
               </div>
               <div className="divide-y divide-gray-50 p-1">
-                <DetailRow icon="calendar" label="Date" value={formatDate(event.event_date)} />
+                <DetailRow icon="calendar" label="Date" value={formatDate(event.event_date as string | null)} />
                 {event.event_end_date && (
-                  <DetailRow icon="calendar-end" label="End Date" value={formatDate(event.event_end_date)} />
+                  <DetailRow icon="calendar-end" label="End Date" value={formatDate(event.event_end_date as string | null)} />
                 )}
-                <DetailRow icon="location" label="Venue" value={event.location_name} subtitle={event.location_address} />
-                <DetailRow icon="host" label="Hosted By" value={event.host_name} />
-                <DetailRow icon="dress" label="Dress Code" value={event.dress_code} />
-                <DetailRow icon="deadline" label="RSVP Deadline" value={formatDate(event.rsvp_deadline)} />
+                <DetailRow icon="location" label="Venue" value={event.location_name as string | null} subtitle={event.location_address as string | null} />
+                <DetailRow icon="host" label="Hosted By" value={event.host_name as string | null} />
+                <DetailRow icon="dress" label="Dress Code" value={event.dress_code as string | null} />
+                <DetailRow icon="deadline" label="RSVP Deadline" value={formatDate(event.rsvp_deadline as string | null)} />
                 <DetailRow icon="capacity" label="Max Attendees" value={event.max_attendees ? `${event.max_attendees}` : null} />
                 <DetailRow icon="capacity" label="Max per RSVP" value={event.max_guests_per_rsvp ? `${event.max_guests_per_rsvp}` : null} />
                 <DetailRow icon="capacity" label="+1s Allowed" value={event.allow_plus_ones === false ? 'No' : event.allow_plus_ones === true ? 'Yes' : null} />
-                <DetailRow icon="slug" label="Slug" value={event.slug} mono />
+                <DetailRow icon="slug" label="Slug" value={event.slug as string | null} mono />
                 <DetailRow
                   icon="created"
                   label="Created"
-                  value={new Date(event.created_at).toLocaleDateString('en-US', {
+                  value={new Date(event.created_at as string).toLocaleDateString('en-US', {
                     year: 'numeric', month: 'long', day: 'numeric',
                   })}
                 />
@@ -237,7 +236,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             {event.description && (
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h2 className="text-sm font-semibold text-gray-900">Description</h2>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description}</p>
+                <p className="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description as string}</p>
               </div>
             )}
           </div>
@@ -247,11 +246,11 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         <div className="mt-6">
           <ExportTools
             eventId={eventId}
-            eventTitle={event.title}
-            eventDate={event.event_date}
-            eventLocation={event.location_name}
-            eventSlug={event.slug}
-            designUrl={event.design_url}
+            eventTitle={event.title as string}
+            eventDate={event.event_date as string}
+            eventLocation={event.location_name as string}
+            eventSlug={event.slug as string}
+            designUrl={event.design_url as string}
           />
         </div>
 
@@ -349,19 +348,17 @@ function PublishButton({ eventId, isPublished }: { eventId: string; isPublished:
     <form
       action={async () => {
         'use server';
-        const supabase = await createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { getCurrentUser } = await import('@/lib/auth/session');
+        const { query: dbQuery } = await import('@/lib/db/client');
 
+        const user = await getCurrentUser();
         if (!user) return;
 
         const newStatus = isPublished ? 'draft' : 'published';
-        await supabase
-          .from('events')
-          .update({ status: newStatus })
-          .eq('id', eventId)
-          .eq('user_id', user.id);
+        await dbQuery(
+          'UPDATE events SET status = $1 WHERE id = $2 AND user_id = $3',
+          [newStatus, eventId, user.id]
+        );
 
         const { revalidatePath } = await import('next/cache');
         revalidatePath(`/events/${eventId}`);

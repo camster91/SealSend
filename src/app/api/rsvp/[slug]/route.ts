@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { rsvpSubmissionSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -16,17 +16,14 @@ export async function POST(
     }
 
     const body = await request.json();
-    const supabase = createAdminClient();
 
     // Find the published event by slug
-    const { data: event, error: eventError } = await supabase
-      .from("events")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "published")
-      .single();
+    const event = await queryOne<any>(
+      'SELECT * FROM events WHERE slug = $1 AND status = $2',
+      [slug, 'published']
+    );
 
-    if (eventError || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: "Event not found or not published" },
         { status: 404 }
@@ -34,14 +31,15 @@ export async function POST(
     }
 
     // Check response limit
-    const { count } = await supabase
-      .from("rsvp_responses")
-      .select("*", { count: "exact", head: true })
-      .eq("event_id", event.id);
+    const countResult = await queryOne<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM rsvp_responses WHERE event_id = $1',
+      [event.id]
+    );
+    const count = countResult ? parseInt(countResult.count, 10) : 0;
 
     const { BETA_MODE, BETA_RESPONSE_LIMIT } = await import("@/lib/constants");
     const effectiveLimit = BETA_MODE ? BETA_RESPONSE_LIMIT : event.max_responses;
-    if (count !== null && effectiveLimit && count >= effectiveLimit) {
+    if (effectiveLimit && count >= effectiveLimit) {
       return NextResponse.json(
         {
           error: "This event has reached its maximum number of responses. The host may need to upgrade their plan.",
@@ -90,13 +88,12 @@ export async function POST(
     // Enforce total attendee limit (default: no limit)
     const maxAttendees = event.max_attendees || null;
     if (maxAttendees && status === "attending") {
-      const { data: attendingResponses } = await supabase
-        .from("rsvp_responses")
-        .select("headcount")
-        .eq("event_id", event.id)
-        .eq("status", "attending");
+      const attendingResponses = await query<{ headcount: number }>(
+        'SELECT headcount FROM rsvp_responses WHERE event_id = $1 AND status = $2',
+        [event.id, 'attending']
+      );
 
-      const currentTotal = (attendingResponses || []).reduce(
+      const currentTotal = attendingResponses.reduce(
         (sum, r) => sum + (r.headcount || 1),
         0
       );
@@ -115,22 +112,29 @@ export async function POST(
     }
 
     // Insert RSVP response
-    const { data: response, error: insertError } = await supabase
-      .from("rsvp_responses")
-      .insert({
-        event_id: event.id,
-        respondent_name,
-        respondent_email: respondent_email || null,
-        status,
-        headcount,
-        response_data,
-        plus_ones_data: plus_ones || [],
-        ...(guest_id && { guest_id }),
-      })
-      .select()
-      .single();
+    const insertParams: unknown[] = [
+      event.id,
+      respondent_name,
+      respondent_email || null,
+      status,
+      headcount,
+      response_data ? JSON.stringify(response_data) : null,
+      plus_ones ? JSON.stringify(plus_ones) : JSON.stringify([]),
+    ];
+    let insertSql: string;
 
-    if (insertError) {
+    if (guest_id) {
+      insertSql = `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data, guest_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
+      insertParams.push(guest_id);
+    } else {
+      insertSql = `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
+    }
+
+    const response = await queryOne<any>(insertSql, insertParams);
+
+    if (!response) {
       return NextResponse.json(
         { error: "Failed to submit RSVP" },
         { status: 500 }
@@ -139,20 +143,26 @@ export async function POST(
 
     // Create plus_ones records if provided
     if (plus_ones && plus_ones.length > 0 && response) {
-      const plusOnesToInsert = plus_ones.map((po) => ({
-        event_id: event.id,
-        rsvp_response_id: response.id,
-        name: po.name,
-        email: po.email || null,
-        status: status, // Inherit status from main RSVP
-      }));
+      const valueClauses: string[] = [];
+      const allParams: unknown[] = [];
+      let paramIndex = 1;
 
-      const { error: plusOnesError } = await supabase
-        .from("plus_ones")
-        .insert(plusOnesToInsert);
+      for (const po of plus_ones) {
+        valueClauses.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`
+        );
+        allParams.push(event.id, response.id, po.name, po.email || null, status);
+        paramIndex += 5;
+      }
 
-      if (plusOnesError) {
-        console.error("Failed to create plus_ones:", plusOnesError);
+      try {
+        await query(
+          `INSERT INTO plus_ones (event_id, rsvp_response_id, name, email, status)
+           VALUES ${valueClauses.join(', ')}`,
+          allParams
+        );
+      } catch (err) {
+        console.error("Failed to create plus_ones:", err);
         // Don't fail the RSVP if plus_ones creation fails
       }
     }

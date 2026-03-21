@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
@@ -57,9 +57,6 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
-    // Use admin client to bypass RLS - auth operations happen before user is authenticated
-    const supabase = createAdminClient();
-
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -67,11 +64,10 @@ export async function POST(request: NextRequest) {
     let role = 'guest';
     if (method === 'email' && email) {
       // Check if this is an admin email
-      const { data: admin } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', email)
-        .single();
+      const admin = await queryOne<{ id: string }>(
+        'SELECT id FROM admin_users WHERE email = $1',
+        [email]
+      );
 
       if (admin) {
         role = 'admin';
@@ -80,24 +76,26 @@ export async function POST(request: NextRequest) {
 
     // Delete any existing codes for this email/phone to avoid stale entries
     if (method === 'email' && email) {
-      await supabase.from('auth_codes').delete().eq('email', email);
+      await query('DELETE FROM auth_codes WHERE email = $1', [email]);
     } else if (method === 'phone' && formattedPhone) {
-      await supabase.from('auth_codes').delete().eq('phone', formattedPhone);
+      await query('DELETE FROM auth_codes WHERE phone = $1', [formattedPhone]);
     }
 
     // Store code in database
-    const { error: dbError } = await supabase
-      .from('auth_codes')
-      .insert({
-        email: email || null,
-        phone: formattedPhone || null,
-        code,
-        role,
-        event_id: eventId || null,
-        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-      });
-
-    if (dbError) {
+    try {
+      await query(
+        `INSERT INTO auth_codes (email, phone, code, role, event_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          email || null,
+          formattedPhone || null,
+          code,
+          role,
+          eventId || null,
+          new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        ]
+      );
+    } catch (dbError) {
       console.error('Database error:', dbError);
       return NextResponse.json(
         { error: 'Failed to generate code' },

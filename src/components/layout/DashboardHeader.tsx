@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { getClientUser } from "@/lib/auth/client-auth";
 import { getInitials } from "@/lib/utils";
 import Link from "next/link";
 
@@ -9,10 +9,8 @@ export function DashboardHeader() {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? null);
-    });
+    const user = getClientUser();
+    setEmail(user?.email ?? null);
   }, []);
 
   return (

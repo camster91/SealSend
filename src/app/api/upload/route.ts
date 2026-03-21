@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { nanoid } from 'nanoid';
+import { mkdir, writeFile } from 'fs/promises';
+import path from 'path';
 import sharp from 'sharp';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
@@ -83,6 +83,8 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
   return { data: buffer, ext: contentType.split('/')[1] || 'bin', mime: contentType };
 }
 
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getApiUser();
@@ -156,29 +158,28 @@ export async function POST(request: NextRequest) {
       finalMime = result.mime;
     }
 
-    const fileName = `${nanoid()}.${finalExt}`;
-    const filePath = `${user.id}/${fileName}`;
+    // Sanitize the original filename: keep only safe characters
+    const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const timestamp = Date.now();
+    const fileName = `${timestamp}-${originalName}`;
 
-    const adminSupabase = createAdminClient();
+    // If compression changed the extension, update the filename
+    const nameWithoutExt = fileName.replace(/\.[^.]+$/, '');
+    const finalFileName = `${nameWithoutExt}.${finalExt}`;
 
-    const { error: uploadError } = await adminSupabase.storage
-      .from('event-designs')
-      .upload(filePath, buffer, {
-        contentType: finalMime,
-        upsert: false,
-      });
+    const userDir = path.join(UPLOADS_DIR, user.id);
+    const filePath = path.join(userDir, finalFileName);
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
+    // Ensure the user's upload directory exists
+    await mkdir(userDir, { recursive: true });
 
-    const { data: urlData } = adminSupabase.storage
-      .from('event-designs')
-      .getPublicUrl(filePath);
+    // Write the file to disk
+    await writeFile(filePath, buffer);
+
+    const urlPath = `/uploads/${user.id}/${finalFileName}`;
 
     return NextResponse.json({
-      url: urlData.publicUrl,
-      path: filePath,
+      url: urlPath,
     });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

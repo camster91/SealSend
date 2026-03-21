@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 
 export async function DELETE(
   _request: Request,
@@ -11,24 +11,17 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { error } = await adminSupabase
-      .from("rsvp_responses")
-      .delete()
-      .eq("id", responseId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await query(
+      'DELETE FROM rsvp_responses WHERE id = $1 AND event_id = $2',
+      [responseId, eventId]
+    );
 
     return NextResponse.json({ success: true });
   } catch {

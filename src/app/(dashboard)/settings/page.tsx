@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TIERS } from "@/lib/constants";
+import { getClientUser } from "@/lib/auth/client-auth";
 
 interface PaidEvent {
   id: string;
@@ -17,51 +16,26 @@ interface PaidEvent {
 
 export default function SettingsPage() {
   const [email, setEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [paidEvents, setPaidEvents] = useState<PaidEvent[]>([]);
   const [billingLoading, setBillingLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? "");
+    const userInfo = getClientUser();
+    if (userInfo?.email) {
+      setEmail(userInfo.email);
+    }
 
-      if (data.user) {
-        supabase
-          .from("events")
-          .select("id, title, tier, payment_id, updated_at")
-          .eq("user_id", data.user.id)
-          .not("payment_id", "is", null)
-          .order("updated_at", { ascending: false })
-          .then(({ data: events }) => {
-            setPaidEvents(events ?? []);
-            setBillingLoading(false);
-          });
-      } else {
+    // Fetch paid events via API
+    fetch("/api/events?paid=true")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((events: PaidEvent[]) => {
+        setPaidEvents(events ?? []);
         setBillingLoading(false);
-      }
-    });
+      })
+      .catch(() => {
+        setBillingLoading(false);
+      });
   }, []);
-
-  async function handlePasswordUpdate() {
-    if (newPassword.length < 6) {
-      setMessage("Password must be at least 6 characters");
-      return;
-    }
-    setLoading(true);
-    setMessage(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage("Password updated successfully");
-      setNewPassword("");
-    }
-    setLoading(false);
-  }
 
   return (
     <div>
@@ -78,27 +52,6 @@ export default function SettingsPage() {
               value={email}
               disabled
             />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Change Password</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              label="New Password"
-              type="password"
-              placeholder="Enter new password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            {message && (
-              <p className="text-sm text-muted-foreground">{message}</p>
-            )}
-            <Button onClick={handlePasswordUpdate} loading={loading}>
-              Update Password
-            </Button>
           </CardContent>
         </Card>
 

@@ -1,16 +1,14 @@
-import { createAdminClient } from '@/lib/supabase/admin';
+import { query, queryOne } from '@/lib/db/client';
+import type { Event } from '@/types/database';
 
 export async function getEvent(eventId: string) {
-  const supabase = createAdminClient();
+  const data = await queryOne<Event>(
+    'SELECT * FROM events WHERE id = $1',
+    [eventId]
+  );
 
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', eventId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching event:', error);
+  if (!data) {
+    console.error('Error fetching event: not found');
     return null;
   }
 
@@ -18,43 +16,20 @@ export async function getEvent(eventId: string) {
 }
 
 export async function getEventsByUser(userId: string) {
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('user_id', userId)
-    .order('event_date', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching events:', error);
-    return [];
-  }
+  const data = await query<Event>(
+    'SELECT * FROM events WHERE user_id = $1 ORDER BY event_date ASC',
+    [userId]
+  );
 
   return data || [];
 }
 
 export async function getInvitedEvents(userId: string) {
-  const supabase = createAdminClient();
-
-  // Find events where this user is a guest
-  // First, get the user's email/phone to match against guests
-  const { data: userData } = await supabase
-    .from('user_sessions')
-    .select('user_id')
-    .eq('user_id', userId)
-    .single();
-
   // Get events where this user has a guest entry
-  const { data: guestEntries, error: guestError } = await supabase
-    .from('guests')
-    .select('event_id')
-    .or(`email.eq.${userId},phone.eq.${userId}`);
-
-  if (guestError) {
-    console.error('Error fetching guest entries:', guestError);
-    return [];
-  }
+  const guestEntries = await query<{ event_id: string }>(
+    'SELECT event_id FROM guests WHERE email = $1 OR phone = $1',
+    [userId]
+  );
 
   if (!guestEntries || guestEntries.length === 0) {
     return [];
@@ -62,33 +37,20 @@ export async function getInvitedEvents(userId: string) {
 
   // Get the actual events
   const eventIds = guestEntries.map(g => g.event_id);
-  const { data: events, error } = await supabase
-    .from('events')
-    .select('*')
-    .in('id', eventIds)
-    .order('event_date', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching invited events:', error);
-    return [];
-  }
+  const placeholders = eventIds.map((_, i) => `$${i + 1}`).join(', ');
+  const events = await query<Event>(
+    `SELECT * FROM events WHERE id IN (${placeholders}) ORDER BY event_date ASC`,
+    eventIds
+  );
 
   return events || [];
 }
 
 export async function getEventGuests(eventId: string) {
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from('guests')
-    .select('*')
-    .eq('event_id', eventId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching guests:', error);
-    return [];
-  }
+  const data = await query(
+    'SELECT * FROM guests WHERE event_id = $1 ORDER BY created_at DESC',
+    [eventId]
+  );
 
   return data || [];
 }

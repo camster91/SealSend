@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { queryOne } from '@/lib/db/client';
 import { getApiUser } from '@/lib/auth/api-auth';
 
 export async function GET(
@@ -17,16 +17,13 @@ export async function GET(
     }
 
     const { eventId } = await params;
-    const adminSupabase = createAdminClient();
 
-    const { data: event, error } = await adminSupabase
-      .from('events')
-      .select('slug')
-      .eq('id', eventId)
-      .eq('user_id', user.id)
-      .single();
+    const event = await queryOne<{ slug: string }>(
+      'SELECT slug FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
-    if (error || !event) {
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }

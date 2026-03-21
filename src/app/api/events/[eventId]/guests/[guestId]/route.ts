@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
 
 export async function PATCH(
@@ -13,14 +13,10 @@ export async function PATCH(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -29,15 +25,22 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    const { data: guest, error } = await adminSupabase
-      .from("guests")
-      .update(parsed.data)
-      .eq("id", guestId)
-      .eq("event_id", eventId)
-      .select()
-      .single();
+    // Build dynamic SET clause from parsed fields
+    const fields = Object.entries(parsed.data).filter(([, v]) => v !== undefined);
+    if (fields.length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const setClauses = fields.map(([key], i) => `${key} = $${i + 1}`);
+    const values = fields.map(([, v]) => v);
+    const paramOffset = fields.length;
+
+    const guest = await queryOne(
+      `UPDATE guests SET ${setClauses.join(', ')} WHERE id = $${paramOffset + 1} AND event_id = $${paramOffset + 2} RETURNING *`,
+      [...values, guestId, eventId]
+    );
+
+    if (!guest) return NextResponse.json({ error: "Guest not found" }, { status: 404 });
 
     return NextResponse.json(guest);
   } catch {
@@ -54,24 +57,17 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { error } = await adminSupabase
-      .from("guests")
-      .delete()
-      .eq("id", guestId)
-      .eq("event_id", eventId);
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await query(
+      'DELETE FROM guests WHERE id = $1 AND event_id = $2',
+      [guestId, eventId]
+    );
 
     return NextResponse.json({ success: true });
   } catch {

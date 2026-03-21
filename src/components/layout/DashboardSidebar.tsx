@@ -9,7 +9,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { clientSignOut } from "@/lib/auth/client-auth";
 import { useRouter } from "next/navigation";
 
 const navItems = [
@@ -27,8 +27,7 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
   const router = useRouter();
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await clientSignOut();
     router.push("/");
   }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 
@@ -13,15 +13,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const adminSupabase = createAdminClient();
-
     // Verify ownership
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("id", eventId)
-      .eq("user_id", user.id)
-      .single();
+    const event = await queryOne(
+      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+      [eventId, user.id]
+    );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -34,15 +30,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Check for existing guests to avoid duplicates
-    const { data: existingGuests } = await adminSupabase
-      .from("guests")
-      .select("email, phone")
-      .eq("event_id", eventId);
+    const existingGuests = await query<{ email: string | null; phone: string | null }>(
+      'SELECT email, phone FROM guests WHERE event_id = $1',
+      [eventId]
+    );
 
     const existingEmails = new Set((existingGuests || [])
       .map(g => g.email?.toLowerCase())
       .filter(Boolean));
-    
+
     const existingPhones = new Set((existingGuests || [])
       .map(g => g.phone)
       .filter(Boolean));
@@ -57,10 +53,10 @@ export async function POST(request: Request, { params }: RouteParams) {
           duplicates.push({ name: g.name, reason: `Email ${g.email} already exists` });
           return null;
         }
-        
+
         if (g.phone) {
           const phoneValidation = validateAndFormatPhone(g.phone);
-          if (phoneValidation.valid && existingPhones.has(phoneValidation.formatted)) {
+          if (phoneValidation.valid && phoneValidation.formatted && existingPhones.has(phoneValidation.formatted)) {
             duplicates.push({ name: g.name, reason: `Phone ${g.phone} already exists` });
             return null;
           }
@@ -108,15 +104,21 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 200 });
     }
 
-    const { error, data: insertedGuests } = await adminSupabase
-      .from("guests")
-      .insert(guests)
-      .select('id, name, email, phone');
+    // Build bulk INSERT with parameterized values
+    const valuePlaceholders: string[] = [];
+    const queryParams: unknown[] = [];
+    let paramIndex = 1;
 
-    if (error) {
-      console.error('Bulk insert error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    for (const g of guests) {
+      valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
+      queryParams.push(g.event_id, g.name, g.email, g.phone, g.notes);
+      paramIndex += 5;
     }
+
+    const insertedGuests = await query<{ id: string; name: string; email: string | null; phone: string | null }>(
+      `INSERT INTO guests (event_id, name, email, phone, notes) VALUES ${valuePlaceholders.join(', ')} RETURNING id, name, email, phone`,
+      queryParams
+    );
 
     return NextResponse.json({
       inserted: insertedGuests?.length || 0,

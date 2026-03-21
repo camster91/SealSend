@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { query, queryOne } from "@/lib/db/client";
 import { commentSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -11,31 +11,22 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const adminSupabase = createAdminClient();
 
     // Find event by slug (any status — page is already rendered if accessible)
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .single();
+    const event = await queryOne<{ id: string }>(
+      'SELECT id FROM events WHERE slug = $1',
+      [slug]
+    );
 
     if (!event) {
       return NextResponse.json([], { status: 200 });
     }
 
     // Only show public comments on the public page
-    const { data: comments, error } = await adminSupabase
-      .from("event_comments")
-      .select("*")
-      .eq("event_id", event.id)
-      .neq("is_private", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      // Table might not exist yet — return empty array
-      return NextResponse.json([], { status: 200 });
-    }
+    const comments = await query(
+      'SELECT * FROM event_comments WHERE event_id = $1 AND is_private != true ORDER BY created_at DESC',
+      [event.id]
+    );
 
     return NextResponse.json(comments ?? []);
   } catch {
@@ -56,14 +47,12 @@ export async function POST(
 
     const { slug } = await params;
     const body = await request.json();
-    const adminSupabase = createAdminClient();
 
     // Find event by slug
-    const { data: event } = await adminSupabase
-      .from("events")
-      .select("id")
-      .eq("slug", slug)
-      .single();
+    const event = await queryOne<{ id: string }>(
+      'SELECT id FROM events WHERE slug = $1',
+      [slug]
+    );
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -77,19 +66,15 @@ export async function POST(
       );
     }
 
-    const { data: comment, error } = await adminSupabase
-      .from("event_comments")
-      .insert({
-        event_id: event.id,
-        author_name: parsed.data.author_name,
-        message: parsed.data.message,
-        is_private: parsed.data.is_private ?? false,
-      })
-      .select()
-      .single();
+    const comment = await queryOne(
+      `INSERT INTO event_comments (event_id, author_name, message, is_private)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [event.id, parsed.data.author_name, parsed.data.message, parsed.data.is_private ?? false]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!comment) {
+      return NextResponse.json({ error: "Failed to create comment" }, { status: 500 });
     }
 
     return NextResponse.json(comment, { status: 201 });
