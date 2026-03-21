@@ -10,6 +10,18 @@ import { rateLimit } from "@/lib/rate-limit";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, delayMs * Math.pow(2, i)));
+    }
+  }
+  throw new Error('Retry exhausted');
+}
+
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
@@ -79,7 +91,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     let smsSent = 0;
     let smsFailed = 0;
     const successIds: string[] = [];
-    const failedIds: string[] = [];
+    const failedGuests: Array<{ id: string; error: string }> = [];
 
     for (let i = 0; i < sendableGuests.length; i += BATCH_SIZE) {
       const batch = sendableGuests.slice(i, i + BATCH_SIZE);
@@ -118,13 +130,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              const result = await sendEmail({
+              const result = await withRetry(() => sendEmail({
                 to: guest.email,
                 subject,
                 html,
-              });
+              }));
               emailOk = true;
-              
+
               // Log successful send
               await logSendSuccess(eventId, 'email', guest.email, {
                 guestId: guest.id,
@@ -136,7 +148,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               errors.push({ type: 'email', message });
               console.error(`[EMAIL FAILED] ${guest.email}:`, message);
-              
+
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
                 subject: event.title,
@@ -169,13 +181,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
               try {
                 const twilioClient = getTwilioClient();
-                const result = await twilioClient.messages.create({
+                const result = await withRetry(() => twilioClient.messages.create({
                   body: smsBody,
                   to: formattedPhone,
                   ...getTwilioSendOptions(),
-                });
+                }));
                 smsOk = true;
-                
+
                 // Log successful SMS
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,
@@ -186,7 +198,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
                 console.error(`[SMS FAILED] ${guest.phone}:`, message);
-                
+
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,
                   provider: 'twilio',
@@ -226,7 +238,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           if (emailOk || smsOk) {
             successIds.push(guestId);
           } else {
-            failedIds.push(guestId);
+            const errorMsg = errors.map(e => `${e.type}: ${e.message}`).join('; ');
+            failedGuests.push({ id: guestId, error: errorMsg || 'Send failed' });
           }
         } else {
           // Promise was rejected (shouldn't happen with our try/catch, but handle just in case)
@@ -242,11 +255,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         .update({ invite_status: "sent", invite_sent_at: new Date().toISOString() })
         .in("id", successIds);
     }
-    if (failedIds.length > 0) {
-      await adminSupabase
-        .from("guests")
-        .update({ invite_status: "failed" })
-        .in("id", failedIds);
+    if (failedGuests.length > 0) {
+      // Update each failed guest with their specific error message
+      await Promise.all(failedGuests.map(({ id, error }) =>
+        adminSupabase
+          .from("guests")
+          .update({ invite_status: "failed", invite_error: error })
+          .eq("id", id)
+      ));
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });

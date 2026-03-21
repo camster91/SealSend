@@ -100,8 +100,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (guests.length === 0) {
       return NextResponse.json({
-        imported: 0,
+        inserted: 0,
         skipped: duplicates.length,
+        imported: 0,
         errors: validationErrors,
         duplicates,
       }, { status: 200 });
@@ -118,8 +119,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json({
-      imported: insertedGuests?.length || 0,
+      inserted: insertedGuests?.length || 0,
       skipped: duplicates.length,
+      imported: insertedGuests?.length || 0,
       errors: validationErrors,
       duplicates: duplicates.length > 0 ? duplicates : undefined,
       guests: insertedGuests,
