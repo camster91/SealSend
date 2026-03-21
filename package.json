@@ -20,6 +20,7 @@
     "@stripe/stripe-js": "^8.7.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "@types/qrcode": "^1.5.6",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -30,6 +31,7 @@
     "nanoid": "^5.1.6",
     "next": "16.1.6",
     "pg": "^8.18.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
@@ -41,6 +43,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

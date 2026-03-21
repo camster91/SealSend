@@ -183,6 +183,16 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                   </Link>
                   <CopyLinkButton url={publicUrl} />
                 </div>
+                <a
+                  href={`/api/events/${eventId}/qr`}
+                  download={`${event.slug}-qr.png`}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 active:scale-[0.98]"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4v4H3V4zm0 8h4v4H3v-4zm8-8h4v4h-4V4zm8 0h4v4h-4V4zm0 8h4v4h-4v-4zm-8 8h4v4h-4v-4z" />
+                  </svg>
+                  Download QR Code
+                </a>
               </div>
             )}
 

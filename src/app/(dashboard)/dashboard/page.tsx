@@ -3,6 +3,8 @@ import { getEventsByUser, getInvitedEvents } from '@/lib/events';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
+import { UsageStats } from '@/components/dashboard/UsageStats';
+import { BETA_MODE, SUBSCRIPTION_TIERS } from '@/lib/constants';
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -42,6 +44,17 @@ export default async function DashboardPage() {
               Create Event
             </Link>
           </div>
+        </div>
+
+        {/* Usage Stats */}
+        <div className="mb-8">
+          <UsageStats
+            tier={BETA_MODE ? 'Business (Beta)' : 'free'}
+            eventsUsed={myEvents.length}
+            eventsLimit={BETA_MODE ? -1 : (SUBSCRIPTION_TIERS.find(t => t.id === 'free')?.limits.events as number) ?? 3}
+            guestsUsed={0}
+            guestsLimit={BETA_MODE ? -1 : (SUBSCRIPTION_TIERS.find(t => t.id === 'free')?.limits.guestsPerEvent as number) ?? 50}
+          />
         </div>
 
         {/* Stats */}
