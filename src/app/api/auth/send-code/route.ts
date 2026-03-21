@@ -34,8 +34,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { method, email, phone, eventId } = body;
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+    const { method, email, phone, eventId } = body as { method?: string; email?: string; phone?: string; eventId?: string };
 
     if (!method || (!email && !phone)) {
       return NextResponse.json(
