@@ -120,10 +120,11 @@ async function handleSubscriptionDeleted(
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
   const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id;
+    typeof invoiceAny.subscription === "string"
+      ? invoiceAny.subscription
+      : invoiceAny.subscription?.id;
 
   if (!subscriptionId) return;
 
