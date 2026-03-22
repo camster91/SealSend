@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
  * BETA MODE - When true, all features are free and unlimited
  * Set to false when launching paid tiers
  */
-export const BETA_MODE = true;
+export const BETA_MODE = false;
 
 /** 
  * Feature flags for gradual rollout
@@ -58,33 +58,37 @@ export interface SubscriptionTier {
   };
 }
 
+// Evite-style per-event pricing at 50% less than Evite
+// Evite: Silver $17.99/12g, Gold $36.99/30g, Platinum $68.99/75g, Diamond $99.99/750g, Pro $249.99/yr
+// SealSend: 50% cheaper with more generous guest limits
+
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
     id: "free",
     name: "Free",
-    description: "Perfect for trying out SealSend",
+    description: "Perfect for small gatherings",
     price: {
       monthly: 0,
       yearly: 0,
     },
     limits: {
-      events: 3,
-      guestsPerEvent: 50,
-      responses: 100,
+      events: 1,
+      guestsPerEvent: 15,
+      responses: 30,
       teamMembers: 1,
-      storageGB: 0.5,
+      storageGB: 0.25,
     },
     features: [
-      { name: "Digital invitations", included: true },
+      { name: "1 event", included: true },
+      { name: "Up to 15 guests", included: true },
       { name: "RSVP tracking", included: true },
-      { name: "Guest management", included: true },
-      { name: "Basic customization", included: true },
+      { name: "Basic templates", included: true },
       { name: "Email notifications", included: true },
+      { name: "SealSend branding", included: true, tooltip: "Free invitations include SealSend branding" },
       { name: "Custom domain", included: false },
       { name: "Remove branding", included: false },
       { name: "SMS notifications", included: false },
       { name: "Advanced analytics", included: false },
-      { name: "Priority support", included: false },
     ],
     cta: {
       text: "Get Started Free",
@@ -93,80 +97,104 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   },
   {
     id: "pro",
-    name: "Pro",
-    description: "For hosts who want more flexibility",
+    name: "Silver",
+    description: "Great for birthday parties & dinners",
     price: {
-      monthly: 12,
-      yearly: 99,
+      monthly: 8.99,
+      yearly: 8.99,
     },
     stripePriceId: {
-      monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
-      yearly: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
+      monthly: process.env.STRIPE_SILVER_PRICE_ID,
     },
     limits: {
-      events: 10,
-      guestsPerEvent: 200,
-      responses: 1000,
-      teamMembers: 3,
-      storageGB: 5,
+      events: 1,
+      guestsPerEvent: 50,
+      responses: 100,
+      teamMembers: 1,
+      storageGB: 1,
     },
     features: [
-      { name: "Everything in Free", included: true },
-      { name: "Remove SealSend branding", included: true },
-      { name: "Custom domain", included: true },
-      { name: "SMS notifications", included: true },
+      { name: "1 premium event", included: true },
+      { name: "Up to 50 guests", included: true },
+      { name: "Premium templates", included: true },
+      { name: "No SealSend branding", included: true },
+      { name: "Custom colors & fonts", included: true },
+      { name: "Photo gallery", included: true },
+      { name: "SMS + email notifications", included: true },
       { name: "Guest tags & groups", included: true },
-      { name: "Advanced RSVP fields", included: true },
-      { name: "Export to CSV/Excel", included: true },
-      { name: "Message board", included: true },
-      { name: "Advanced analytics", included: false },
-      { name: "Priority support", included: false },
+      { name: "Export to CSV", included: true },
+      { name: "Ad-free experience", included: true },
     ],
     popular: true,
     badges: ["Most Popular"],
     cta: {
-      text: "Start Pro Trial",
-      href: "/signup?plan=pro",
+      text: "Create Event — $8.99",
+      href: "/signup?plan=silver",
     },
   },
   {
     id: "business",
-    name: "Business",
-    description: "For professional event planners",
+    name: "Gold",
+    description: "Perfect for weddings & large celebrations",
     price: {
-      monthly: 39,
-      yearly: 349,
+      monthly: 17.99,
+      yearly: 17.99,
     },
     stripePriceId: {
-      monthly: process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID,
-      yearly: process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID,
+      monthly: process.env.STRIPE_GOLD_PRICE_ID,
     },
     limits: {
-      events: "unlimited",
-      guestsPerEvent: "unlimited",
-      responses: "unlimited",
-      teamMembers: 10,
-      storageGB: 50,
+      events: 1,
+      guestsPerEvent: 150,
+      responses: 300,
+      teamMembers: 3,
+      storageGB: 5,
     },
     features: [
-      { name: "Everything in Pro", included: true },
-      { name: "Unlimited events", included: true },
-      { name: "Unlimited guests", included: true },
-      { name: "Advanced analytics", included: true },
+      { name: "Everything in Silver", included: true },
+      { name: "Up to 150 guests", included: true },
+      { name: "Custom domain", included: true },
       { name: "Team collaboration", included: true },
-      { name: "API access", included: true },
-      { name: "White-label options", included: true },
+      { name: "Advanced RSVP fields", included: true },
+      { name: "Meal preferences & +1s", included: true },
+      { name: "Seating chart tool", included: true },
+      { name: "Message board", included: true },
+      { name: "Advanced analytics", included: true },
       { name: "Priority support", included: true },
-      { name: "Custom integrations", included: true },
-      { name: "Dedicated account manager", included: true },
     ],
-    badges: ["Best Value"],
     cta: {
-      text: "Start Business Trial",
-      href: "/signup?plan=business",
+      text: "Create Event — $17.99",
+      href: "/signup?plan=gold",
     },
   },
 ];
+
+// Additional per-event tiers (available via API / upgrade flow)
+export const PREMIUM_TIERS = {
+  platinum: {
+    name: "Platinum",
+    price: 34.99,
+    guestsPerEvent: 500,
+    description: "For galas & corporate events",
+  },
+  diamond: {
+    name: "Diamond",
+    price: 49.99,
+    guestsPerEvent: 750,
+    description: "For the biggest celebrations",
+  },
+};
+
+// Unlimited yearly plan (competitor to Evite Pro at $249.99/yr)
+export const PRO_ANNUAL = {
+  name: "SealSend Pro",
+  price: 124.99,
+  interval: "year" as const,
+  description: "Unlimited premium events for power hosts & event planners",
+  guestsPerEvent: 2500,
+  events: "unlimited",
+  stripePriceId: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
+};
 
 // ========================================
 // LEGACY EVENT TIERS (Per-Event - Deprecated)
