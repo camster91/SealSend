@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases'];
+  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases', '/terms', '/privacy', '/robots.txt', '/sitemap.xml'];
 
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||

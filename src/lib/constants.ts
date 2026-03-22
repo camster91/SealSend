@@ -204,26 +204,47 @@ export const PRO_ANNUAL = {
  * @deprecated Use SUBSCRIPTION_TIERS instead
  * Event-level tiers - only used when BETA_MODE is false and subscriptions not enabled
  */
+// Event-level tiers (used by checkout and webhook handlers)
 export const TIERS = {
   free: {
     price: 0,
     maxResponses: 15,
     features: ["emailInvites", "basicRsvp"],
   },
+  silver: {
+    price: 899,
+    maxResponses: 50,
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "customColors"],
+  },
+  gold: {
+    price: 1799,
+    maxResponses: 150,
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics"],
+  },
+  platinum: {
+    price: 3499,
+    maxResponses: 500,
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics", "api"],
+  },
+  diamond: {
+    price: 4999,
+    maxResponses: 750,
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics", "api", "priority"],
+  },
+  // Backwards compatibility
   standard: {
-    price: 5,
+    price: 899,
     maxResponses: 50,
     features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements"],
   },
   premium: {
-    price: 10,
-    maxResponses: 1200,
+    price: 1799,
+    maxResponses: 150,
     features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard"],
   },
 } as const;
 
-/** Beta uses premium limits for all events */
-export const BETA_RESPONSE_LIMIT = TIERS.premium.maxResponses;
+export const BETA_RESPONSE_LIMIT = TIERS.diamond.maxResponses;
 
 // ========================================
 // FEATURES LIST (Marketing)
