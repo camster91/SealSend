@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
-import { updateSendStatus } from '@/lib/email-logger';
+// import { updateSendStatus } from '@/lib/email-logger'; // TODO: wire up status tracking
 
 /**
  * Twilio webhook handler for SMS status callbacks

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth/session';
-import { query, queryOne } from '@/lib/db/client';
+import { queryOne } from '@/lib/db/client';
 import type { Event } from '@/types/database';
 import { AnnouncementSection } from '@/components/dashboard/AnnouncementSection';
 import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
@@ -10,8 +10,8 @@ import { CloneEventButton } from '@/components/dashboard/CloneEventButton';
 import { UpgradeButton } from '@/components/events/UpgradeButton';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { ExportTools } from '@/components/dashboard/ExportTools';
-import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
-import { TIERS } from '@/lib/constants';
+// import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
+// import { TIERS } from '@/lib/constants';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
