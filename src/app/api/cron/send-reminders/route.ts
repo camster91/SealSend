@@ -45,9 +45,8 @@ interface EventRow {
 
 export async function GET(request: NextRequest) {
   try {
-    // Check cron secret for authentication
+    // Check cron secret for authentication (Bearer token or query param for backwards compat)
     const { searchParams } = new URL(request.url);
-    const secret = searchParams.get("secret");
     const dryRun = searchParams.get("dryRun") === "true";
 
     const cronSecret = process.env.CRON_SECRET;
@@ -59,7 +58,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (secret !== cronSecret) {
+    const authHeader = request.headers.get("authorization");
+    const querySecret = searchParams.get("secret");
+    const isAuthorized = authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+
+    if (!isAuthorized) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

@@ -4,9 +4,15 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
 import { UsageStats } from '@/components/dashboard/UsageStats';
+import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { BETA_MODE, SUBSCRIPTION_TIERS } from '@/lib/constants';
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams: Promise<{ upgraded?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const { upgraded } = await searchParams;
   const user = await getCurrentUser();
   
   // Redirect to login if no user
@@ -183,9 +189,9 @@ export default async function DashboardPage() {
         {invitedEvents.length > 0 && (
           <div className="bg-white shadow overflow-hidden sm:rounded-md mb-8">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Events I'm Invited To</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Events I&apos;m Invited To</h3>
               <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                Events you've been invited to as a guest
+                Events you&apos;ve been invited to as a guest
               </p>
             </div>
             <ul className="divide-y divide-gray-200">
@@ -260,6 +266,7 @@ export default async function DashboardPage() {
             </div>
           </div>
         )}
+        {upgraded === 'true' && <UpgradeSuccessToast />}
       </div>
     </div>
   );

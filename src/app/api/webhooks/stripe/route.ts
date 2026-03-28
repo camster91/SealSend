@@ -4,13 +4,22 @@ import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 
+// Map legacy tier names to unified names
+const TIER_ALIAS: Record<string, string> = {
+  standard: "silver",
+  premium: "gold",
+};
+
 async function handleEventCheckout(session: Stripe.Checkout.Session) {
   const { eventId, tier } = session.metadata || {};
 
   if (!eventId || !tier) return;
 
-  const tierKey = tier as keyof typeof TIERS;
-  if (tierKey !== "standard" && tierKey !== "premium") return;
+  // Resolve legacy names (standard -> silver, premium -> gold)
+  const resolvedTier = TIER_ALIAS[tier] || tier;
+  const tierKey = resolvedTier as keyof typeof TIERS;
+
+  if (!(tierKey in TIERS)) return;
 
   const maxResponses = TIERS[tierKey].maxResponses;
 
