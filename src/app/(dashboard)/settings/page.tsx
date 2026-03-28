@@ -16,16 +16,26 @@ interface PaidEvent {
 
 export default function SettingsPage() {
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const [paidEvents, setPaidEvents] = useState<PaidEvent[]>([]);
   const [billingLoading, setBillingLoading] = useState(true);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     const userInfo = getClientUser();
     if (userInfo?.email) {
       setEmail(userInfo.email);
     }
+    if (userInfo?.role) {
+      setRole(userInfo.role);
+    }
 
-    // Fetch paid events via API
     fetch("/api/events?paid=true")
       .then((res) => (res.ok ? res.json() : []))
       .then((events: PaidEvent[]) => {
@@ -36,6 +46,62 @@ export default function SettingsPage() {
         setBillingLoading(false);
       });
   }, []);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage(null);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: "error", text: "New passwords do not match" });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordMessage({ type: "error", text: "Password must be at least 8 characters" });
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPasswordMessage({
+          type: "error",
+          text: data.error || "Failed to change password",
+        });
+        return;
+      }
+
+      setPasswordMessage({ type: "success", text: "Password updated successfully" });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      setPasswordMessage({ type: "error", text: "Something went wrong" });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const getTierBadge = (tier: string) => {
+    const styles: Record<string, string> = {
+      gold: "bg-amber-100 text-amber-700",
+      premium: "bg-amber-100 text-amber-700",
+      platinum: "bg-slate-100 text-slate-700",
+      diamond: "bg-indigo-100 text-indigo-700",
+      silver: "bg-brand-100 text-brand-700",
+      standard: "bg-brand-100 text-brand-700",
+    };
+    return styles[tier] || "bg-gray-100 text-gray-600";
+  };
 
   return (
     <div>
@@ -54,6 +120,57 @@ export default function SettingsPage() {
             />
           </CardContent>
         </Card>
+
+        {role === "admin" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <Input
+                  label="Current Password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+                <Input
+                  label="New Password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Confirm New Password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+                {passwordMessage && (
+                  <p
+                    className={`text-sm ${
+                      passwordMessage.type === "success"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {passwordMessage.text}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {passwordLoading ? "Updating..." : "Update Password"}
+                </button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -88,13 +205,10 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          evt.tier === "premium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-brand-100 text-brand-700"
-                        }`}
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${getTierBadge(evt.tier)}`}
                       >
-                        {evt.tier.charAt(0).toUpperCase() + evt.tier.slice(1)} &middot; ${tierInfo?.price ?? "0"}
+                        {evt.tier.charAt(0).toUpperCase() + evt.tier.slice(1)} &middot; $
+                        {tierInfo ? (tierInfo.price / 100).toFixed(2) : "0.00"}
                       </span>
                     </div>
                   );

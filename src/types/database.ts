@@ -1,5 +1,5 @@
 export type EventStatus = "draft" | "published" | "archived";
-export type EventTier = "free" | "standard" | "premium";
+export type EventTier = "free" | "standard" | "premium" | "silver" | "gold" | "platinum" | "diamond";
 export type RSVPFieldType =
   | "attendance"
   | "text"
@@ -52,6 +52,7 @@ export interface Event {
   max_attendees: number | null;
   allow_plus_ones: boolean;
   max_guests_per_rsvp: number;
+  auto_reminders: boolean;
   payment_id: string | null;
   created_at: string;
   updated_at: string;

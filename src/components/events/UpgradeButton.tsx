@@ -1,9 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import { TIERS, BETA_MODE } from "@/lib/constants";
+import { BETA_MODE } from "@/lib/constants";
 
-type UpgradeTier = "standard" | "premium";
+type UpgradeTier = "silver" | "gold" | "platinum" | "diamond";
+
+interface TierInfo {
+  name: string;
+  price: string;
+  style: string;
+}
+
+const UPGRADE_TIERS: Record<UpgradeTier, TierInfo> = {
+  silver: {
+    name: "Silver",
+    price: "$8.99",
+    style: "bg-brand-600 text-white hover:bg-brand-700",
+  },
+  gold: {
+    name: "Gold",
+    price: "$17.99",
+    style: "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm hover:shadow-md",
+  },
+  platinum: {
+    name: "Platinum",
+    price: "$34.99",
+    style: "bg-gradient-to-r from-slate-500 to-slate-700 text-white shadow-sm hover:shadow-md",
+  },
+  diamond: {
+    name: "Diamond",
+    price: "$49.99",
+    style: "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-sm hover:shadow-md",
+  },
+};
+
+const TIER_RANK: Record<string, number> = {
+  free: 0,
+  silver: 1,
+  standard: 1,
+  gold: 2,
+  premium: 2,
+  platinum: 3,
+  diamond: 4,
+};
 
 interface UpgradeButtonProps {
   eventId: string;
@@ -13,7 +52,6 @@ interface UpgradeButtonProps {
 export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   const [loading, setLoading] = useState<UpgradeTier | null>(null);
 
-  // During beta, all features are free — hide upgrade buttons
   if (BETA_MODE) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
@@ -25,12 +63,11 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
     );
   }
 
-  const tierRank = { free: 0, standard: 1, premium: 2 } as const;
-  const currentRank = tierRank[currentTier as keyof typeof tierRank] ?? 0;
+  const currentRank = TIER_RANK[currentTier] ?? 0;
 
-  const availableUpgrades: UpgradeTier[] = [];
-  if (currentRank < 1) availableUpgrades.push("standard");
-  if (currentRank < 2) availableUpgrades.push("premium");
+  const availableUpgrades = (Object.keys(UPGRADE_TIERS) as UpgradeTier[]).filter(
+    (tier) => (TIER_RANK[tier] ?? 0) > currentRank
+  );
 
   if (availableUpgrades.length === 0) return null;
 
@@ -50,7 +87,6 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
         return;
       }
 
-      // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch {
       alert("Something went wrong. Please try again.");
@@ -62,18 +98,14 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {availableUpgrades.map((tier) => {
-        const tierInfo = TIERS[tier];
+        const info = UPGRADE_TIERS[tier];
         const isLoading = loading === tier;
         return (
           <button
             key={tier}
             onClick={() => handleUpgrade(tier)}
             disabled={loading !== null}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50 ${
-              tier === "premium"
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm hover:shadow-md"
-                : "bg-brand-600 text-white hover:bg-brand-700"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50 ${info.style}`}
           >
             {isLoading ? (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -85,7 +117,7 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             )}
-            {tier.charAt(0).toUpperCase() + tier.slice(1)} ${tierInfo.price}
+            {info.name} {info.price}
           </button>
         );
       })}

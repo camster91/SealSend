@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
-// import { updateSendStatus } from '@/lib/email-logger'; // TODO: wire up status tracking
 
 /**
  * Twilio webhook handler for SMS status callbacks
@@ -20,18 +19,32 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const data = Object.fromEntries(formData.entries()) as unknown as TwilioWebhookData;
 
-    // Verify the request is from Twilio (in production, validate the signature)
-    // See: https://www.twilio.com/docs/usage/security#validating-requests
+    // Verify the request is from Twilio using signature validation
     const twilioSignature = request.headers.get('x-twilio-signature');
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-    if (twilioSignature && authToken) {
-      // In production, implement signature validation
-      // const isValid = validateTwilioSignature(request.url, data, authToken, twilioSignature);
-      // if (!isValid) {
-      //   console.error('Invalid Twilio signature');
-      //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      // }
+    if (authToken && twilioSignature) {
+      const { createHmac } = await import('crypto');
+      const webhookUrl = process.env.TWILIO_WEBHOOK_URL || request.url;
+
+      // Sort form params alphabetically and concatenate
+      const sortedParams = Object.keys(data).sort().reduce((acc, key) => {
+        return acc + key + (data as unknown as Record<string, string>)[key];
+      }, '');
+
+      const expectedSignature = createHmac('sha1', authToken)
+        .update(webhookUrl + sortedParams)
+        .digest('base64');
+
+      // Use timing-safe comparison
+      const { timingSafeEqual } = await import('crypto');
+      const sigBuffer = Buffer.from(twilioSignature);
+      const expectedBuffer = Buffer.from(expectedSignature);
+
+      if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
+        console.error('Invalid Twilio signature');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
     }
 
     console.log(`[Twilio Webhook] Status: ${data.MessageStatus}`, {

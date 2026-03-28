@@ -11,15 +11,15 @@ import type { LucideIcon } from "lucide-react";
  */
 export const BETA_MODE = false;
 
-/** 
+/**
  * Feature flags for gradual rollout
  */
 export const FEATURE_FLAGS = {
-  subscriptions: false,     // Enable subscription billing
-  teams: false,            // Enable team/organization features
-  templates: false,        // Enable template gallery
-  analytics: false,        // Enable advanced analytics
-  aiAssistant: false,      // Enable AI design assistant
+  subscriptions: true,      // Enable subscription billing
+  teams: false,             // Enable team/organization features (not yet implemented)
+  templates: false,         // Enable template gallery (not yet implemented)
+  analytics: true,          // Enable advanced analytics
+  aiAssistant: false,       // Enable AI design assistant (not yet implemented)
 } as const;
 
 // ========================================
