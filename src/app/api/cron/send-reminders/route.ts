@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db/client";
+import { query } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";

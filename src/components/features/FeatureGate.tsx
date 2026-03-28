@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Lock, Sparkles, X } from "lucide-react";
+import { Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { BETA_MODE, SUBSCRIPTION_TIERS } from "@/lib/constants";

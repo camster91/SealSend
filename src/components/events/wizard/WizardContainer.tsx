@@ -208,13 +208,6 @@ export default function WizardContainer({
     }
   }, [formData, isHydrated, mode]);
 
-  // Clear localStorage on successful submit
-  const clearStorage = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
-
   const updateField = useCallback(
     (field: keyof WizardFormData, value: unknown) => {
       dispatch({ type: 'UPDATE_FIELD', field, value });

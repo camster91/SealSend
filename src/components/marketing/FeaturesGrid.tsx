@@ -16,7 +16,6 @@ import {
   Gift,
   Image,
   Share2,
-  type LucideIcon,
 } from "lucide-react";
 
 // Map icon components from constants

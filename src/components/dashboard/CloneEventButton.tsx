@@ -31,7 +31,7 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
         setIsCloning(false);
         alert(data.error || 'Failed to clone event');
       }
-    } catch (error) {
+    } catch (_error) {
       setIsCloning(false);
       alert('An error occurred while cloning the event');
     }

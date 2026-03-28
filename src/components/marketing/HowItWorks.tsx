@@ -103,7 +103,7 @@ export default function HowItWorks() {
           </div>
 
           <div className="grid gap-8 lg:grid-cols-4">
-            {steps.map((step, idx) => {
+            {steps.map((step, _idx) => {
               const Icon = step.icon;
 
               return (

@@ -149,13 +149,13 @@ export async function POST(request: NextRequest) {
 
     // Compress images (not videos or audio)
     let finalExt = file.name.split('.').pop() || 'bin';
-    let finalMime = file.type;
+    let _finalMime = file.type;
 
     if (uploadType === 'image' || (!['video', 'audio'].includes(uploadType) && IMAGE_TYPES.includes(file.type))) {
       const result = await compressImage(buffer, file.type);
       buffer = result.data;
       finalExt = result.ext;
-      finalMime = result.mime;
+      _finalMime = result.mime;
     }
 
     // Sanitize the original filename: keep only safe characters
