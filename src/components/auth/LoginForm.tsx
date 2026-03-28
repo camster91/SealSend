@@ -14,8 +14,10 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
   const rawRedirect = searchParams.get("redirect") || "/dashboard";
-  const redirect = isValidRelativePath(rawRedirect) ? rawRedirect : "/dashboard";
+  const baseRedirect = isValidRelativePath(rawRedirect) ? rawRedirect : "/dashboard";
+  const redirect = plan && baseRedirect === "/dashboard" ? `/dashboard?plan=${plan}` : baseRedirect;
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
