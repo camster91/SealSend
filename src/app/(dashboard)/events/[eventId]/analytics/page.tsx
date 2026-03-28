@@ -216,14 +216,8 @@ export default function AnalyticsPage() {
     timeline[date] = (timeline[date] || 0) + 1;
   });
 
-  // Cumulative timeline data
   const timelineDates = Object.keys(timeline);
   const timelineValues = Object.values(timeline);
-  let cumulative = 0;
-  const cumulativeTimeline = timelineValues.map((val) => {
-    cumulative += val;
-    return cumulative;
-  });
 
   // Colors for charts
   const statusColors = ["#22c55e", "#ef4444", "#f59e0b", "#6b7280"];

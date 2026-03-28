@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
 import { UsageStats } from '@/components/dashboard/UsageStats';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
+import { PlanCheckoutClient } from '@/components/dashboard/PlanCheckoutClient';
 import { BETA_MODE, SUBSCRIPTION_TIERS } from '@/lib/constants';
 
 interface DashboardPageProps {
-  searchParams: Promise<{ upgraded?: string }>;
+  searchParams: Promise<{ upgraded?: string; plan?: string }>;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { upgraded } = await searchParams;
+  const { upgraded, plan } = await searchParams;
   const user = await getCurrentUser();
   
   // Redirect to login if no user
@@ -267,6 +268,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         )}
         {upgraded === 'true' && <UpgradeSuccessToast />}
+        {plan && <PlanCheckoutClient plan={plan} />}
       </div>
     </div>
   );

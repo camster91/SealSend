@@ -27,6 +27,8 @@ export async function middleware(request: NextRequest) {
   if (isAuthRoute && isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
+    // Preserve query params (e.g., ?plan=pro) so the dashboard can handle them
+    // Keep existing search params from the original URL
     return NextResponse.redirect(url);
   }
 
