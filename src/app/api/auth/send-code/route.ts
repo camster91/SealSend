@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
 function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: string): string {
   const isAdmin = role === 'admin';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
-  const loginUrl = isAdmin ? `${siteUrl}/login` : eventId ? `${siteUrl}/events/${eventId}/guest` : `${siteUrl}/login`;
+  const loginUrl = isAdmin ? `${siteUrl}/login` : eventId ? `${siteUrl}/events/${encodeURIComponent(eventId)}/guest` : `${siteUrl}/login`;
 
   return `<!DOCTYPE html>
 <html lang="en">

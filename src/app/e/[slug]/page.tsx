@@ -12,11 +12,6 @@ import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/
 import {
   sanitizeCustomization,
   sanitizeInviteToken,
-  sanitizeColor,
-  sanitizeFontFamily,
-  sanitizeBackgroundImage,
-  sanitizeAudioUrl,
-  sanitizeButtonStyle
 } from "@/lib/sanitize";
 import type { Event, RSVPField } from "@/types/database";
 import type { Metadata } from "next";

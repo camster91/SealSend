@@ -96,10 +96,6 @@ export default function Hero() {
                     <div
                       key={i}
                       className="h-10 w-10 rounded-full border-2 border-white bg-gradient-to-br from-primary-300 to-primary-500 shadow-sm"
-                      style={{
-                        backgroundImage: `url(https://i.pravatar.cc/100?img=${i + 20})`,
-                        backgroundSize: "cover",
-                      }}
                     />
                   ))}
                 </div>

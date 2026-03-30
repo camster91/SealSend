@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowLeft, BarChart3, Users, Utensils, Clock, MessageSquare } from "lucide-react";
+import { FeatureGate } from "@/components/features/FeatureGate";
 import type { RSVPResponse } from "@/types/database";
 
 // Simple pie chart component using SVG
@@ -215,14 +216,8 @@ export default function AnalyticsPage() {
     timeline[date] = (timeline[date] || 0) + 1;
   });
 
-  // Cumulative timeline data
   const timelineDates = Object.keys(timeline);
   const timelineValues = Object.values(timeline);
-  let cumulative = 0;
-  const cumulativeTimeline = timelineValues.map((val) => {
-    cumulative += val;
-    return cumulative;
-  });
 
   // Colors for charts
   const statusColors = ["#22c55e", "#ef4444", "#f59e0b", "#6b7280"];
@@ -241,6 +236,13 @@ export default function AnalyticsPage() {
   }
 
   return (
+    <FeatureGate
+      requiredTier="pro"
+      currentTier="free"
+      featureName="RSVP Analytics"
+      featureDescription="Get detailed insights and statistics for your event responses."
+      mode="overlay"
+    >
     <div className="py-6">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         {/* Header */}
@@ -506,5 +508,6 @@ export default function AnalyticsPage() {
         )}
       </div>
     </div>
+    </FeatureGate>
   );
 }

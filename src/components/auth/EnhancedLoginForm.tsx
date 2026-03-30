@@ -31,8 +31,10 @@ export function EnhancedLoginForm({
   
   const router = useRouter();
   const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
   const rawRedirect = searchParams.get("redirect") || (isGuestMode ? `/events/${eventId}` : "/dashboard");
-  const redirect = isValidRelativePath(rawRedirect) ? rawRedirect : "/dashboard";
+  const baseRedirect = isValidRelativePath(rawRedirect) ? rawRedirect : "/dashboard";
+  const redirect = plan && baseRedirect === "/dashboard" ? `/dashboard?plan=${plan}` : baseRedirect;
 
   const authService = new AuthService();
 

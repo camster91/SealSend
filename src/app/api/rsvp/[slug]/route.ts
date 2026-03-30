@@ -10,7 +10,7 @@ export async function POST(
   try {
     const { slug } = await params;
     const ip = getClientIp(request);
-    const { success } = await rateLimit(`rsvp:${slug}:${ip}`, { max: 5, windowSeconds: 3600 });
+    const { success } = await rateLimit(`rsvp:${slug}:${ip}`, { max: 10, windowSeconds: 300 });
     if (!success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
     }

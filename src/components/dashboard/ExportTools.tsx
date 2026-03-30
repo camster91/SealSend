@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/features/FeatureGate';
 
 interface ExportToolsProps {
   eventId: string;
@@ -92,15 +93,23 @@ ${eventLocation ? `  <p style="margin:0 0 16px;font-size:14px;color:#6b7280;">${
         </button>
 
         {/* Export CSV */}
-        <a
-          href={`/api/events/${eventId}/export-csv`}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+        <FeatureGate
+          requiredTier="pro"
+          currentTier="free"
+          featureName="CSV Export"
+          featureDescription="Export your guest list and responses as a CSV file."
+          mode="banner"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Export Guest CSV
-        </a>
+          <a
+            href={`/api/events/${eventId}/export-csv`}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export Guest CSV
+          </a>
+        </FeatureGate>
       </div>
     </div>
   );

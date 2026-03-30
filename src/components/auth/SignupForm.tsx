@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthService } from "@/lib/auth/auth-service";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,9 @@ export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const authService = new AuthService();
+  const plan = searchParams.get("plan");
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +56,8 @@ export function SignupForm() {
       });
 
       if (result.success) {
-        router.push("/dashboard");
+        const redirectTo = plan ? `/dashboard?plan=${plan}` : "/dashboard";
+        router.push(redirectTo);
         router.refresh();
       } else {
         setError(result.message);

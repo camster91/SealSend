@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS events (
   design_type TEXT DEFAULT 'upload',
   customization JSONB DEFAULT '{}',
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'standard', 'premium')),
+  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'silver', 'gold', 'platinum', 'diamond', 'standard', 'premium')),
   max_responses INTEGER DEFAULT 15,
   auto_reminders BOOLEAN DEFAULT FALSE,
   reminder_days_before INTEGER DEFAULT 2,

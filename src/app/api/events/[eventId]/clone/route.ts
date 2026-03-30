@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
 
     // Create new event (clone) - exclude id, title, status, created_at, updated_at
-    const { title, status, created_at, updated_at, id, ...eventData } = originalEvent;
+    const { title, status: _status, created_at: _created_at, updated_at: _updated_at, id: _id, ...eventData } = originalEvent;
 
     const columns = Object.keys(eventData);
     const paramIndices = columns.map((_, i) => `$${i + 1}`);

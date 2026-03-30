@@ -10,8 +10,7 @@ import { CloneEventButton } from '@/components/dashboard/CloneEventButton';
 import { UpgradeButton } from '@/components/events/UpgradeButton';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { ExportTools } from '@/components/dashboard/ExportTools';
-// import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
-// import { TIERS } from '@/lib/constants';
+import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -129,11 +128,15 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           {/* Tier + Upgrade */}
           <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3">
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              event.tier === 'premium'
+              ['gold', 'premium'].includes(event.tier as string)
                 ? 'bg-amber-100 text-amber-700'
-                : event.tier === 'standard'
-                  ? 'bg-brand-100 text-brand-700'
-                  : 'bg-gray-100 text-gray-600'
+                : ['platinum'].includes(event.tier as string)
+                  ? 'bg-slate-100 text-slate-700'
+                  : ['diamond'].includes(event.tier as string)
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : ['silver', 'standard'].includes(event.tier as string)
+                      ? 'bg-brand-100 text-brand-700'
+                      : 'bg-gray-100 text-gray-600'
             }`}>
               {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
             </span>
@@ -194,6 +197,14 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 </a>
               </div>
             )}
+
+            {/* Auto Reminders */}
+            <AutoRemindersToggle
+              eventId={eventId}
+              initialEnabled={!!event.auto_reminders}
+              eventDate={event.event_date as string | null}
+              isPublished={isPublished}
+            />
 
             {/* Publish / delete / clone */}
             <div className="space-y-2">

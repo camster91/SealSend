@@ -6,8 +6,18 @@ import { z } from "zod";
 
 const checkoutSchema = z.object({
   eventId: z.string().uuid(),
-  tier: z.enum(["standard", "premium"]),
+  tier: z.enum(["silver", "gold", "platinum", "diamond", "standard", "premium"]),
 });
+
+const TIER_RANK: Record<string, number> = {
+  free: 0,
+  silver: 1,
+  standard: 1,
+  gold: 2,
+  premium: 2,
+  platinum: 3,
+  diamond: 4,
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,9 +52,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify event is on a lower tier
-    const tierRank = { free: 0, standard: 1, premium: 2 } as const;
-    const currentRank = tierRank[event.tier as keyof typeof tierRank] ?? 0;
-    const targetRank = tierRank[tier];
+    const currentRank = TIER_RANK[event.tier] ?? 0;
+    const targetRank = TIER_RANK[tier] ?? 0;
 
     if (targetRank <= currentRank) {
       return NextResponse.json(

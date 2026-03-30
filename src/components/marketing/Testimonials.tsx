@@ -11,7 +11,7 @@ const testimonials = [
     quote:
       "SealSend made our wedding invitations absolutely magical. The RSVP tracking saved us so much time, and our guests loved the beautiful design!",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=5",
+    initials: "SM",
   },
   {
     name: "David Chen",
@@ -20,7 +20,7 @@ const testimonials = [
     quote:
       "I use SealSend for all my corporate events. The guest management features are incredible, and my clients are always impressed with the results.",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=11",
+    initials: "DC",
   },
   {
     name: "Emily Rodriguez",
@@ -29,7 +29,7 @@ const testimonials = [
     quote:
       "So easy to use! I created my baby shower invitation in minutes and tracking RSVPs was a breeze. Highly recommend!",
     rating: 5,
-    image: "https://i.pravatar.cc/150?img=9",
+    initials: "ER",
   },
 ];
 
@@ -111,11 +111,9 @@ export default function Testimonials() {
 
               {/* Author */}
               <div className="flex items-center gap-4">
-                <img
-                  src={testimonial.image}
-                  alt={testimonial.name}
-                  className="h-12 w-12 rounded-full object-cover"
-                />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-sm font-bold text-white">
+                  {testimonial.initials}
+                </div>
                 <div>
                   <p className="font-semibold text-neutral-900">
                     {testimonial.name}
