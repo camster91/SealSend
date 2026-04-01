@@ -64,7 +64,7 @@ export default function HowItWorks() {
         {/* Section header */}
         <motion.div
           className="mb-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
@@ -85,7 +85,7 @@ export default function HowItWorks() {
         <motion.div
           className="relative"
           variants={containerVariants}
-          initial="hidden"
+          initial="visible"
           whileInView="visible"
           viewport={{ once: true }}
         >

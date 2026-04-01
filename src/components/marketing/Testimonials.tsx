@@ -59,7 +59,7 @@ export default function Testimonials() {
         {/* Section header */}
         <motion.div
           className="mb-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
@@ -79,7 +79,7 @@ export default function Testimonials() {
         <motion.div
           className="grid gap-8 md:grid-cols-3"
           variants={containerVariants}
-          initial="hidden"
+          initial="visible"
           whileInView="visible"
           viewport={{ once: true }}
         >
@@ -130,7 +130,7 @@ export default function Testimonials() {
         {/* Trust badges */}
         <motion.div
           className="mt-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}

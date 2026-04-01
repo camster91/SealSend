@@ -60,7 +60,7 @@ export default function FeaturesGrid() {
         {/* Section header */}
         <motion.div
           className="mb-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
@@ -81,7 +81,7 @@ export default function FeaturesGrid() {
         <motion.div
           className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
           variants={containerVariants}
-          initial="hidden"
+          initial="visible"
           whileInView="visible"
           viewport={{ once: true }}
         >
@@ -125,7 +125,7 @@ export default function FeaturesGrid() {
         {/* Bottom CTA */}
         <motion.div
           className="mt-16 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 0 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
