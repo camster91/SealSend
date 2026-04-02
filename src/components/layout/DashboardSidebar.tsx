@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   CalendarPlus,
   Settings,
+  LayoutTemplate,
   LogOut,
 } from "lucide-react";
 import { clientSignOut } from "@/lib/auth/client-auth";
@@ -15,6 +16,7 @@ import { useRouter } from "next/navigation";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/events/new", label: "Create Event", icon: CalendarPlus },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
