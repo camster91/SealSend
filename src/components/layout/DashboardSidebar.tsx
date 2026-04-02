@@ -8,6 +8,8 @@ import {
   CalendarPlus,
   Settings,
   LayoutTemplate,
+  Users,
+  Sparkles,
   LogOut,
 } from "lucide-react";
 import { clientSignOut } from "@/lib/auth/client-auth";
@@ -17,6 +19,8 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/events/new", label: "Create Event", icon: CalendarPlus },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
+  { href: "/ai-assistant", label: "AI Design", icon: Sparkles },
+  { href: "/settings/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
