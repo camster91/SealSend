@@ -108,7 +108,7 @@ export function Footer() {
             <ul className="mt-3 space-y-2">
               <li>
                 <span className="text-sm text-muted-foreground">
-                  support@sealsend.com
+                  support@sealsend.app
                 </span>
               </li>
             </ul>

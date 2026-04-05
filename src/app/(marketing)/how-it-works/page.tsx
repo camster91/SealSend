@@ -5,9 +5,9 @@ import FeaturesGrid from "@/components/marketing/FeaturesGrid";
 import CTASection from "@/components/marketing/CTASection";
 
 export const metadata = createMetadata({
-  title: "How Seal and Send Works — Create Digital Invitations in 3 Steps",
+  title: "How Seal and Send Works — Create Digital Invitations in 4 Steps",
   description:
-    "Learn how to create beautiful digital invitations in three simple steps: design your invitation, add your guests, and track RSVPs in real-time.",
+    "Learn how to create beautiful digital invitations in four simple steps: design your invitation, add your guests, track RSVPs, and enjoy your event.",
   path: "/how-it-works",
   keywords: [
     "how to create digital invitations",
@@ -23,7 +23,7 @@ export default function HowItWorksPage() {
     "@type": "HowTo",
     name: "How to Create Digital Invitations with Seal and Send",
     description:
-      "Create and send beautiful digital invitations in three simple steps.",
+      "Create and send beautiful digital invitations in four simple steps.",
     step: [
       {
         "@type": "HowToStep",
@@ -43,6 +43,12 @@ export default function HowItWorksPage() {
         name: "Track RSVPs",
         text: "Watch responses roll in. See headcounts, meal choices, and manage everything from your dashboard.",
       },
+      {
+        "@type": "HowToStep",
+        position: 4,
+        name: "Enjoy Your Event",
+        text: "Focus on hosting while we handle the logistics. Send updates and collect messages from guests.",
+      },
     ],
     tool: {
       "@type": "SoftwareApplication",
@@ -59,7 +65,7 @@ export default function HowItWorksPage() {
       <section className="gradient-brand px-4 py-20 text-center text-white sm:py-28">
         <div className="mx-auto max-w-3xl">
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Create Digital Invitations in 3 Simple Steps
+            Create Digital Invitations in 4 Simple Steps
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 sm:text-xl">
             Seal and Send makes it easy to design, share, and manage beautiful

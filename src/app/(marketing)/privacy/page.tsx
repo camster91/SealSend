@@ -47,7 +47,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">7. Your Rights</h2>
-          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.com" className="text-primary-600 hover:underline">support@sealsend.com</a>.</p>
+          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
         </section>
 
         <section>
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.com" className="text-primary-600 hover:underline">support@sealsend.com</a>.</p>
+          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>

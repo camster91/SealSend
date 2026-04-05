@@ -64,7 +64,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.com" className="text-primary-600 hover:underline">support@sealsend.com</a>.</p>
+          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>
