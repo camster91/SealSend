@@ -1,39 +1,53 @@
-# SealSend — Digital Invitations & RSVP Platform
+# SealSend
 
-**SealSend** is a modern, high-performance SaaS platform for creating, sending, and tracking digital invitations with robust RSVP management. Built specifically for event organizers who need reliability and elegance.
+**Digital Invitations & RSVP Platform**
 
-## 🚀 Vision & Future Planning
+SealSend is a modern, high-performance SaaS platform for creating, sending, and tracking digital invitations with robust RSVP management. Built for event organizers who need reliability, elegance, and powerful automation.
 
-SealSend represents the next generation of event management within the Nexus AI & GlowOS ecosystem. As part of our product consolidation and monetization strategy, SealSend is being prepared for a broader public SaaS launch.
+## Features
 
-**Upcoming Enhancements:**
-- Integration with the GlowOS ecosystem for AI-generated event descriptions and automated guest communication.
-- Premium tiers utilizing the 24-hour token reset model for high-volume senders.
-- Advanced automated follow-ups via integrated Mailgun/Twilio services.
+### Authentication
+- **Passwordless Login:** 6-digit SMS or Email OTP authentication
+- **Secure Sessions:** JWT-based session management
+- **Multi-device Support:** Seamless login across devices
 
-## 🏗 Tech Stack
+### Event Management
+- **Dynamic Dashboards:** Dedicated views for event hosts and guests
+- **Custom Invitations:** Beautiful, customizable digital invitations
+- **Guest Lists:** Manage guests, plus-ones, and dietary restrictions
+- **QR Codes:** Automatic QR code generation for event entry
 
-- **Framework:** Next.js 16 (App Router)
-- **Database & Auth:** Supabase (PostgreSQL, Row Level Security)
-- **Styling:** Tailwind CSS + Radix UI Primitives
-- **Communication:** Twilio (SMS) & Mailgun (Email)
-- **Deployment:** Docker / Coolify
+### RSVP Tracking
+- **Real-time Metrics:** Track attendance, plus-ones, and responses
+- **Automated Reminders:** Scheduled dispatch of event updates
+- **Guest Communication:** SMS and email notifications via Twilio/Mailgun
 
-## ✨ Core Features
+### Integrations
+- **Payment Processing:** Stripe integration for premium features
+- **Calendar Export:** Add events to Google, Apple, or Outlook calendars
 
-- **Seamless Authentication:** Passwordless login via 6-digit SMS or Email OTP.
-- **Dynamic Dashboards:** Dedicated views for event hosts and guests.
-- **RSVP Tracking:** Real-time metrics on attendance, plus-ones, and dietary restrictions.
-- **Automated Reminders:** Scheduled dispatch of event updates to the guest list.
+## Tech Stack
 
-## 🛠 Getting Started (Development)
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 16 (App Router) |
+| Database | Supabase (PostgreSQL with Row Level Security) |
+| Authentication | Supabase Auth / Custom JWT |
+| Styling | Tailwind CSS + Radix UI Primitives |
+| SMS | Twilio |
+| Email | Mailgun / Resend |
+| Payments | Stripe |
+| Deployment | Docker / Coolify |
 
-### Prerequisites
+## Prerequisites
+
 - Node.js 18+
-- Supabase Project (Free Tier)
-- Twilio & Mailgun accounts (for OTP and notifications)
+- Supabase project (Free Tier works)
+- Twilio account (for SMS)
+- Mailgun or Resend account (for email)
+- Stripe account (for payments)
 
-### Setup
+## Installation
 
 ```bash
 # Clone the repository
@@ -43,19 +57,157 @@ cd SealSend
 # Install dependencies
 npm install
 
-# Configure environment variables
+# Configure environment
 cp .env.example .env.local
-# (Fill in your Supabase, Twilio, and Mailgun credentials)
+```
 
-# Start the development server
+### Environment Variables
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+
+# Twilio (SMS)
+TWILIO_ACCOUNT_SID="your-account-sid"
+TWILIO_AUTH_TOKEN="your-auth-token"
+TWILIO_PHONE_NUMBER="+1234567890"
+
+# Mailgun (Email)
+MAILGUN_API_KEY="your-api-key"
+MAILGUN_DOMAIN="your-domain.com"
+
+# Stripe
+STRIPE_SECRET_KEY="sk_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_..."
+
+# App
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+### Database Setup
+
+```bash
+# Run Supabase migrations
+# See SUPABASE_SETUP.md for detailed instructions
+```
+
+## Usage
+
+### Development
+
+```bash
+# Start development server
 npm run dev
 ```
 
 Visit `http://localhost:3000` to view the application.
 
-## 🛳 Deployment
+### Production Build
 
-SealSend is fully Dockerized and optimized for VPS deployment via Coolify or Docker Compose. See `DEPLOYMENT_GUIDE.md` and `COOLIFY_DEPLOY.md` for detailed infrastructure setup instructions.
+```bash
+# Build for production
+npm run build
+
+# Start production server
+npm run start
+```
+
+## Testing
+
+```bash
+# Run configuration tests
+npm run test:config
+
+# Test email delivery
+npm run test:email
+
+# Test SMS delivery
+npm run test:sms
+
+# Run all integration tests
+npm run test:all
+```
+
+## Deployment
+
+SealSend is fully Dockerized and optimized for VPS deployment.
+
+### Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+### Coolify
+
+See `COOLIFY_DEPLOY.md` for detailed Coolify deployment instructions.
+
+### Manual Deployment
+
+See `DEPLOYMENT_GUIDE.md` and `MANUAL_DEPLOY.md` for step-by-step instructions.
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Authentication pages
+│   ├── (dashboard)/       # Dashboard pages
+│   ├── (event)/           # Event pages
+│   └── api/               # API routes
+├── components/             # React components
+│   ├── ui/                # Base UI components
+│   ├── invitations/       # Invitation components
+│   └── dashboard/         # Dashboard components
+├── lib/                    # Utility libraries
+│   ├── supabase/          # Supabase client
+│   ├── twilio/            # Twilio helpers
+│   └── stripe/            # Stripe helpers
+└── types/                  # TypeScript types
+
+supabase/
+└── migrations/            # Database migrations
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/otp` | Send OTP code |
+| POST | `/api/auth/verify` | Verify OTP code |
+| POST | `/api/events` | Create event |
+| GET | `/api/events/:id` | Get event details |
+| POST | `/api/invitations` | Send invitations |
+| POST | `/api/rsvp` | Submit RSVP |
+
+## Documentation
+
+- `AUTHENTICATION_SYSTEM.md` - Auth architecture
+- `DEPLOYMENT_GUIDE.md` - Deployment instructions
+- `SUPABASE_SETUP.md` - Database setup
+- `TESTING.md` - Testing guide
+- `TROUBLESHOOT.md` - Common issues
+
+## Roadmap
+
+- [ ] GlowOS integration for AI-generated event descriptions
+- [ ] Premium tiers with 24-hour token reset model
+- [ ] Advanced automated follow-ups
+- [ ] Calendar integration improvements
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push and open a Pull Request
+
+## License
+
+Proprietary - All rights reserved.
 
 ---
-*Developed by Cameron Ashley / Nexus AI.*
+Developed by Cameron Ashley / Nexus AI.
