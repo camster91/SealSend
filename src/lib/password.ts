@@ -5,7 +5,7 @@
 
 import bcrypt from 'bcryptjs';
 
-const SALT_ROUNDS = 12;
+const SALT_ROUNDS = 14;
 
 /**
  * Hash a password for secure storage

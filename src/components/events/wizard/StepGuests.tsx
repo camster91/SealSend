@@ -38,13 +38,37 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
     onUpdate(guests.filter((_, i) => i !== index));
   };
 
+  const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const handleCsvImport = () => {
     if (!csvText.trim()) return;
     const lines = csvText.trim().split('\n');
     const newGuests: GuestEntry[] = [];
 
     for (const line of lines) {
-      const parts = line.split(',').map((p) => p.trim());
+      const parts = parseCsvLine(line);
       const guestName = parts[0];
       const guestEmail = parts[1] || '';
       if (guestName) {

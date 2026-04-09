@@ -52,7 +52,7 @@ export async function POST(
     const parsed = rsvpSubmissionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid submission", details: parsed.error.flatten() },
+        { error: "Invalid submission" },
         { status: 400 }
       );
     }
@@ -64,6 +64,14 @@ export async function POST(
     const allowPlusOnes = event.allow_plus_ones !== undefined ? event.allow_plus_ones : true;
     if (!allowPlusOnes) {
       headcount = 1;
+    }
+
+    // Enforce minimum headcount
+    if (headcount < 1) {
+      return NextResponse.json(
+        { error: "Headcount must be at least 1." },
+        { status: 400 }
+      );
     }
 
     // Enforce per-RSVP guest limit (default: 10)

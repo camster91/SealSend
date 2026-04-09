@@ -1,4 +1,5 @@
 import { formatDateTime, escapeHtml } from "@/lib/utils";
+import { sanitizeUrl } from "@/lib/sanitize";
 
 interface InvitationEmailParams {
   guestName: string;
@@ -116,11 +117,12 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
       </td></tr>`
     : '';
 
-  const designBlock = designUrl
+  const safeDesignUrl = designUrl ? sanitizeUrl(designUrl) : null;
+  const designBlock = safeDesignUrl
     ? `<tr>
         <td style="padding:0;">
           <a href="${rsvpUrl}" style="display:block;">
-            <img src="${escapeHtml(designUrl)}" alt="${safeEventTitle}" style="display:block;width:100%;height:auto;border:0;" />
+            <img src="${escapeHtml(safeDesignUrl)}" alt="${safeEventTitle}" style="display:block;width:100%;height:auto;border:0;" />
           </a>
         </td>
       </tr>`

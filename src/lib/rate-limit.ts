@@ -49,11 +49,20 @@ export async function rateLimit(
   };
 }
 
-/** Extract client IP from request headers */
+/** Extract client IP from request headers.
+ *  Uses x-real-ip (set by trusted reverse proxy) first,
+ *  then falls back to x-forwarded-for (first entry). */
 export function getClientIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+  // Prefer x-real-ip as it's typically set by the trusted reverse proxy
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp && /^[\d.:a-fA-F]+$/.test(realIp.trim())) {
+    return realIp.trim();
+  }
+
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (forwarded && /^[\d.:a-fA-F]+$/.test(forwarded)) {
+    return forwarded;
+  }
+
+  return "unknown";
 }

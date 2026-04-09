@@ -59,8 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     const authHeader = request.headers.get("authorization");
-    const querySecret = searchParams.get("secret");
-    const isAuthorized = authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+    const isAuthorized = authHeader === `Bearer ${cronSecret}`;
 
     if (!isAuthorized) {
       return NextResponse.json(
@@ -350,7 +349,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[CRON] Unexpected error:", error);
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

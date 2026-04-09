@@ -37,16 +37,15 @@ export function CommentsSection({ eventSlug }: CommentsSectionProps) {
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fill name if user is signed in
+  // Auto-fill name if user is signed in (runs once on mount)
   useEffect(() => {
     const user = getClientUser();
-    if (user && !authorName) {
+    if (user) {
       const name = user.name
         || user.email?.split('@')[0]
         || '';
-      if (name) setAuthorName(name);
+      if (name) setAuthorName((prev) => prev || name);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchComments = useCallback(async () => {

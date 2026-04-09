@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ deleted: deleted?.length || 0 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
