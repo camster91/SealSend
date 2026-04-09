@@ -114,7 +114,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               maxLength: { value: 200, message: 'Title must be less than 200 characters' },
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
         </div>
@@ -126,7 +126,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
 
@@ -137,7 +137,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             type="text"
             {...register('host_name')}
             placeholder="e.g. Sarah & Tom"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
       </section>
@@ -154,7 +154,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               id="event_date"
               type="datetime-local"
               {...register('event_date')}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
           <div>
@@ -163,7 +163,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               id="event_end_date"
               type="datetime-local"
               {...register('event_end_date')}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               type="text"
               {...register('location_name')}
               placeholder="e.g. Grand Ballroom"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
           <div>
@@ -192,7 +192,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               type="text"
               {...register('location_address')}
               placeholder="e.g. 123 Main St, Toronto"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
         </div>
@@ -209,7 +209,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <select
               id="dress_code"
               {...register('dress_code')}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 bg-white"
             >
               <option value="">Select...</option>
               {DRESS_CODE_OPTIONS.filter(Boolean).map((opt) => (
@@ -223,7 +223,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               id="rsvp_deadline"
               type="datetime-local"
               {...register('rsvp_deadline')}
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
         </div>
@@ -238,7 +238,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               max="10000"
               {...register('max_attendees')}
               placeholder="No limit"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
           <div>
@@ -250,7 +250,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               max="50"
               {...register('max_guests_per_rsvp')}
               placeholder="10"
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
         </div>
@@ -263,7 +263,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           <button
             type="button"
             onClick={() => onUpdate('allow_plus_ones', !allowPlusOnes)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${allowPlusOnes ? 'bg-indigo-600' : 'bg-gray-300'}`}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${allowPlusOnes ? 'bg-brand-600' : 'bg-gray-300'}`}
           >
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition ${allowPlusOnes ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
@@ -281,19 +281,19 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             value={regLabel}
             onChange={(e) => setRegLabel(e.target.value)}
             placeholder="Label (e.g. Amazon)"
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           <input
             type="url"
             value={regUrl}
             onChange={(e) => setRegUrl(e.target.value)}
             placeholder="https://..."
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           <button
             type="button"
             onClick={addRegistryLink}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
           >
             Add
           </button>

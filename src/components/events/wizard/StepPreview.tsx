@@ -206,7 +206,7 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
             aria-checked={publishOnCreate}
             onClick={() => setPublishOnCreate(!publishOnCreate)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              publishOnCreate ? 'bg-indigo-600' : 'bg-gray-300'
+              publishOnCreate ? 'bg-brand-600' : 'bg-gray-300'
             }`}
           >
             <span
@@ -222,7 +222,7 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
           type="button"
           onClick={() => onSubmit(publishOnCreate)}
           disabled={isSubmitting || !formData.title.trim()}
-          className="w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
