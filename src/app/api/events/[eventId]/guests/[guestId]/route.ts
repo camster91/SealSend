@@ -25,8 +25,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    // Build dynamic SET clause from parsed fields
-    const fields = Object.entries(parsed.data).filter(([, v]) => v !== undefined);
+    // Build dynamic SET clause from parsed fields (whitelist columns)
+    const ALLOWED_COLUMNS = ['name', 'email', 'phone', 'notes'];
+    const fields = Object.entries(parsed.data).filter(([k, v]) => v !== undefined && ALLOWED_COLUMNS.includes(k));
     if (fields.length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }

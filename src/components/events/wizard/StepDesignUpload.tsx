@@ -128,9 +128,9 @@ export default function StepDesignUpload({
       </div>
 
       {/* Design tips */}
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-purple-50/40 p-5">
+      <div className="rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/80 to-purple-50/40 p-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-600">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
             </svg>
@@ -139,23 +139,23 @@ export default function StepDesignUpload({
         </div>
         <ul className="mt-3 space-y-2 text-sm text-gray-600">
           <li className="flex items-start gap-2">
-            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
             <span>
-              <a href="https://www.canva.com/invitations/templates/" target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-700">
+              <a href="https://www.canva.com/invitations/templates/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline decoration-brand-300 underline-offset-2 hover:text-brand-700">
                 Canva Invitation Templates
               </a>{' '}&mdash; hundreds of free templates to customize
             </span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
             <span>Use the AI prompt generator below to create a unique design with ChatGPT or Gemini</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
             <span><strong>Images:</strong> 1080&times;1350px (portrait) or 1200&times;630px (landscape) &middot; PNG or JPG &middot; max 10MB</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
+            <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />
             <span><strong>Videos:</strong> MP4 or WebM &middot; max 50MB &middot; great for slideshows and animated invitations</span>
           </li>
         </ul>
@@ -181,7 +181,7 @@ export default function StepDesignUpload({
               onClick={() => setMode(mode)}
               className={`flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition-all ${
                 isActive
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                  ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-sm'
                   : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50'
               }`}
             >
@@ -203,8 +203,8 @@ export default function StepDesignUpload({
               onDragLeave={handleDragLeave}
               className={`relative flex min-h-[340px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
                 dragActive
-                  ? 'border-indigo-500 bg-indigo-50 shadow-inner'
-                  : 'border-gray-300 bg-gray-50/50 hover:border-indigo-300 hover:bg-indigo-50/30'
+                  ? 'border-brand-500 bg-brand-50 shadow-inner'
+                  : 'border-gray-300 bg-gray-50/50 hover:border-brand-300 hover:bg-brand-50/30'
               }`}
             >
               <input
@@ -216,14 +216,14 @@ export default function StepDesignUpload({
               />
               {isUploading ? (
                 <div className="flex flex-col items-center gap-4">
-                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
                   <p className="text-base font-medium text-gray-600">
                     Uploading your {activeMode === 'video' ? 'video' : 'design'}...
                   </p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 p-8 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-100 text-brand-600">
                     <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                       {activeMode === 'video' ? (
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
@@ -284,7 +284,7 @@ export default function StepDesignUpload({
             value={designUrl}
             onChange={(e) => onUpdate('design_url', e.target.value)}
             placeholder="https://example.com/your-design.png"
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
           {designUrl && (
             <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">

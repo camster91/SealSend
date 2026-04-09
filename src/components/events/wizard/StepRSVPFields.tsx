@@ -122,7 +122,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                 onClick={() => toggleFieldEnabled(index)}
                 className={cn(
                   'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
-                  field.is_enabled ? 'bg-indigo-600' : 'bg-gray-300'
+                  field.is_enabled ? 'bg-brand-600' : 'bg-gray-300'
                 )}
               >
                 <span
@@ -191,7 +191,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                     onClick={() => toggleFieldRequired(index)}
                     className={cn(
                       'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                      field.is_required ? 'bg-indigo-600' : 'bg-gray-300'
+                      field.is_required ? 'bg-brand-600' : 'bg-gray-300'
                     )}
                   >
                     <span
@@ -215,7 +215,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                       value={field.placeholder ?? ''}
                       onChange={(e) => updateFieldPlaceholder(index, e.target.value)}
                       placeholder="Enter placeholder text..."
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                     />
                   </div>
                 )}
@@ -234,7 +234,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                               updateOptionValue(index, optIdx, e.target.value)
                             }
                             placeholder={`Option ${optIdx + 1}`}
-                            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                           />
                           <button
                             type="button"
@@ -250,7 +250,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                       <button
                         type="button"
                         onClick={() => addOption(index)}
-                        className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700"
+                        className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

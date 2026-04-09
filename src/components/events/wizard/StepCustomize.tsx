@@ -58,7 +58,7 @@ export default function StepCustomize({ customization, onUpdate }: StepCustomize
                 type="text"
                 value={customization.primaryColor}
                 onChange={(e) => onUpdate('primaryColor', e.target.value)}
-                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
           </div>
@@ -80,7 +80,7 @@ export default function StepCustomize({ customization, onUpdate }: StepCustomize
                 type="text"
                 value={customization.backgroundColor}
                 onChange={(e) => onUpdate('backgroundColor', e.target.value)}
-                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
           </div>
@@ -94,7 +94,7 @@ export default function StepCustomize({ customization, onUpdate }: StepCustomize
               id="fontFamily"
               value={customization.fontFamily}
               onChange={(e) => onUpdate('fontFamily', e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             >
               {FONT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -113,7 +113,7 @@ export default function StepCustomize({ customization, onUpdate }: StepCustomize
               id="buttonStyle"
               value={customization.buttonStyle}
               onChange={(e) => onUpdate('buttonStyle', e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             >
               {BUTTON_STYLE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -135,7 +135,7 @@ export default function StepCustomize({ customization, onUpdate }: StepCustomize
               aria-checked={customization.showCountdown}
               onClick={() => onUpdate('showCountdown', !customization.showCountdown)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                customization.showCountdown ? 'bg-indigo-600' : 'bg-gray-300'
+                customization.showCountdown ? 'bg-brand-600' : 'bg-gray-300'
               }`}
             >
               <span
@@ -345,10 +345,10 @@ function MediaUpload({
             className="absolute inset-0 cursor-pointer opacity-0"
             disabled={uploading}
           />
-          <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 text-center hover:border-indigo-300 hover:bg-indigo-50/30">
+          <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 py-6 text-center hover:border-brand-300 hover:bg-brand-50/30">
             {uploading ? (
               <div className="flex items-center gap-2">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
                 <span className="text-sm text-gray-600">Uploading...</span>
               </div>
             ) : (

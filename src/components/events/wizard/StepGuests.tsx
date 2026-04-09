@@ -18,6 +18,7 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
   const [error, setError] = useState('');
   const [csvText, setCsvText] = useState('');
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   const handleAdd = () => {
     if (!name.trim()) {
@@ -38,13 +39,37 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
     onUpdate(guests.filter((_, i) => i !== index));
   };
 
+  const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const handleCsvImport = () => {
     if (!csvText.trim()) return;
     const lines = csvText.trim().split('\n');
     const newGuests: GuestEntry[] = [];
 
     for (const line of lines) {
-      const parts = line.split(',').map((p) => p.trim());
+      const parts = parseCsvLine(line);
       const guestName = parts[0];
       const guestEmail = parts[1] || '';
       if (guestName) {
@@ -52,10 +77,14 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
       }
     }
 
+    const skipped = lines.length - newGuests.length;
     if (newGuests.length > 0) {
       onUpdate([...guests, ...newGuests]);
       setCsvText('');
-      setShowCsvImport(false);
+      setImportResult(`${newGuests.length} guest${newGuests.length !== 1 ? 's' : ''} imported${skipped > 0 ? `, ${skipped} row${skipped !== 1 ? 's' : ''} skipped` : ''}`);
+      setTimeout(() => setImportResult(null), 5000);
+    } else {
+      setImportResult('No valid guests found. Format: Name, Email (one per line)');
     }
   };
 
@@ -154,6 +183,11 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
               >
                 Import Guests
               </button>
+              {importResult && (
+                <p className={`text-xs ${importResult.includes('skipped') || importResult.includes('No valid') ? 'text-amber-600' : 'text-green-600'}`}>
+                  {importResult}
+                </p>
+              )}
             </div>
           )}
         </div>

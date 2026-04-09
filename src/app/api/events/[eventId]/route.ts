@@ -79,8 +79,16 @@ export async function PATCH(
       );
     }
 
+    const ALLOWED_COLUMNS = [
+      'title', 'description', 'event_date', 'event_end_date',
+      'location_name', 'location_address', 'host_name', 'dress_code',
+      'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
+      'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',
+      'status', 'auto_reminders',
+    ];
+
     const updates = parsed.data as Record<string, unknown>;
-    const keys = Object.keys(updates);
+    const keys = Object.keys(updates).filter((key) => ALLOWED_COLUMNS.includes(key));
 
     if (keys.length === 0) {
       return NextResponse.json(existing);

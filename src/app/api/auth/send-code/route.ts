@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('Email error:', error);
         return NextResponse.json(
-          { error: error instanceof Error ? error.message : 'Failed to send email' },
+          { error: 'Failed to send verification email. Please try again.' },
           { status: 500 }
         );
       }
@@ -136,9 +136,8 @@ export async function POST(request: NextRequest) {
         });
       } catch (error) {
         console.error('SMS error:', error);
-        const message = error instanceof Error ? error.message : 'Failed to send SMS';
         return NextResponse.json(
-          { error: message },
+          { error: 'Failed to send verification SMS. Please try again.' },
           { status: 500 }
         );
       }

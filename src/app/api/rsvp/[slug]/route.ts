@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
 import { rsvpSubmissionSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(
   request: Request,
@@ -52,7 +53,7 @@ export async function POST(
     const parsed = rsvpSubmissionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid submission", details: parsed.error.flatten() },
+        { error: "Invalid submission" },
         { status: 400 }
       );
     }
@@ -64,6 +65,14 @@ export async function POST(
     const allowPlusOnes = event.allow_plus_ones !== undefined ? event.allow_plus_ones : true;
     if (!allowPlusOnes) {
       headcount = 1;
+    }
+
+    // Enforce minimum headcount
+    if (headcount < 1) {
+      return NextResponse.json(
+        { error: "Headcount must be at least 1." },
+        { status: 400 }
+      );
     }
 
     // Enforce per-RSVP guest limit (default: 10)
@@ -165,6 +174,24 @@ export async function POST(
         console.error("Failed to create plus_ones:", err);
         // Don't fail the RSVP if plus_ones creation fails
       }
+    }
+
+    // Send host notification (best-effort, don't fail the RSVP)
+    try {
+      const host = await queryOne<{ email: string }>(
+        'SELECT email FROM admin_users WHERE id = $1',
+        [event.user_id]
+      );
+      if (host?.email) {
+        const statusLabel = status === 'attending' ? 'Yes' : status === 'maybe' ? 'Maybe' : 'No';
+        await sendEmail({
+          to: host.email,
+          subject: `New RSVP: ${respondent_name} (${statusLabel}) - ${event.title}`,
+          html: `<p><strong>${respondent_name}</strong> responded <strong>${statusLabel}</strong> to <strong>${event.title}</strong>${headcount > 1 ? ` with ${headcount} guests` : ''}.</p><p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app'}/events/${event.id}/responses">View all responses</a></p>`,
+        });
+      }
+    } catch {
+      // Non-critical, don't fail the RSVP
     }
 
     return NextResponse.json({ success: true, response });

@@ -193,10 +193,13 @@ export default function WizardContainer({
     setIsHydrated(true);
   }, [mode]);
 
-  // Save to localStorage whenever formData changes (only for create mode)
+  // Save to localStorage whenever formData changes (only for create mode), debounced
   useEffect(() => {
     if (mode === 'create' && isHydrated && typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+      const timer = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [formData, mode, isHydrated]);
 
@@ -280,11 +283,14 @@ export default function WizardContainer({
         eventResponse = await res.json();
 
         // Update RSVP fields
-        await fetch(`/api/events/${eventId}/rsvp-fields`, {
+        const rsvpRes = await fetch(`/api/events/${eventId}/rsvp-fields`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData.rsvp_fields),
         });
+        if (!rsvpRes.ok) {
+          console.error('Failed to update RSVP fields');
+        }
       } else {
         const res = await fetch('/api/events', {
           method: 'POST',
@@ -300,16 +306,19 @@ export default function WizardContainer({
         eventResponse = await res.json();
 
         // Update RSVP fields if different from defaults
-        await fetch(`/api/events/${eventResponse.id}/rsvp-fields`, {
+        const rsvpRes = await fetch(`/api/events/${eventResponse.id}/rsvp-fields`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData.rsvp_fields),
         });
+        if (!rsvpRes.ok) {
+          console.error('Failed to update RSVP fields');
+        }
       }
 
       // Bulk-create guests if any were added during wizard
       if (formData.guests.length > 0) {
-        await fetch(`/api/events/${eventResponse.id}/guests/bulk`, {
+        const guestRes = await fetch(`/api/events/${eventResponse.id}/guests/bulk`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
@@ -319,6 +328,9 @@ export default function WizardContainer({
             }))
           ),
         });
+        if (!guestRes.ok) {
+          console.error('Failed to bulk-create guests');
+        }
       }
 
       router.push(`/events/${eventResponse.id}`);

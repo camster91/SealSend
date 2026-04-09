@@ -29,14 +29,13 @@ export function SignupBoard({ eventSlug }: SignupBoardProps) {
     fetchItems();
   }, [fetchItems]);
 
-  // Auto-fill name from session cookie
+  // Auto-fill name from session cookie (runs once on mount)
   useEffect(() => {
     const user = getClientUser();
-    if (user && !claimName) {
+    if (user) {
       const name = user.name || user.email?.split('@')[0] || '';
-      if (name) setClaimName(name);
+      if (name) setClaimName((prev) => prev || name);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleClaim(itemId: string) {

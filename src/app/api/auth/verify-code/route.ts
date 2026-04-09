@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = await rateLimit(`verify-code:${ip}`, { max: 10, windowSeconds: 600 });
+    const { success: rateLimitOk } = await rateLimit(`verify-code:${ip}`, { max: 5, windowSeconds: 900 });
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: 'Too many attempts. Please wait a few minutes before trying again.' },
@@ -107,7 +107,13 @@ export async function POST(request: NextRequest) {
       eventId: authCode.event_id
     };
 
-    cookieStore.set('sealsend_user', JSON.stringify(userInfo), {
+    // Non-httpOnly cookie for client-side display only (no sensitive fields)
+    const clientUserInfo = {
+      email: authCode.email,
+      role: authCode.role,
+      name: authCode.email?.split('@')[0] || null,
+    };
+    cookieStore.set('sealsend_user', JSON.stringify(clientUserInfo), {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       expires: expiresAt,

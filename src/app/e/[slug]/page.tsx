@@ -95,11 +95,12 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   const audioUrl = customization.audioUrl;
   const buttonStyle = customization.buttonStyle;
 
+  // backgroundImage is already sanitized by sanitizeCustomization (HTTPS-only, no special chars)
   const pageStyle: React.CSSProperties = {
     backgroundColor: safeBgColor,
     fontFamily,
     ...(backgroundImage && {
-      backgroundImage: `url(${encodeURI(backgroundImage)})`,
+      backgroundImage: `url("${encodeURI(backgroundImage)}")`,
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundAttachment: "fixed",

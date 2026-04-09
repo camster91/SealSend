@@ -172,6 +172,13 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         <p className="mt-1 text-sm text-green-700">
           Your response has been recorded.
         </p>
+        <button
+          type="button"
+          onClick={() => { setSubmitted(false); setFormData({}); setPlusOnes([]); }}
+          className="mt-4 text-sm font-medium text-green-700 underline underline-offset-2 hover:text-green-800"
+        >
+          Update your response
+        </button>
       </div>
     );
   }
@@ -195,8 +202,8 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       </div>
 
       {inviteGuestName && (
-        <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-2.5">
-          <p className="text-sm text-indigo-700">
+        <div className="rounded-lg bg-brand-50 border border-brand-100 px-4 py-2.5">
+          <p className="text-sm text-brand-700">
             Welcome, <strong>{inviteGuestName}</strong>! Your details have been pre-filled.
           </p>
         </div>

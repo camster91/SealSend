@@ -190,9 +190,9 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="group flex w-full items-center gap-4 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-5 text-left transition-all hover:border-indigo-300 hover:shadow-md"
+        className="group flex w-full items-center gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 to-purple-50 p-5 text-left transition-all hover:border-brand-300 hover:shadow-md"
       >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm transition-transform group-hover:scale-105">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm transition-transform group-hover:scale-105">
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
@@ -211,11 +211,11 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
   }
 
   return (
-    <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6 shadow-sm">
+    <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-purple-50 p-6 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 text-white">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
             </svg>
@@ -250,7 +250,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             id="ai-event-type"
             value={form.eventType}
             onChange={(e) => updateField('eventType', e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="mt-1.5 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             {EVENT_TYPES.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -267,7 +267,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             id="ai-style"
             value={form.style}
             onChange={(e) => updateField('style', e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="mt-1.5 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
             {STYLES.map((s) => (
               <option key={s.label} value={s.label}>{s.label}</option>
@@ -287,7 +287,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             value={form.colors}
             onChange={(e) => updateField('colors', e.target.value)}
             placeholder="e.g. gold and navy blue"
-            className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
 
@@ -303,7 +303,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             value={form.extras}
             onChange={(e) => updateField('extras', e.target.value)}
             placeholder="e.g. roses, star patterns, winter theme"
-            className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
       </div>
@@ -319,7 +319,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             onClick={() => updateField('orientation', 'portrait')}
             className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
               form.orientation === 'portrait'
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-sm'
                 : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50'
             }`}
           >
@@ -335,7 +335,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
             onClick={() => updateField('orientation', 'landscape')}
             className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
               form.orientation === 'landscape'
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm'
+                ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-sm'
                 : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50'
             }`}
           >
@@ -374,7 +374,7 @@ export default function AIPromptGenerator({ eventDetails }: AIPromptGeneratorPro
       <button
         type="button"
         onClick={handleGenerate}
-        className="mt-6 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-all hover:from-indigo-700 hover:to-purple-700 hover:shadow-md"
+        className="mt-6 w-full rounded-xl bg-gradient-to-r from-brand-600 to-purple-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-all hover:from-brand-700 hover:to-purple-700 hover:shadow-md"
       >
         Generate Prompt
       </button>

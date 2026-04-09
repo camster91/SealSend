@@ -41,12 +41,17 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
       document.addEventListener("keydown", onKeyDown);
       document.body.style.overflow = "hidden";
       // Auto-focus first focusable element
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const el = contentRef.current?.querySelector<HTMLElement>(
           'a[href], button:not([disabled]), textarea, input, select'
         );
         el?.focus();
       }, 50);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener("keydown", onKeyDown);
+        document.body.style.overflow = "";
+      };
     }
     return () => {
       document.removeEventListener("keydown", onKeyDown);

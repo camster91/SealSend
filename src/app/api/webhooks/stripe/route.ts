@@ -15,6 +15,9 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
 
   if (!eventId || !tier) return;
 
+  // Validate eventId is a UUID to prevent injection
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) return;
+
   // Resolve legacy names (standard -> silver, premium -> gold)
   const resolvedTier = TIER_ALIAS[tier] || tier;
   const tierKey = resolvedTier as keyof typeof TIERS;
@@ -29,9 +32,15 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
   );
 }
 
+const VALID_SUBSCRIPTION_TIERS = ["pro", "business"];
+
 async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   const { userId, tier, billing } = session.metadata || {};
   if (!userId || !tier) return;
+
+  // Validate userId is a UUID and tier is a known subscription tier
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) return;
+  if (!VALID_SUBSCRIPTION_TIERS.includes(tier)) return;
 
   const stripeCustomerId =
     typeof session.customer === "string"

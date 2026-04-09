@@ -73,14 +73,14 @@ export function LoginForm() {
   if (step === "code") {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4 text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
-            <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="rounded-lg border border-brand-100 bg-brand-50 p-4 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-brand-100">
+            <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-indigo-700">Check your email</p>
-          <p className="mt-1 text-xs text-indigo-600">
+          <p className="text-sm font-medium text-brand-700">Check your email</p>
+          <p className="mt-1 text-xs text-brand-600">
             We sent a login link and code to <strong>{email}</strong>
           </p>
         </div>

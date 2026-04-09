@@ -94,7 +94,13 @@ export async function POST(request: NextRequest) {
       role: 'admin',
     };
 
-    cookieStore.set('sealsend_user', JSON.stringify(userInfo), {
+    // Non-httpOnly cookie for client-side display only (no sensitive fields)
+    const clientUserInfo = {
+      email: adminUser.email,
+      name: adminUser.name,
+      role: 'admin',
+    };
+    cookieStore.set('sealsend_user', JSON.stringify(clientUserInfo), {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       expires: expiresAt,
