@@ -68,7 +68,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Sen
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">Send Announcement</h2>
-          <button onClick={handleClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button aria-label="Close announcement modal" onClick={handleClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X className="h-5 w-5" />
           </button>
         </div>
