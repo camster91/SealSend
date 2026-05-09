@@ -130,6 +130,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
               </Link>
             )}
             <button
+              aria-label="Toggle mobile navigation menu"
               className="rounded-lg p-2 hover:bg-neutral-100 transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
