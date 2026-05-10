@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthService } from "@/lib/auth/auth-service";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { signupSchema } from "@/lib/validations";
 import Link from "next/link";
 
 export function SignupForm() {
@@ -17,6 +18,12 @@ export function SignupForm() {
   const searchParams = useSearchParams();
   const authService = new AuthService();
   const plan = searchParams.get("plan");
+
+  const isEmailValid = useMemo(() => {
+    if (!email.trim()) return false;
+    const result = signupSchema.safeParse({ email: email.trim() });
+    return result.success;
+  }, [email]);
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -152,7 +159,7 @@ export function SignupForm() {
         </div>
       )}
 
-      <Button type="submit" loading={loading} className="w-full">
+      <Button type="submit" disabled={!isEmailValid} loading={loading} className="w-full">
         Get Started
       </Button>
 
