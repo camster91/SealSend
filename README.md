@@ -64,10 +64,8 @@ cp .env.example .env.local
 ### Environment Variables
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
-SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
 
 # Twilio (SMS)
 TWILIO_ACCOUNT_SID="your-account-sid"
@@ -163,13 +161,10 @@ src/
 │   ├── invitations/       # Invitation components
 │   └── dashboard/         # Dashboard components
 ├── lib/                    # Utility libraries
-│   ├── supabase/          # Supabase client
+│   ├── db/                # Database client (PostgreSQL)
 │   ├── twilio/            # Twilio helpers
 │   └── stripe/            # Stripe helpers
 └── types/                  # TypeScript types
-
-supabase/
-└── migrations/            # Database migrations
 ```
 
 ## API Endpoints
@@ -187,7 +182,6 @@ supabase/
 
 - `AUTHENTICATION_SYSTEM.md` - Auth architecture
 - `DEPLOYMENT_GUIDE.md` - Deployment instructions
-- `SUPABASE_SETUP.md` - Database setup
 - `TESTING.md` - Testing guide
 - `TROUBLESHOOT.md` - Common issues
 

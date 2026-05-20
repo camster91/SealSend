@@ -39,8 +39,6 @@ and should be set as regular Environment Variables.
 #### Build Arguments (Coolify → Settings → Build Args)
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://vtbreowxqfcvwegpfnwn.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YnJlb3d4cWZjdndlZ3BmbnduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NDA4NTMsImV4cCI6MjA4NjQxNjg1M30.eFcnSP-sNXJq7TOsnu2bQ-hI0_-IibQZsruRNugQV3E
 NEXT_PUBLIC_SITE_URL=https://sealsend.app
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your-stripe-publishable-key
 ```
@@ -48,8 +46,8 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_your-stripe-publishable-key
 #### Runtime Environment Variables (Coolify → Environment Variables)
 
 ```bash
-# Supabase (Required - server-side)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Database
+DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
 
 # Email - Mailgun (Required)
 MAILGUN_API_KEY=your-mailgun-sending-key

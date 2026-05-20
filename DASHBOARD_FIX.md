@@ -15,7 +15,7 @@ The dashboard at `https://sealsend.app/dashboard` is not loading due to an authe
 
 ## Solution Applied
 
-### 1. Updated Middleware (`src/lib/supabase/middleware.ts`)
+### 1. Updated Middleware (`src/lib/db/migrate.ts`)
 The middleware now recognizes **both authentication methods**:
 - ✅ Supabase Auth sessions (existing)
 - ✅ Custom auth sessions via `sealsend_session` cookie (added)
@@ -27,8 +27,8 @@ The middleware now recognizes **both authentication methods**:
 - Auth pages redirect authenticated users (including custom sessions)
 
 ### 2. File Changes
-- **Modified**: `src/lib/supabase/middleware.ts`
-- **Backup created**: `src/lib/supabase/middleware.ts.backup`
+- **Modified**: `src/lib/db/migrate.ts`
+- **Backup created**: `src/lib/db/migrate.ts.backup`
 
 ## Deployment Instructions
 

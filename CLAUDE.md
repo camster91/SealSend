@@ -72,8 +72,6 @@ src/
   types/
     database.ts           # TypeScript interfaces for all DB tables
   middleware.ts           # Auth middleware (route protection)
-supabase/
-  migrations/             # SQL migration files (run in order)
 ```
 
 ## Key Architectural Patterns

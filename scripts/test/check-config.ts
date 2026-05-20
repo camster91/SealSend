@@ -25,32 +25,15 @@ interface ConfigCheck {
 function checkConfig(): ConfigCheck[] {
   const checks: ConfigCheck[] = [];
 
-  // Supabase
+  // Database
   checks.push({
-    name: 'NEXT_PUBLIC_SUPABASE_URL',
+    name: 'DATABASE_URL',
     required: true,
-    value: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    valid: !!process.env.NEXT_PUBLIC_SUPABASE_URL && 
-           !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('your-supabase-url'),
-    error: !process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Not set' : 'Contains placeholder value',
-  });
-
-  checks.push({
-    name: 'SUPABASE_SERVICE_ROLE_KEY',
-    required: true,
-    value: process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 20) + '...',
-    valid: !!process.env.SUPABASE_SERVICE_ROLE_KEY && 
-           !process.env.SUPABASE_SERVICE_ROLE_KEY?.includes('your-service-role-key'),
-    error: !process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Not set' : 
-           process.env.SUPABASE_SERVICE_ROLE_KEY?.includes('your-service-role-key') ? 'Contains placeholder value' : undefined,
-  });
-
-  checks.push({
-    name: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    required: true,
-    value: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 20) + '...',
-    valid: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    error: !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Not set' : undefined,
+    value: process.env.DATABASE_URL?.slice(0, 50) + '...',
+    valid: !!process.env.DATABASE_URL && 
+           process.env.DATABASE_URL?.startsWith('postgresql://'),
+    error: !process.env.DATABASE_URL ? 'Not set' : 
+           !process.env.DATABASE_URL?.startsWith('postgresql://') ? 'Must start with postgresql://' : undefined,
   });
 
   // Email (Resend)

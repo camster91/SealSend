@@ -103,10 +103,10 @@ docker-compose logs web | tail -50
 ```
 
 ### Database connection errors
-- Check Supabase is accessible
-- Verify environment variables:
+- Verify `DATABASE_URL` is configured
+- Check PostgreSQL is accessible
 ```bash
-docker exec x8okwogw0so8s08oss04s088-web printenv | grep SUPABASE
+docker exec x8okwogw0so8s08oss04s088-web printenv | grep DATABASE_URL
 ```
 
 ### Build failures

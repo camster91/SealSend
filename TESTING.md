@@ -51,8 +51,7 @@ Create `.env.local`:
 
 ```env
 # Required for all tests
-NEXT_PUBLIC_SUPABASE_URL=https://...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
 
 # Required for email tests (Mailgun)
 MAILGUN_API_KEY=key-...
@@ -175,7 +174,7 @@ After running tests, verify:
 - [ ] Twilio console shows "Delivered"
 
 ### Integration
-- [ ] Events created in Supabase
+- [ ] Events created in PostgreSQL
 - [ ] Guests have invite tokens
 - [ ] Send logs populated
 - [ ] No errors in console

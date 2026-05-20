@@ -91,10 +91,12 @@ TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxx
 
 ## Setup Instructions
 
-### 1. Run Database Migrations
+### 1. Initialize Database
+
+Run the schema against your PostgreSQL instance:
+
 ```bash
-# Apply the auth tables migration
-supabase db push
+psql $DATABASE_URL -f src/lib/db/schema.sql
 ```
 
 ### 2. Install Dependencies
@@ -174,8 +176,9 @@ npm run dev
    - Verify phone number format (+1XXXXXXXXXX)
 
 3. **Database errors**
-   - Run migrations: `supabase db push`
-   - Check Supabase connection
+   - Verify `DATABASE_URL` is configured
+   - Run the schema: `psql $DATABASE_URL -f src/lib/db/schema.sql`
+   - Check database connection logs
 
 4. **Session issues**
    - Clear browser cookies

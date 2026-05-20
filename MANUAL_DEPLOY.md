@@ -62,9 +62,7 @@ Look for:
 
 ## Step 7: Apply Database Migration
 
-Go to: https://supabase.com/dashboard/project/vtbreowxqfcvwegpfnwn/sql/new
-
-Paste and run:
+Connect to your self-hosted PostgreSQL database and run:
 
 ```sql
 -- Add last_login_at column
@@ -102,7 +100,7 @@ Check for build errors.
 ### Database connection errors
 Verify environment variables:
 ```bash
-docker exec x8okwogw0so8s08oss04s088-web printenv | grep SUPABASE
+docker exec x8okwogw0so8s08oss04s088-web printenv | grep DATABASE_URL
 ```
 
 ### Site returns 404
