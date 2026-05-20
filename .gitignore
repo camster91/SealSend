@@ -57,3 +57,6 @@ test-and-setup.js
 test-auth.js
 test-basic.js
 visual-test-screenshots/
+
+fix_*.py
+scripts/archive/
