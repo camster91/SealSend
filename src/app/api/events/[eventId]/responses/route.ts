@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import type { PlusOne } from "@/types/database";
 
 export async function GET(
@@ -12,32 +12,34 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
 
-    // Fetch responses
-    const responses = await query(
-      'SELECT * FROM rsvp_responses WHERE event_id = $1 ORDER BY submitted_at DESC',
-      [eventId]
-    );
+    // Fetch responses with their plus_ones
+    const responses = await prisma.rsvpResponse.findMany({
+      where: { event_id: eventId },
+      orderBy: { submitted_at: 'desc' },
+    });
 
     // Fetch plus_ones for these responses
     const responseIds = responses.map((r: any) => r.id);
     let plusOnes: PlusOne[] = [];
 
     if (responseIds.length > 0) {
-      const placeholders = responseIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
-      plusOnes = await query<PlusOne>(
-        `SELECT * FROM plus_ones WHERE rsvp_response_id IN (${placeholders})`,
-        responseIds
-      );
+      const plusOnesData = await prisma.plusOne.findMany({
+        where: { rsvp_response_id: { in: responseIds } },
+      });
+
+      if (plusOnesData) {
+        plusOnes = plusOnesData as unknown as PlusOne[];
+      }
     }
 
     // Group plus_ones by response_id

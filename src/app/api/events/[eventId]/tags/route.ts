@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { z } from "zod";
 
 const tagSchema = z.object({
@@ -22,17 +22,17 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const tags = await query(
-      'SELECT * FROM guest_tags WHERE event_id = $1 ORDER BY created_at ASC',
-      [eventId]
-    );
+    const tags = await prisma.guestTag.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'asc' },
+    });
 
     return NextResponse.json(tags);
   } catch {
@@ -51,10 +51,10 @@ export async function POST(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, tier: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -72,10 +72,13 @@ export async function POST(
       return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const tag = await queryOne(
-      'INSERT INTO guest_tags (event_id, tag_name, color) VALUES ($1, $2, $3) RETURNING *',
-      [eventId, parsed.data.tag_name, parsed.data.color]
-    );
+    const tag = await prisma.guestTag.create({
+      data: {
+        event_id: eventId,
+        tag_name: parsed.data.tag_name,
+        color: parsed.data.color,
+      },
+    });
 
     return NextResponse.json(tag, { status: 201 });
   } catch {
@@ -94,10 +97,10 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -106,10 +109,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid tag ID" }, { status: 400 });
     }
 
-    await query(
-      'DELETE FROM guest_tags WHERE id = $1 AND event_id = $2',
-      [parsed.data.tagId, eventId]
-    );
+    await prisma.guestTag.deleteMany({
+      where: { id: parsed.data.tagId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

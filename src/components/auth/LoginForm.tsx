@@ -32,8 +32,8 @@ export function LoginForm() {
         body: JSON.stringify({ method: "email", email: email.trim() }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error || "Failed to send code");
         return;
       }
@@ -54,12 +54,16 @@ export function LoginForm() {
       const res = await fetch("/api/auth/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method: "email", email: email.trim(), code: otpCode.trim() }),
+        body: JSON.stringify({
+          method: "email",
+          email: email.trim(),
+          code: otpCode.trim(),
+        }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Verification failed");
+        setError(data.error || "Invalid or expired code");
         return;
       }
 
@@ -79,14 +83,14 @@ export function LoginForm() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-brand-700">Check your email</p>
-          <p className="mt-1 text-xs text-brand-600">
-            We sent a login link and code to <strong>{email}</strong>
+          <p className="text-sm font-medium text-indigo-700">Check your email</p>
+          <p className="mt-1 text-xs text-indigo-600">
+            We sent a login code to <strong>{email}</strong>
           </p>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Click the magic link in your email, or enter the 6-digit code below:
+          Enter the 6-digit code from your email:
         </p>
 
         <form onSubmit={handleVerifyCode} className="space-y-4">
@@ -154,11 +158,11 @@ export function LoginForm() {
       )}
 
       <Button type="submit" loading={loading} className="w-full">
-        Send Login Link
+        Send Login Code
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        No password needed. We&apos;ll email you a magic link to sign in.
+        No password needed. We&apos;ll email you a code to sign in.
       </p>
     </form>
   );

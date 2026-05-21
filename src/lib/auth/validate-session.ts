@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { AuthUser } from './types';
 
 export interface SessionValidationResult {
@@ -10,12 +10,12 @@ export interface SessionValidationResult {
 
 export async function validateSession(token: string): Promise<SessionValidationResult> {
   try {
-    const session = await queryOne<{ user_id: string; user_role: string; expires_at: string }>(
-      'SELECT user_id, user_role, expires_at FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
-      [token]
-    );
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: token },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    if (!session) {
+    if (!session || session.expires_at < new Date()) {
       return { valid: false, error: 'Invalid or expired session' };
     }
 
@@ -61,9 +61,13 @@ export async function getValidatedSession(): Promise<SessionValidationResult> {
 }
 
 export async function invalidateSession(token: string): Promise<void> {
-  await queryOne('DELETE FROM user_sessions WHERE session_token = $1', [token]);
+  await prisma.userSession.deleteMany({
+    where: { session_token: token },
+  });
 }
 
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  await queryOne('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+  await prisma.userSession.deleteMany({
+    where: { user_id: userId },
+  });
 }

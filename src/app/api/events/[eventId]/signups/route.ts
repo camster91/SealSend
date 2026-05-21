@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { z } from "zod";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -19,17 +19,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const items = await query(
-      'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
-      [eventId]
-    );
+    const items = await prisma.eventSignupItem.findMany({
+      where: { event_id: eventId },
+      include: { claims: true },
+      orderBy: { sort_order: 'asc' },
+    });
 
     // Fetch claims for all items
     const itemIds = items.map((i: any) => i.id);
@@ -60,10 +61,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, tier: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -83,20 +84,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get next sort_order
-    const countResult = await queryOne<{ count: string }>(
-      'SELECT COUNT(*) as count FROM event_signup_items WHERE event_id = $1',
-      [eventId]
-    );
-    const sortOrder = countResult ? parseInt(countResult.count, 10) : 0;
+    const count = await prisma.eventSignupItem.count({
+      where: { event_id: eventId },
+    });
 
-    const item = await queryOne(
-      `INSERT INTO event_signup_items (event_id, title, description, category, slots, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [eventId, parsed.data.title, parsed.data.description || null, parsed.data.category || null, parsed.data.slots, sortOrder]
-    );
-
-    if (!item) return NextResponse.json({ error: "Failed to create item" }, { status: 500 });
+    const item = await prisma.eventSignupItem.create({
+      data: {
+        event_id: eventId,
+        title: parsed.data.title,
+        description: parsed.data.description || null,
+        category: parsed.data.category || null,
+        slots: parsed.data.slots,
+        sort_order: count ?? 0,
+      },
+    });
 
     return NextResponse.json(item, { status: 201 });
   } catch {
@@ -112,17 +113,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await query(
-      'DELETE FROM event_signup_items WHERE id = $1 AND event_id = $2',
-      [itemId, eventId]
-    );
+    await prisma.eventSignupItem.deleteMany({
+      where: { id: itemId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

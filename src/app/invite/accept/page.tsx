@@ -1,4 +1,4 @@
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { nanoid } from "nanoid";
@@ -20,10 +20,10 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   }
 
   // Find the guest by invite token
-  const guest = await queryOne<{ id: string; name: string; email: string | null; phone: string | null; event_id: string; invite_token: string }>(
-    'SELECT id, name, email, phone, event_id, invite_token FROM guests WHERE invite_token = $1',
-    [token]
-  );
+  const guest = await prisma.guest.findFirst({
+    where: { invite_token: token },
+    select: { id: true, name: true, email: true, phone: true, event_id: true, invite_token: true },
+  });
 
   if (!guest) {
     console.error("Invalid invite token");
@@ -31,10 +31,10 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   }
 
   // Verify the event slug matches
-  const event = await queryOne<{ id: string; slug: string }>(
-    'SELECT id, slug FROM events WHERE id = $1',
-    [guest.event_id]
-  );
+  const event = await prisma.event.findUnique({
+    where: { id: guest.event_id },
+    select: { id: true, slug: true },
+  });
 
   if (!event || event.slug !== eventSlug) {
     console.error("Event mismatch");
@@ -48,12 +48,16 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
 
   // Create user session
   try {
-    await query(
-      'INSERT INTO user_sessions (user_id, session_token, user_role, expires_at) VALUES ($1, $2, $3, $4)',
-      [guest.id, sessionToken, 'guest', expiresAt.toISOString()]
-    );
-  } catch (sessionError) {
-    console.error("Failed to create session:", sessionError);
+    await prisma.userSession.create({
+      data: {
+        user_id: guest.id,
+        session_token: sessionToken,
+        user_role: "guest",
+        expires_at: expiresAt,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to create session:", err);
     redirect("/login?error=session_failed");
   }
 
@@ -86,10 +90,10 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   );
 
   // Update guest's invite status to accepted
-  await query(
-    'UPDATE guests SET invite_status = $1 WHERE id = $2',
-    ['accepted', guest.id]
-  );
+  await prisma.guest.update({
+    where: { id: guest.id },
+    data: { invite_status: "accepted" },
+  });
 
   // Redirect to the event page
   redirect(`/events/${guest.event_id}/guest`);

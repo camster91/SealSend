@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 
@@ -14,10 +14,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -30,10 +30,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     // Check for existing guests to avoid duplicates
-    const existingGuests = await query<{ email: string | null; phone: string | null }>(
-      'SELECT email, phone FROM guests WHERE event_id = $1',
-      [eventId]
-    );
+    const existingGuests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      select: { email: true, phone: true },
+    });
 
     const existingEmails = new Set((existingGuests || [])
       .map(g => g.email?.toLowerCase())
@@ -104,30 +104,31 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 200 });
     }
 
-    // Build bulk INSERT with parameterized values
-    const valuePlaceholders: string[] = [];
-    const queryParams: unknown[] = [];
-    let paramIndex = 1;
+    try {
+      await prisma.guest.createMany({ data: guests });
 
-    for (const g of guests) {
-      valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
-      queryParams.push(g.event_id, g.name, g.email, g.phone, g.notes);
-      paramIndex += 5;
+      // Fetch the inserted guests to return them
+      const insertedGuests = await prisma.guest.findMany({
+        where: {
+          event_id: eventId,
+          name: { in: guests.map(g => g.name) },
+        },
+        select: { id: true, name: true, email: true, phone: true },
+        orderBy: { created_at: 'desc' },
+        take: guests.length,
+      });
+
+      return NextResponse.json({
+        imported: insertedGuests?.length || 0,
+        skipped: duplicates.length,
+        errors: validationErrors,
+        duplicates: duplicates.length > 0 ? duplicates : undefined,
+        guests: insertedGuests,
+      }, { status: 201 });
+    } catch (error: any) {
+      console.error('Bulk insert error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    const insertedGuests = await query<{ id: string; name: string; email: string | null; phone: string | null }>(
-      `INSERT INTO guests (event_id, name, email, phone, notes) VALUES ${valuePlaceholders.join(', ')} RETURNING id, name, email, phone`,
-      queryParams
-    );
-
-    return NextResponse.json({
-      inserted: insertedGuests?.length || 0,
-      skipped: duplicates.length,
-      imported: insertedGuests?.length || 0,
-      errors: validationErrors,
-      duplicates: duplicates.length > 0 ? duplicates : undefined,
-      guests: insertedGuests,
-    }, { status: 201 });
   } catch (error) {
     console.error('Bulk import error:', error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

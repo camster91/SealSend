@@ -1,4 +1,3 @@
-import { query, queryOne } from "@/lib/db/client";
 import { notFound } from "next/navigation";
 import { EventHero } from "@/components/public-event/EventHero";
 import { EventDetails } from "@/components/public-event/EventDetails";
@@ -9,8 +8,9 @@ import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
 import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
-import {
-  sanitizeCustomization,
+import { getPublicEventBySlug, getRsvpFields, getRemainingSpots, getInviteGuest } from "@/lib/repositories/publicEventRepository";
+import { 
+  sanitizeCustomization, 
   sanitizeInviteToken,
 } from "@/lib/sanitize";
 import type { Event, RSVPField } from "@/types/database";
@@ -23,10 +23,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const event = await queryOne<{ title: string; description: string | null; design_url: string | null }>(
-    'SELECT title, description, design_url FROM events WHERE slug = $1 AND status = $2',
-    [slug, 'published']
-  );
+  const { data: event } = await getPublicEventBySlug(slug);
 
   if (!event) return { title: "Event Not Found" };
 
@@ -45,49 +42,23 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
 
-  const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE slug = $1 AND status = $2',
-    [slug, 'published']
-  );
-
+  const { data: event } = await getPublicEventBySlug(slug);
   if (!event) notFound();
 
-  const rsvpFields = await query<RSVPField>(
-    'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
-    [event.id]
-  );
+  const { data: rsvpFields } = await getRsvpFields(event.id);
+  const spotsRemaining = await getRemainingSpots(event.id, event.max_attendees);
 
-  // Calculate spots remaining for guest limits
-  let spotsRemaining: number | null = null;
-  const maxAttendees = (event.max_attendees as number) || null;
-  if (maxAttendees) {
-    const attendingResponses = await query<{ headcount: number }>(
-      'SELECT headcount FROM rsvp_responses WHERE event_id = $1 AND status = $2',
-      [event.id, 'attending']
-    );
-
-    const currentTotal = (attendingResponses || []).reduce(
-      (sum: number, r: { headcount: number }) => sum + (r.headcount || 1),
-      0
-    );
-    spotsRemaining = Math.max(0, maxAttendees - currentTotal);
-  }
-
-  // Resolve invite token for magic link pre-filling
   let inviteGuest: { id: string; name: string; email: string | null } | null = null;
   const rawToken = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
   const token = sanitizeInviteToken(rawToken);
 
   if (token) {
-    const guest = await queryOne<{ id: string; name: string; email: string | null }>(
-      'SELECT id, name, email FROM guests WHERE invite_token = $1 AND event_id = $2',
-      [token, event.id]
-    );
+    const { data: guest } = await getInviteGuest(event.id, token);
     if (guest) inviteGuest = guest;
   }
 
-  // Sanitize all customization values
-  const customization = sanitizeCustomization(event.customization as unknown as Record<string, unknown>);
+  
+  const customization = sanitizeCustomization(event.customization);
   const safeBgColor = customization.backgroundColor;
   const safePrimaryColor = customization.primaryColor;
   const fontFamily = customization.fontFamily;

@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { getClientUser } from "@/lib/auth/client-auth";
 import type { RSVPField, PlusOneData } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
@@ -46,16 +45,24 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       setFormData((prev) => ({ ...prev, email: inviteGuestEmail }));
     }
 
-    // Fall back to session cookie if no invite data
-    if (!inviteGuestName && !cancelled) {
-      const user = getClientUser();
-      if (user) {
-        const name = user.name || user.email?.split("@")[0] || "";
-        if (name) {
-          setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
-        }
-        if (user.email) {
-          setFormData((prev) => ({ ...prev, email: prev.email || user.email || "" }));
+    // Fall back to auth session if no invite data
+    if (!inviteGuestName) {
+      async function prefill() {
+        try {
+          const res = await fetch("/api/auth/me");
+          if (!res.ok || cancelled) return;
+          const data = await res.json();
+          const user = data.user;
+          if (!user) return;
+          const name = user.name || user.email?.split("@")[0] || "";
+          if (name) {
+            setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
+          }
+          if (user.email) {
+            setFormData((prev) => ({ ...prev, email: prev.email || user.email || "" }));
+          }
+        } catch {
+          // Not signed in, that's fine
         }
       }
     }

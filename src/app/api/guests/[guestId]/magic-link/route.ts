@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from '@/lib/db';
 import { getApiUser } from "@/lib/auth/api-auth";
 import { query, queryOne } from "@/lib/db/client";
 import { randomBytes, createHash } from "crypto";
@@ -33,7 +34,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Rate limit: 10 magic link generations per user per hour
-    const { success: rateLimitOk } = await rateLimit(`magic-link:${user.id}`, {
+    const { success: rateLimitOk } = rateLimit(`magic-link:${user.id}`, {
       max: 10,
       windowSeconds: 3600
     });
@@ -46,20 +47,20 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Get guest and verify ownership through event
-    const guest = await queryOne<{ id: string; event_id: string; name: string; email: string | null; invite_token: string | null }>(
-      'SELECT id, event_id, name, email, invite_token FROM guests WHERE id = $1',
-      [guestId]
-    );
+    const guest = await prisma.guest.findUnique({
+      where: { id: guestId },
+      select: { id: true, event_id: true, name: true, email: true, invite_token: true },
+    });
 
     if (!guest) {
       return NextResponse.json({ error: "Guest not found" }, { status: 404 });
     }
 
     // Verify user owns the event
-    const event = await queryOne<{ id: string; user_id: string; slug: string }>(
-      'SELECT id, user_id, slug FROM events WHERE id = $1',
-      [guest.event_id]
-    );
+    const event = await prisma.event.findUnique({
+      where: { id: guest.event_id },
+      select: { id: true, user_id: true, slug: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -82,18 +83,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     // Store hashed token in database
-    const magicToken = await queryOne(
-      'INSERT INTO guest_magic_tokens (guest_id, event_id, token_hash, token_preview, expires_at, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [guestId, guest.event_id, tokenHash, tokenPreview, expiresAt.toISOString(), user.id]
-    );
-
-    if (!magicToken) {
-      console.error("Failed to create magic token");
-      return NextResponse.json(
-        { error: "Failed to generate magic link" },
-        { status: 500 }
-      );
-    }
+    const magicToken = await prisma.guestMagicToken.create({
+      data: {
+        guest_id: guestId,
+        event_id: guest.event_id,
+        token_hash: tokenHash,
+        token_preview: tokenPreview,
+        expires_at: expiresAt.toISOString(),
+      },
+    });
 
     // Build the magic link URL (using the raw token - this is the only time it's exposed)
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
@@ -130,30 +128,35 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Get guest and verify ownership
-    const guest = await queryOne<{ id: string; event_id: string }>(
-      'SELECT id, event_id FROM guests WHERE id = $1',
-      [guestId]
-    );
+    const guest = await prisma.guest.findUnique({
+      where: { id: guestId },
+      select: { id: true, event_id: true },
+    });
 
     if (!guest) {
       return NextResponse.json({ error: "Guest not found" }, { status: 404 });
     }
 
     // Verify user owns the event
-    const event = await queryOne<{ user_id: string }>(
-      'SELECT user_id FROM events WHERE id = $1',
-      [guest.event_id]
-    );
+    const event = await prisma.event.findUnique({
+      where: { id: guest.event_id },
+      select: { user_id: true },
+    });
 
     if (!event || event.user_id !== user.id) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     // Get active (non-expired, non-used) magic tokens
-    const tokens = await query(
-      'SELECT id, token_preview, expires_at, used_at, created_at FROM guest_magic_tokens WHERE guest_id = $1 AND expires_at > $2 AND used_at IS NULL ORDER BY created_at DESC',
-      [guestId, new Date().toISOString()]
-    );
+    const tokens = await prisma.guestMagicToken.findMany({
+      where: {
+        guest_id: guestId,
+        expires_at: { gt: new Date().toISOString() },
+        used_at: null,
+      },
+      select: { id: true, token_preview: true, expires_at: true, used_at: true, created_at: true },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json({
       tokens: tokens || [],

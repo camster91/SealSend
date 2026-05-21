@@ -1,56 +1,56 @@
-import { query, queryOne } from '@/lib/db/client';
-import type { Event } from '@/types/database';
+import { prisma } from '@/lib/db';
 
 export async function getEvent(eventId: string) {
-  const data = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1',
-    [eventId]
-  );
-
-  if (!data) {
-    console.error('Error fetching event: not found');
+  try {
+    return await prisma.event.findUnique({ where: { id: eventId } });
+  } catch (error) {
+    console.error('Error fetching event:', error);
     return null;
   }
-
-  return data;
 }
 
 export async function getEventsByUser(userId: string) {
-  const data = await query<Event>(
-    'SELECT * FROM events WHERE user_id = $1 ORDER BY event_date ASC',
-    [userId]
-  );
-
-  return data || [];
+  try {
+    return await prisma.event.findMany({
+      where: { user_id: userId },
+      orderBy: { event_date: 'asc' },
+    });
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
 }
 
 export async function getInvitedEvents(userId: string) {
-  // Get events where this user has a guest entry
-  const guestEntries = await query<{ event_id: string }>(
-    'SELECT event_id FROM guests WHERE email = $1 OR phone = $1',
-    [userId]
-  );
+  try {
+    const guestEntries = await prisma.guest.findMany({
+      where: {
+        OR: [{ email: userId }, { phone: userId }],
+      },
+      select: { event_id: true },
+    });
 
-  if (!guestEntries || guestEntries.length === 0) {
+    if (guestEntries.length === 0) return [];
+
+    const eventIds = guestEntries.map((g) => g.event_id);
+    return await prisma.event.findMany({
+      where: { id: { in: eventIds } },
+      orderBy: { event_date: 'asc' },
+    });
+  } catch (error) {
+    console.error('Error fetching invited events:', error);
     return [];
   }
-
-  // Get the actual events
-  const eventIds = guestEntries.map(g => g.event_id);
-  const placeholders = eventIds.map((_, i) => `$${i + 1}`).join(', ');
-  const events = await query<Event>(
-    `SELECT * FROM events WHERE id IN (${placeholders}) ORDER BY event_date ASC`,
-    eventIds
-  );
-
-  return events || [];
 }
 
 export async function getEventGuests(eventId: string) {
-  const data = await query(
-    'SELECT * FROM guests WHERE event_id = $1 ORDER BY created_at DESC',
-    [eventId]
-  );
-
-  return data || [];
+  try {
+    return await prisma.guest.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
+  } catch (error) {
+    console.error('Error fetching guests:', error);
+    return [];
+  }
 }

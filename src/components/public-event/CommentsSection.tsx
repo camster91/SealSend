@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatRelative } from '@/lib/utils';
-import { getClientUser } from '@/lib/auth/client-auth';
 import type { EventComment } from '@/types/database';
 
 interface CommentsSectionProps {
@@ -39,12 +38,19 @@ export function CommentsSection({ eventSlug }: CommentsSectionProps) {
 
   // Auto-fill name if user is signed in (runs once on mount)
   useEffect(() => {
-    const user = getClientUser();
-    if (user) {
-      const name = user.name
-        || user.email?.split('@')[0]
-        || '';
-      if (name) setAuthorName((prev) => prev || name);
+    async function prefill() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user;
+        if (user && !authorName) {
+          const name = user.name || user.email?.split('@')[0] || '';
+          if (name) setAuthorName(name);
+        }
+      } catch {
+        // Not signed in, that's fine
+      }
     }
   }, []);
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
@@ -29,10 +29,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<any>(
-      'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, event_date: true, location_name: true, slug: true, status: true, tier: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -46,12 +46,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that have been invited but not reminded
-    const guests = await query<any>(
-      `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at
-       FROM guests
-       WHERE event_id = $1 AND invite_status = $2 AND reminder_sent_at IS NULL`,
-      [eventId, 'sent']
-    );
+    const guests = await prisma.guest.findMany({
+      where: {
+        event_id: eventId,
+        invite_status: "sent",
+        reminder_sent_at: null,
+      },
+      select: { id: true, name: true, email: true, phone: true, invite_status: true, invite_token: true, reminder_sent_at: true },
+    });
 
     // Filter to guests with email or phone
     const sendableGuests = guests.filter((g) => g.email || g.phone);
@@ -200,11 +202,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     if (successIds.length > 0) {
-      const placeholders = successIds.map((_, i) => `$${i + 2}`).join(', ');
-      await query(
-        `UPDATE guests SET reminder_sent_at = $1 WHERE id IN (${placeholders})`,
-        [new Date().toISOString(), ...successIds]
-      );
+      await prisma.guest.updateMany({
+        where: { id: { in: successIds } },
+        data: { reminder_sent_at: new Date().toISOString() },
+      });
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });

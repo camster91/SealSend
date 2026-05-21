@@ -12,7 +12,6 @@ import {
   Sparkles,
   LogOut,
 } from "lucide-react";
-import { clientSignOut } from "@/lib/auth/client-auth";
 import { useRouter } from "next/navigation";
 
 const navItems = [
@@ -33,8 +32,9 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
   const router = useRouter();
 
   async function handleSignOut() {
-    await clientSignOut();
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
+    router.refresh();
   }
 
   return (

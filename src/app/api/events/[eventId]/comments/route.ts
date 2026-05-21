@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -14,17 +14,17 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const comments = await query(
-      'SELECT * FROM event_comments WHERE event_id = $1 ORDER BY created_at DESC',
-      [eventId]
-    );
+    const comments = await prisma.eventComment.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(comments);
   } catch {
@@ -43,17 +43,16 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await query(
-      'DELETE FROM event_comments WHERE id = $1 AND event_id = $2',
-      [commentId, eventId]
-    );
+    await prisma.eventComment.deleteMany({
+      where: { id: commentId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { mkdir, writeFile } from 'fs/promises';
-import path from 'path';
+import { nanoid } from 'nanoid';
 import sharp from 'sharp';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 const VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -16,16 +17,16 @@ const COMPRESS_MAX_WIDTH = 2048;
 const COMPRESS_MAX_HEIGHT = 2048;
 const COMPRESS_QUALITY = 80;
 
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+
 function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
   const h = buffer.slice(0, 12);
 
-  // Images
   if (contentType === 'image/jpeg') return h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF;
   if (contentType === 'image/png') return h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4E && h[3] === 0x47;
   if (contentType === 'image/gif') return h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46;
   if (contentType === 'image/webp') return h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46;
   if (contentType === 'image/svg+xml') {
-    // Basic SVG validation: must start with XML or SVG tag, reject script tags
     const text = buffer.slice(0, 1024).toString('utf-8').toLowerCase();
     if (text.includes('<script') || text.includes('javascript:') || text.includes('onerror') || text.includes('onload')) {
       return false;
@@ -33,11 +34,9 @@ function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
     return text.includes('<svg') || text.includes('<?xml');
   }
 
-  // Video
   if (contentType === 'video/mp4') return h[4] === 0x66 && h[5] === 0x74 && h[6] === 0x79 && h[7] === 0x70;
   if (contentType === 'video/webm') return h[0] === 0x1A && h[1] === 0x45 && h[2] === 0xDF && h[3] === 0xA3;
 
-  // Audio
   if (contentType === 'audio/mpeg') return (h[0] === 0xFF && (h[1] & 0xE0) === 0xE0) || (h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33);
   if (contentType === 'audio/wav') return h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46;
   if (contentType === 'audio/ogg') return h[0] === 0x4F && h[1] === 0x67 && h[2] === 0x67 && h[3] === 0x53;
@@ -47,12 +46,10 @@ function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
 }
 
 async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): Promise<{ data: Buffer<ArrayBuffer>; ext: string; mime: string }> {
-  // Skip SVGs — they're already tiny and not raster
   if (contentType === 'image/svg+xml') {
     return { data: buffer, ext: 'svg', mime: contentType };
   }
 
-  // Skip GIFs — sharp can't handle animated GIFs well
   if (contentType === 'image/gif') {
     return { data: buffer, ext: 'gif', mime: contentType };
   }
@@ -60,7 +57,6 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
   const image = sharp(buffer);
   const metadata = await image.metadata();
 
-  // Resize if larger than max dimensions
   const needsResize =
     (metadata.width && metadata.width > COMPRESS_MAX_WIDTH) ||
     (metadata.height && metadata.height > COMPRESS_MAX_HEIGHT);
@@ -72,10 +68,8 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
     });
   }
 
-  // Compress to WebP for best size/quality ratio
   const compressed = await image.webp({ quality: COMPRESS_QUALITY }).toBuffer();
 
-  // Only use compressed if it's actually smaller
   if (compressed.length < buffer.length) {
     return { data: compressed as Buffer<ArrayBuffer>, ext: 'webp', mime: 'image/webp' };
   }
@@ -101,7 +95,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Determine allowed types and size limit based on upload type
     let allowedTypes: string[];
     let maxSize: number;
     let typeLabel: string;
@@ -147,7 +140,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Compress images (not videos or audio)
     let finalExt = file.name.split('.').pop() || 'bin';
     let _finalMime = file.type;
 
@@ -158,28 +150,19 @@ export async function POST(request: NextRequest) {
       _finalMime = result.mime;
     }
 
-    // Sanitize the original filename: keep only safe characters
-    const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const timestamp = Date.now();
-    const fileName = `${timestamp}-${originalName}`;
+    const fileName = `${nanoid()}.${finalExt}`;
+    const userDir = path.join(UPLOAD_DIR, user.id);
+    const filePath = path.join(userDir, fileName);
 
-    // If compression changed the extension, update the filename
-    const nameWithoutExt = fileName.replace(/\.[^.]+$/, '');
-    const finalFileName = `${nameWithoutExt}.${finalExt}`;
-
-    const userDir = path.join(UPLOADS_DIR, user.id);
-    const filePath = path.join(userDir, finalFileName);
-
-    // Ensure the user's upload directory exists
+    // Ensure upload directory exists
     await mkdir(userDir, { recursive: true });
-
-    // Write the file to disk
     await writeFile(filePath, buffer);
 
-    const urlPath = `/uploads/${user.id}/${finalFileName}`;
+    const publicUrl = `/uploads/${user.id}/${fileName}`;
 
     return NextResponse.json({
-      url: urlPath,
+      url: publicUrl,
+      path: `${user.id}/${fileName}`,
     });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

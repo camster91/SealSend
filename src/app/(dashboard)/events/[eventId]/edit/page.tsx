@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
-import { query, queryOne } from '@/lib/db/client';
 import WizardContainer from '@/components/events/wizard/WizardContainer';
 import type { Event, RSVPField } from '@/types/database';
 import type { Metadata } from 'next';
@@ -15,7 +15,6 @@ interface EditEventPageProps {
 
 export default async function EditEventPage({ params }: EditEventPageProps) {
   const { eventId } = await params;
-
   const user = await getCurrentUser();
 
   if (!user) {
@@ -23,20 +22,19 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   }
 
   // Fetch the event
-  const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-    [eventId, user.id]
-  );
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, user_id: user.id },
+  });
 
   if (!event) {
     notFound();
   }
 
   // Fetch RSVP fields for this event
-  const rsvpFields = await query<RSVPField>(
-    'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
-    [eventId]
-  );
+  const rsvpFields = await prisma.rsvpField.findMany({
+    where: { event_id: eventId },
+    orderBy: { sort_order: 'asc' },
+  });
 
   // Transform the event data into wizard form data shape
   const initialData = {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
@@ -162,15 +162,24 @@ export async function POST(request: NextRequest) {
       await handleSubscriptionUpdated(subscription);
       break;
     }
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await handleSubscriptionDeleted(subscription);
-      break;
-    }
-    case "invoice.payment_failed": {
-      const invoice = event.data.object as Stripe.Invoice;
-      await handlePaymentFailed(invoice);
-      break;
+
+    const maxResponses = TIERS[tierKey].maxResponses;
+
+    try {
+      await prisma.event.update({
+        where: { id: eventId },
+        data: {
+          tier: tierKey,
+          max_responses: maxResponses,
+          payment_id: session.id,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to update event after payment:", error);
+      return NextResponse.json(
+        { error: "Failed to update event" },
+        { status: 500 }
+      );
     }
   }
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
 
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = await rateLimit(`verify-code:${ip}`, { max: 5, windowSeconds: 900 });
+    const { success: rateLimitOk } = await rateLimit(`verify-code:${ip}`, { max: 10, windowSeconds: 600 });
     if (!rateLimitOk) {
       return NextResponse.json(
         { error: 'Too many attempts. Please wait a few minutes before trying again.' },
@@ -30,20 +30,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify code
-    const authCode = await queryOne<{
-      id: string;
-      email: string | null;
-      phone: string | null;
-      code: string;
-      role: string;
-      event_id: string | null;
-    }>(
-      `SELECT * FROM auth_codes
-       WHERE ${method === 'email' ? 'email' : 'phone'} = $1
-         AND code = $2
-         AND expires_at > $3`,
-      [method === 'email' ? email : phone, code, new Date().toISOString()]
-    );
+    const whereClause: Record<string, unknown> = {
+      code,
+      expires_at: { gt: new Date() },
+    };
+    if (method === 'email') {
+      whereClause.email = email;
+    } else {
+      whereClause.phone = phone;
+    }
+
+    const authCode = await prisma.authCode.findFirst({ where: whereClause });
 
     if (!authCode) {
       return NextResponse.json(
@@ -53,18 +50,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete used code
-    await query('DELETE FROM auth_codes WHERE id = $1', [authCode.id]);
+    await prisma.authCode.delete({ where: { id: authCode.id } });
 
     // Determine the correct user_id for the session
     let userId = authCode.id; // Default to auth_code id for guests
 
     if (authCode.role === 'admin' && authCode.email) {
-      // For admin users, look up their actual admin_users ID for FK constraint
-      const adminUser = await queryOne<{ id: string }>(
-        'SELECT id FROM admin_users WHERE email = $1',
-        [authCode.email]
-      );
-
+      const adminUser = await prisma.adminUser.findUnique({
+        where: { email: authCode.email },
+        select: { id: true },
+      });
       if (adminUser) {
         userId = adminUser.id;
       }
@@ -72,21 +67,16 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    try {
-      await query(
-        `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [userId, authCode.role, sessionToken, expiresAt.toISOString()]
-      );
-    } catch (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 }
-      );
-    }
+    await prisma.userSession.create({
+      data: {
+        user_id: userId,
+        user_role: authCode.role,
+        session_token: sessionToken,
+        expires_at: expiresAt,
+      },
+    });
 
     // Set session cookie
     const cookieStore = await cookies();

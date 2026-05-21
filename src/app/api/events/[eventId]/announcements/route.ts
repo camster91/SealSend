@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 import { buildAnnouncementEmail } from "@/lib/email-templates";
@@ -22,17 +22,17 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const announcements = await query(
-      'SELECT * FROM event_announcements WHERE event_id = $1 ORDER BY created_at DESC',
-      [eventId]
-    );
+    const announcements = await prisma.eventAnnouncement.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(announcements);
   } catch (error) {
@@ -63,10 +63,10 @@ export async function POST(
     }
 
     // Ownership + status check
-    const event = await queryOne<{ id: string; title: string; slug: string; status: string; tier: string }>(
-      'SELECT id, title, slug, status, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, slug: true, status: true, tier: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -97,10 +97,10 @@ export async function POST(
     }
 
     // Fetch all guests with email or phone
-    const guests = await query<{ id: string; name: string; email: string | null; phone: string | null; invite_token: string | null }>(
-      'SELECT id, name, email, phone, invite_token FROM guests WHERE event_id = $1',
-      [eventId]
-    );
+    const guests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      select: { id: true, name: true, email: true, phone: true, invite_token: true },
+    });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured();
@@ -211,16 +211,14 @@ export async function POST(
     }
 
     // Save the announcement record
-    const announcement = await queryOne(
-      `INSERT INTO event_announcements (event_id, subject, message, sent_to_count)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [eventId, parsed.data.subject, parsed.data.message, sentCount]
-    );
-
-    if (!announcement) {
-      return NextResponse.json({ error: "Failed to insert announcement" }, { status: 500 });
-    }
+    const announcement = await prisma.eventAnnouncement.create({
+      data: {
+        event_id: eventId,
+        subject: parsed.data.subject,
+        message: parsed.data.message,
+        sent_to_count: sentCount,
+      },
+    });
 
     return NextResponse.json(announcement, { status: 201 });
   } catch (error) {

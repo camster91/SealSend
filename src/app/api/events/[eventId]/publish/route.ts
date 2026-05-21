@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiUser } from '@/lib/auth/api-auth';
-import { queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -20,10 +20,10 @@ export async function POST(
     }
 
     // Fetch the current event to get its status
-    const event = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, status: true },
+    });
 
     if (!event) {
       return NextResponse.json(
@@ -35,17 +35,10 @@ export async function POST(
     // Toggle status between draft and published
     const newStatus = event.status === 'published' ? 'draft' : 'published';
 
-    const updatedEvent = await queryOne(
-      'UPDATE events SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-      [newStatus, eventId, user.id]
-    );
-
-    if (!updatedEvent) {
-      return NextResponse.json(
-        { error: 'Failed to update event status' },
-        { status: 500 }
-      );
-    }
+    const updatedEvent = await prisma.event.update({
+      where: { id: eventId },
+      data: { status: newStatus },
+    });
 
     return NextResponse.json(updatedEvent);
   } catch {

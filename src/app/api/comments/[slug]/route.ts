@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { commentSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -13,20 +13,23 @@ export async function GET(
     const { slug } = await params;
 
     // Find event by slug (any status — page is already rendered if accessible)
-    const event = await queryOne<{ id: string }>(
-      'SELECT id FROM events WHERE slug = $1',
-      [slug]
-    );
+    const event = await prisma.event.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
 
     if (!event) {
       return NextResponse.json([], { status: 200 });
     }
 
     // Only show public comments on the public page
-    const comments = await query(
-      'SELECT * FROM event_comments WHERE event_id = $1 AND is_private != true ORDER BY created_at DESC',
-      [event.id]
-    );
+    const comments = await prisma.eventComment.findMany({
+      where: {
+        event_id: event.id,
+        is_private: { not: true },
+      },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(comments ?? []);
   } catch {
@@ -49,10 +52,10 @@ export async function POST(
     const body = await request.json();
 
     // Find event by slug
-    const event = await queryOne<{ id: string }>(
-      'SELECT id FROM events WHERE slug = $1',
-      [slug]
-    );
+    const event = await prisma.event.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -66,16 +69,14 @@ export async function POST(
       );
     }
 
-    const comment = await queryOne(
-      `INSERT INTO event_comments (event_id, author_name, message, is_private)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [event.id, parsed.data.author_name, parsed.data.message, parsed.data.is_private ?? false]
-    );
-
-    if (!comment) {
-      return NextResponse.json({ error: "Failed to create comment" }, { status: 500 });
-    }
+    const comment = await prisma.eventComment.create({
+      data: {
+        event_id: event.id,
+        author_name: parsed.data.author_name,
+        message: parsed.data.message,
+        is_private: parsed.data.is_private ?? false,
+      },
+    });
 
     return NextResponse.json(comment, { status: 201 });
   } catch {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { getApiUser } from '@/lib/auth/api-auth';
 import { eventUpdateSchema } from '@/lib/validations';
 
@@ -20,10 +20,9 @@ export async function GET(
       );
     }
 
-    const event = await queryOne(
-      'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+    });
 
     if (!event) {
       return NextResponse.json(
@@ -57,10 +56,10 @@ export async function PATCH(
     }
 
     // Verify ownership
-    const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const existing = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!existing) {
       return NextResponse.json(
@@ -79,45 +78,10 @@ export async function PATCH(
       );
     }
 
-    const ALLOWED_COLUMNS = [
-      'title', 'description', 'event_date', 'event_end_date',
-      'location_name', 'location_address', 'host_name', 'dress_code',
-      'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
-      'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',
-      'status', 'auto_reminders',
-    ];
-
-    const updates = parsed.data as Record<string, unknown>;
-    const keys = Object.keys(updates).filter((key) => ALLOWED_COLUMNS.includes(key));
-
-    if (keys.length === 0) {
-      return NextResponse.json(existing);
-    }
-
-    const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
-    const values = keys.map((key) => {
-      const val = updates[key];
-      // JSON columns need to be stringified
-      if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-        return JSON.stringify(val);
-      }
-      if (Array.isArray(val)) {
-        return JSON.stringify(val);
-      }
-      return val;
+    const event = await prisma.event.update({
+      where: { id: eventId },
+      data: parsed.data,
     });
-
-    const event = await queryOne(
-      `UPDATE events SET ${setClauses.join(', ')} WHERE id = $${keys.length + 1} AND user_id = $${keys.length + 2} RETURNING *`,
-      [...values, eventId, user.id]
-    );
-
-    if (!event) {
-      return NextResponse.json(
-        { error: 'Failed to update event' },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json(event);
   } catch {
@@ -144,10 +108,10 @@ export async function DELETE(
     }
 
     // Verify ownership
-    const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const existing = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!existing) {
       return NextResponse.json(
@@ -156,10 +120,9 @@ export async function DELETE(
       );
     }
 
-    await query(
-      'DELETE FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    await prisma.event.delete({
+      where: { id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

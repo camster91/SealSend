@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getClientUser } from "@/lib/auth/client-auth";
 import { getInitials } from "@/lib/utils";
 import Link from "next/link";
 
@@ -9,8 +8,18 @@ export function DashboardHeader() {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const user = getClientUser();
-    setEmail(user?.email ?? null);
+    async function fetchUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setEmail(data.user?.email ?? null);
+        }
+      } catch {
+        // Not signed in
+      }
+    }
+    fetchUser();
   }, []);
 
   return (

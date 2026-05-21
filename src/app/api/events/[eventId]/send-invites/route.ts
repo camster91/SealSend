@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
@@ -39,10 +39,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<any>(
-      'SELECT id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, event_date: true, location_name: true, slug: true, status: true, design_url: true, host_name: true, dress_code: true, rsvp_deadline: true, tier: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -56,11 +56,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that need invitations (email OR phone)
-    const guests = await query<any>(
-      `SELECT id, name, email, phone, invite_status, invite_token FROM guests
-       WHERE event_id = $1 AND invite_status IN ('not_sent', 'failed')`,
-      [eventId]
-    );
+    const guests = await prisma.guest.findMany({
+      where: {
+        event_id: eventId,
+        invite_status: { in: ["not_sent", "failed"] },
+      },
+      select: { id: true, name: true, email: true, phone: true, invite_status: true, invite_token: true },
+    });
 
     // Filter to guests that have email or phone
     const sendableGuests = guests.filter((g) => g.email || g.phone);
@@ -91,10 +93,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           let token = guest.invite_token;
           if (!token) {
             token = generateInviteToken();
-            await query(
-              'UPDATE guests SET invite_token = $1 WHERE id = $2',
-              [token, guest.id]
-            );
+            await prisma.guest.update({
+              where: { id: guest.id },
+              data: { invite_token: token },
+            });
           }
 
           // Create a seamless magic invite link that auto-logs the guest in
@@ -239,20 +241,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Batch update statuses
     if (successIds.length > 0) {
-      const placeholders = successIds.map((_, i) => `$${i + 3}`).join(', ');
-      await query(
-        `UPDATE guests SET invite_status = $1, invite_sent_at = $2 WHERE id IN (${placeholders})`,
-        ['sent', new Date().toISOString(), ...successIds]
-      );
+      await prisma.guest.updateMany({
+        where: { id: { in: successIds } },
+        data: { invite_status: "sent", invite_sent_at: new Date().toISOString() },
+      });
     }
-    if (failedGuests.length > 0) {
-      // Update each failed guest with their specific error message
-      await Promise.all(failedGuests.map(({ id, error }) =>
-        query(
-          'UPDATE guests SET invite_status = $1, invite_error = $2 WHERE id = $3',
-          ['failed', error, id]
-        )
-      ));
+    if (failedIds.length > 0) {
+      await prisma.guest.updateMany({
+        where: { id: { in: failedIds } },
+        data: { invite_status: "failed" },
+      });
     }
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 
 export async function DELETE(
   _request: Request,
@@ -11,17 +11,16 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    await query(
-      'DELETE FROM rsvp_responses WHERE id = $1 AND event_id = $2',
-      [responseId, eventId]
-    );
+    await prisma.rsvpResponse.deleteMany({
+      where: { id: responseId, event_id: eventId },
+    });
 
     return NextResponse.json({ success: true });
   } catch {

@@ -3,7 +3,7 @@
  * Logs send attempts, successes, and failures for debugging and analytics
  */
 
-import { query } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 
 export type SendType = 'email' | 'sms';
 export type SendStatus = 'pending' | 'sent' | 'failed' | 'delivered' | 'bounced';
@@ -13,64 +13,53 @@ export interface SendLogEntry {
   event_id: string;
   send_type: SendType;
   status: SendStatus;
-  recipient: string; // email or phone
+  recipient: string;
   subject?: string;
   error_message?: string;
-  provider?: string; // 'mailgun' | 'twilio'
+  provider?: string;
   provider_message_id?: string;
   metadata?: Record<string, unknown>;
 }
 
-/**
- * Log a send attempt to the database
- * Requires a send_logs table (see migration below)
- */
 export async function logSendAttempt(entry: SendLogEntry): Promise<void> {
   try {
-    await query(
-      `INSERT INTO send_logs (guest_id, event_id, send_type, status, recipient, subject, error_message, provider, provider_message_id, metadata, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [
-        entry.guest_id ?? null,
-        entry.event_id,
-        entry.send_type,
-        entry.status,
-        entry.recipient,
-        entry.subject ?? null,
-        entry.error_message ?? null,
-        entry.provider ?? null,
-        entry.provider_message_id ?? null,
-        entry.metadata ? JSON.stringify(entry.metadata) : null,
-        new Date().toISOString(),
-      ]
-    );
+    await prisma.sendLog.create({
+      data: {
+        guest_id: entry.guest_id || null,
+        event_id: entry.event_id,
+        send_type: entry.send_type,
+        status: entry.status,
+        recipient: entry.recipient,
+        subject: entry.subject || null,
+        error_message: entry.error_message || null,
+        provider: entry.provider || null,
+        provider_message_id: entry.provider_message_id || null,
+        metadata: entry.metadata || null,
+      },
+    });
   } catch (error) {
-    // Don't throw - logging failures shouldn't break the main flow
     console.error('Failed to log send attempt:', error);
   }
 }
 
-/**
- * Update the status of a logged send (e.g., after webhook callback)
- */
 export async function updateSendStatus(
   logId: string,
   status: SendStatus,
-  errorMessage?: string
+  errorMessage?: string,
 ): Promise<void> {
   try {
-    await query(
-      'UPDATE send_logs SET status = $1, error_message = $2, updated_at = $3 WHERE id = $4',
-      [status, errorMessage ?? null, new Date().toISOString(), logId]
-    );
+    await prisma.sendLog.update({
+      where: { id: logId },
+      data: {
+        status,
+        error_message: errorMessage,
+      },
+    });
   } catch (error) {
     console.error('Failed to update send status:', error);
   }
 }
 
-/**
- * Log a successful send
- */
 export async function logSendSuccess(
   eventId: string,
   sendType: SendType,
@@ -81,7 +70,7 @@ export async function logSendSuccess(
     provider?: string;
     providerMessageId?: string;
     metadata?: Record<string, unknown>;
-  } = {}
+  } = {},
 ): Promise<void> {
   await logSendAttempt({
     event_id: eventId,
@@ -96,9 +85,6 @@ export async function logSendSuccess(
   });
 }
 
-/**
- * Log a failed send
- */
 export async function logSendFailure(
   eventId: string,
   sendType: SendType,
@@ -108,7 +94,7 @@ export async function logSendFailure(
     guestId?: string;
     subject?: string;
     provider?: string;
-  } = {}
+  } = {},
 ): Promise<void> {
   console.error(`[${sendType.toUpperCase()} FAILED] ${recipient}: ${errorMessage}`);
 
@@ -124,9 +110,6 @@ export async function logSendFailure(
   });
 }
 
-/**
- * Get send statistics for an event
- */
 export async function getEventSendStats(eventId: string): Promise<{
   total: number;
   sent: number;
@@ -134,10 +117,10 @@ export async function getEventSendStats(eventId: string): Promise<{
   pending: number;
   byType: Record<SendType, { sent: number; failed: number }>;
 }> {
-  const logs = await query<{ send_type: string; status: string }>(
-    'SELECT send_type, status FROM send_logs WHERE event_id = $1',
-    [eventId]
-  );
+  const logs = await prisma.sendLog.findMany({
+    where: { event_id: eventId },
+    select: { send_type: true, status: true },
+  });
 
   const stats = {
     total: 0,
@@ -150,7 +133,7 @@ export async function getEventSendStats(eventId: string): Promise<{
     },
   };
 
-  for (const log of logs || []) {
+  for (const log of logs) {
     stats.total++;
 
     if (log.status === 'sent' || log.status === 'delivered') {
@@ -166,37 +149,3 @@ export async function getEventSendStats(eventId: string): Promise<{
 
   return stats;
 }
-
-/**
- * Migration to create send_logs table:
- *
- * ```sql
- * CREATE TABLE send_logs (
- *   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
- *   guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
- *   event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
- *   send_type TEXT NOT NULL CHECK (send_type IN ('email', 'sms')),
- *   status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'delivered', 'bounced')),
- *   recipient TEXT NOT NULL, -- email or phone
- *   subject TEXT,
- *   error_message TEXT,
- *   provider TEXT,
- *   provider_message_id TEXT,
- *   metadata JSONB,
- *   created_at TIMESTAMPTZ DEFAULT NOW(),
- *   updated_at TIMESTAMPTZ DEFAULT NOW()
- * );
- *
- * CREATE INDEX idx_send_logs_event ON send_logs(event_id);
- * CREATE INDEX idx_send_logs_guest ON send_logs(guest_id);
- * CREATE INDEX idx_send_logs_status ON send_logs(status);
- * CREATE INDEX idx_send_logs_created ON send_logs(created_at);
- *
- * ALTER TABLE send_logs ENABLE ROW LEVEL SECURITY;
- *
- * CREATE POLICY "Users can view own event send logs" ON send_logs
- *   FOR SELECT USING (
- *     event_id IN (SELECT id FROM events WHERE user_id = auth.uid())
- *   );
- * ```
- */

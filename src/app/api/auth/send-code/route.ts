@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
@@ -71,45 +71,33 @@ export async function POST(request: NextRequest) {
     // Determine role
     let role = 'guest';
     if (method === 'email' && email) {
-      // Check if this is an admin email
-      const admin = await queryOne<{ id: string }>(
-        'SELECT id FROM admin_users WHERE email = $1',
-        [email]
-      );
-
+      const admin = await prisma.adminUser.findUnique({
+        where: { email },
+        select: { id: true },
+      });
       if (admin) {
         role = 'admin';
       }
     }
 
-    // Delete any existing codes for this email/phone to avoid stale entries
+    // Delete any existing codes for this email/phone
     if (method === 'email' && email) {
-      await query('DELETE FROM auth_codes WHERE email = $1', [email]);
+      await prisma.authCode.deleteMany({ where: { email } });
     } else if (method === 'phone' && formattedPhone) {
-      await query('DELETE FROM auth_codes WHERE phone = $1', [formattedPhone]);
+      await prisma.authCode.deleteMany({ where: { phone: formattedPhone } });
     }
 
     // Store code in database
-    try {
-      await query(
-        `INSERT INTO auth_codes (email, phone, code, role, event_id, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          email || null,
-          formattedPhone || null,
-          code,
-          role,
-          eventId || null,
-          new Date(Date.now() + 15 * 60 * 1000).toISOString()
-        ]
-      );
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to generate code' },
-        { status: 500 }
-      );
-    }
+    await prisma.authCode.create({
+      data: {
+        email: email || null,
+        phone: formattedPhone || null,
+        code,
+        role,
+        event_id: eventId || null,
+        expires_at: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
 
     // Send code via appropriate channel
     if (method === 'email' && email) {

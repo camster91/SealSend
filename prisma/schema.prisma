@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────
+
+enum EventStatus {
+  draft
+  published
+  archived
+
+  @@map("event_status")
+}
+
+enum EventTier {
+  free
+  standard
+  premium
+
+  @@map("event_tier")
+}
+
+enum RsvpFieldType {
+  attendance
+  text
+  select
+  multiselect
+  number
+  email
+  phone
+
+  @@map("rsvp_field_type")
+}
+
+enum RsvpStatus {
+  attending
+  not_attending
+  maybe
+  pending
+
+  @@map("rsvp_status")
+}
+
+// ─── Auth Models ─────────────────────────────────────────────────────
+
+model AdminUser {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String        @unique
+  password   String
+  name       String?
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
+  sessions   UserSession[]
+  events     Event[]
+
+  @@map("admin_users")
+}
+
+model AuthCode {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String?
+  phone      String?
+  code       String
+  role       String
+  event_id   String?  @db.Uuid
+  event      Event?   @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  expires_at DateTime @db.Timestamptz(6)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("auth_codes")
+}
+
+model UserSession {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String    @db.Uuid
+  user_role     String
+  session_token String    @unique
+  expires_at    DateTime  @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  admin_user    AdminUser @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// ─── Core Models ─────────────────────────────────────────────────────
+
+model Event {
+  id                 String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id            String             @db.Uuid
+  title              String
+  description        String?
+  event_date         DateTime?          @db.Timestamptz(6)
+  event_end_date     DateTime?          @db.Timestamptz(6)
+  location_name      String?
+  location_address   String?
+  location_lat       Float?
+  location_lng       Float?
+  host_name          String?
+  dress_code         String?
+  rsvp_deadline      DateTime?          @db.Timestamptz(6)
+  registry_links     Json               @default("[]")
+  design_url         String?
+  design_type        String             @default("image")
+  customization      Json               @default("{\"primaryColor\":\"#7c3aed\",\"backgroundColor\":\"#ffffff\",\"backgroundImage\":null,\"fontFamily\":\"Inter\",\"buttonStyle\":\"rounded\",\"showCountdown\":true}")
+  slug               String             @unique
+  status             EventStatus        @default(draft)
+  tier               EventTier          @default(free)
+  max_responses      Int                @default(15)
+  max_attendees      Int?
+  allow_plus_ones    Boolean            @default(true)
+  max_guests_per_rsvp Int               @default(10)
+  auto_reminders     Boolean            @default(false)
+  payment_id         String?
+  created_at         DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  admin_user         AdminUser          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  guests             Guest[]
+  rsvp_responses     RsvpResponse[]
+  rsvp_fields        RsvpField[]
+  guest_tags         GuestTag[]
+  comments           EventComment[]
+  announcements      EventAnnouncement[]
+  signup_items       EventSignupItem[]
+  signup_claims      EventSignupClaim[]
+  plus_ones          PlusOne[]
+  auth_codes         AuthCode[]
+  send_logs          SendLog[]
+  magic_tokens       GuestMagicToken[]
+
+  @@index([user_id])
+  @@map("events")
+}
+
+model Guest {
+  id                  String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id            String             @db.Uuid
+  name                String
+  email               String?
+  phone               String?
+  notes               String?
+  invite_token        String?            @unique
+  invite_status       String             @default("not_sent")
+  invite_sent_at      DateTime?          @db.Timestamptz(6)
+  reminder_sent_at    DateTime?          @db.Timestamptz(6)
+  email_bounced_at    DateTime?          @db.Timestamptz(6)
+  email_complained_at DateTime?          @db.Timestamptz(6)
+  phone_invalid_at    DateTime?          @db.Timestamptz(6)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+
+  event               Event              @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  rsvp_responses      RsvpResponse[]
+  tag_assignments     GuestTagAssignment[]
+  plus_ones           PlusOne[]
+  send_logs           SendLog[]
+  magic_tokens        GuestMagicToken[]
+
+  @@index([event_id])
+  @@index([invite_token])
+  @@map("guests")
+}
+
+model RsvpField {
+  id          String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id    String        @db.Uuid
+  field_name  String
+  field_label String
+  field_type  RsvpFieldType
+  options     Json?
+  placeholder String?
+  is_required Boolean       @default(false)
+  is_enabled  Boolean       @default(true)
+  sort_order  Int           @default(0)
+  created_at  DateTime      @default(now()) @db.Timestamptz(6)
+
+  event       Event         @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id])
+  @@map("rsvp_fields")
+}
+
+model RsvpResponse {
+  id               String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id         String     @db.Uuid
+  guest_id         String?    @db.Uuid
+  respondent_name  String
+  respondent_email String?
+  status           RsvpStatus @default(pending)
+  response_data    Json       @default("{}")
+  headcount        Int        @default(1)
+  plus_ones_data   Json       @default("[]")
+  submitted_at     DateTime   @default(now()) @db.Timestamptz(6)
+
+  event            Event      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  guest            Guest?     @relation(fields: [guest_id], references: [id], onDelete: SetNull)
+  plus_ones        PlusOne[]
+
+  @@index([event_id])
+  @@index([event_id, status])
+  @@map("rsvp_responses")
+}
+
+model GuestTag {
+  id          String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id    String               @db.Uuid
+  tag_name    String
+  color       String               @default("#7c3aed")
+  created_at  DateTime             @default(now()) @db.Timestamptz(6)
+
+  event       Event                @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  assignments GuestTagAssignment[]
+
+  @@index([event_id])
+  @@map("guest_tags")
+}
+
+model GuestTagAssignment {
+  guest_id String   @db.Uuid
+  tag_id   String   @db.Uuid
+
+  guest    Guest    @relation(fields: [guest_id], references: [id], onDelete: Cascade)
+  tag      GuestTag @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([guest_id, tag_id])
+  @@map("guest_tag_assignments")
+}
+
+model EventComment {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id    String   @db.Uuid
+  author_name String
+  message     String
+  is_private  Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  event       Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id])
+  @@map("event_comments")
+}
+
+model EventAnnouncement {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id      String   @db.Uuid
+  subject       String
+  message       String
+  sent_to_count Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  event         Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id])
+  @@map("event_announcements")
+}
+
+model EventSignupItem {
+  id          String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id    String             @db.Uuid
+  title       String
+  description String?
+  category    String?
+  slots       Int                @default(1)
+  sort_order  Int                @default(0)
+  created_at  DateTime           @default(now()) @db.Timestamptz(6)
+
+  event       Event              @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  claims      EventSignupClaim[]
+
+  @@index([event_id])
+  @@map("event_signup_items")
+}
+
+model EventSignupClaim {
+  id              String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  item_id         String          @db.Uuid
+  event_id        String          @db.Uuid
+  claimant_name   String
+  claimant_email  String?
+  created_at      DateTime        @default(now()) @db.Timestamptz(6)
+
+  item            EventSignupItem @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  event           Event           @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([item_id])
+  @@index([event_id])
+  @@map("event_signup_claims")
+}
+
+model PlusOne {
+  id               String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id         String       @db.Uuid
+  rsvp_response_id String       @db.Uuid
+  guest_id         String?      @db.Uuid
+  name             String
+  email            String?
+  status           RsvpStatus   @default(pending)
+  invite_token     String?      @unique
+  invite_status    String       @default("not_sent")
+  invite_sent_at   DateTime?    @db.Timestamptz(6)
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+
+  event            Event        @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  rsvp_response    RsvpResponse @relation(fields: [rsvp_response_id], references: [id], onDelete: Cascade)
+  guest            Guest?       @relation(fields: [guest_id], references: [id], onDelete: SetNull)
+
+  @@index([event_id])
+  @@index([rsvp_response_id])
+  @@index([guest_id])
+  @@index([invite_token])
+  @@map("plus_ones")
+}
+
+model SendLog {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  guest_id            String?  @db.Uuid
+  event_id            String   @db.Uuid
+  send_type           String
+  status              String
+  recipient           String
+  subject             String?
+  error_message       String?
+  provider            String?
+  provider_message_id String?
+  metadata            Json?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  guest               Guest?   @relation(fields: [guest_id], references: [id], onDelete: SetNull)
+  event               Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id])
+  @@index([guest_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("send_logs")
+}
+
+model GuestMagicToken {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  guest_id      String    @db.Uuid
+  event_id      String    @db.Uuid
+  token_hash    String
+  token_preview String?
+  expires_at    DateTime  @db.Timestamptz(6)
+  used_at       DateTime? @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+
+  guest         Guest     @relation(fields: [guest_id], references: [id], onDelete: Cascade)
+  event         Event     @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([guest_id])
+  @@index([event_id])
+  @@index([token_hash])
+  @@map("guest_magic_tokens")
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { getApiUser } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
@@ -16,10 +16,10 @@ export async function GET() {
       );
     }
 
-    const events = await query(
-      'SELECT * FROM events WHERE user_id = $1 ORDER BY created_at DESC',
-      [user.id]
-    );
+    const events = await prisma.event.findMany({
+      where: { user_id: user.id },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(events);
   } catch {
@@ -59,47 +59,38 @@ export async function POST(request: NextRequest) {
     for (let attempt = 0; attempt < 3; attempt++) {
       const slug = generateSlug(title);
       try {
-        event = await queryOne(
-          `INSERT INTO events (
-            user_id, title, slug, description, event_date, event_end_date,
-            location_name, location_address, host_name, dress_code,
-            rsvp_deadline, registry_links, max_attendees, allow_plus_ones,
-            max_guests_per_rsvp, design_url, design_type, customization, status
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
-          ) RETURNING *`,
-          [
-            user.id,
+        event = await prisma.event.create({
+          data: {
+            user_id: user.id,
             title,
             slug,
-            description ?? null,
-            event_date ?? null,
-            event_end_date ?? null,
-            location_name ?? null,
-            location_address ?? null,
-            host_name ?? null,
-            dress_code ?? null,
-            rsvp_deadline ?? null,
-            JSON.stringify(registry_links ?? []),
-            max_attendees ?? null,
-            allow_plus_ones ?? null,
-            max_guests_per_rsvp ?? null,
-            design_url ?? null,
-            design_type ?? 'upload',
-            JSON.stringify(customization ?? {}),
-            status ?? 'draft',
-          ]
-        );
+            description: description ?? null,
+            event_date: event_date ?? null,
+            event_end_date: event_end_date ?? null,
+            location_name: location_name ?? null,
+            location_address: location_address ?? null,
+            host_name: host_name ?? null,
+            dress_code: dress_code ?? null,
+            rsvp_deadline: rsvp_deadline ?? null,
+            registry_links: registry_links ?? [],
+            ...(max_attendees !== undefined && { max_attendees: max_attendees }),
+            ...(allow_plus_ones !== undefined && { allow_plus_ones }),
+            ...(max_guests_per_rsvp !== undefined && { max_guests_per_rsvp }),
+            design_url: design_url ?? null,
+            design_type: design_type ?? 'upload',
+            customization: customization ?? {},
+            status: status ?? 'draft',
+          },
+        });
         insertError = null;
         break;
-      } catch (err: unknown) {
-        const pgError = err as { code?: string; message?: string };
+      } catch (error: any) {
         // If not a unique constraint violation, don't retry
-        if (pgError.code !== '23505') {
-          insertError = pgError;
+        if (error?.code !== 'P2002') {
+          insertError = error;
           break;
         }
-        insertError = pgError;
+        insertError = error;
       }
     }
 
@@ -116,33 +107,10 @@ export async function POST(request: NextRequest) {
       const values: unknown[] = [];
       let paramIdx = 1;
 
-      DEFAULT_RSVP_FIELDS.forEach((field, index) => {
-        placeholders.push(
-          `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8})`
-        );
-        values.push(
-          (event as Record<string, unknown>).id,
-          field.field_name,
-          field.field_type,
-          field.field_label,
-          field.is_required,
-          field.is_enabled,
-          index,
-          field.options ?? null,
-          field.placeholder ?? null,
-        );
-        paramIdx += 9;
-      });
-
-      try {
-        await query(
-          `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder) VALUES ${placeholders.join(', ')}`,
-          values
-        );
-      } catch (rsvpErr: unknown) {
-        const rsvpError = rsvpErr as { message?: string };
-        console.error('Failed to insert default RSVP fields:', rsvpError.message);
-      }
+    try {
+      await prisma.rsvpField.createMany({ data: rsvpFields });
+    } catch (rsvpError: any) {
+      console.error('Failed to insert default RSVP fields:', rsvpError.message);
     }
 
     return NextResponse.json(event, { status: 201 });

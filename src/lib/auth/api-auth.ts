@@ -1,26 +1,49 @@
 import { cookies } from 'next/headers';
-import { queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
+import { verifyToken } from '@/lib/auth';
 
 interface AuthenticatedUser {
   id: string;
   email?: string | null;
   role: 'admin' | 'guest';
+  source: 'jwt' | 'session';
 }
 
+/**
+ * Authenticate API requests using JWT token or session cookie.
+ * Returns the authenticated user or null if unauthenticated.
+ */
 export async function getApiUser(): Promise<AuthenticatedUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('sealsend_session')?.value;
+  const cookieStore = await cookies();
 
+  // 1. Try JWT token first
+  const token = cookieStore.get('sealsend_token')?.value;
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      return {
+        id: payload.userId,
+        email: payload.email,
+        role: payload.role,
+        source: 'jwt',
+      };
+    }
+  }
+
+  // 2. Try session cookie
+  try {
+    const sessionToken = cookieStore.get('sealsend_session')?.value;
     if (!sessionToken) return null;
 
-    const session = await queryOne<{ user_id: string; user_role: string }>(
-      'SELECT user_id, user_role FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
-      [sessionToken]
-    );
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: sessionToken },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    if (!session) return null;
+    if (!session || session.expires_at < new Date()) return null;
 
+    // Get user info from the cookie
+    const userCookie = cookieStore.get('sealsend_user')?.value;
     let email: string | null = null;
     if (session.user_role === 'admin') {
       const adminUser = await queryOne<{ email: string }>(
@@ -34,6 +57,7 @@ export async function getApiUser(): Promise<AuthenticatedUser | null> {
       id: session.user_id,
       email,
       role: session.user_role as 'admin' | 'guest',
+      source: 'session',
     };
   } catch {
     return null;

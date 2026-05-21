@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { guestSchema } from "@/lib/validations";
 
 export async function GET(
@@ -13,17 +13,17 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const guests = await query(
-      'SELECT * FROM guests WHERE event_id = $1 ORDER BY created_at DESC',
-      [eventId]
-    );
+    const guests = await prisma.guest.findMany({
+      where: { event_id: eventId },
+      orderBy: { created_at: 'desc' },
+    });
 
     return NextResponse.json(guests);
   } catch {
@@ -42,10 +42,10 @@ export async function POST(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true },
+    });
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -54,10 +54,15 @@ export async function POST(
       return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const guest = await queryOne(
-      'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [eventId, parsed.data.name, parsed.data.email || null, parsed.data.phone || null, parsed.data.notes || null]
-    );
+    const guest = await prisma.guest.create({
+      data: {
+        event_id: eventId,
+        name: parsed.data.name,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        notes: parsed.data.notes || null,
+      },
+    });
 
     return NextResponse.json(guest, { status: 201 });
   } catch {

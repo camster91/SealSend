@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { queryOne } from '@/lib/db/client';
 import { AuthUser } from './types';
+import { prisma } from '@/lib/db';
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
@@ -11,12 +12,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 
   try {
-    const session = await queryOne<{ user_id: string; user_role: string }>(
-      'SELECT user_id, user_role FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
-      [sessionToken]
-    );
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: sessionToken },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    if (!session) {
+    if (!session || session.expires_at < new Date()) {
       cookieStore.delete('sealsend_session');
       cookieStore.delete('sealsend_user');
       return null;
@@ -81,13 +82,16 @@ export async function logout() {
 
   if (sessionToken) {
     try {
-      await queryOne('DELETE FROM user_sessions WHERE session_token = $1', [sessionToken]);
+      await prisma.userSession.deleteMany({
+        where: { session_token: sessionToken },
+      });
     } catch (error) {
       console.error('Error deleting session:', error);
     }
   }
 
   cookieStore.delete('sealsend_session');
+  cookieStore.delete('sealsend_token');
   cookieStore.delete('sealsend_user');
 }
 
@@ -97,12 +101,12 @@ export async function validateSessionToken(token: string): Promise<{
   error?: string;
 }> {
   try {
-    const session = await queryOne<{ user_id: string; user_role: string; expires_at: string }>(
-      'SELECT user_id, user_role, expires_at FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
-      [token]
-    );
+    const session = await prisma.userSession.findUnique({
+      where: { session_token: token },
+      select: { user_id: true, user_role: true, expires_at: true },
+    });
 
-    if (!session) {
+    if (!session || session.expires_at < new Date()) {
       return { valid: false, error: 'Invalid or expired session' };
     }
 
@@ -137,9 +141,13 @@ export async function validateSessionToken(token: string): Promise<{
 }
 
 export async function invalidateSession(token: string): Promise<void> {
-  await queryOne('DELETE FROM user_sessions WHERE session_token = $1', [token]);
+  await prisma.userSession.deleteMany({
+    where: { session_token: token },
+  });
 }
 
 export async function invalidateAllUserSessions(userId: string): Promise<void> {
-  await queryOne('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+  await prisma.userSession.deleteMany({
+    where: { user_id: userId },
+  });
 }

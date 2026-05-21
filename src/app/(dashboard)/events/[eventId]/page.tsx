@@ -1,8 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth/session';
-import { queryOne } from '@/lib/db/client';
-import type { Event } from '@/types/database';
+import { getEventById, getEventMetrics } from '@/lib/repositories/eventRepository';
+import { toggleEventStatus } from '@/actions/eventActions';
+import { useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { AnnouncementSection } from '@/components/dashboard/AnnouncementSection';
 import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
 import { CopyLinkButton } from '@/components/dashboard/CopyLinkButton';
@@ -20,33 +22,19 @@ interface EventDetailPageProps {
 export default async function EventDetailPage({ params, searchParams }: EventDetailPageProps) {
   const { eventId } = await params;
   const { upgraded } = await searchParams;
-
   const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
-  const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-    [eventId, user.id]
-  );
+  const { data: event, error } = await getEventById(eventId, user.id);
 
   if (!event) {
     notFound();
   }
 
-  const responseCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM rsvp_responses WHERE event_id = $1',
-    [eventId]
-  );
-  const responseCount = responseCountResult?.count ?? 0;
-
-  const guestCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM guests WHERE event_id = $1',
-    [eventId]
-  );
-  const guestCount = guestCountResult?.count ?? 0;
+  const { responseCount, guestCount } = await getEventMetrics(eventId);
 
   const isPublished = event.status === 'published';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
@@ -355,50 +343,40 @@ function DetailRow({ icon, label, value, subtitle, mono }: { icon: string; label
 }
 
 function PublishButton({ eventId, isPublished }: { eventId: string; isPublished: boolean }) {
+  const [isPending, startTransition] = useTransition();
+
+  const handleAction = async () => {
+    startTransition(async () => {
+      await toggleEventStatus(eventId);
+    });
+  };
+
   return (
-    <form
-      action={async () => {
-        'use server';
-        const { getCurrentUser } = await import('@/lib/auth/session');
-        const { query: dbQuery } = await import('@/lib/db/client');
-
-        const user = await getCurrentUser();
-        if (!user) return;
-
-        const newStatus = isPublished ? 'draft' : 'published';
-        await dbQuery(
-          'UPDATE events SET status = $1 WHERE id = $2 AND user_id = $3',
-          [newStatus, eventId, user.id]
-        );
-
-        const { revalidatePath } = await import('next/cache');
-        revalidatePath(`/events/${eventId}`);
-      }}
+    <button
+      onClick={handleAction}
+      disabled={isPending}
+      type="button"
+      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-all active:scale-[0.98] ${
+        isPublished
+          ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+          : 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-500/20 hover:shadow-lg'
+      }`}
     >
-      <button
-        type="submit"
-        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-all active:scale-[0.98] ${
-          isPublished
-            ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-            : 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-500/20 hover:shadow-lg'
-        }`}
-      >
-        {isPublished ? (
-          <>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-            </svg>
-            Unpublish
-          </>
-        ) : (
-          <>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-            </svg>
-            Publish Event
-          </>
-        )}
-      </button>
-    </form>
+      {isPending ? 'Updating...' : isPublished ? (
+        <>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+          </svg>
+          Unpublish
+        </>
+      ) : (
+        <>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+          </svg>
+          Publish Event
+        </>
+      )}
+    </button>
   );
 }

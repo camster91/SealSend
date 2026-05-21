@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getClientUser } from '@/lib/auth/client-auth';
 import type { SignupItemWithClaims } from '@/types/database';
 
 interface SignupBoardProps {
@@ -31,10 +30,19 @@ export function SignupBoard({ eventSlug }: SignupBoardProps) {
 
   // Auto-fill name from session cookie (runs once on mount)
   useEffect(() => {
-    const user = getClientUser();
-    if (user) {
-      const name = user.name || user.email?.split('@')[0] || '';
-      if (name) setClaimName((prev) => prev || name);
+    async function prefill() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user;
+        if (user && !claimName) {
+          const name = user.name || user.email?.split('@')[0] || '';
+          if (name) setClaimName(name);
+        }
+      } catch {
+        // Not signed in
+      }
     }
   }, []);
 

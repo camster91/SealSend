@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { prisma } from '@/lib/db';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 import { cookies } from 'next/headers';
@@ -8,8 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
     const { success: rateLimitOk } = await rateLimit(`login-password:${ip}`, {
-      max: 3,
-      windowSeconds: 900
+      max: 5,
+      windowSeconds: 600
     });
 
     if (!rateLimitOk) {
@@ -30,18 +30,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Find admin user by email
-    const adminUser = await queryOne<{
-      id: string;
-      email: string;
-      name: string;
-      password: string;
-    }>(
-      'SELECT id, email, name, password FROM admin_users WHERE email = $1',
-      [email]
-    );
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, password: true },
+    });
 
     if (!adminUser) {
-      // Don't reveal whether email exists
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -60,21 +54,16 @@ export async function POST(request: NextRequest) {
 
     // Create session
     const sessionToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    try {
-      await query(
-        `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [adminUser.id, 'admin', sessionToken, expiresAt.toISOString()]
-      );
-    } catch (sessionError) {
-      console.error('Session creation error:', sessionError);
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 }
-      );
-    }
+    await prisma.userSession.create({
+      data: {
+        user_id: adminUser.id,
+        user_role: 'admin',
+        session_token: sessionToken,
+        expires_at: expiresAt,
+      },
+    });
 
     // Set session cookie
     const cookieStore = await cookies();

@@ -20,36 +20,47 @@ export interface PhoneValidationResult {
  * @returns Validation result with formatted number if valid
  */
 export function validateAndFormatPhone(
-  phone: string,
+  phone: string | null | undefined,
   defaultCountry: string = 'US'
 ): PhoneValidationResult {
-  try {
-    // Basic pre-check
-    if (!phone || phone.trim().length < 10) {
-      return { valid: false, error: 'Phone number is too short' };
-    }
+  if (!phone || typeof phone !== 'string' || phone.trim().length < 5) {
+    return { valid: false, error: 'Phone number is too short or invalid type' };
+  }
 
-    // Check if valid for the country
-    if (!isValidPhoneNumber(phone, defaultCountry as any)) {
+  // Sanitize: ensure + prefix
+  const sanitizedPhone = phone.trim().startsWith('+') 
+    ? phone.trim() 
+    : `+1${phone.trim().replace(/\D/g, '')}`;
+
+  try {
+    // Attempt robust parsing
+    if (!isValidPhoneNumber(sanitizedPhone)) {
       return { valid: false, error: 'Invalid phone number format' };
     }
 
-    const parsed = parsePhoneNumber(phone, defaultCountry as any);
+    const parsed = parsePhoneNumber(sanitizedPhone);
     
     if (!parsed || !parsed.isValid()) {
       return { valid: false, error: 'Invalid phone number' };
     }
 
-    // Return E.164 format (required by Twilio)
     return {
       valid: true,
       formatted: parsed.format('E.164'),
       country: parsed.country,
     };
   } catch (error) {
+    // If library fails, fallback to basic E.164-like validation
+    console.warn('Phone validation library error, using fallback:', error);
+    if (/^\+[1-9]\d{6,14}$/.test(sanitizedPhone)) {
+      return {
+        valid: true,
+        formatted: sanitizedPhone,
+      };
+    }
     return { 
       valid: false, 
-      error: error instanceof Error ? error.message : 'Invalid phone number format'
+      error: 'Invalid phone number format'
     };
   }
 }

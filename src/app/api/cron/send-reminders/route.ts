@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";
@@ -58,10 +58,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const authHeader = request.headers.get("authorization");
-    const isAuthorized = authHeader === `Bearer ${cronSecret}`;
-
-    if (!isAuthorized) {
+    if (secret !== cronSecret) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -79,14 +76,26 @@ export async function GET(request: NextRequest) {
     console.log(`[CRON] Checking for events between ${windowStart.toISOString()} and ${windowEnd.toISOString()}`);
 
     // Find published events with auto_reminders enabled happening in the window
-    const events = await query<EventRow>(
-      `SELECT id, title, event_date, location_name, slug, tier, user_id
-       FROM events
-       WHERE status = $1 AND auto_reminders = true
-         AND event_date >= $2 AND event_date <= $3
-       ORDER BY event_date ASC`,
-      ["published", windowStart.toISOString(), windowEnd.toISOString()]
-    );
+    const events = await prisma.event.findMany({
+      where: {
+        status: "published",
+        auto_reminders: true,
+        event_date: {
+          gte: windowStart.toISOString(),
+          lte: windowEnd.toISOString(),
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        event_date: true,
+        location_name: true,
+        slug: true,
+        tier: true,
+        user_id: true,
+      },
+      orderBy: { event_date: 'asc' },
+    });
 
     if (!events || events.length === 0) {
       console.log("[CRON] No events found requiring reminders");
@@ -123,17 +132,27 @@ export async function GET(request: NextRequest) {
       // Fetch guests who:
       // 1. Haven't received a reminder yet (reminder_sent_at is null)
       // 2. Have either email or phone
-      // Join with rsvp_responses to check status
-      const guests = await query<GuestWithResponse>(
-        `SELECT g.id, g.name, g.email, g.phone, g.invite_token, g.reminder_sent_at,
-                r.status as rsvp_status
-         FROM guests g
-         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
-         WHERE g.event_id = $1
-           AND g.reminder_sent_at IS NULL
-           AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
-        [event.id]
-      );
+      const guests = await prisma.guest.findMany({
+        where: {
+          event_id: event.id,
+          reminder_sent_at: null,
+          OR: [
+            { email: { not: null } },
+            { phone: { not: null } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          invite_token: true,
+          reminder_sent_at: true,
+          rsvp_responses: {
+            select: { status: true },
+          },
+        },
+      });
 
       if (!guests || guests.length === 0) {
         console.log(`[CRON] No guests to notify for event ${event.id}`);
@@ -302,10 +321,10 @@ export async function GET(request: NextRequest) {
       // Update reminder_sent_at for successful sends
       if (successIds.length > 0) {
         try {
-          await query(
-            'UPDATE guests SET reminder_sent_at = $1 WHERE id = ANY($2)',
-            [new Date().toISOString(), successIds]
-          );
+          await prisma.guest.updateMany({
+            where: { id: { in: successIds } },
+            data: { reminder_sent_at: new Date().toISOString() },
+          });
         } catch (updateError: any) {
           console.error(`[CRON] Error updating reminder_sent_at for event ${event.id}:`, updateError);
           errors.push(updateError.message);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { queryOne } from "@/lib/db/client";
+import { prisma } from '@/lib/db';
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
 
@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
     const { eventId, tier } = parsed.data;
 
     // Verify user owns the event
-    const event = await queryOne<{ id: string; title: string; tier: string }>(
-      'SELECT id, title, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, user_id: user.id },
+      select: { id: true, title: true, tier: true },
+    });
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
