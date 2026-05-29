@@ -22,11 +22,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect('/login?redirect=/dashboard');
   }
   
-  // Get events created by the user
-  const myEvents = await getEventsByUser(user.id);
-  
-  // Get events the user is invited to (as a guest)
-  const invitedEvents = await getInvitedEvents(user.id);
+  // Optimization: Parallelize fetching of user events and invited events using Promise.all
+  // Also pass the correct identifier (email or phone) to find guest invitations
+  const [myEvents, invitedEvents] = await Promise.all([
+    getEventsByUser(user.id),
+    getInvitedEvents(user.email || user.phone || user.id)
+  ]);
   
   const allEvents = [...myEvents, ...invitedEvents];
 
