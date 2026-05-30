@@ -4,6 +4,7 @@
  */
 
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const SALT_ROUNDS = 14;
 
@@ -26,21 +27,31 @@ export async function verifyPassword(password: string, hashedPassword: string): 
  */
 export function generateSecurePassword(length: number = 16): string {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
+  const uppers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lowers = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const specials = '!@#$%^&*';
   
-  // Ensure at least one of each required character type
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-  password += '0123456789'[Math.floor(Math.random() * 10)];
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
+  const passwordArr: string[] = [];
   
-  // Fill the rest randomly
+  // Ensure at least one of each required character type using secure randomness
+  passwordArr.push(uppers[crypto.randomInt(0, uppers.length)]);
+  passwordArr.push(lowers[crypto.randomInt(0, lowers.length)]);
+  passwordArr.push(numbers[crypto.randomInt(0, numbers.length)]);
+  passwordArr.push(specials[crypto.randomInt(0, specials.length)]);
+
+  // Fill the rest randomly using secure randomness
   for (let i = 4; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+    passwordArr.push(charset[crypto.randomInt(0, charset.length)]);
+  }
+
+  // Shuffle the password using a cryptographically secure Fisher-Yates shuffle
+  for (let i = passwordArr.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [passwordArr[i], passwordArr[j]] = [passwordArr[j], passwordArr[i]];
   }
   
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  return passwordArr.join('');
 }
 
 /**

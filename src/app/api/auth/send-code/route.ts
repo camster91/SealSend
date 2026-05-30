@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
@@ -65,8 +66,8 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6-digit code using cryptographically secure randomness
+    const code = crypto.randomInt(100000, 1000000).toString();
 
     // Determine role
     let role = 'guest';
