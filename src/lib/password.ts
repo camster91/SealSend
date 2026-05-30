@@ -4,6 +4,7 @@
  */
 
 import bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 
 const SALT_ROUNDS = 14;
 
@@ -26,21 +27,26 @@ export async function verifyPassword(password: string, hashedPassword: string): 
  */
 export function generateSecurePassword(length: number = 16): string {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  let password = '';
+  const chars: string[] = [];
   
   // Ensure at least one of each required character type
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-  password += '0123456789'[Math.floor(Math.random() * 10)];
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
+  chars.push('ABCDEFGHIJKLMNOPQRSTUVWXYZ'[randomInt(0, 26)]);
+  chars.push('abcdefghijklmnopqrstuvwxyz'[randomInt(0, 26)]);
+  chars.push('0123456789'[randomInt(0, 10)]);
+  chars.push('!@#$%^&*'[randomInt(0, 8)]);
   
   // Fill the rest randomly
   for (let i = 4; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+    chars.push(charset[randomInt(0, charset.length)]);
   }
   
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  // Shuffle the password securely using Fisher-Yates shuffle
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join('');
 }
 
 /**
