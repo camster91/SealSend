@@ -210,6 +210,8 @@ export default function SignupsPage() {
                     size="icon"
                     onClick={() => handleDelete(item.id)}
                     className="text-gray-400 hover:text-red-600"
+                    aria-label="Delete item"
+                    tooltip="Delete item"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

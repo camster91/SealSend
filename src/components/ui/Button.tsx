@@ -3,6 +3,12 @@
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./Tooltip";
 
 type ButtonVariant = "default" | "outline" | "ghost" | "destructive" | "link";
 type ButtonSize = "sm" | "md" | "lg" | "icon";
@@ -11,6 +17,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  tooltip?: string;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -38,13 +45,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "default",
       size = "md",
       loading = false,
+      tooltip,
       disabled,
       children,
       ...props
     },
     ref
   ) => {
-    return (
+    const button = (
       <button
         ref={ref}
         className={cn(
@@ -60,6 +68,21 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {children}
       </button>
     );
+
+    if (tooltip) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent>
+              <p>{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return button;
   }
 );
 Button.displayName = "Button";
