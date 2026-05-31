@@ -95,6 +95,8 @@ export default function CommentsPage() {
                   size="icon"
                   onClick={() => handleDelete(comment.id)}
                   className="text-gray-400 hover:text-red-600"
+                  aria-label="Delete comment"
+                  tooltip="Delete comment"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
