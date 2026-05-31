@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS guests (
 
 CREATE INDEX IF NOT EXISTS idx_guests_event_id ON guests(event_id);
 CREATE INDEX IF NOT EXISTS idx_guests_email ON guests(email);
+CREATE INDEX IF NOT EXISTS idx_guests_phone ON guests(phone);
 CREATE INDEX IF NOT EXISTS idx_guests_invite_token ON guests(invite_token);
 CREATE INDEX IF NOT EXISTS idx_guests_magic_token ON guests(magic_token);
 

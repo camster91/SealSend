@@ -22,11 +22,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect('/login?redirect=/dashboard');
   }
   
-  // Optimization: Parallelize fetching of user events and invited events using Promise.all
-  // Also pass the correct identifier (email or phone) to find guest invitations
+  // Optimized: Using Promise.all to fetch events in parallel reduces TTFB.
+  // Passing both email and phone to getInvitedEvents for accurate guest lookup.
   const [myEvents, invitedEvents] = await Promise.all([
     getEventsByUser(user.id),
-    getInvitedEvents(user.email || user.phone || user.id)
+    getInvitedEvents(user.email, user.phone)
   ]);
   
   const allEvents = [...myEvents, ...invitedEvents];
