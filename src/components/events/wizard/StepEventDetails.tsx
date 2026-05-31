@@ -3,6 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
+import { Textarea } from '@/components/ui/Textarea';
 
 interface EventDetailsFormValues {
   title: string;
@@ -120,13 +121,15 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea
+          <Textarea
             id="description"
+            label="Description"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            showCharacterCount
+            maxLength={2000}
+            value={watchedValues.description}
           />
         </div>
 
