@@ -24,23 +24,14 @@ export async function getEventsByUser(userId: string) {
   return data || [];
 }
 
-export async function getInvitedEvents(userId: string) {
-  // Get events where this user has a guest entry
-  const guestEntries = await query<{ event_id: string }>(
-    'SELECT event_id FROM guests WHERE email = $1 OR phone = $1',
-    [userId]
-  );
-
-  if (!guestEntries || guestEntries.length === 0) {
-    return [];
-  }
-
-  // Get the actual events
-  const eventIds = guestEntries.map(g => g.event_id);
-  const placeholders = eventIds.map((_, i) => `$${i + 1}`).join(', ');
+export async function getInvitedEvents(identifier: string) {
+  // Optimization: Use a single JOIN query with DISTINCT to fetch invited events in one database round-trip
   const events = await query<Event>(
-    `SELECT * FROM events WHERE id IN (${placeholders}) ORDER BY event_date ASC`,
-    eventIds
+    `SELECT DISTINCT e.* FROM events e
+     JOIN guests g ON e.id = g.event_id
+     WHERE g.email = $1 OR g.phone = $1
+     ORDER BY e.event_date ASC`,
+    [identifier]
   );
 
   return events || [];
