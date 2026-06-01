@@ -10,7 +10,7 @@ interface TextareaProps
 }
 
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, error, id, required, ...props }, ref) => {
     return (
       <div className="space-y-1.5">
         {label && (
@@ -19,11 +19,13 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             className="block text-sm font-medium text-neutral-700"
           >
             {label}
+            {required && <span className="ml-1 text-accent-red text-xs" aria-hidden="true">*</span>}
           </label>
         )}
         <textarea
           id={id}
           ref={ref}
+          required={required}
           className={cn(
             "flex min-h-[80px] w-full rounded-lg border border-input bg-white px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50",
             error && "border-accent-red focus:border-accent-red focus:ring-red-500/20",
