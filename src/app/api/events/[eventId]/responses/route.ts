@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
+import { escapeCsv } from "@/lib/utils";
 import type { PlusOne } from "@/types/database";
 
 export async function GET(
@@ -76,7 +77,9 @@ export async function GET(
         }
       });
       const dataKeysList = Array.from(dataKeys);
-      headers.push(...dataKeysList);
+
+      // Use escapeCsv for all headers including dynamic ones
+      const escapedHeaders = [...headers, ...dataKeysList].map(h => escapeCsv(h)).join(",");
 
       const rows = responsesWithPlusOnes.map((r: any) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
@@ -84,7 +87,7 @@ export async function GET(
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");
         const plusOneEmails = plusOnesList.map((po: PlusOne) => po.email || "").filter(Boolean).join("; ");
 
-        return [
+        const values = [
           r.respondent_name,
           r.respondent_email || "",
           r.status,
@@ -94,17 +97,12 @@ export async function GET(
           plusOneNames,
           plusOneEmails,
           ...dataKeysList.map((k) => String(rd[k] || "")),
-        ]
-          .map((v) => {
-            let s = String(v).replace(/"/g, '""');
-            // Prevent CSV formula injection
-            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-            return `"${s}"`;
-          })
-          .join(",");
+        ];
+
+        return values.map((v) => escapeCsv(v)).join(",");
       });
 
-      const csv = [headers.join(","), ...rows].join("\n");
+      const csv = [escapedHeaders, ...rows].join("\n");
 
       return new NextResponse(csv, {
         headers: {

@@ -54,6 +54,23 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
+/**
+ * Escapes a string for use in a CSV file.
+ * Prevents CSV formula injection by prepending a single quote to values
+ * that start with =, +, -, @, \t, or \r.
+ */
+export function escapeCsv(value: string | number | null | undefined): string {
+  const s = value === null || value === undefined ? "" : String(value);
+  let escaped = s.replace(/"/g, '""');
+
+  // Prevent CSV formula injection
+  if (/^[=+\-@\t\r]/.test(escaped)) {
+    escaped = "'" + escaped;
+  }
+
+  return `"${escaped}"`;
+}
+
 export function generateInviteToken(): string {
   return randomBytes(18).toString("base64url");
 }
