@@ -3,6 +3,8 @@
 import { useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { RSVPField } from './WizardContainer';
+import { Toggle } from '@/components/ui/Toggle';
+import { Input } from '@/components/ui/Input';
 
 interface StepRSVPFieldsProps {
   fields: RSVPField[];
@@ -114,34 +116,13 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
           >
             {/* Card header */}
             <div className="flex items-center gap-3 p-4">
-              {/* Toggle switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={field.is_enabled}
-                onClick={() => toggleFieldEnabled(index)}
-                className={cn(
-                  'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
-                  field.is_enabled ? 'bg-brand-600' : 'bg-gray-300'
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-block h-4 w-4 rounded-full bg-white transition-transform',
-                    field.is_enabled ? 'translate-x-6' : 'translate-x-1'
-                  )}
-                />
-              </button>
-
-              {/* Field label */}
-              <span
-                className={cn(
-                  'flex-1 text-sm font-medium',
-                  field.is_enabled ? 'text-gray-900' : 'text-gray-400'
-                )}
-              >
-                {field.field_label}
-              </span>
+              {/* Toggle switch with label */}
+              <Toggle
+                checked={field.is_enabled}
+                onChange={() => toggleFieldEnabled(index)}
+                label={field.field_label}
+                className={cn('flex-1', !field.is_enabled && 'opacity-60')}
+              />
 
               {/* Type badge */}
               <span
@@ -157,6 +138,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
               {field.is_enabled && (
                 <button
                   type="button"
+                  aria-label={expandedIndex === index ? "Collapse field settings" : "Expand field settings"}
                   onClick={() =>
                     setExpandedIndex(expandedIndex === index ? null : index)
                   }
@@ -182,42 +164,24 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
             {field.is_enabled && expandedIndex === index && (
               <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-4">
                 {/* Required toggle */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Required field</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={field.is_required}
-                    onClick={() => toggleFieldRequired(index)}
-                    className={cn(
-                      'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                      field.is_required ? 'bg-brand-600' : 'bg-gray-300'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
-                        field.is_required ? 'translate-x-4.5' : 'translate-x-0.5'
-                      )}
-                    />
-                  </button>
-                </div>
+                <Toggle
+                  checked={field.is_required}
+                  onChange={() => toggleFieldRequired(index)}
+                  label="Required field"
+                  className="w-full justify-between flex-row-reverse"
+                />
 
                 {/* Placeholder for text-like fields */}
                 {(field.field_type === 'text' ||
                   field.field_type === 'email' ||
                   field.field_type === 'tel' ||
                   field.field_type === 'textarea') && (
-                  <div>
-                    <label className="block text-sm text-gray-600">Placeholder text</label>
-                    <input
-                      type="text"
-                      value={field.placeholder ?? ''}
-                      onChange={(e) => updateFieldPlaceholder(index, e.target.value)}
-                      placeholder="Enter placeholder text..."
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                    />
-                  </div>
+                  <Input
+                    label="Placeholder text"
+                    value={field.placeholder ?? ''}
+                    onChange={(e) => updateFieldPlaceholder(index, e.target.value)}
+                    placeholder="Enter placeholder text..."
+                  />
                 )}
 
                 {/* Options editor for select fields */}
@@ -238,6 +202,7 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
                           />
                           <button
                             type="button"
+                            aria-label="Remove option"
                             onClick={() => removeOption(index, optIdx)}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
                           >
