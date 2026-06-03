@@ -18,35 +18,35 @@ interface EventDetailPageProps {
 }
 
 export default async function EventDetailPage({ params, searchParams }: EventDetailPageProps) {
-  const { eventId } = await params;
-  const { upgraded } = await searchParams;
-
-  const user = await getCurrentUser();
+  // Optimized: Parallelize initial async data fetching to reduce waterfall latency
+  const [{ eventId }, { upgraded }, user] = await Promise.all([
+    params,
+    searchParams,
+    getCurrentUser(),
+  ]);
 
   if (!user) {
     redirect('/login');
   }
 
-  const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+  // Optimized: Consolidate event details and counts into a single SQL query
+  // to reduce database round-trips and improve TTFB.
+  const eventData = await queryOne<Event & { response_count: number; guest_count: number }>(
+    `SELECT e.*,
+            (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = e.id) as response_count,
+            (SELECT COUNT(*)::int FROM guests WHERE event_id = e.id) as guest_count
+     FROM events e
+     WHERE e.id = $1 AND e.user_id = $2`,
     [eventId, user.id]
   );
 
-  if (!event) {
+  if (!eventData) {
     notFound();
   }
 
-  const responseCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM rsvp_responses WHERE event_id = $1',
-    [eventId]
-  );
-  const responseCount = responseCountResult?.count ?? 0;
-
-  const guestCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM guests WHERE event_id = $1',
-    [eventId]
-  );
-  const guestCount = guestCountResult?.count ?? 0;
+  const event = eventData;
+  const responseCount = eventData.response_count;
+  const guestCount = eventData.guest_count;
 
   const isPublished = event.status === 'published';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
