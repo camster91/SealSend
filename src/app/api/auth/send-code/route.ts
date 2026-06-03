@@ -27,10 +27,11 @@ function getTwilioClient() {
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { success: rateLimitOk } = await rateLimit(`send-code:${ip}`, { max: 5, windowSeconds: 600 });
-    if (!rateLimitOk) {
+    // 1. IP-based rate limit
+    const { success: ipRateLimitOk } = await rateLimit(`send-code-ip:${ip}`, { max: 5, windowSeconds: 600 });
+    if (!ipRateLimitOk) {
       return NextResponse.json(
-        { error: 'Too many requests. Please wait a few minutes before trying again.' },
+        { error: 'Too many requests from this IP. Please wait a few minutes.' },
         { status: 429 }
       );
     }
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
 
     // Validate and format phone number if using SMS
     let formattedPhone: string | null = null;
+    let identifier = email || undefined;
+
     if (method === 'phone' && phone) {
       const phoneValidation = validateAndFormatPhone(phone);
       if (!phoneValidation.valid) {
@@ -64,6 +67,23 @@ export async function POST(request: NextRequest) {
         );
       }
       formattedPhone = phoneValidation.formatted ?? null;
+      identifier = formattedPhone || undefined;
+    }
+
+    if (!identifier) {
+      return NextResponse.json(
+        { error: 'Identifier is required' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Identifier-based rate limit (prevent abuse of a single email/phone)
+    const { success: idRateLimitOk } = await rateLimit(`send-code-id:${identifier}`, { max: 3, windowSeconds: 900 });
+    if (!idRateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many requests for this account. Please wait 15 minutes.' },
+        { status: 429 }
+      );
     }
 
     // Generate 6-digit code using cryptographically secure randomness
