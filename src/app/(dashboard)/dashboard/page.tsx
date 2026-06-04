@@ -14,8 +14,11 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const { upgraded, plan } = await searchParams;
-  const user = await getCurrentUser();
+  // Optimized: Resolve searchParams and user in parallel to reduce waterfall latency.
+  const [{ upgraded, plan }, user] = await Promise.all([
+    searchParams,
+    getCurrentUser(),
+  ]);
   
   // Redirect to login if no user
   if (!user) {
