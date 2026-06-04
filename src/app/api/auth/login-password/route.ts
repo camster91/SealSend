@@ -29,6 +29,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Secondary rate limit: 5 requests per 30 minutes per email to prevent distributed brute-force
+    const { success: emailRateLimitOk } = await rateLimit(`login-email:${email}`, {
+      max: 5,
+      windowSeconds: 1800
+    });
+
+    if (!emailRateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many attempts for this account. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     // Find admin user by email
     const adminUser = await queryOne<{
       id: string;

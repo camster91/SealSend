@@ -53,6 +53,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Secondary rate limit: 3 requests per 15 minutes per email/phone to prevent bombing
+    const identifier = method === 'email' ? email : phone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`send-code-id:${identifier}`, { max: 3, windowSeconds: 900 });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many requests for this account. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Validate and format phone number if using SMS
     let formattedPhone: string | null = null;
     if (method === 'phone' && phone) {

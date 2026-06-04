@@ -29,6 +29,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Secondary rate limit: 5 requests per 15 minutes per email/phone to prevent brute-forcing
+    const identifier = method === 'email' ? email : phone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`verify-code-id:${identifier}`, { max: 5, windowSeconds: 900 });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many attempts for this account. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Verify code
     const authCode = await queryOne<{
       id: string;
