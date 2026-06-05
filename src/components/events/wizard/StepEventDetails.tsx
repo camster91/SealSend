@@ -115,8 +115,16 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            aria-describedby="title-counter"
           />
-          {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
+          <div className="mt-1 flex justify-between items-start">
+            <div>
+              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
+            </div>
+            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
+              {(watchedValues.title || '').length}/200
+            </p>
+          </div>
         </div>
 
         <div>
@@ -127,7 +135,16 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             rows={3}
             placeholder="Tell your guests what to expect..."
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            aria-describedby="description-counter"
           />
+          <div className="mt-1 flex justify-between items-start">
+            <div>
+              {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
+            </div>
+            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
+              {(watchedValues.description || '').length}/2000
+            </p>
+          </div>
         </div>
 
         <div>
