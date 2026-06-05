@@ -66,6 +66,22 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
+    // Identifier-based rate limiting to prevent bombing specific users
+    // Normalize identifier (email to lowercase) to prevent bypasses
+    const identifier = method === 'email' ? email?.toLowerCase() : formattedPhone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`send-code-id:${identifier}`, {
+        max: 3,
+        windowSeconds: 900
+      });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many requests for this account. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Generate 6-digit code using cryptographically secure randomness
     const code = crypto.randomInt(100000, 1000000).toString();
 

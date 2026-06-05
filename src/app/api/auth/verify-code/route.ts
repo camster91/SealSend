@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { cookies } from 'next/headers';
+import { validateAndFormatPhone } from '@/lib/phone-validation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize phone number for consistent rate limiting and querying
+    let formattedPhone: string | null = null;
+    if (method === 'phone' && phone) {
+      const phoneValidation = validateAndFormatPhone(phone);
+      if (!phoneValidation.valid) {
+        return NextResponse.json(
+          { error: phoneValidation.error || 'Invalid phone number' },
+          { status: 400 }
+        );
+      }
+      formattedPhone = phoneValidation.formatted ?? null;
+    }
+
+    // Identifier-based rate limiting to prevent distributed brute-force attacks
+    // Normalize identifier (email to lowercase, phone to E.164) to prevent bypasses
+    const identifier = method === 'email' ? email?.toLowerCase() : formattedPhone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`verify-code-id:${identifier}`, {
+        max: 5,
+        windowSeconds: 900
+      });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many verification attempts. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Verify code
     const authCode = await queryOne<{
       id: string;
@@ -42,7 +72,7 @@ export async function POST(request: NextRequest) {
        WHERE ${method === 'email' ? 'email' : 'phone'} = $1
          AND code = $2
          AND expires_at > $3`,
-      [method === 'email' ? email : phone, code, new Date().toISOString()]
+      [method === 'email' ? email : formattedPhone, code, new Date().toISOString()]
     );
 
     if (!authCode) {
