@@ -1,3 +1,7 @@
 ## 2025-05-15 - Optimized Dashboard Loading and Guest Lookups
 **Learning:** Database round-trips are a significant source of latency, especially when sequential. Parallelizing independent queries with `Promise.all` and merging dependent queries into a single JOIN can drastically reduce TTFB and overall page load time.
 **Action:** Always check if multiple database queries can be parallelized or combined into a single efficient query. Ensure frequently queried fields (like phone numbers in guest lookups) are indexed.
+
+## 2026-06-06 - Optimized Event Detail Page with Scalar Subqueries
+**Learning:** Consolidating sequential database queries for an entity and its associated counts into a single query using scalar subqueries reduces database round-trips and improves TTFB.
+**Action:** Use scalar subqueries in a single SELECT statement when entity details and multiple counts are needed simultaneously.
