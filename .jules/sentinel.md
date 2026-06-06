@@ -1,0 +1,4 @@
+## 2026-06-06 - Dual-Layer Rate Limiting and Info Leak Prevention
+**Vulnerability:** The `send-code` API endpoint leaked the user's `role` (admin vs guest) in the response, allowing for account enumeration. Additionally, only IP-based rate limiting was present, leaving the system vulnerable to distributed identifier-based "bombing" or brute-force.
+**Learning:** Returning internal user metadata (like roles) during the initial step of a multi-step authentication process provides attackers with valuable reconnaissance data. Relying solely on IP-based rate limiting is insufficient against distributed attacks targeting specific accounts.
+**Prevention:** Always suppress user-specific details in pre-authentication responses. Implement "defense in depth" rate limiting by using both the client IP and the unique identifier (email/phone) as keys.
