@@ -25,6 +25,7 @@ import { BETA_MODE } from "@/lib/constants";
 
 interface GuestWithResponse {
   id: string;
+  event_id: string;
   name: string;
   email: string | null;
   phone: string | null;
@@ -104,6 +105,30 @@ export async function GET(request: NextRequest) {
 
     console.log(`[CRON] Found ${events.length} events requiring reminders`);
 
+    // Fetch all guests for all events in one query to avoid N+1 bottleneck
+    // We only fetch guests who haven't received a reminder and haven't declined
+    const eventIds = events.map((e) => e.id);
+    const allGuests = await query<GuestWithResponse>(
+      `SELECT g.id, g.event_id, g.name, g.email, g.phone, g.invite_token, g.reminder_sent_at,
+                r.status as rsvp_status
+         FROM guests g
+         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
+         WHERE g.event_id = ANY($1)
+           AND g.reminder_sent_at IS NULL
+           AND (g.email IS NOT NULL OR g.phone IS NOT NULL)
+           AND (r.status IS NULL OR r.status != 'not_attending')`,
+      [eventIds]
+    );
+
+    // Group guests by event ID for efficient lookup
+    const guestsByEvent = (allGuests || []).reduce((acc, guest) => {
+      if (!acc[guest.event_id]) {
+        acc[guest.event_id] = [];
+      }
+      acc[guest.event_id].push(guest);
+      return acc;
+    }, {} as Record<string, GuestWithResponse[]>);
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     const smsEnabled = isTwilioConfigured();
 
@@ -120,44 +145,10 @@ export async function GET(request: NextRequest) {
     for (const event of events) {
       console.log(`[CRON] Processing event: ${event.title} (${event.id})`);
 
-      // Fetch guests who:
-      // 1. Haven't received a reminder yet (reminder_sent_at is null)
-      // 2. Have either email or phone
-      // Join with rsvp_responses to check status
-      const guests = await query<GuestWithResponse>(
-        `SELECT g.id, g.name, g.email, g.phone, g.invite_token, g.reminder_sent_at,
-                r.status as rsvp_status
-         FROM guests g
-         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
-         WHERE g.event_id = $1
-           AND g.reminder_sent_at IS NULL
-           AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
-        [event.id]
-      );
-
-      if (!guests || guests.length === 0) {
-        console.log(`[CRON] No guests to notify for event ${event.id}`);
-        results.push({
-          eventId: event.id,
-          eventTitle: event.title,
-          guestsNotified: 0,
-          emailsSent: 0,
-          smsSent: 0,
-          errors: [],
-        });
-        continue;
-      }
-
-      // Filter guests who haven't declined (either no response or attending/maybe)
-      const guestsToNotify = guests.filter((g) => {
-        // If no response, include them
-        if (!g.rsvp_status) return true;
-        // If response is not "not_attending", include them
-        return g.rsvp_status !== "not_attending";
-      });
+      const guestsToNotify = guestsByEvent[event.id] || [];
 
       if (guestsToNotify.length === 0) {
-        console.log(`[CRON] All guests have declined or been reminded for event ${event.id}`);
+        console.log(`[CRON] No guests to notify for event ${event.id}`);
         results.push({
           eventId: event.id,
           eventTitle: event.title,
