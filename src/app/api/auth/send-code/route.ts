@@ -53,8 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate and format phone number if using SMS
+    // Normalize and validate identifiers
+    const normalizedEmail = email?.toLowerCase().trim();
     let formattedPhone: string | null = null;
+
     if (method === 'phone' && phone) {
       const phoneValidation = validateAndFormatPhone(phone);
       if (!phoneValidation.valid) {
@@ -66,16 +68,31 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
+    // Identifier-based rate limit (3 attempts per 15 minutes) to prevent distributed bombing
+    const identifier = method === 'email' ? normalizedEmail : formattedPhone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`send-code-id:${identifier}`, {
+        max: 3,
+        windowSeconds: 900
+      });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many requests for this account. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Generate 6-digit code using cryptographically secure randomness
     const code = crypto.randomInt(100000, 1000000).toString();
 
     // Determine role
     let role = 'guest';
-    if (method === 'email' && email) {
+    if (method === 'email' && normalizedEmail) {
       // Check if this is an admin email
       const admin = await queryOne<{ id: string }>(
         'SELECT id FROM admin_users WHERE email = $1',
-        [email]
+        [normalizedEmail]
       );
 
       if (admin) {
@@ -84,8 +101,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete any existing codes for this email/phone to avoid stale entries
-    if (method === 'email' && email) {
-      await query('DELETE FROM auth_codes WHERE email = $1', [email]);
+    if (method === 'email' && normalizedEmail) {
+      await query('DELETE FROM auth_codes WHERE email = $1', [normalizedEmail]);
     } else if (method === 'phone' && formattedPhone) {
       await query('DELETE FROM auth_codes WHERE phone = $1', [formattedPhone]);
     }
@@ -96,7 +113,7 @@ export async function POST(request: NextRequest) {
         `INSERT INTO auth_codes (email, phone, code, role, event_id, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
-          email || null,
+          normalizedEmail || null,
           formattedPhone || null,
           code,
           role,
@@ -113,10 +130,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Send code via appropriate channel
-    if (method === 'email' && email) {
+    if (method === 'email' && normalizedEmail) {
       try {
         await sendEmail({
-          to: email,
+          to: normalizedEmail,
           subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
           html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId),
         });
@@ -146,8 +163,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Code sent to your ${method === 'email' ? 'email' : 'phone'}`,
-      role
+      message: `Code sent to your ${method === 'email' ? 'email' : 'phone'}`
     });
   } catch (error) {
     console.error('Auth error:', error);

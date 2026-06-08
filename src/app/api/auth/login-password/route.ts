@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
@@ -29,6 +30,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize identifiers
+    const normalizedEmail = email?.toLowerCase().trim();
+
+    // Identifier-based rate limit (5 attempts per 30 minutes)
+    const { success: idRateLimitOk } = await rateLimit(`login-email:${normalizedEmail}`, {
+      max: 5,
+      windowSeconds: 1800
+    });
+
+    if (!idRateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many login attempts for this account. Please wait 30 minutes.' },
+        { status: 429 }
+      );
+    }
+
     // Find admin user by email
     const adminUser = await queryOne<{
       id: string;
@@ -37,7 +54,7 @@ export async function POST(request: NextRequest) {
       password: string;
     }>(
       'SELECT id, email, name, password FROM admin_users WHERE email = $1',
-      [email]
+      [normalizedEmail]
     );
 
     if (!adminUser) {
