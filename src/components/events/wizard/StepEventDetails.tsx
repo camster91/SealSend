@@ -3,6 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
 
 interface EventDetailsFormValues {
   title: string;
@@ -101,33 +103,38 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
       <section className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Basic Info</h3>
         
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-            Event Title <span className="text-red-500">*</span>
-          </label>
-          <input
+        <div className="relative">
+          <Input
             id="title"
-            type="text"
+            label="Event Title"
+            required
             {...register('title', {
               required: 'Event title is required',
               minLength: { value: 2, message: 'Title must be at least 2 characters' },
               maxLength: { value: 200, message: 'Title must be less than 200 characters' },
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            error={errors.title?.message}
+            aria-describedby="title-counter"
           />
-          {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
+          <div id="title-counter" aria-live="polite" className="absolute right-0 top-0 text-[10px] font-medium text-gray-400">
+            {(watchedValues.title || '').length}/200
+          </div>
         </div>
 
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-          <textarea
+        <div className="relative">
+          <Textarea
             id="description"
+            label="Description"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
-            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            error={errors.description?.message}
+            aria-describedby="description-counter"
           />
+          <div id="description-counter" aria-live="polite" className="absolute right-0 top-0 text-[10px] font-medium text-gray-400">
+            {(watchedValues.description || '').length}/2000
+          </div>
         </div>
 
         <div>

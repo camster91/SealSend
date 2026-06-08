@@ -20,7 +20,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             htmlFor={id}
             className="block text-sm font-medium text-neutral-700"
           >
-            {label}
+            {label} {props.required && <span className="text-accent-red">*</span>}
           </label>
         )}
         <div className="relative">
