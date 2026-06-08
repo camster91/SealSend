@@ -66,6 +66,21 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
+    // ID-based rate limiting (defense against targeted bombing)
+    const identifier = method === 'email' ? email?.trim().toLowerCase() : formattedPhone;
+    if (identifier) {
+      const { success: idRateLimitOk } = await rateLimit(`send-code-id:${identifier}`, {
+        max: 3,
+        windowSeconds: 900
+      });
+      if (!idRateLimitOk) {
+        return NextResponse.json(
+          { error: 'Too many requests for this account. Please wait 15 minutes.' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Generate 6-digit code using cryptographically secure randomness
     const code = crypto.randomInt(100000, 1000000).toString();
 
@@ -146,8 +161,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Code sent to your ${method === 'email' ? 'email' : 'phone'}`,
-      role
+      message: `Code sent to your ${method === 'email' ? 'email' : 'phone'}`
     });
   } catch (error) {
     console.error('Auth error:', error);
