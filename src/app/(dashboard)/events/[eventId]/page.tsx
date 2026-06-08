@@ -27,8 +27,14 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
     redirect('/login');
   }
 
-  const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
+  // Optimized: Fetch event details and counts in a single database round-trip using scalar subqueries.
+  // This reduces the number of sequential queries from 3 to 1, improving TTFB.
+  const event = await queryOne<Event & { response_count: number; guest_count: number }>(
+    `SELECT *,
+      (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id) AS response_count,
+      (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count
+     FROM events
+     WHERE id = $1 AND user_id = $2`,
     [eventId, user.id]
   );
 
@@ -36,17 +42,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
     notFound();
   }
 
-  const responseCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM rsvp_responses WHERE event_id = $1',
-    [eventId]
-  );
-  const responseCount = responseCountResult?.count ?? 0;
-
-  const guestCountResult = await queryOne<{ count: number }>(
-    'SELECT COUNT(*)::int AS count FROM guests WHERE event_id = $1',
-    [eventId]
-  );
-  const guestCount = guestCountResult?.count ?? 0;
+  const responseCount = event.response_count;
+  const guestCount = event.guest_count;
 
   const isPublished = event.status === 'published';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
