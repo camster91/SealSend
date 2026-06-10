@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
 import { rsvpSubmissionSchema } from "@/lib/validations";
+import { escapeHtml } from "@/lib/utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 
@@ -184,10 +185,13 @@ export async function POST(
       );
       if (host?.email) {
         const statusLabel = status === 'attending' ? 'Yes' : status === 'maybe' ? 'Maybe' : 'No';
+        const safeName = escapeHtml(respondent_name);
+        const safeTitle = escapeHtml(event.title);
+
         await sendEmail({
           to: host.email,
           subject: `New RSVP: ${respondent_name} (${statusLabel}) - ${event.title}`,
-          html: `<p><strong>${respondent_name}</strong> responded <strong>${statusLabel}</strong> to <strong>${event.title}</strong>${headcount > 1 ? ` with ${headcount} guests` : ''}.</p><p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app'}/events/${event.id}/responses">View all responses</a></p>`,
+          html: `<p><strong>${safeName}</strong> responded <strong>${statusLabel}</strong> to <strong>${safeTitle}</strong>${headcount > 1 ? ` with ${headcount} guests` : ''}.</p><p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app'}/events/${event.id}/responses">View all responses</a></p>`,
         });
       }
     } catch {
