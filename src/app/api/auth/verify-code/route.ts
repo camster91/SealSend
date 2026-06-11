@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
-    const { method, email, phone, code, eventId } = body as { method?: string; email?: string; phone?: string; code?: string; eventId?: string };
+    const { method, email, phone, code } = body as { method?: string; email?: string; phone?: string; code?: string };
 
     if (!method || !code || (!email && !phone)) {
       return NextResponse.json(
@@ -56,18 +56,23 @@ export async function POST(request: NextRequest) {
     await query('DELETE FROM auth_codes WHERE id = $1', [authCode.id]);
 
     // Determine the correct user_id for the session
-    let userId = authCode.id; // Default to auth_code id for guests
+    let userId = authCode.id;
 
     if (authCode.role === 'admin' && authCode.email) {
-      // For admin users, look up their actual admin_users ID for FK constraint
+      // For admin users, look up their actual admin_users ID
       const adminUser = await queryOne<{ id: string }>(
         'SELECT id FROM admin_users WHERE email = $1',
         [authCode.email]
       );
-
-      if (adminUser) {
-        userId = adminUser.id;
-      }
+      if (adminUser) userId = adminUser.id;
+    } else if (authCode.role === 'guest' && authCode.event_id) {
+      // For guests, look up their actual guest ID
+      const guest = await queryOne<{ id: string }>(
+        `SELECT id FROM guests
+         WHERE event_id = $1 AND (${method === 'email' ? 'email' : 'phone'} = $2)`,
+        [authCode.event_id, method === 'email' ? authCode.email : authCode.phone]
+      );
+      if (guest) userId = guest.id;
     }
 
     // Create session
@@ -110,7 +115,9 @@ export async function POST(request: NextRequest) {
     // Non-httpOnly cookie for client-side display only (no sensitive fields)
     const clientUserInfo = {
       email: authCode.email,
+      phone: authCode.phone,
       role: authCode.role,
+      eventId: authCode.event_id,
       name: authCode.email?.split('@')[0] || null,
     };
     cookieStore.set('sealsend_user', JSON.stringify(clientUserInfo), {

@@ -101,7 +101,7 @@ export const plusOneDataSchema = z.object({
 });
 
 export const rsvpSubmissionSchema = z.object({
-  respondent_name: z.string().min(1, "Your name is required"),
+  respondent_name: z.string().min(1, "Your name is required").max(100),
   respondent_email: z.string().email().optional().or(z.literal("")),
   status: z.enum(["attending", "not_attending", "maybe"]),
   headcount: z.number().min(1).max(50).default(1),

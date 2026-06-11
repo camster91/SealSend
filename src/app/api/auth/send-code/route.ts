@@ -147,7 +147,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Code sent to your ${method === 'email' ? 'email' : 'phone'}`,
-      role
     });
   } catch (error) {
     console.error('Auth error:', error);
