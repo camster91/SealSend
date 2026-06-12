@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Trash2 } from 'lucide-react';
 
 interface GuestEntry {
   name: string;
@@ -212,15 +214,15 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
                     {guest.email && <p className="text-xs text-gray-500">{guest.email}</p>}
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => handleRemove(index)}
-                  className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                  className="h-8 w-8 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                  tooltip="Remove guest"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>

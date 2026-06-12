@@ -122,7 +122,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <input
             id="title"
-            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -159,7 +158,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <textarea
             id="description"
-            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
