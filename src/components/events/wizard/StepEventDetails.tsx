@@ -2,6 +2,7 @@
 
 import { useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
 import { Button } from '@/components/ui/Button';
 import { X } from 'lucide-react';
@@ -104,11 +105,24 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Basic Info</h3>
         
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-            Event Title <span className="text-red-500">*</span>
-          </label>
+          <div className="flex justify-between items-center mb-1">
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              Event Title <span className="text-red-500">*</span>
+            </label>
+            <span
+              id="title-counter"
+              aria-live="polite"
+              className={cn(
+                "text-[10px] text-gray-400",
+                (watchedValues.title?.length || 0) >= 180 && "text-amber-600 font-medium"
+              )}
+            >
+              {watchedValues.title?.length || 0}/200
+            </span>
+          </div>
           <input
             id="title"
+            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -130,9 +144,22 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <div className="flex justify-between items-center mb-1">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
+            <span
+              id="description-counter"
+              aria-live="polite"
+              className={cn(
+                "text-[10px] text-gray-400",
+                (watchedValues.description?.length || 0) >= 1800 && "text-amber-600 font-medium"
+              )}
+            >
+              {watchedValues.description?.length || 0}/2000
+            </span>
+          </div>
           <textarea
             id="description"
+            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
