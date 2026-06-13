@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
 import { Button } from '@/components/ui/Button';
+import { Toggle } from '@/components/ui/Toggle';
 import { X } from 'lucide-react';
 
 interface EventDetailsFormValues {
@@ -110,8 +111,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               Event Title <span className="text-red-500">*</span>
             </label>
             <span
-              id="title-counter"
-              aria-live="polite"
+              id="title-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.title?.length || 0) >= 180 && "text-amber-600 font-medium"
@@ -122,7 +123,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <input
             id="title"
-            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -147,8 +147,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           <div className="flex justify-between items-center mb-1">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
             <span
-              id="description-counter"
-              aria-live="polite"
+              id="description-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.description?.length || 0) >= 1800 && "text-amber-600 font-medium"
@@ -159,7 +159,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <textarea
             id="description"
-            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
@@ -301,19 +300,13 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium text-gray-900">Allow +1s</p>
-            <p className="text-xs text-gray-500">Let guests bring additional people</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onUpdate('allow_plus_ones', !allowPlusOnes)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${allowPlusOnes ? 'bg-brand-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition ${allowPlusOnes ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
-        </div>
+        <Toggle
+          label="Allow +1s"
+          description="Let guests bring additional people"
+          checked={allowPlusOnes}
+          onChange={(checked) => onUpdate('allow_plus_ones', checked)}
+          className="flex-row-reverse justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+        />
       </section>
 
       <hr className="border-gray-200" />

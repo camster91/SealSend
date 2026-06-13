@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { RSVPField } from './WizardContainer';
+import { Toggle } from '@/components/ui/Toggle';
 
 interface StepRSVPFieldsProps {
   fields: RSVPField[];
@@ -115,23 +116,10 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
             {/* Card header */}
             <div className="flex items-center gap-3 p-4">
               {/* Toggle switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={field.is_enabled}
-                onClick={() => toggleFieldEnabled(index)}
-                className={cn(
-                  'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
-                  field.is_enabled ? 'bg-brand-600' : 'bg-gray-300'
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-block h-4 w-4 rounded-full bg-white transition-transform',
-                    field.is_enabled ? 'translate-x-6' : 'translate-x-1'
-                  )}
-                />
-              </button>
+              <Toggle
+                checked={field.is_enabled}
+                onChange={() => toggleFieldEnabled(index)}
+              />
 
               {/* Field label */}
               <span
@@ -182,26 +170,12 @@ export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps
             {field.is_enabled && expandedIndex === index && (
               <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-4">
                 {/* Required toggle */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Required field</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={field.is_required}
-                    onClick={() => toggleFieldRequired(index)}
-                    className={cn(
-                      'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                      field.is_required ? 'bg-brand-600' : 'bg-gray-300'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
-                        field.is_required ? 'translate-x-4.5' : 'translate-x-0.5'
-                      )}
-                    />
-                  </button>
-                </div>
+                <Toggle
+                  label="Required field"
+                  checked={field.is_required}
+                  onChange={() => toggleFieldRequired(index)}
+                  className="flex-row-reverse justify-between"
+                />
 
                 {/* Placeholder for text-like fields */}
                 {(field.field_type === 'text' ||
