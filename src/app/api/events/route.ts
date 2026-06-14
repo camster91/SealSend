@@ -104,8 +104,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertError) {
+      console.error('Event insertion error:', insertError);
       return NextResponse.json(
-        { error: insertError.message },
+        { error: 'Failed to create event' },
         { status: 500 }
       );
     }

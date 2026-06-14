@@ -3,8 +3,17 @@ import { query } from "@/lib/db/client";
 
 export async function GET(request: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error("[CRON] CRON_SECRET environment variable not set");
+      return NextResponse.json(
+        { error: "Cron secret not configured" },
+        { status: 500 }
+      );
+    }
+
     const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
