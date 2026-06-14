@@ -122,7 +122,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <input
             id="title"
-            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -137,7 +136,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
-            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
+            <p className="text-xs text-gray-500" aria-hidden="true">
               {(watchedValues.title || '').length}/200
             </p>
           </div>
@@ -159,7 +158,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <textarea
             id="description"
-            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
@@ -170,7 +168,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
             </div>
-            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
+            <p className="text-xs text-gray-500" aria-hidden="true">
               {(watchedValues.description || '').length}/2000
             </p>
           </div>
