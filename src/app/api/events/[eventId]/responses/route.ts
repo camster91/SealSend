@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
-import type { PlusOne } from "@/types/database";
+import { query } from "@/lib/db/client";
+import type { PlusOne, RSVPResponseWithPlusOnes } from "@/types/database";
 
 export async function GET(
   request: Request,
@@ -12,48 +12,34 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+    // Optimized: Consolidate event ownership check, responses fetch, and plus-ones aggregation into a single query.
+    // This reduces database round-trips from 3 to 1 and eliminates in-memory grouping.
+    const rows = await query<RSVPResponseWithPlusOnes & { id: string }>(
+      `SELECT
+        e.id AS event_id,
+        r.*,
+        (
+          SELECT COALESCE(json_agg(po.* ORDER BY po.created_at), '[]'::json)
+          FROM plus_ones po
+          WHERE po.rsvp_response_id = r.id
+        ) AS plus_ones
+      FROM events e
+      LEFT JOIN rsvp_responses r ON e.id = r.event_id
+      WHERE e.id = $1 AND e.user_id = $2
+      ORDER BY r.submitted_at DESC NULLS LAST`,
       [eventId, user.id]
     );
 
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // If there are no responses, the LEFT JOIN results in a single row with null r.* fields.
+    // We check for r.id (which is primary key) to see if we have actual responses.
+    const responsesWithPlusOnes = rows[0].id ? rows : [];
 
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
-
-    // Fetch responses
-    const responses = await query(
-      'SELECT * FROM rsvp_responses WHERE event_id = $1 ORDER BY submitted_at DESC',
-      [eventId]
-    );
-
-    // Fetch plus_ones for these responses
-    const responseIds = responses.map((r: any) => r.id);
-    let plusOnes: PlusOne[] = [];
-
-    if (responseIds.length > 0) {
-      const placeholders = responseIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
-      plusOnes = await query<PlusOne>(
-        `SELECT * FROM plus_ones WHERE rsvp_response_id IN (${placeholders})`,
-        responseIds
-      );
-    }
-
-    // Group plus_ones by response_id
-    const plusOnesByResponse = plusOnes.reduce((acc, po) => {
-      if (!acc[po.rsvp_response_id]) {
-        acc[po.rsvp_response_id] = [];
-      }
-      acc[po.rsvp_response_id].push(po);
-      return acc;
-    }, {} as Record<string, PlusOne[]>);
-
-    // Attach plus_ones to responses
-    const responsesWithPlusOnes = responses.map((r: any) => ({
-      ...r,
-      plus_ones: plusOnesByResponse[r.id] || [],
-    }));
 
     // CSV export
     if (format === "csv") {
@@ -70,7 +56,7 @@ export async function GET(
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
-      responses.forEach((r: any) => {
+      responsesWithPlusOnes.forEach((r) => {
         if (r.response_data && typeof r.response_data === "object") {
           Object.keys(r.response_data as Record<string, unknown>).forEach((k) => dataKeys.add(k));
         }
@@ -78,7 +64,7 @@ export async function GET(
       const dataKeysList = Array.from(dataKeys);
       headers.push(...dataKeysList);
 
-      const rows = responsesWithPlusOnes.map((r: any) => {
+      const csvRows = responsesWithPlusOnes.map((r) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");
@@ -104,7 +90,7 @@ export async function GET(
           .join(",");
       });
 
-      const csv = [headers.join(","), ...rows].join("\n");
+      const csv = [headers.join(","), ...csvRows].join("\n");
 
       return new NextResponse(csv, {
         headers: {
