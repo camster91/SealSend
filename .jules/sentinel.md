@@ -7,3 +7,8 @@
 **Vulnerability:** The `verify-code` API was using the transient `auth_code.id` as the `user_id` for guest sessions instead of looking up the persistent guest ID.
 **Learning:** Transient authentication records (like OTP codes) should not be used as identity identifiers. This led to sessions that couldn't be correctly mapped back to the actual guest record in subsequent requests.
 **Prevention:** Always resolve the final persistent entity ID (User or Guest) during the final step of authentication before creating a session.
+
+## 2025-05-15 - Fail-Open Cron Authentication
+**Vulnerability:** Cron endpoints used template literal comparison `authHeader !== \`Bearer ${process.env.CRON_SECRET}\`` without checking if the secret was defined.
+**Learning:** In many environments, missing environment variables resolve to `undefined` which becomes the string `"undefined"` in template literals, allowing authentication bypass if the attacker provides `Bearer undefined`.
+**Prevention:** Always verify that security-critical environment variables are defined and non-empty before using them in comparisons. Fail closed (500 error) if configuration is missing.
