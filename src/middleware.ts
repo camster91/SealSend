@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases', '/terms', '/privacy', '/robots.txt', '/sitemap.xml'];
+  const publicPaths = ['/', '/verify-ui', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases', '/terms', '/privacy', '/robots.txt', '/sitemap.xml'];
 
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||
