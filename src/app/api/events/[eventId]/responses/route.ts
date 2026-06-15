@@ -12,48 +12,32 @@ export async function GET(
     const user = await getApiUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
 
-    // Fetch responses
-    const responses = await query(
-      'SELECT * FROM rsvp_responses WHERE event_id = $1 ORDER BY submitted_at DESC',
-      [eventId]
+    // Optimized: Consolidating event ownership check, responses fetch, and plus-ones aggregation.
+    // This reduces database round-trips from 3 to 1.
+    const queryRows = await query<any>(
+      `SELECT
+        e.id as event_exists,
+        r.*,
+        COALESCE(
+          (SELECT json_agg(po.*) FROM plus_ones po WHERE po.rsvp_response_id = r.id),
+          '[]'::json
+        ) as plus_ones
+      FROM events e
+      LEFT JOIN rsvp_responses r ON e.id = r.event_id
+      WHERE e.id = $1 AND e.user_id = $2
+      ORDER BY r.submitted_at DESC NULLS LAST`,
+      [eventId, user.id]
     );
 
-    // Fetch plus_ones for these responses
-    const responseIds = responses.map((r: any) => r.id);
-    let plusOnes: PlusOne[] = [];
-
-    if (responseIds.length > 0) {
-      const placeholders = responseIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
-      plusOnes = await query<PlusOne>(
-        `SELECT * FROM plus_ones WHERE rsvp_response_id IN (${placeholders})`,
-        responseIds
-      );
+    if (queryRows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Group plus_ones by response_id
-    const plusOnesByResponse = plusOnes.reduce((acc, po) => {
-      if (!acc[po.rsvp_response_id]) {
-        acc[po.rsvp_response_id] = [];
-      }
-      acc[po.rsvp_response_id].push(po);
-      return acc;
-    }, {} as Record<string, PlusOne[]>);
-
-    // Attach plus_ones to responses
-    const responsesWithPlusOnes = responses.map((r: any) => ({
-      ...r,
-      plus_ones: plusOnesByResponse[r.id] || [],
-    }));
+    // If event exists but has no responses, queryRows[0].id will be null due to LEFT JOIN
+    const responsesWithPlusOnes = queryRows[0].id ? queryRows : [];
 
     // CSV export
     if (format === "csv") {
@@ -70,7 +54,7 @@ export async function GET(
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
-      responses.forEach((r: any) => {
+      responsesWithPlusOnes.forEach((r: any) => {
         if (r.response_data && typeof r.response_data === "object") {
           Object.keys(r.response_data as Record<string, unknown>).forEach((k) => dataKeys.add(k));
         }
