@@ -7,3 +7,8 @@
 **Vulnerability:** The `verify-code` API was using the transient `auth_code.id` as the `user_id` for guest sessions instead of looking up the persistent guest ID.
 **Learning:** Transient authentication records (like OTP codes) should not be used as identity identifiers. This led to sessions that couldn't be correctly mapped back to the actual guest record in subsequent requests.
 **Prevention:** Always resolve the final persistent entity ID (User or Guest) during the final step of authentication before creating a session.
+
+## 2025-05-16 - Database Error Leakage in API Responses
+**Vulnerability:** The event creation API was returning raw database error messages (`insertError.message`) to the client when an insertion failed.
+**Learning:** Raw database errors can leak sensitive information about the schema, table names, or constraints, which can be used by an attacker to craft SQL injection or other attacks.
+**Prevention:** Always log specific error details on the server and return a generic "Internal server error" message to the client.
