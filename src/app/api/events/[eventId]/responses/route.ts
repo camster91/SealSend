@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
-import type { PlusOne } from "@/types/database";
+import { query } from "@/lib/db/client";
+import type { PlusOne, RSVPResponse } from "@/types/database";
+
+type ResponseWithPlusOnes = RSVPResponse & { plus_ones: PlusOne[] };
 
 export async function GET(
   request: Request,
@@ -17,7 +19,7 @@ export async function GET(
 
     // Optimized: Consolidating event ownership check, responses fetch, and plus-ones aggregation.
     // This reduces database round-trips from 3 to 1.
-    const queryRows = await query<any>(
+    const queryRows = await query<ResponseWithPlusOnes & { event_exists: string }>(
       `SELECT
         e.id as event_exists,
         r.*,
@@ -54,7 +56,7 @@ export async function GET(
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
-      responsesWithPlusOnes.forEach((r: any) => {
+      responsesWithPlusOnes.forEach((r: ResponseWithPlusOnes) => {
         if (r.response_data && typeof r.response_data === "object") {
           Object.keys(r.response_data as Record<string, unknown>).forEach((k) => dataKeys.add(k));
         }
@@ -62,7 +64,7 @@ export async function GET(
       const dataKeysList = Array.from(dataKeys);
       headers.push(...dataKeysList);
 
-      const rows = responsesWithPlusOnes.map((r: any) => {
+      const rows = responsesWithPlusOnes.map((r: ResponseWithPlusOnes) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");

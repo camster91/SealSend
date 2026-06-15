@@ -136,7 +136,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
-            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
+            <p className="text-xs text-gray-500" aria-hidden="true">
               {(watchedValues.title || '').length}/200
             </p>
           </div>
@@ -168,7 +168,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
             </div>
-            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
+            <p className="text-xs text-gray-500" aria-hidden="true">
               {(watchedValues.description || '').length}/2000
             </p>
           </div>
