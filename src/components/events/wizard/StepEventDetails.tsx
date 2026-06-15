@@ -110,8 +110,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               Event Title <span className="text-red-500">*</span>
             </label>
             <span
-              id="title-counter"
-              aria-live="polite"
+              id="title-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.title?.length || 0) >= 180 && "text-amber-600 font-medium"
@@ -136,7 +136,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
-            <p className="text-xs text-gray-500" aria-hidden="true">
+            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
               {(watchedValues.title || '').length}/200
             </p>
           </div>
@@ -146,8 +146,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           <div className="flex justify-between items-center mb-1">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
             <span
-              id="description-counter"
-              aria-live="polite"
+              id="description-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.description?.length || 0) >= 1800 && "text-amber-600 font-medium"
@@ -168,7 +168,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             <div>
               {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
             </div>
-            <p className="text-xs text-gray-500" aria-hidden="true">
+            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
               {(watchedValues.description || '').length}/2000
             </p>
           </div>
