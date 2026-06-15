@@ -110,8 +110,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
               Event Title <span className="text-red-500">*</span>
             </label>
             <span
-              id="title-counter"
-              aria-live="polite"
+              id="title-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.title?.length || 0) >= 180 && "text-amber-600 font-medium"
@@ -122,7 +122,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <input
             id="title"
-            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -131,11 +130,11 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby="title-counter"
+            aria-describedby={cn("title-counter", errors.title && "title-error")}
           />
           <div className="mt-1 flex justify-between items-start">
             <div>
-              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
+              {errors.title && <p id="title-error" className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
             <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
               {(watchedValues.title || '').length}/200
@@ -147,8 +146,8 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           <div className="flex justify-between items-center mb-1">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
             <span
-              id="description-counter"
-              aria-live="polite"
+              id="description-counter-visual"
+              aria-hidden="true"
               className={cn(
                 "text-[10px] text-gray-400",
                 (watchedValues.description?.length || 0) >= 1800 && "text-amber-600 font-medium"
@@ -159,16 +158,15 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <textarea
             id="description"
-            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby="description-counter"
+            aria-describedby={cn("description-counter", errors.description && "description-error")}
           />
           <div className="mt-1 flex justify-between items-start">
             <div>
-              {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
+              {errors.description && <p id="description-error" className="text-sm text-red-600">{errors.description.message}</p>}
             </div>
             <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
               {(watchedValues.description || '').length}/2000
