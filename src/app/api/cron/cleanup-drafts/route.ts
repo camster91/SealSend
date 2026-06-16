@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
 
+import { timingSafeEqual } from "crypto";
+
 export async function GET(request: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    // Security: Fail securely if the secret is not configured to prevent a "Bearer undefined" bypass.
+    if (!cronSecret) {
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+
     const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    const expectedHeader = `Bearer ${cronSecret}`;
+
+    // Security: Use timingSafeEqual to prevent timing attacks when comparing the secret.
+    const headerBuffer = Buffer.from(authHeader || "");
+    const expectedBuffer = Buffer.from(expectedHeader);
+
+    if (
+      !authHeader ||
+      headerBuffer.length !== expectedBuffer.length ||
+      !timingSafeEqual(headerBuffer, expectedBuffer)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
