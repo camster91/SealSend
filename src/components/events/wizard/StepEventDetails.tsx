@@ -131,7 +131,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby="title-counter"
           />
           <div className="mt-1 flex justify-between items-start">
             <div>
@@ -164,7 +163,6 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             rows={3}
             placeholder="Tell your guests what to expect..."
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby="description-counter"
           />
           <div className="mt-1 flex justify-between items-start">
             <div>

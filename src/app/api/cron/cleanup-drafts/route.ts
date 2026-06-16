@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
-
 import { timingSafeEqual } from "crypto";
 
 export async function GET(request: NextRequest) {
@@ -34,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ deleted: deleted?.length || 0 });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
