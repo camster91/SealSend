@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
 import { Button } from '@/components/ui/Button';
-import { Toggle } from '@/components/ui/Toggle';
-import { Select } from '@/components/ui/Select';
 import { X } from 'lucide-react';
 
 interface EventDetailsFormValues {
@@ -124,6 +122,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <input
             id="title"
+            aria-describedby="title-counter"
             type="text"
             {...register('title', {
               required: 'Event title is required',
@@ -132,14 +131,15 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             })}
             placeholder="e.g. Sarah & Tom's Wedding"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby={cn("title-counter", errors.title && "title-error")}
+            aria-describedby="title-counter"
           />
-          <div className="mt-1">
-            {errors.title && (
-              <p id="title-error" className="text-sm text-red-600">
-                {errors.title.message}
-              </p>
-            )}
+          <div className="mt-1 flex justify-between items-start">
+            <div>
+              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
+            </div>
+            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
+              {(watchedValues.title || '').length}/200
+            </p>
           </div>
         </div>
 
@@ -159,18 +159,20 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
           <textarea
             id="description"
+            aria-describedby="description-counter"
             {...register('description', { maxLength: { value: 2000, message: 'Description must be less than 2000 characters' } })}
             rows={3}
             placeholder="Tell your guests what to expect..."
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-            aria-describedby={cn("description-counter", errors.description && "description-error")}
+            aria-describedby="description-counter"
           />
-          <div className="mt-1">
-            {errors.description && (
-              <p id="description-error" className="text-sm text-red-600">
-                {errors.description.message}
-              </p>
-            )}
+          <div className="mt-1 flex justify-between items-start">
+            <div>
+              {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
+            </div>
+            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
+              {(watchedValues.description || '').length}/2000
+            </p>
           </div>
         </div>
 
@@ -248,13 +250,19 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
       <section className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Settings</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            id="dress_code"
-            label="Dress Code"
-            options={DRESS_CODE_OPTIONS.filter(Boolean).map((opt) => ({ value: opt, label: opt }))}
-            placeholder="Select..."
-            {...register('dress_code')}
-          />
+          <div>
+            <label htmlFor="dress_code" className="block text-sm font-medium text-gray-700 mb-1">Dress Code</label>
+            <select
+              id="dress_code"
+              {...register('dress_code')}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 bg-white"
+            >
+              <option value="">Select...</option>
+              {DRESS_CODE_OPTIONS.filter(Boolean).map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label htmlFor="rsvp_deadline" className="block text-sm font-medium text-gray-700 mb-1">RSVP Deadline</label>
             <input
@@ -293,13 +301,19 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
           </div>
         </div>
 
-        <Toggle
-          label="Allow +1s"
-          description="Let guests bring additional people"
-          checked={allowPlusOnes}
-          onChange={(checked) => onUpdate('allow_plus_ones', checked)}
-          className="flex-row-reverse justify-between w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-        />
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Allow +1s</p>
+            <p className="text-xs text-gray-500">Let guests bring additional people</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onUpdate('allow_plus_ones', !allowPlusOnes)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${allowPlusOnes ? 'bg-brand-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition ${allowPlusOnes ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
       </section>
 
       <hr className="border-gray-200" />
@@ -322,13 +336,13 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             placeholder="https://..."
             className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
-          <Button
+          <button
             type="button"
             onClick={addRegistryLink}
-            className="px-8"
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
           >
             Add
-          </Button>
+          </button>
         </div>
         {regError && <p className="text-sm text-red-600">{regError}</p>}
 
