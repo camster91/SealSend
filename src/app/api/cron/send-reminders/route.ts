@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     // Process each event
     for (const event of events) {
-      console.log(`[CRON] Processing event: ${event.title} (${event.id})`);
+      console.log(`[CRON] Processing event ${event.id}`);
 
       // Fetch guests who:
       // 1. Haven't received a reminder yet (reminder_sent_at is null)
@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
                 });
               } catch (error) {
                 const message = error instanceof Error ? error.message : "Email send failed";
-                console.error(`[CRON] Email failed for ${guest.email}:`, message);
+                console.error(`[CRON] Email failed for guest=${guest.id}:`, message);
                 await logSendFailure(event.id, "email", guest.email, message, {
                   guestId: guest.id,
                   subject: `Reminder: ${event.title}`,
@@ -265,7 +265,7 @@ export async function GET(request: NextRequest) {
                   });
                 } catch (error) {
                   const message = error instanceof Error ? error.message : "SMS send failed";
-                  console.error(`[CRON] SMS failed for ${guest.phone}:`, message);
+                  console.error(`[CRON] SMS failed for guest=${guest.id}:`, message);
                   await logSendFailure(event.id, "sms", guest.phone, message, {
                     guestId: guest.id,
                     provider: "twilio",

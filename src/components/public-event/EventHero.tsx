@@ -1,7 +1,7 @@
 "use client";
 
 import { Share2, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Event } from "@/types/database";
 import { isValidHexColor } from "@/lib/utils";
 import { sanitizeUrl } from "@/lib/sanitize";
@@ -19,6 +19,13 @@ function isVideo(event: Event): boolean {
 
 export function EventHero({ event }: EventHeroProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
 
   const primaryColor = isValidHexColor(event.customization?.primaryColor ?? "")
     ? event.customization.primaryColor
@@ -38,14 +45,15 @@ export function EventHero({ event }: EventHeroProps) {
           text,
           url,
         });
-      } catch (err) {
-        console.log("Error sharing:", err);
+      } catch {
+        // User cancelled share sheet — ignore
       }
     } else {
       // Fallback to copy link
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
     }
   };
 

@@ -25,6 +25,18 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const user = auth.user;
 
+    const { rateLimit } = await import("@/lib/rate-limit");
+    const { success: rateLimitOk } = await rateLimit(`checkout:${user.id}`, {
+      max: 10,
+      windowSeconds: 3600,
+    });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: "Too many checkout attempts. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const parsed = checkoutSchema.safeParse(body);
     if (!parsed.success) {

@@ -49,19 +49,39 @@ export async function rateLimit(
   };
 }
 
-/** Extract client IP from request headers.
- *  Uses x-real-ip (set by trusted reverse proxy) first,
- *  then falls back to x-forwarded-for (first entry). */
-export function getClientIp(request: Request): string {
-  // Prefer x-real-ip as it's typically set by the trusted reverse proxy
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp && /^[\d.:a-fA-F]+$/.test(realIp.trim())) {
-    return realIp.trim();
-  }
+const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const IPV6_RE = /^[0-9a-fA-F:]+$/;
 
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded && /^[\d.:a-fA-F]+$/.test(forwarded)) {
-    return forwarded;
+function isPlausibleIp(value: string): boolean {
+  const v = value.trim();
+  if (!v || v.length > 45) return false;
+  if (IPV4_RE.test(v)) {
+    return v.split('.').every((octet) => {
+      const n = Number(octet);
+      return n >= 0 && n <= 255;
+    });
+  }
+  return IPV6_RE.test(v) && v.includes(':');
+}
+
+/**
+ * Extract client IP from request headers.
+ * Prefer x-real-ip (set by trusted reverse proxy). Only use the left-most
+ * x-forwarded-for hop when TRUST_PROXY_HEADERS=true (Coolify/nginx setups).
+ */
+export function getClientIp(request: Request): string {
+  const trustProxy = process.env.TRUST_PROXY_HEADERS !== 'false';
+
+  if (trustProxy) {
+    const realIp = request.headers.get("x-real-ip");
+    if (realIp && isPlausibleIp(realIp)) {
+      return realIp.trim();
+    }
+
+    const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    if (forwarded && isPlausibleIp(forwarded)) {
+      return forwarded;
+    }
   }
 
   return "unknown";

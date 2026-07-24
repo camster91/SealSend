@@ -110,7 +110,7 @@ export async function logSendFailure(
     provider?: string;
   } = {}
 ): Promise<void> {
-  console.error(`[${sendType.toUpperCase()} FAILED] ${recipient}: ${errorMessage}`);
+  console.error(`[${sendType.toUpperCase()} FAILED] send_type=${sendType} event=${eventId}`);
 
   await logSendAttempt({
     event_id: eventId,
@@ -134,8 +134,11 @@ export async function getEventSendStats(eventId: string): Promise<{
   pending: number;
   byType: Record<SendType, { sent: number; failed: number }>;
 }> {
-  const logs = await query<{ send_type: string; status: string }>(
-    'SELECT send_type, status FROM send_logs WHERE event_id = $1',
+  const rows = await query<{ send_type: string; status: string; count: string }>(
+    `SELECT send_type, status, COUNT(*)::text AS count
+     FROM send_logs
+     WHERE event_id = $1
+     GROUP BY send_type, status`,
     [eventId]
   );
 
@@ -147,20 +150,26 @@ export async function getEventSendStats(eventId: string): Promise<{
     byType: {
       email: { sent: 0, failed: 0 },
       sms: { sent: 0, failed: 0 },
-    },
+    } as Record<SendType, { sent: number; failed: number }>,
   };
 
-  for (const log of logs || []) {
-    stats.total++;
+  for (const row of rows || []) {
+    const count = parseInt(row.count || '0', 10);
+    stats.total += count;
 
-    if (log.status === 'sent' || log.status === 'delivered') {
-      stats.sent++;
-      stats.byType[log.send_type as SendType].sent++;
-    } else if (log.status === 'failed') {
-      stats.failed++;
-      stats.byType[log.send_type as SendType].failed++;
-    } else if (log.status === 'pending') {
-      stats.pending++;
+    const type = (row.send_type === 'sms' ? 'sms' : 'email') as SendType;
+    if (!stats.byType[type]) {
+      stats.byType[type] = { sent: 0, failed: 0 };
+    }
+
+    if (row.status === 'sent' || row.status === 'delivered') {
+      stats.sent += count;
+      stats.byType[type].sent += count;
+    } else if (row.status === 'failed') {
+      stats.failed += count;
+      stats.byType[type].failed += count;
+    } else if (row.status === 'pending') {
+      stats.pending += count;
     }
   }
 

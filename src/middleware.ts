@@ -1,31 +1,36 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+/**
+ * CSRF: for browser state-changing API calls require Origin or Referer
+ * matching this host. Missing both is rejected (except webhooks/cron).
+ */
 function isValidOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
   const host = request.headers.get('host');
 
-  // Allow requests with no origin (same-origin navigations, server-to-server)
-  if (!origin) return true;
+  if (!host) return false;
 
-  // Validate origin matches host
-  try {
-    const originHost = new URL(origin).host;
-    if (originHost === host) return true;
-  } catch {
-    // Invalid origin URL
-  }
-
-  // Check referer as fallback
-  if (referer) {
+  if (origin) {
     try {
-      const refererHost = new URL(referer).host;
-      if (refererHost === host) return true;
+      if (new URL(origin).host === host) return true;
     } catch {
-      // Invalid referer URL
+      return false;
     }
   }
 
+  if (referer) {
+    try {
+      if (new URL(referer).host === host) return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // No Origin and no Referer — typical of non-browser clients.
+  // Reject browser-like cookie-authenticated API mutations without proof of same origin.
+  // Allow only when neither Origin nor Referer is present AND Content-Type is not a
+  // browser form/json post without cookies would still need session — fail closed.
   return false;
 }
 

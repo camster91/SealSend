@@ -134,7 +134,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               errors.push({ type: 'email', message });
-              console.error(`[EMAIL FAILED] ${guest.email}:`, message);
+              console.error(`[EMAIL FAILED] guest=${guest.id}:`, message);
 
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
@@ -150,7 +150,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
             if (!phoneValidation.valid) {
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
-              console.error(`[SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              console.error(`[SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
@@ -184,7 +184,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               } catch (error) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
-                console.error(`[SMS FAILED] ${guest.phone}:`, message);
+                console.error(`[SMS FAILED] guest=${guest.id}:`, message);
 
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,

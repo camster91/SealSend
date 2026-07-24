@@ -142,7 +142,7 @@ export async function POST(
               });
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Email send failed';
-              console.error(`[ANNOUNCEMENT EMAIL FAILED] ${guest.email}:`, message);
+              console.error(`[ANNOUNCEMENT EMAIL FAILED] guest=${guest.id}:`, message);
 
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
@@ -157,7 +157,7 @@ export async function POST(
             const phoneValidation = validateAndFormatPhone(guest.phone);
 
             if (!phoneValidation.valid) {
-              console.error(`[ANNOUNCEMENT SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              console.error(`[ANNOUNCEMENT SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
@@ -187,7 +187,7 @@ export async function POST(
                 });
               } catch (error) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
-                console.error(`[ANNOUNCEMENT SMS FAILED] ${guest.phone}:`, message);
+                console.error(`[ANNOUNCEMENT SMS FAILED] guest=${guest.id}:`, message);
 
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,

@@ -78,6 +78,18 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const user = auth.user;
 
+    const { rateLimit } = await import('@/lib/rate-limit');
+    const { success: rateLimitOk } = await rateLimit(`upload:${user.id}`, {
+      max: 30,
+      windowSeconds: 3600,
+    });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many uploads. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const uploadType = request.nextUrl.searchParams.get('type') || 'image';
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -105,7 +117,7 @@ export async function POST(request: NextRequest) {
       default:
         allowedTypes = IMAGE_TYPES;
         maxSize = MAX_IMAGE_SIZE;
-        typeLabel = 'JPEG, PNG, GIF, WebP, or SVG';
+        typeLabel = 'JPEG, PNG, GIF, or WebP';
     }
 
     if (!allowedTypes.includes(file.type)) {

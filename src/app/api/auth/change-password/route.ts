@@ -9,6 +9,18 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const user = auth.user;
 
+    const { rateLimit } = await import('@/lib/rate-limit');
+    const { success: rateLimitOk } = await rateLimit(`change-password:${user.id}`, {
+      max: 5,
+      windowSeconds: 900,
+    });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many password change attempts. Please wait and try again.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
