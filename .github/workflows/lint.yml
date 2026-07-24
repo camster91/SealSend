@@ -2,12 +2,12 @@ name: Lint
 
 # Lint workflow. Runs the project's `lint` script on PRs and pushes.
 # Fails the build if lint errors are found.
+#
+# DISABLED: automatic triggers removed due to GitHub Actions billing limits.
+# Re-enable by restoring push/pull_request triggers below.
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,11 +34,9 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-
         run: npm ci --no-audit --no-fund
 
       - name: Run lint
-
         run: npm run lint
         env:
           CI: true
