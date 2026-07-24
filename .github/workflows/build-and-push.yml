@@ -11,13 +11,12 @@ name: Build and Push Image
 #   - Multi-arch: linux/amd64 + linux/arm64 (Raspberry Pi, Apple Silicon hosts)
 #   - Buildx cache pushed to GHCR type=cache (saves ~3min per build)
 #   - SBOM + provenance attestations enabled (for supply-chain trust)
+#
+# DISABLED: automatic push/PR triggers removed due to GitHub Actions billing limits.
+# Re-enable by restoring push/pull_request triggers below.
 
 on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
-  pull_request:
-    branches: [main, master]
+  workflow_dispatch:
   workflow_call:
     inputs:
       image_name:

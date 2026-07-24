@@ -1,8 +1,11 @@
 name: Stale Issues
+
+# DISABLED: scheduled trigger removed due to GitHub Actions billing limits.
+# Re-enable by restoring the cron schedule below.
+
 on:
-  schedule:
-    - cron: "0 7 * * 1"
   workflow_dispatch:
+
 jobs:
   stale:
     runs-on: ubuntu-latest

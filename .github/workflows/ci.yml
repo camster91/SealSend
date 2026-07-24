@@ -1,12 +1,11 @@
 name: CI Build
 
 # Build-only workflow: verifies the project builds cleanly. No deploy, no secrets required.
+#
+# DISABLED: automatic triggers removed due to GitHub Actions billing limits.
+# Re-enable by restoring push/pull_request triggers below.
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 permissions:

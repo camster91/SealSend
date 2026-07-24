@@ -1,7 +1,11 @@
 name: Auto Merge
+
+# DISABLED: automatic triggers removed due to GitHub Actions billing limits.
+# Re-enable by restoring pull_request_target trigger below.
+
 on:
-  pull_request_target:
-    types: [labeled, unlabeled, synchronize, opened, edited, reopened]
+  workflow_dispatch:
+
 jobs:
   auto-merge:
     if: contains(github.event.pull_request.labels.*.name, 'auto-merge')

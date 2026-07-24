@@ -12,13 +12,12 @@
 # deployments endpoint to confirm the new build succeeded.
 #
 # Reference: skill `coolify` (the "git push succeeds but Coolify doesn't redeploy" section)
+#
+# DISABLED: automatic push/PR triggers removed due to GitHub Actions billing limits.
+# Re-enable by restoring push/pull_request triggers below.
 name: Build, Test & Deploy to Coolify
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 # Cancel in-progress runs on the same branch when a new push lands
