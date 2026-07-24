@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/auth/api-auth";
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { getStripe } from "@/lib/stripe";
 import { SUBSCRIPTION_TIERS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
-  const user = await getApiUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireApiHost();
+  if (auth.error) return auth.error;
+  const user = auth.user;
 
   let body: { tier: string; billing: string };
   try {

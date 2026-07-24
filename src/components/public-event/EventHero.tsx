@@ -4,6 +4,7 @@ import { Share2, Check } from "lucide-react";
 import { useState } from "react";
 import type { Event } from "@/types/database";
 import { isValidHexColor } from "@/lib/utils";
+import { sanitizeUrl } from "@/lib/sanitize";
 
 interface EventHeroProps {
   event: Event;
@@ -22,7 +23,8 @@ export function EventHero({ event }: EventHeroProps) {
   const primaryColor = isValidHexColor(event.customization?.primaryColor ?? "")
     ? event.customization.primaryColor
     : "#7c3aed";
-  const logoUrl = event.customization?.logoUrl;
+  const logoUrl = sanitizeUrl(event.customization?.logoUrl);
+  const designUrl = sanitizeUrl(event.design_url);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -73,7 +75,7 @@ export function EventHero({ event }: EventHeroProps) {
       </div>
 
       {/* Design */}
-      {!event.design_url ? (
+      {!designUrl ? (
         <div
           className="flex h-64 items-center justify-center rounded-xl"
           style={{ backgroundColor: primaryColor + "20" }}
@@ -88,7 +90,7 @@ export function EventHero({ event }: EventHeroProps) {
       ) : isVideo(event) ? (
         <div className="overflow-hidden rounded-xl shadow-lg ring-1 ring-black/5">
           <video
-            src={event.design_url}
+            src={designUrl}
             autoPlay
             muted
             loop
@@ -100,7 +102,7 @@ export function EventHero({ event }: EventHeroProps) {
         <div className="overflow-hidden rounded-xl shadow-lg ring-1 ring-black/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={event.design_url}
+            src={designUrl}
             alt={event.title}
             className="h-auto w-full object-cover"
           />

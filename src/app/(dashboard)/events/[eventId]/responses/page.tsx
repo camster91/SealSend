@@ -19,12 +19,17 @@ export default function ResponsesPage() {
 
   const fetchResponses = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/events/${eventId}/responses`);
-    if (res.ok) {
-      const data = await res.json();
-      setResponses(data);
+    try {
+      const res = await fetch(`/api/events/${eventId}/responses?limit=500`);
+      if (res.ok) {
+        const data = await res.json();
+        setResponses(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load responses:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   useEffect(() => {

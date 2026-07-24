@@ -8,10 +8,11 @@ const MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
   '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
   '.pdf': 'application/pdf',
 };
 
@@ -35,9 +36,14 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const fileBuffer = await readFile(resolved);
-
     const ext = path.extname(resolved).toLowerCase();
+
+    // Never serve SVG as active content
+    if (ext === '.svg' || ext === '.svgz' || ext === '.html' || ext === '.htm' || ext === '.js') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    const fileBuffer = await readFile(resolved);
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
     return new NextResponse(fileBuffer, {
@@ -46,6 +52,8 @@ export async function GET(
         'Content-Type': contentType,
         'Content-Length': fileBuffer.length.toString(),
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
       },
     });
   } catch (err: unknown) {

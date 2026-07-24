@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
 import { DEFAULT_RSVP_FIELDS } from '@/lib/constants';
 
 export async function GET() {
   try {
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const events = await query(
       'SELECT * FROM events WHERE user_id = $1 ORDER BY created_at DESC',
@@ -32,14 +27,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const body = await request.json();
     const parsed = eventCreateSchema.safeParse(body);
@@ -104,8 +94,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertError) {
+      console.error('Event insert failed:', insertError.message);
       return NextResponse.json(
-        { error: insertError.message },
+        { error: 'Failed to create event' },
         { status: 500 }
       );
     }

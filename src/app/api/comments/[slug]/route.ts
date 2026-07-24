@@ -12,9 +12,9 @@ export async function GET(
   try {
     const { slug } = await params;
 
-    // Find event by slug (any status — page is already rendered if accessible)
+    // Find published event by slug
     const event = await queryOne<{ id: string }>(
-      'SELECT id FROM events WHERE slug = $1',
+      `SELECT id FROM events WHERE slug = $1 AND status = 'published'`,
       [slug]
     );
 
@@ -48,9 +48,9 @@ export async function POST(
     const { slug } = await params;
     const body = await request.json();
 
-    // Find event by slug
+    // Find published event by slug
     const event = await queryOne<{ id: string }>(
-      'SELECT id FROM events WHERE slug = $1',
+      `SELECT id FROM events WHERE slug = $1 AND status = 'published'`,
       [slug]
     );
 

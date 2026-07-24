@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 
@@ -16,8 +16,9 @@ const signupItemSchema = z.object({
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const event = await queryOne(
       'SELECT id FROM events WHERE id = $1 AND user_id = $2',
@@ -57,8 +58,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const event = await queryOne<{ id: string; tier: string }>(
       'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
@@ -109,8 +111,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const { itemId } = await request.json();
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const event = await queryOne(
       'SELECT id FROM events WHERE id = $1 AND user_id = $2',

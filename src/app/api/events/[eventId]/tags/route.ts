@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 
@@ -18,8 +18,9 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne(
@@ -47,8 +48,9 @@ export async function POST(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne<{ id: string; tier: string }>(
@@ -90,8 +92,9 @@ export async function DELETE(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne(

@@ -38,10 +38,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // Attach claims to items
+    // Attach claims to items — redact emails from public API
     const itemsWithClaims = items.map((item: any) => ({
       ...item,
-      claims: claims.filter((c: any) => c.item_id === item.id),
+      claims: claims
+        .filter((c: any) => (c.item_id ?? c.signup_item_id) === item.id)
+        .map((c: any) => ({
+          id: c.id,
+          item_id: c.item_id ?? c.signup_item_id,
+          claimant_name: c.claimant_name ?? c.claimer_name,
+          created_at: c.created_at ?? c.claimed_at,
+        })),
     }));
 
     return NextResponse.json(itemsWithClaims);

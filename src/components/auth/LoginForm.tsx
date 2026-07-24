@@ -33,12 +33,14 @@ export function LoginForm() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         setError(data.error || "Failed to send code");
         return;
       }
 
       setStep("code");
+    } catch {
+      setError("Network error. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -58,13 +60,15 @@ export function LoginForm() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         setError(data.error || "Verification failed");
         return;
       }
 
       router.push(redirect);
       router.refresh();
+    } catch {
+      setError("Network error. Check your connection and try again.");
     } finally {
       setLoading(false);
     }

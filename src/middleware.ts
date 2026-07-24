@@ -37,14 +37,29 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
-    !pathname.startsWith('/api/webhooks/') // Webhooks use signature verification
+    !pathname.startsWith('/api/webhooks/') && // Webhooks use signature verification
+    !pathname.startsWith('/api/cron/') // Cron uses Bearer secret
   ) {
     if (!isValidOrigin(request)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }
 
-  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases', '/terms', '/privacy', '/robots.txt', '/sitemap.xml'];
+  const publicPaths = [
+    '/',
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/callback',
+    '/how-it-works',
+    '/pricing',
+    '/use-cases',
+    '/terms',
+    '/privacy',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/invite/accept',
+  ];
 
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||
@@ -59,7 +74,9 @@ export async function middleware(request: NextRequest) {
   if (!isPublicRoute && !isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('redirect', pathname);
+    // Preserve full path + query (needed for invite tokens)
+    const redirectTarget = pathname + (request.nextUrl.search || '');
+    url.searchParams.set('redirect', redirectTarget);
     return NextResponse.redirect(url);
   }
 
@@ -69,7 +86,6 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     // Preserve query params (e.g., ?plan=pro) so the dashboard can handle them
-    // Keep existing search params from the original URL
     return NextResponse.redirect(url);
   }
 

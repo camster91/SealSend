@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
@@ -27,11 +27,9 @@ type RouteParams = { params: Promise<{ eventId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const { success: rateLimitOk } = await rateLimit(`send-invites:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
@@ -246,11 +244,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       );
     }
     if (failedGuests.length > 0) {
-      // Update each failed guest with their specific error message
-      await Promise.all(failedGuests.map(({ id, error }) =>
+      // Store sanitized error only — never persist raw provider messages
+      await Promise.all(failedGuests.map(({ id }) =>
         query(
           'UPDATE guests SET invite_status = $1, invite_error = $2 WHERE id = $3',
-          ['failed', error, id]
+          ['failed', 'Delivery failed', id]
         )
       ));
     }

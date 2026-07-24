@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query } from '@/lib/db/client';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { verifyPassword, hashPassword, checkPasswordStrength } from '@/lib/password';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getApiUser();
-
-    if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const body = await request.json();
     const { currentPassword, newPassword } = body;

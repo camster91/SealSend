@@ -3,8 +3,14 @@ import { query } from "@/lib/db/client";
 
 export async function GET(request: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error("[cleanup-drafts] CRON_SECRET is not configured");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -17,6 +23,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ deleted: deleted?.length || 0 });
   } catch (error) {
+    console.error("[cleanup-drafts] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
