@@ -1,31 +1,36 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+/**
+ * CSRF: for browser state-changing API calls require Origin or Referer
+ * matching this host. Missing both is rejected (except webhooks/cron).
+ */
 function isValidOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
   const host = request.headers.get('host');
 
-  // Allow requests with no origin (same-origin navigations, server-to-server)
-  if (!origin) return true;
+  if (!host) return false;
 
-  // Validate origin matches host
-  try {
-    const originHost = new URL(origin).host;
-    if (originHost === host) return true;
-  } catch {
-    // Invalid origin URL
-  }
-
-  // Check referer as fallback
-  if (referer) {
+  if (origin) {
     try {
-      const refererHost = new URL(referer).host;
-      if (refererHost === host) return true;
+      if (new URL(origin).host === host) return true;
     } catch {
-      // Invalid referer URL
+      return false;
     }
   }
 
+  if (referer) {
+    try {
+      if (new URL(referer).host === host) return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // No Origin and no Referer — typical of non-browser clients.
+  // Reject browser-like cookie-authenticated API mutations without proof of same origin.
+  // Allow only when neither Origin nor Referer is present AND Content-Type is not a
+  // browser form/json post without cookies would still need session — fail closed.
   return false;
 }
 
@@ -37,14 +42,29 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
-    !pathname.startsWith('/api/webhooks/') // Webhooks use signature verification
+    !pathname.startsWith('/api/webhooks/') && // Webhooks use signature verification
+    !pathname.startsWith('/api/cron/') // Cron uses Bearer secret
   ) {
     if (!isValidOrigin(request)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }
 
-  const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/callback', '/how-it-works', '/pricing', '/use-cases', '/terms', '/privacy', '/robots.txt', '/sitemap.xml'];
+  const publicPaths = [
+    '/',
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/callback',
+    '/how-it-works',
+    '/pricing',
+    '/use-cases',
+    '/terms',
+    '/privacy',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/invite/accept',
+  ];
 
   const isPublicRoute =
     publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||
@@ -59,7 +79,9 @@ export async function middleware(request: NextRequest) {
   if (!isPublicRoute && !isAuthenticated) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('redirect', pathname);
+    // Preserve full path + query (needed for invite tokens)
+    const redirectTarget = pathname + (request.nextUrl.search || '');
+    url.searchParams.set('redirect', redirectTarget);
     return NextResponse.redirect(url);
   }
 
@@ -69,7 +91,6 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     // Preserve query params (e.g., ?plan=pro) so the dashboard can handle them
-    // Keep existing search params from the original URL
     return NextResponse.redirect(url);
   }
 

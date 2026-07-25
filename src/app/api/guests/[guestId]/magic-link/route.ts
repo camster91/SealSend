@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from "@/lib/auth/api-auth";
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { randomBytes, createHash } from "crypto";
 import { rateLimit } from "@/lib/rate-limit";
@@ -26,11 +26,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { guestId } = await params;
 
-    // Authenticate user
-    const user = await getApiUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Authenticate host
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Rate limit: 10 magic link generations per user per hour
     const { success: rateLimitOk } = await rateLimit(`magic-link:${user.id}`, {
@@ -124,10 +123,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { guestId } = await params;
 
-    const user = await getApiUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Get guest and verify ownership
     const guest = await queryOne<{ id: string; event_id: string }>(

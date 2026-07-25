@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, Check, Loader2 } from 'lucide-react';
 
@@ -11,16 +11,24 @@ interface AutoRemindersToggleProps {
   isPublished: boolean;
 }
 
-export function AutoRemindersToggle({ 
-  eventId, 
-  initialEnabled, 
+export function AutoRemindersToggle({
+  eventId,
+  initialEnabled,
   eventDate,
-  isPublished 
+  isPublished
 }: AutoRemindersToggleProps) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    return () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
 
   // Don't show if event has no date or is not published
   if (!eventDate || !isPublished) {
@@ -28,8 +36,10 @@ export function AutoRemindersToggle({
   }
 
   const handleToggle = async () => {
+    const previous = enabled;
     setIsLoading(true);
     setShowSuccess(false);
+    setError(null);
 
     try {
       const response = await fetch(`/api/events/${eventId}`, {
@@ -44,14 +54,14 @@ export function AutoRemindersToggle({
 
       setEnabled(!enabled);
       setShowSuccess(true);
-      
-      // Hide success message after 2 seconds
-      setTimeout(() => setShowSuccess(false), 2000);
-      
-      // Refresh the page data
+
+      if (successTimer.current) clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setShowSuccess(false), 2000);
+
       router.refresh();
-    } catch (error) {
-      console.error('Error updating auto reminders:', error);
+    } catch {
+      setEnabled(previous);
+      setError('Could not update reminders. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +70,7 @@ export function AutoRemindersToggle({
   const eventDateObj = new Date(eventDate);
   const now = new Date();
   const hoursUntilEvent = (eventDateObj.getTime() - now.getTime()) / (1000 * 60 * 60);
-  
+
   // Show warning if event is less than 48 hours away
   const showWarning = hoursUntilEvent < 48 && hoursUntilEvent > 0;
 
@@ -83,11 +93,15 @@ export function AutoRemindersToggle({
           <p className="mt-1 text-xs text-gray-500">
             Automatically send reminder emails and SMS to guests 24-48 hours before the event.
           </p>
-          
+
           {showWarning && (
             <p className="mt-2 text-xs text-amber-600">
-              ⚠️ Event is less than 48 hours away. Reminders may be sent immediately.
+              Event is less than 48 hours away. Reminders may be sent immediately.
             </p>
+          )}
+
+          {error && (
+            <p className="mt-2 text-xs text-red-600">{error}</p>
           )}
 
           <div className="mt-3 flex items-center gap-3">

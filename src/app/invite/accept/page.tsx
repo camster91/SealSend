@@ -71,7 +71,6 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   cookieStore.set(
     "sealsend_user",
     JSON.stringify({
-      id: guest.id,
       email: guest.email,
       phone: guest.phone,
       role: "guest",
@@ -79,6 +78,7 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
       name: guest.name,
     }),
     {
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       expires: expiresAt,

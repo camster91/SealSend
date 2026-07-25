@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query } from '@/lib/db/client';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { verifyPassword, hashPassword, checkPasswordStrength } from '@/lib/password';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getApiUser();
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
-    if (!user || user.role !== 'admin') {
+    const { rateLimit } = await import('@/lib/rate-limit');
+    const { success: rateLimitOk } = await rateLimit(`change-password:${user.id}`, {
+      max: 5,
+      windowSeconds: 900,
+    });
+    if (!rateLimitOk) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Too many password change attempts. Please wait and try again.' },
+        { status: 429 }
       );
     }
 

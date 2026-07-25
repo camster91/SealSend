@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
 
+const DEFAULT_LIMIT = 500;
+const MAX_LIMIT = 500;
+
+function parsePagination(request: Request) {
+  const url = new URL(request.url);
+  const limit = Math.min(
+    Math.max(parseInt(url.searchParams.get("limit") || String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT, 1),
+    MAX_LIMIT
+  );
+  const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
+  return { limit, offset };
+}
+
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne(
@@ -20,12 +34,32 @@ export async function GET(
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const { limit, offset } = parsePagination(request);
+
+    // Exclude sensitive token/error fields from list payloads
     const guests = await query(
-      'SELECT * FROM guests WHERE event_id = $1 ORDER BY created_at DESC',
+      `SELECT id, event_id, name, email, phone, notes, invite_status, invite_sent_at,
+              reminder_sent_at, tags, created_at, updated_at
+       FROM guests
+       WHERE event_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [eventId, limit, offset]
+    );
+
+    const countRow = await queryOne<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM guests WHERE event_id = $1',
       [eventId]
     );
 
-    return NextResponse.json(guests);
+    // Keep array response for existing clients; expose pagination via headers
+    return NextResponse.json(guests, {
+      headers: {
+        'X-Total-Count': countRow?.count || '0',
+        'X-Limit': String(limit),
+        'X-Offset': String(offset),
+      },
+    });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -38,8 +72,9 @@ export async function POST(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne(
@@ -55,7 +90,7 @@ export async function POST(
     }
 
     const guest = await queryOne(
-      'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
       [eventId, parsed.data.name, parsed.data.email || null, parsed.data.phone || null, parsed.data.notes || null]
     );
 

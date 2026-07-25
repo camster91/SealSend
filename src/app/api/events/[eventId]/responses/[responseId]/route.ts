@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 
 export async function DELETE(
@@ -8,8 +8,9 @@ export async function DELETE(
 ) {
   try {
     const { eventId, responseId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const event = await queryOne(
       'SELECT id FROM events WHERE id = $1 AND user_id = $2',

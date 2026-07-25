@@ -114,23 +114,29 @@ export default function AnalyticsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch responses
-      const res = await fetch(`/api/events/${eventId}/responses`);
+      // Fetch responses (capped)
+      const res = await fetch(`/api/events/${eventId}/responses?limit=500`);
       if (res.ok) {
         const data = await res.json();
-        setResponses(data);
+        setResponses(Array.isArray(data) ? data : []);
       }
 
-      // Fetch guest count
-      const guestRes = await fetch(`/api/events/${eventId}/guests`);
+      // Guest count via pagination header — avoid loading full guest payloads
+      const guestRes = await fetch(`/api/events/${eventId}/guests?limit=1`);
       if (guestRes.ok) {
-        const guests = await guestRes.json();
-        setGuestCount(guests.length);
+        const total = guestRes.headers.get("X-Total-Count");
+        if (total != null) {
+          setGuestCount(parseInt(total, 10) || 0);
+        } else {
+          const guests = await guestRes.json();
+          setGuestCount(Array.isArray(guests) ? guests.length : 0);
+        }
       }
     } catch (error) {
-      console.error("Error fetching analytics data:", error);
+      console.error("Error fetching analytics data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   useEffect(() => {

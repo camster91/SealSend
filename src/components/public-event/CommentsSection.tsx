@@ -49,12 +49,17 @@ export function CommentsSection({ eventSlug }: CommentsSectionProps) {
   }, []);
 
   const fetchComments = useCallback(async () => {
-    const res = await fetch(`/api/comments/${eventSlug}`);
-    if (res.ok) {
-      const data = await res.json();
-      setComments(data);
+    try {
+      const res = await fetch(`/api/comments/${eventSlug}`);
+      if (res.ok) {
+        const data = await res.json();
+        setComments(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // Offline / network — keep empty list
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventSlug]);
 
   useEffect(() => {

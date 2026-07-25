@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { eventUpdateSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -11,14 +11,9 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const event = await queryOne(
       'SELECT * FROM events WHERE id = $1 AND user_id = $2',
@@ -47,14 +42,9 @@ export async function PATCH(
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const existing = await queryOne(
@@ -134,14 +124,9 @@ export async function DELETE(
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const existing = await queryOne(

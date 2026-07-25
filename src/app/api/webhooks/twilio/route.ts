@@ -19,38 +19,38 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const data = Object.fromEntries(formData.entries()) as unknown as TwilioWebhookData;
 
-    // Verify the request is from Twilio using signature validation
+    // Verify the request is from Twilio using signature validation (fail closed)
     const twilioSignature = request.headers.get('x-twilio-signature');
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-    if (authToken && twilioSignature) {
-      const { createHmac } = await import('crypto');
-      const webhookUrl = process.env.TWILIO_WEBHOOK_URL || request.url;
-
-      // Sort form params alphabetically and concatenate
-      const sortedParams = Object.keys(data).sort().reduce((acc, key) => {
-        return acc + key + (data as unknown as Record<string, string>)[key];
-      }, '');
-
-      const expectedSignature = createHmac('sha1', authToken)
-        .update(webhookUrl + sortedParams)
-        .digest('base64');
-
-      // Use timing-safe comparison
-      const { timingSafeEqual } = await import('crypto');
-      const sigBuffer = Buffer.from(twilioSignature);
-      const expectedBuffer = Buffer.from(expectedSignature);
-
-      if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
-        console.error('Invalid Twilio signature');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    if (!authToken) {
+      console.error('[Twilio Webhook] TWILIO_AUTH_TOKEN is not configured');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`[Twilio Webhook] Status: ${data.MessageStatus}`, {
-      to: data.To,
-      sid: data.MessageSid,
-    });
+    if (!twilioSignature) {
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
+
+    const { createHmac, timingSafeEqual } = await import('crypto');
+    const webhookUrl = process.env.TWILIO_WEBHOOK_URL || request.url;
+
+    // Sort form params alphabetically and concatenate
+    const sortedParams = Object.keys(data).sort().reduce((acc, key) => {
+      return acc + key + (data as unknown as Record<string, string>)[key];
+    }, '');
+
+    const expectedSignature = createHmac('sha1', authToken)
+      .update(webhookUrl + sortedParams)
+      .digest('base64');
+
+    const sigBuffer = Buffer.from(twilioSignature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
+      console.error('[Twilio Webhook] Invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
 
     // Map Twilio status to our status
     const status = mapTwilioStatus(data.MessageStatus);

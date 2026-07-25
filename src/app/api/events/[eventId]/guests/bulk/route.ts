@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
@@ -10,8 +10,9 @@ export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Verify ownership
     const event = await queryOne(

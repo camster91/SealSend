@@ -1,4 +1,35 @@
 import { z } from "zod";
+import { isSafeRelativeUploadPath } from "@/lib/sanitize";
+
+/** Reject javascript:/data: and require https or same-origin /uploads paths */
+export function isSafeHttpUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (isSafeRelativeUploadPath(trimmed)) return true;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+const safeHttpUrl = z
+  .string()
+  .max(500)
+  .refine(isSafeHttpUrl, "URL must be https:// or a /uploads/ path");
+
+const optionalSafeHttpUrl = z
+  .string()
+  .max(500)
+  .refine((v) => v === "" || isSafeHttpUrl(v), "URL must be https:// or a /uploads/ path")
+  .optional();
+
+const optionalNullableSafeHttpUrl = z
+  .string()
+  .max(500)
+  .nullable()
+  .refine((v) => v === null || isSafeHttpUrl(v), "URL must be https:// or a /uploads/ path");
 
 export const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -12,6 +43,28 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 });
 
+export const sendCodeSchema = z
+  .object({
+    method: z.enum(["email", "phone"]),
+    email: z.string().email().optional(),
+    phone: z.string().min(7).max(30).optional(),
+    eventId: z.string().uuid().optional(),
+  })
+  .refine((data) => (data.method === "email" ? !!data.email : !!data.phone), {
+    message: "Email or phone is required for the selected method",
+  });
+
+export const verifyCodeSchema = z
+  .object({
+    method: z.enum(["email", "phone"]),
+    email: z.string().email().optional(),
+    phone: z.string().min(7).max(30).optional(),
+    code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+  })
+  .refine((data) => (data.method === "email" ? !!data.email : !!data.phone), {
+    message: "Email or phone is required for the selected method",
+  });
+
 export const eventCreateSchema = z.object({
   title: z.string().min(1, "Event title is required").max(200),
   description: z.string().max(2000).optional(),
@@ -24,23 +77,23 @@ export const eventCreateSchema = z.object({
   rsvp_deadline: z.string().optional(),
   registry_links: z.array(z.object({
     label: z.string().min(1).max(100),
-    url: z.string().url().max(500),
+    url: safeHttpUrl,
   })).max(10).optional(),
   max_attendees: z.number().int().min(1).max(10000).nullable().optional(),
   allow_plus_ones: z.boolean().optional(),
   max_guests_per_rsvp: z.number().int().min(1).max(50).optional(),
-  design_url: z.string().optional(),
+  design_url: optionalSafeHttpUrl,
   design_type: z.enum(["image", "pdf", "upload", "video"]).default("upload"),
   customization: z
     .object({
-      primaryColor: z.string().default("#7c3aed"),
-      backgroundColor: z.string().default("#ffffff"),
-      backgroundImage: z.string().nullable().default(null),
-      fontFamily: z.string().default("Inter"),
+      primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#7c3aed"),
+      backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#ffffff"),
+      backgroundImage: optionalNullableSafeHttpUrl.default(null),
+      fontFamily: z.string().max(50).default("Inter"),
       buttonStyle: z.enum(["rounded", "pill", "square"]).default("rounded"),
       showCountdown: z.boolean().default(true),
-      audioUrl: z.string().nullable().default(null),
-      logoUrl: z.string().nullable().default(null),
+      audioUrl: optionalNullableSafeHttpUrl.default(null),
+      logoUrl: optionalNullableSafeHttpUrl.default(null),
     })
     .optional(),
   status: z.enum(["draft", "published"]).default("draft"),

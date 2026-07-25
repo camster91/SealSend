@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { queryOne } from "@/lib/db/client";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
@@ -21,12 +21,19 @@ const TIER_RANK: Record<string, number> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getApiUser();
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
-    if (!user) {
+    const { rateLimit } = await import("@/lib/rate-limit");
+    const { success: rateLimitOk } = await rateLimit(`checkout:${user.id}`, {
+      max: 10,
+      windowSeconds: 3600,
+    });
+    if (!rateLimitOk) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: "Too many checkout attempts. Please try again later." },
+        { status: 429 }
       );
     }
 

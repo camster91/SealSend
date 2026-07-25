@@ -23,12 +23,17 @@ export default function GuestsPage() {
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/events/${eventId}/guests`);
-    if (res.ok) {
-      const data = await res.json();
-      setGuests(data);
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests?limit=500`);
+      if (res.ok) {
+        const data = await res.json();
+        setGuests(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load guests:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   useEffect(() => {

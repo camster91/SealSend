@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Trash2, ChevronDown, ChevronRight, Mail, UserPlus } from "lucide-react";
@@ -38,19 +38,31 @@ const inviteStatusBadge: Record<string, { label: string; className: string }> = 
 export function ResponseTable({ responses, eventId, onRefresh, filter }: ResponseTableProps) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = filter && filter !== "all"
-    ? responses.filter((r) => r.status === filter)
-    : responses;
+  const filtered = useMemo(
+    () =>
+      filter && filter !== "all"
+        ? responses.filter((r) => r.status === filter)
+        : responses,
+    [responses, filter]
+  );
 
   async function handleDelete(responseId: string) {
     if (!confirm("Delete this response?")) return;
     setDeleting(responseId);
+    setError(null);
     try {
-      await fetch(`/api/events/${eventId}/responses/${responseId}`, {
+      const res = await fetch(`/api/events/${eventId}/responses/${responseId}`, {
         method: "DELETE",
       });
+      if (!res.ok) {
+        setError("Failed to delete response. Please try again.");
+        return;
+      }
       onRefresh();
+    } catch {
+      setError("Network error. Check your connection and try again.");
     } finally {
       setDeleting(null);
     }
@@ -68,107 +80,110 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
     });
   }
 
-  const columns: Column<RSVPResponseWithPlusOnes & Record<string, unknown>>[] = [
-    {
-      key: "expand",
-      header: "",
-      className: "w-8",
-      render: (item) => {
-        const response = item as RSVPResponseWithPlusOnes;
-        const hasPlusOnes = (response.plus_ones?.length || 0) > 0;
-        if (!hasPlusOnes) return null;
-        return (
+  const columns: Column<RSVPResponseWithPlusOnes & Record<string, unknown>>[] = useMemo(
+    () => [
+      {
+        key: "expand",
+        header: "",
+        className: "w-8",
+        render: (item) => {
+          const response = item as RSVPResponseWithPlusOnes;
+          const hasPlusOnes = (response.plus_ones?.length || 0) > 0;
+          if (!hasPlusOnes) return null;
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleExpand(response.id);
+              }}
+              className="p-1 hover:bg-neutral-100 rounded"
+            >
+              {expandedRows.has(response.id) ? (
+                <ChevronDown className="h-4 w-4 text-neutral-500" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-neutral-500" />
+              )}
+            </button>
+          );
+        },
+      },
+      { key: "respondent_name", header: "Name", sortable: true },
+      {
+        key: "respondent_email",
+        header: "Email",
+        render: (item) => (
+          <span className="text-muted-foreground">
+            {(item as RSVPResponseWithPlusOnes).respondent_email || "\u2014"}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        sortable: true,
+        render: (item) => {
+          const r = item as RSVPResponseWithPlusOnes;
+          return (
+            <Badge variant={statusVariant[r.status] || "secondary"}>
+              {statusLabel[r.status] || r.status}
+            </Badge>
+          );
+        },
+      },
+      {
+        key: "headcount",
+        header: "Guests",
+        sortable: true,
+        render: (item) => {
+          const r = item as RSVPResponseWithPlusOnes;
+          const plusOnesCount = r.plus_ones?.length || 0;
+          return (
+            <div className="flex items-center gap-1">
+              <span>{r.headcount}</span>
+              {plusOnesCount > 0 && (
+                <span className="text-xs text-neutral-500">
+                  ({plusOnesCount} named)
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: "submitted_at",
+        header: "Submitted",
+        sortable: true,
+        render: (item) => (
+          <span className="text-sm text-muted-foreground">
+            {formatDateTime((item as RSVPResponseWithPlusOnes).submitted_at)}
+          </span>
+        ),
+      },
+      {
+        key: "actions",
+        header: "",
+        className: "w-12",
+        render: (item) => (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              toggleExpand(response.id);
+              handleDelete(item.id as string);
             }}
-            className="p-1 hover:bg-neutral-100 rounded"
+            disabled={deleting === item.id}
+            className="rounded-lg p-1.5 hover:bg-red-50"
           >
-            {expandedRows.has(response.id) ? (
-              <ChevronDown className="h-4 w-4 text-neutral-500" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-neutral-500" />
-            )}
+            <Trash2 className="h-4 w-4 text-accent-red" />
           </button>
-        );
+        ),
       },
-    },
-    { key: "respondent_name", header: "Name", sortable: true },
-    {
-      key: "respondent_email",
-      header: "Email",
-      render: (item) => (
-        <span className="text-muted-foreground">
-          {(item as RSVPResponseWithPlusOnes).respondent_email || "\u2014"}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      sortable: true,
-      render: (item) => {
-        const r = item as RSVPResponseWithPlusOnes;
-        return (
-          <Badge variant={statusVariant[r.status] || "secondary"}>
-            {statusLabel[r.status] || r.status}
-          </Badge>
-        );
-      },
-    },
-    {
-      key: "headcount",
-      header: "Guests",
-      sortable: true,
-      render: (item) => {
-        const r = item as RSVPResponseWithPlusOnes;
-        const plusOnesCount = r.plus_ones?.length || 0;
-        return (
-          <div className="flex items-center gap-1">
-            <span>{r.headcount}</span>
-            {plusOnesCount > 0 && (
-              <span className="text-xs text-neutral-500">
-                ({plusOnesCount} named)
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: "submitted_at",
-      header: "Submitted",
-      sortable: true,
-      render: (item) => (
-        <span className="text-sm text-muted-foreground">
-          {formatDateTime((item as RSVPResponseWithPlusOnes).submitted_at)}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      className: "w-12",
-      render: (item) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete(item.id as string);
-          }}
-          disabled={deleting === item.id}
-          className="rounded-lg p-1.5 hover:bg-red-50"
-        >
-          <Trash2 className="h-4 w-4 text-accent-red" />
-        </button>
-      ),
-    },
-  ];
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deleting, eventId, expandedRows]
+  );
 
-  // Custom row renderer to show expanded plus_ones
   function renderExpandedRow(response: RSVPResponseWithPlusOnes) {
     if (!expandedRows.has(response.id)) return null;
-    
+
     const plusOnes = response.plus_ones || [];
     if (plusOnes.length === 0) return null;
 
@@ -222,6 +237,9 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
 
   return (
     <div className="space-y-2">
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
       <DataTable
         columns={columns}
         data={filtered as (RSVPResponseWithPlusOnes & Record<string, unknown>)[]}

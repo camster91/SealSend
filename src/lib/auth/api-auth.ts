@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db/client';
 
-interface AuthenticatedUser {
+export interface AuthenticatedUser {
   id: string;
   email?: string | null;
   role: 'admin' | 'guest';
@@ -34,4 +35,31 @@ export async function getApiUser(): Promise<AuthenticatedUser | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Require an authenticated host (admin) user for host-only API routes.
+ * Invitees/guests must not create events, upload media, or manage billing.
+ */
+export async function requireApiHost(): Promise<
+  { user: AuthenticatedUser; error?: undefined } | { user?: undefined; error: NextResponse }
+> {
+  const user = await getApiUser();
+
+  if (!user) {
+    return {
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    };
+  }
+
+  if (user.role !== 'admin') {
+    return {
+      error: NextResponse.json(
+        { error: 'Forbidden. Host account required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { user };
 }

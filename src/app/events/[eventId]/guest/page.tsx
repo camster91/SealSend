@@ -9,7 +9,7 @@ interface GuestLoginPageProps {
 
 export async function generateMetadata({ params }: GuestLoginPageProps): Promise<Metadata> {
   const { eventId } = await params;
-  const event = await getEvent(eventId);
+  const event = await getEvent(eventId, { publishedOnly: true });
   
   return {
     title: `Guest Access - ${event?.title || 'Event'}`,
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: GuestLoginPageProps): Promise
 
 export default async function GuestLoginPage({ params }: GuestLoginPageProps) {
   const { eventId } = await params;
-  const event = await getEvent(eventId);
+  const event = await getEvent(eventId, { publishedOnly: true });
 
   if (!event) {
     return (

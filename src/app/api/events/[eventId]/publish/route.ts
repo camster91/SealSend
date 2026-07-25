@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { queryOne } from '@/lib/db/client';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -10,14 +10,9 @@ export async function POST(
 ) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Fetch the current event to get its status
     const event = await queryOne<{ id: string; status: string }>(

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
@@ -14,14 +14,9 @@ type RouteParams = { params: Promise<{ eventId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     const { success: rateLimitOk } = await rateLimit(`send-reminders:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
@@ -109,7 +104,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Email send failed';
               errors.push({ type: 'email', message });
-              console.error(`[REMINDER EMAIL FAILED] ${guest.email}:`, message);
+              console.error(`[REMINDER EMAIL FAILED] guest=${guest.id}:`, message);
 
               await logSendFailure(eventId, 'email', guest.email, message, {
                 guestId: guest.id,
@@ -125,7 +120,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
             if (!phoneValidation.valid) {
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
-              console.error(`[REMINDER SMS INVALID] ${guest.phone}:`, phoneValidation.error);
+              console.error(`[REMINDER SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 
               await logSendFailure(eventId, 'sms', guest.phone, phoneValidation.error || 'Invalid phone', {
                 guestId: guest.id,
@@ -156,7 +151,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               } catch (error) {
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
-                console.error(`[REMINDER SMS FAILED] ${guest.phone}:`, message);
+                console.error(`[REMINDER SMS FAILED] guest=${guest.id}:`, message);
 
                 await logSendFailure(eventId, 'sms', guest.phone, message, {
                   guestId: guest.id,

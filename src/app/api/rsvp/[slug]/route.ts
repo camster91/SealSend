@@ -98,15 +98,12 @@ export async function POST(
     // Enforce total attendee limit (default: no limit)
     const maxAttendees = event.max_attendees || null;
     if (maxAttendees && status === "attending") {
-      const attendingResponses = await query<{ headcount: number }>(
-        'SELECT headcount FROM rsvp_responses WHERE event_id = $1 AND status = $2',
+      const sumResult = await queryOne<{ total: string }>(
+        `SELECT COALESCE(SUM(headcount), 0)::text AS total
+         FROM rsvp_responses WHERE event_id = $1 AND status = $2`,
         [event.id, 'attending']
       );
-
-      const currentTotal = attendingResponses.reduce(
-        (sum, r) => sum + (r.headcount || 1),
-        0
-      );
+      const currentTotal = parseInt(sumResult?.total || '0', 10);
 
       if (currentTotal + headcount > maxAttendees) {
         const spotsLeft = Math.max(0, maxAttendees - currentTotal);
@@ -134,6 +131,17 @@ export async function POST(
     let insertSql: string;
 
     if (guest_id) {
+      // Bind guest_id to this event only — prevent cross-event IDOR
+      const guest = await queryOne<{ id: string }>(
+        'SELECT id FROM guests WHERE id = $1 AND event_id = $2',
+        [guest_id, event.id]
+      );
+      if (!guest) {
+        return NextResponse.json(
+          { error: "Invalid guest for this event" },
+          { status: 400 }
+        );
+      }
       insertSql = `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data, guest_id)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
       insertParams.push(guest_id);

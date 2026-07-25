@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
 import { getTwilioSendOptions } from '@/lib/twilio';
+import { sendCodeSchema } from '@/lib/validations';
 
 function getTwilioClient() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
@@ -44,14 +45,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { method, email, phone, eventId } = body as { method?: string; email?: string; phone?: string; eventId?: string };
 
-    if (!method || (!email && !phone)) {
+    const parsed = sendCodeSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Invalid request', details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { method, email, phone, eventId } = parsed.data;
 
     // Validate and format phone number if using SMS
     let formattedPhone: string | null = null;
@@ -66,26 +69,46 @@ export async function POST(request: NextRequest) {
       formattedPhone = phoneValidation.formatted ?? null;
     }
 
-    // Generate 6-digit code using cryptographically secure randomness
-    const code = crypto.randomInt(100000, 1000000).toString();
+    const recipientKey = method === 'email' ? email!.toLowerCase() : formattedPhone!;
+    const { success: recipientLimitOk } = await rateLimit(`send-code-recipient:${recipientKey}`, {
+      max: 5,
+      windowSeconds: 600,
+    });
+    if (!recipientLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many codes requested for this address. Please wait a few minutes.' },
+        { status: 429 }
+      );
+    }
 
-    // Determine role
-    let role = 'guest';
-    if (method === 'email' && email) {
-      // Check if this is an admin email
-      const admin = await queryOne<{ id: string }>(
-        'SELECT id FROM admin_users WHERE email = $1',
-        [email]
+    // Host login/signup (no eventId) → admin role.
+    // Guest access (with eventId) → must be on the event guest list.
+    let role: 'admin' | 'guest' = 'admin';
+
+    if (eventId) {
+      role = 'guest';
+      const guest = await queryOne<{ id: string }>(
+        method === 'email'
+          ? 'SELECT id FROM guests WHERE event_id = $1 AND LOWER(email) = LOWER($2)'
+          : 'SELECT id FROM guests WHERE event_id = $1 AND phone = $2',
+        [eventId, method === 'email' ? email : formattedPhone]
       );
 
-      if (admin) {
-        role = 'admin';
+      if (!guest) {
+        // Generic error to avoid guest-list enumeration
+        return NextResponse.json(
+          { error: 'Unable to send code. Check your details and try again.' },
+          { status: 400 }
+        );
       }
     }
 
+    // Generate 6-digit code using cryptographically secure randomness
+    const code = crypto.randomInt(100000, 1000000).toString();
+
     // Delete any existing codes for this email/phone to avoid stale entries
     if (method === 'email' && email) {
-      await query('DELETE FROM auth_codes WHERE email = $1', [email]);
+      await query('DELETE FROM auth_codes WHERE email = $1', [email.toLowerCase()]);
     } else if (method === 'phone' && formattedPhone) {
       await query('DELETE FROM auth_codes WHERE phone = $1', [formattedPhone]);
     }
@@ -96,7 +119,7 @@ export async function POST(request: NextRequest) {
         `INSERT INTO auth_codes (email, phone, code, role, event_id, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
-          email || null,
+          email ? email.toLowerCase() : null,
           formattedPhone || null,
           code,
           role,
@@ -117,8 +140,8 @@ export async function POST(request: NextRequest) {
       try {
         await sendEmail({
           to: email,
-          subject: role === 'admin' ? 'Your Admin Login Code' : 'Your Guest Access Code',
-          html: generateEmailTemplate(code, role as 'admin' | 'guest', eventId),
+          subject: role === 'admin' ? 'Your SealSend Login Code' : 'Your Guest Access Code',
+          html: generateEmailTemplate(code, role, eventId),
         });
       } catch (error) {
         console.error('Email error:', error);
@@ -131,7 +154,7 @@ export async function POST(request: NextRequest) {
       try {
         const twilioClient = getTwilioClient();
         await twilioClient.messages.create({
-          body: `Your Seal and Send ${role} access code: ${code}. This code expires in 15 minutes.`,
+          body: `Your Seal and Send ${role === 'admin' ? 'login' : 'guest'} access code: ${code}. This code expires in 15 minutes.`,
           to: formattedPhone,
           ...getTwilioSendOptions(),
         });
@@ -169,36 +192,29 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
     <tr>
       <td align="center">
-        <!-- Top accent bar -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
           <tr><td style="height:4px;background:linear-gradient(to right,#7c3aed,#ec4899,#3b82f6);border-radius:16px 16px 0 0;"></td></tr>
         </table>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:0 0 16px 16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-          <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#7c3aed 0%,#6366f1 50%,#3b82f6 100%);padding:40px 32px;text-align:center;">
-              <p style="margin:0 0 8px;font-size:32px;">${isAdmin ? '&#128272;' : '&#127881;'}</p>
               <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">
-                ${isAdmin ? 'Admin Login Code' : 'Guest Access Code'}
+                ${isAdmin ? 'Login Code' : 'Guest Access Code'}
               </h1>
               <p style="margin:8px 0 0;font-size:14px;color:rgba(255,255,255,0.8);">
                 <span style="font-weight:600;">Seal</span><span style="color:#c4b5fd;">Send</span>
               </p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:32px 24px 16px;">
               <p style="margin:0;font-size:15px;color:#6b7280;line-height:1.6;">
                 ${isAdmin
-                  ? 'Enter the code below on the login page to access your admin dashboard.'
+                  ? 'Enter the code below on the login page to access your dashboard.'
                   : 'Enter the code below to access your event as a guest.'}
               </p>
             </td>
           </tr>
-
-          <!-- Code Block -->
           <tr>
             <td style="padding:0 24px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f5ff;border-radius:16px;border:2px dashed #c4b5fd;overflow:hidden;">
@@ -209,15 +225,13 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
                       ${code}
                     </p>
                     <p style="margin:12px 0 0;font-size:13px;color:#9ca3af;">
-                      &#9200; Expires in 15 minutes
+                      Expires in 15 minutes
                     </p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-
-          <!-- CTA Button -->
           <tr>
             <td style="padding:24px 24px 12px;" align="center">
               <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#ffffff;text-decoration:none;padding:14px 40px;border-radius:12px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(99,102,241,0.35);">
@@ -225,23 +239,19 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
               </a>
             </td>
           </tr>
-
-          <!-- Security Notice -->
           <tr>
             <td style="padding:12px 24px 28px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border-radius:10px;overflow:hidden;">
                 <tr>
                   <td style="padding:14px 16px;">
                     <p style="margin:0;font-size:13px;color:#854d0e;line-height:1.5;">
-                      &#128274; <strong>Security tip:</strong> Never share this code with anyone. Seal and Send will never ask for your code via phone or chat.
+                      <strong>Security tip:</strong> Never share this code with anyone. Seal and Send will never ask for your code via phone or chat.
                     </p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
               <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">
@@ -249,9 +259,6 @@ function generateEmailTemplate(code: string, role: 'admin' | 'guest', eventId?: 
               </p>
               <p style="margin:8px 0 0;font-size:13px;font-weight:600;">
                 <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
-              </p>
-              <p style="margin:4px 0 0;font-size:11px;color:#d1d5db;">
-                Beautiful Digital Invitations &amp; RSVP Management
               </p>
             </td>
           </tr>

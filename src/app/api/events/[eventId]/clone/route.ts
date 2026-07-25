@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
-import { getApiUser } from "@/lib/auth/api-auth";
+import { requireApiHost } from '@/lib/auth/api-auth';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const user = await getApiUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
     // Get original event
     const originalEvent = await queryOne<Record<string, unknown>>(
@@ -32,20 +33,41 @@ export async function POST(request: Request, { params }: RouteParams) {
       [eventId]
     );
 
-    // Create new event (clone) - exclude id, title, status, created_at, updated_at
-    const { title, status: _status, created_at: _created_at, updated_at: _updated_at, id: _id, ...eventData } = originalEvent;
+    // Create new event (clone) — reset billing/lifecycle fields so paid tiers are not copied
+    const {
+      title,
+      status: _status,
+      created_at: _created_at,
+      updated_at: _updated_at,
+      id: _id,
+      tier: _tier,
+      max_responses: _max_responses,
+      auto_reminders: _auto_reminders,
+      reminder_days_before: _reminder_days_before,
+      reminder_sent_at: _reminder_sent_at,
+      slug: _slug,
+      user_id: _user_id,
+      ...eventData
+    } = originalEvent;
 
     const columns = Object.keys(eventData);
     const paramIndices = columns.map((_, i) => `$${i + 1}`);
-    // Add title, status, user_id
-    columns.push('title', 'status', 'user_id');
-    paramIndices.push(`$${columns.length - 2}`, `$${columns.length - 1}`, `$${columns.length}`);
+    // Add title, status, user_id, tier, max_responses, slug
+    const extraCols = ['title', 'status', 'user_id', 'tier', 'max_responses', 'slug'];
+    for (const col of extraCols) {
+      columns.push(col);
+      paramIndices.push(`$${columns.length}`);
+    }
 
+    const { generateSlug } = await import('@/lib/utils');
     const values = [
       ...Object.values(eventData),
       `${title} (Copy)`,
       'draft',
       user.id,
+      'free',
+      15,
+      generateSlug(String(title) + '-copy'),
     ];
 
     const newEvent = await queryOne<Record<string, unknown>>(

@@ -1,6 +1,7 @@
 import { Calendar, MapPin, Clock, User, Shirt, CalendarClock, Gift, ExternalLink } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { AddToCalendar } from "@/components/public-event/AddToCalendar";
+import { sanitizeUrl } from "@/lib/sanitize";
 import type { Event } from "@/types/database";
 
 interface EventDetailsProps {
@@ -81,10 +82,13 @@ export function EventDetails({ event }: EventDetailsProps) {
             Gift Registries
           </div>
           <div className="flex flex-wrap gap-2">
-            {event.registry_links.map((link, index) => (
+            {event.registry_links.map((link, index) => {
+              const safeUrl = sanitizeUrl(link.url);
+              if (!safeUrl) return null;
+              return (
               <a
                 key={index}
-                href={link.url}
+                href={safeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-medium text-pink-700 transition-colors hover:bg-pink-100"
@@ -92,7 +96,8 @@ export function EventDetails({ event }: EventDetailsProps) {
                 {link.label}
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

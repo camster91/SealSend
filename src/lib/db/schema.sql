@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
 CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug);
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_status_date ON events(status, event_date);
+CREATE INDEX IF NOT EXISTS idx_events_auto_reminders ON events(status, auto_reminders, event_date)
+  WHERE auto_reminders = TRUE;
 
 -- =====================
 -- RSVP FIELDS
@@ -141,6 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_guests_email ON guests(email);
 CREATE INDEX IF NOT EXISTS idx_guests_phone ON guests(phone);
 CREATE INDEX IF NOT EXISTS idx_guests_invite_token ON guests(invite_token);
 CREATE INDEX IF NOT EXISTS idx_guests_magic_token ON guests(magic_token);
+CREATE INDEX IF NOT EXISTS idx_guests_event_reminder ON guests(event_id, reminder_sent_at);
 
 -- =====================
 -- GUEST TAGS
@@ -257,6 +261,8 @@ CREATE TABLE IF NOT EXISTS event_signup_items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_signup_items_event ON event_signup_items(event_id);
+
 CREATE TABLE IF NOT EXISTS event_signup_claims (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   signup_item_id UUID NOT NULL REFERENCES event_signup_items(id) ON DELETE CASCADE,
@@ -265,6 +271,8 @@ CREATE TABLE IF NOT EXISTS event_signup_claims (
   claimer_email TEXT,
   claimed_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_signup_claims_item ON event_signup_claims(signup_item_id);
 
 -- =====================
 -- SEND LOGS
@@ -283,6 +291,8 @@ CREATE TABLE IF NOT EXISTS send_logs (
 
 CREATE INDEX IF NOT EXISTS idx_send_logs_event ON send_logs(event_id);
 CREATE INDEX IF NOT EXISTS idx_send_logs_guest ON send_logs(guest_id);
+CREATE INDEX IF NOT EXISTS idx_send_logs_provider_message_id ON send_logs(provider_message_id)
+  WHERE provider_message_id IS NOT NULL;
 
 -- =====================
 -- GUEST MAGIC TOKENS

@@ -17,12 +17,17 @@ export function SignupBoard({ eventSlug }: SignupBoardProps) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
-    const res = await fetch(`/api/signups/${eventSlug}`);
-    if (res.ok) {
-      const data = await res.json();
-      setItems(data);
+    try {
+      const res = await fetch(`/api/signups/${eventSlug}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // Offline / network — keep empty list
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventSlug]);
 
   useEffect(() => {

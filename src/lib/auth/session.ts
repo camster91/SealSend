@@ -2,6 +2,41 @@ import { cookies } from 'next/headers';
 import { queryOne } from '@/lib/db/client';
 import { AuthUser } from './types';
 
+/**
+ * Load identity from the database — never trust sealsend_user for authorization.
+ */
+async function loadUserProfile(
+  userId: string,
+  role: 'admin' | 'guest'
+): Promise<Pick<AuthUser, 'email' | 'phone' | 'name' | 'eventId'>> {
+  if (role === 'admin') {
+    const admin = await queryOne<{ email: string; name: string | null }>(
+      'SELECT email, name FROM admin_users WHERE id = $1',
+      [userId]
+    );
+    return {
+      email: admin?.email || null,
+      phone: null,
+      name: admin?.name || undefined,
+      eventId: undefined,
+    };
+  }
+
+  const guest = await queryOne<{
+    email: string | null;
+    phone: string | null;
+    name: string;
+    event_id: string;
+  }>('SELECT email, phone, name, event_id FROM guests WHERE id = $1', [userId]);
+
+  return {
+    email: guest?.email || null,
+    phone: guest?.phone || null,
+    name: guest?.name,
+    eventId: guest?.event_id,
+  };
+}
+
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get('sealsend_session')?.value;
@@ -22,24 +57,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    const userCookie = cookieStore.get('sealsend_user')?.value;
-    let userInfo: Partial<AuthUser> = {};
-
-    if (userCookie) {
-      try {
-        userInfo = JSON.parse(userCookie);
-      } catch {
-        // ignore parse errors
-      }
-    }
+    const role = session.user_role as 'admin' | 'guest';
+    const profile = await loadUserProfile(session.user_id, role);
 
     return {
       id: session.user_id,
-      email: userInfo.email || null,
-      phone: userInfo.phone || null,
-      role: session.user_role as 'admin' | 'guest',
-      name: userInfo.name,
-      eventId: userInfo.eventId,
+      email: profile.email,
+      phone: profile.phone,
+      role,
+      name: profile.name,
+      eventId: profile.eventId,
     };
   } catch (error) {
     console.error('Session validation error:', error);
@@ -106,25 +133,16 @@ export async function validateSessionToken(token: string): Promise<{
       return { valid: false, error: 'Invalid or expired session' };
     }
 
-    const cookieStore = await cookies();
-    const userCookie = cookieStore.get('sealsend_user')?.value;
-    let userInfo: Partial<AuthUser> = {};
-
-    if (userCookie) {
-      try {
-        userInfo = JSON.parse(userCookie);
-      } catch {
-        // ignore parse errors
-      }
-    }
+    const role = session.user_role as 'admin' | 'guest';
+    const profile = await loadUserProfile(session.user_id, role);
 
     const user: AuthUser = {
       id: session.user_id,
-      email: userInfo.email || null,
-      phone: userInfo.phone || null,
-      role: session.user_role as 'admin' | 'guest',
-      eventId: userInfo.eventId,
-      name: userInfo.name,
+      email: profile.email,
+      phone: profile.phone,
+      role,
+      eventId: profile.eventId,
+      name: profile.name,
     };
 
     return { valid: true, user };

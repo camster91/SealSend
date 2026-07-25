@@ -1,9 +1,10 @@
 "use client";
 
 import { Share2, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Event } from "@/types/database";
 import { isValidHexColor } from "@/lib/utils";
+import { sanitizeUrl } from "@/lib/sanitize";
 
 interface EventHeroProps {
   event: Event;
@@ -18,11 +19,19 @@ function isVideo(event: Event): boolean {
 
 export function EventHero({ event }: EventHeroProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
 
   const primaryColor = isValidHexColor(event.customization?.primaryColor ?? "")
     ? event.customization.primaryColor
     : "#7c3aed";
-  const logoUrl = event.customization?.logoUrl;
+  const logoUrl = sanitizeUrl(event.customization?.logoUrl);
+  const designUrl = sanitizeUrl(event.design_url);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -36,14 +45,15 @@ export function EventHero({ event }: EventHeroProps) {
           text,
           url,
         });
-      } catch (err) {
-        console.log("Error sharing:", err);
+      } catch {
+        // User cancelled share sheet — ignore
       }
     } else {
       // Fallback to copy link
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -73,7 +83,7 @@ export function EventHero({ event }: EventHeroProps) {
       </div>
 
       {/* Design */}
-      {!event.design_url ? (
+      {!designUrl ? (
         <div
           className="flex h-64 items-center justify-center rounded-xl"
           style={{ backgroundColor: primaryColor + "20" }}
@@ -88,7 +98,7 @@ export function EventHero({ event }: EventHeroProps) {
       ) : isVideo(event) ? (
         <div className="overflow-hidden rounded-xl shadow-lg ring-1 ring-black/5">
           <video
-            src={event.design_url}
+            src={designUrl}
             autoPlay
             muted
             loop
@@ -100,7 +110,7 @@ export function EventHero({ event }: EventHeroProps) {
         <div className="overflow-hidden rounded-xl shadow-lg ring-1 ring-black/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={event.design_url}
+            src={designUrl}
             alt={event.title}
             className="h-auto w-full object-cover"
           />

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getApiUser } from '@/lib/auth/api-auth';
+import { requireApiHost } from '@/lib/auth/api-auth';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
 
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4'];
 
@@ -19,19 +19,11 @@ const COMPRESS_QUALITY = 80;
 function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
   const h = buffer.slice(0, 12);
 
-  // Images
+  // Images — SVG intentionally disallowed (active content / XSS risk)
   if (contentType === 'image/jpeg') return h[0] === 0xFF && h[1] === 0xD8 && h[2] === 0xFF;
   if (contentType === 'image/png') return h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4E && h[3] === 0x47;
   if (contentType === 'image/gif') return h[0] === 0x47 && h[1] === 0x49 && h[2] === 0x46;
   if (contentType === 'image/webp') return h[0] === 0x52 && h[1] === 0x49 && h[2] === 0x46 && h[3] === 0x46;
-  if (contentType === 'image/svg+xml') {
-    // Basic SVG validation: must start with XML or SVG tag, reject script tags
-    const text = buffer.slice(0, 1024).toString('utf-8').toLowerCase();
-    if (text.includes('<script') || text.includes('javascript:') || text.includes('onerror') || text.includes('onload')) {
-      return false;
-    }
-    return text.includes('<svg') || text.includes('<?xml');
-  }
 
   // Video
   if (contentType === 'video/mp4') return h[4] === 0x66 && h[5] === 0x74 && h[6] === 0x79 && h[7] === 0x70;
@@ -47,11 +39,6 @@ function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
 }
 
 async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): Promise<{ data: Buffer<ArrayBuffer>; ext: string; mime: string }> {
-  // Skip SVGs — they're already tiny and not raster
-  if (contentType === 'image/svg+xml') {
-    return { data: buffer, ext: 'svg', mime: contentType };
-  }
-
   // Skip GIFs — sharp can't handle animated GIFs well
   if (contentType === 'image/gif') {
     return { data: buffer, ext: 'gif', mime: contentType };
@@ -87,10 +74,20 @@ const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getApiUser();
+    const auth = await requireApiHost();
+    if (auth.error) return auth.error;
+    const user = auth.user;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { rateLimit } = await import('@/lib/rate-limit');
+    const { success: rateLimitOk } = await rateLimit(`upload:${user.id}`, {
+      max: 30,
+      windowSeconds: 3600,
+    });
+    if (!rateLimitOk) {
+      return NextResponse.json(
+        { error: 'Too many uploads. Please try again later.' },
+        { status: 429 }
+      );
     }
 
     const uploadType = request.nextUrl.searchParams.get('type') || 'image';
@@ -120,7 +117,7 @@ export async function POST(request: NextRequest) {
       default:
         allowedTypes = IMAGE_TYPES;
         maxSize = MAX_IMAGE_SIZE;
-        typeLabel = 'JPEG, PNG, GIF, WebP, or SVG';
+        typeLabel = 'JPEG, PNG, GIF, or WebP';
     }
 
     if (!allowedTypes.includes(file.type)) {
