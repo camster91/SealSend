@@ -16,10 +16,10 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260808T140650Z`
-- Current verified application commit: `1f05323`
-- Current release source: `/opt/sealsend/releases/20260808T140650Z`
-- Immediate rollback image/source: `sealsend:20260808T140236Z` and `/opt/sealsend/releases/20260808T140236Z`
+- Current verified image: `sealsend:20260808T142000Z`
+- Current verified application commit: `db858e9`
+- Current release source: `/opt/sealsend/releases/20260808T142000Z`
+- Immediate rollback image/source: `sealsend:20260808T140650Z` and `/opt/sealsend/releases/20260808T140650Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
 - Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260808T134326Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 88 unit/readiness tests passed, including selected-channel cost-preview, atomic RSVP-field, checkout-authorization-order, and check-in UUID regressions.
+- 89 unit/readiness tests passed, including selected-channel cost-preview, atomic RSVP-field, checkout-authorization-order, check-in UUID, and published deletion-policy regressions.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -50,6 +50,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - A disposable check-in-only staff account passed the production least-privilege matrix at 375px: guest list, check-in, check-out, keyboard focus, and no overflow passed; event edit, response export, member administration, messaging, and checkout were denied. The test exposed and drove fixes for checkout configuration leakage and a PostgreSQL UUID assignment error before passing. Final fixture counts were zero.
 - A disposable paid-event fixture verified Google and Outlook calendar links plus a downloadable ICS with the stable event UID. A future approved email announcement remained queued with `dispatch=null`, appeared in status history, and was cancelled before dispatch. No provider send occurred and the fixture was deleted.
 - All 13 launch templates passed production QA at 375px and 1440px. Both galleries had no horizontal overflow; every template opened the correct named wizard and persisted its complete customization into an isolated editable draft; no browser runtime errors occurred. The disposable account was deleted.
+- The deployed Terms and Privacy pages match the verified support-request deletion workflow. Health and both policy pages returned HTTP 200, and 12 production desktop/mobile marketing and accessibility checks passed with no serious or critical Axe findings.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
