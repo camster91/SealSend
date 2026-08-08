@@ -28,7 +28,11 @@ export function buildAudienceQuery(eventId: string, audience: MessageAudience) {
     )`);
   }
   if (audience.unansweredOnly) {
-    clauses.push("NOT EXISTS (SELECT 1 FROM rsvp_responses rr WHERE rr.event_id = g.event_id AND LOWER(rr.respondent_email) = LOWER(g.email))");
+    clauses.push(`NOT EXISTS (
+      SELECT 1 FROM rsvp_responses rr
+      WHERE rr.event_id = g.event_id
+        AND (rr.guest_id = g.id OR (g.email IS NOT NULL AND LOWER(rr.respondent_email) = LOWER(g.email)))
+    )`);
   }
   return {
     sql: `SELECT g.id, g.name, g.email, g.phone, g.invite_token

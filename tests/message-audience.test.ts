@@ -29,4 +29,5 @@ test("unanswered means no RSVP response rather than trusting a display flag", ()
     rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: true,
   });
   assert.match(result.sql, /NOT EXISTS[\s\S]*rsvp_responses/);
+  assert.match(result.sql, /rr\.guest_id = g\.id/);
 });
