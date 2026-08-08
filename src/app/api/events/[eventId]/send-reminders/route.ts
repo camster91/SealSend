@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
@@ -9,6 +9,7 @@ import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import type { Event, Guest } from "@/types/database";
+import { assertApprovedRecipient } from "@/lib/communications-safety";
 
 type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
 type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at">;
@@ -18,7 +19,7 @@ type RouteParams = { params: Promise<{ eventId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'send_messages');
     if (auth.error) return auth.error;
     const user = auth.user;
 
@@ -29,8 +30,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Ownership + status check
     const event = await queryOne<ReminderEvent>(
-      'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {
@@ -139,6 +140,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               });
 
               try {
+                assertApprovedRecipient(formattedPhone);
                 const twilioClient = getTwilioClient();
                 const result = await twilioClient.messages.create({
                   body: smsBody,
@@ -205,6 +207,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         [new Date().toISOString(), ...successIds]
       );
     }
+
+    await query(
+      `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
+       VALUES ($1, $2, 'reminders_sent', $3::jsonb)`,
+      [eventId, user.id, JSON.stringify({ emailAccepted: sent, emailFailed: failed, smsAccepted: smsSent, smsFailed })]
+    );
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });
   } catch (error) {

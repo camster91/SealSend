@@ -7,6 +7,8 @@ import twilio from 'twilio';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
 import { getTwilioSendOptions } from '@/lib/twilio';
 import { sendCodeSchema } from '@/lib/validations';
+import { assertApprovedRecipient } from '@/lib/communications-safety';
+import { hashAuthCode } from '@/lib/auth/code-hash';
 
 function getTwilioClient() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -106,22 +108,22 @@ export async function POST(request: NextRequest) {
     // Generate 6-digit code using cryptographically secure randomness
     const code = crypto.randomInt(100000, 1000000).toString();
 
-    // Delete any existing codes for this email/phone to avoid stale entries
+    // Invalidate only this login context, not another active host/guest flow.
     if (method === 'email' && email) {
-      await query('DELETE FROM auth_codes WHERE email = $1', [email.toLowerCase()]);
+      await query('DELETE FROM auth_codes WHERE email = $1 AND role = $2 AND event_id IS NOT DISTINCT FROM $3', [email.toLowerCase(), role, eventId ?? null]);
     } else if (method === 'phone' && formattedPhone) {
-      await query('DELETE FROM auth_codes WHERE phone = $1', [formattedPhone]);
+      await query('DELETE FROM auth_codes WHERE phone = $1 AND role = $2 AND event_id IS NOT DISTINCT FROM $3', [formattedPhone, role, eventId ?? null]);
     }
 
     // Store code in database
     try {
       await query(
-        `INSERT INTO auth_codes (email, phone, code, role, event_id, expires_at)
+        `INSERT INTO auth_codes (email, phone, code_hash, role, event_id, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [
           email ? email.toLowerCase() : null,
           formattedPhone || null,
-          code,
+          hashAuthCode({ code, recipient: recipientKey, role, eventId }),
           role,
           eventId || null,
           new Date(Date.now() + 15 * 60 * 1000).toISOString()
@@ -152,6 +154,7 @@ export async function POST(request: NextRequest) {
       }
     } else if (method === 'phone' && formattedPhone) {
       try {
+        assertApprovedRecipient(formattedPhone);
         const twilioClient = getTwilioClient();
         await twilioClient.messages.create({
           body: `Your Seal and Send ${role === 'admin' ? 'login' : 'guest'} access code: ${code}. This code expires in 15 minutes.`,

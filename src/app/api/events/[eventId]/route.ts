@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -11,13 +11,12 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'view_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     const event = await queryOne(
-      'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT * FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {
@@ -42,14 +41,13 @@ export async function PATCH(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Verify ownership
     const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT id FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!existing) {
@@ -68,9 +66,16 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    if (parsed.data.ai_generation_id) {
+      const generation = await queryOne(
+        "SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'",
+        [parsed.data.ai_generation_id, auth.user.id]
+      );
+      if (!generation) return NextResponse.json({ error: 'AI generation was not accepted by this host' }, { status: 400 });
+    }
 
     const ALLOWED_COLUMNS = [
-      'title', 'description', 'event_date', 'event_end_date', 'event_timezone',
+      'title', 'description', 'invitation_headline', 'invitation_body', 'reminder_sequence', 'ai_generation_id', 'event_date', 'event_end_date', 'event_timezone',
       'location_name', 'location_address', 'host_name', 'dress_code',
       'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
       'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',
@@ -98,8 +103,8 @@ export async function PATCH(
     });
 
     const event = await queryOne(
-      `UPDATE events SET ${setClauses.join(', ')} WHERE id = $${keys.length + 1} AND user_id = $${keys.length + 2} RETURNING *`,
-      [...values, eventId, user.id]
+      `UPDATE events SET ${setClauses.join(', ')} WHERE id = $${keys.length + 1} RETURNING *`,
+      [...values, eventId]
     );
 
     if (!event) {
@@ -124,14 +129,13 @@ export async function DELETE(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'delete_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Verify ownership
     const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT id FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!existing) {
@@ -142,8 +146,8 @@ export async function DELETE(
     }
 
     await query(
-      'DELETE FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'DELETE FROM events WHERE id = $1',
+      [eventId]
     );
 
     return NextResponse.json({ success: true });

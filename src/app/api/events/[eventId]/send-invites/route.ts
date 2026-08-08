@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
@@ -12,6 +12,8 @@ import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import type { Event, Guest } from "@/types/database";
 import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { assertApprovedRecipient } from "@/lib/communications-safety";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
 type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token">;
@@ -33,7 +35,7 @@ type RouteParams = { params: Promise<{ eventId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'send_messages');
     if (auth.error) return auth.error;
     const user = auth.user;
 
@@ -43,9 +45,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<InviteEvent>(
-      'SELECT id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+    const event = await queryOne<InviteEvent & { user_id: string }>(
+      'SELECT id, user_id, title, event_date, event_timezone, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {
@@ -74,7 +76,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     // SMS requires standard or premium tier (unlocked in beta)
-    const accountPlan = await getUserTier(user.id);
+    const accountPlan = await getUserTier(event.user_id);
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
@@ -122,6 +124,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               dressCode: event.dress_code,
               rsvpDeadline: event.rsvp_deadline,
               rsvpUrl,
+              qrCodeUrl: `${siteUrl}/api/guest-qr/${encodeURIComponent(token)}`,
             });
 
             try {
@@ -175,6 +178,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               });
 
               try {
+                assertApprovedRecipient(formattedPhone);
                 const twilioClient = getTwilioClient();
                 const result = await withRetry(() => twilioClient.messages.create({
                   body: smsBody,
@@ -260,6 +264,21 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         )
       ));
     }
+
+    if (successIds.length > 0) {
+      await recordActivationEventSafely({
+        name: "first_invitation_sent",
+        userId: event.user_id,
+        eventId,
+        metadata: { channel: smsSent > 0 && sent > 0 ? "email_and_sms" : smsSent > 0 ? "sms" : "email" },
+      });
+    }
+
+    await query(
+      `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
+       VALUES ($1, $2, 'invitations_sent', $3::jsonb)`,
+      [eventId, user.id, JSON.stringify({ emailAccepted: sent, emailFailed: failed, smsAccepted: smsSent, smsFailed })]
+    );
 
     return NextResponse.json({ sent, failed, sms_sent: smsSent, sms_failed: smsFailed });
   } catch {

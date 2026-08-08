@@ -32,6 +32,10 @@ export interface Event {
   user_id: string;
   title: string;
   description: string | null;
+  invitation_headline: string | null;
+  invitation_body: string | null;
+  reminder_sequence: Array<{ timing: string; subject: string; message: string }>;
+  ai_generation_id: string | null;
   event_date: string | null;
   event_end_date: string | null;
   event_timezone: string;
@@ -84,6 +88,8 @@ export interface Guest {
   invite_status: InviteStatus;
   invite_sent_at: string | null;
   reminder_sent_at: string | null;
+  checked_in_at: string | null;
+  checked_in_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -177,5 +183,9 @@ export interface EventAnnouncement {
   subject: string;
   message: string;
   sent_to_count: number;
+  status: 'queued' | 'processing' | 'sent' | 'partially_failed' | 'failed' | 'cancelled';
+  scheduled_at: string;
+  accepted_count: number;
+  failed_count: number;
   created_at: string;
 }

@@ -7,6 +7,7 @@ import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import { BETA_MODE } from "@/lib/constants";
+import { assertApprovedRecipient } from "@/lib/communications-safety";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -250,6 +251,7 @@ export async function GET(request: NextRequest) {
                 });
 
                 try {
+                  assertApprovedRecipient(phoneValidation.formatted);
                   const twilioClient = getTwilioClient();
                   const result = await twilioClient.messages.create({
                     body: smsBody,

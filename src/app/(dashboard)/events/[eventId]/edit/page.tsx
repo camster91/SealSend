@@ -4,6 +4,7 @@ import { query, queryOne } from '@/lib/db/client';
 import WizardContainer from '@/components/events/wizard/WizardContainer';
 import type { Event, RSVPField } from '@/types/database';
 import type { Metadata } from 'next';
+import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 
 export const metadata: Metadata = {
   title: 'Edit Event',
@@ -30,11 +31,13 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   if (!user) {
     redirect('/login');
   }
+  const access = await getEventAccess(user.id, eventId);
+  if (!access || !roleCan(access.role, 'edit_event')) notFound();
 
   // Fetch the event
   const event = await queryOne<Event>(
-    'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-    [eventId, user.id]
+    'SELECT * FROM events WHERE id = $1',
+    [eventId]
   );
 
   if (!event) {
@@ -71,6 +74,10 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     max_guests_per_rsvp: event.max_guests_per_rsvp,
     design_url: event.design_url ?? '',
     design_type: event.design_type ?? 'upload',
+    invitation_headline: event.invitation_headline ?? '',
+    invitation_body: event.invitation_body ?? '',
+    reminder_sequence: event.reminder_sequence ?? [],
+    ai_generation_id: event.ai_generation_id ?? '',
     customization: {
       primaryColor: event.customization?.primaryColor ?? '#6366f1',
       backgroundColor: event.customization?.backgroundColor ?? '#ffffff',

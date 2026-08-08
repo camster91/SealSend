@@ -29,6 +29,19 @@ export async function getEventsByUser(userId: string) {
   return data || [];
 }
 
+export async function getCollaboratingEvents(userId: string) {
+  const data = await query<Event & { access_role: string }>(
+    `SELECT e.*, em.role AS access_role
+     FROM event_members em
+     JOIN events e ON e.id = em.event_id
+     WHERE em.user_id = $1
+     ORDER BY e.event_date ASC NULLS LAST
+     LIMIT 500`,
+    [userId]
+  );
+  return data || [];
+}
+
 export async function getInvitedEvents(email: string | null, phone: string | null) {
   if (!email && !phone) {
     return [];

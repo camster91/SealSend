@@ -141,19 +141,23 @@ async function updateSmsStatus(
   }
 ) {
   try {
+    const deliveryStatus = status === 'sent' ? 'accepted' : status;
+    await query(
+      `UPDATE announcement_deliveries SET status = $1, error = $2, updated_at = NOW()
+       WHERE provider_message_id = $3`,
+      [deliveryStatus, metadata.errorMessage || null, messageSid]
+    );
+
     // Find the send log by provider message ID (Twilio SID)
     const sendLog = await queryOne<{ id: string; metadata: Record<string, unknown> | null }>(
       'SELECT id, metadata FROM send_logs WHERE provider_message_id = $1',
       [messageSid]
     );
 
-    if (!sendLog) {
-      console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
-      return;
-    }
+    if (!sendLog) console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
 
     // Update the send log
-    await query(
+    if (sendLog) await query(
       `UPDATE send_logs SET status = $1, error_message = $2, metadata = $3, updated_at = $4
        WHERE id = $5`,
       [

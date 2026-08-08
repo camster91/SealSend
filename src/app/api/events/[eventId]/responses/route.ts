@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { requireEventPermission } from '@/lib/auth/event-api-access';
+import { query } from "@/lib/db/client";
 import type { PlusOne, RSVPResponse, RSVPResponseWithPlusOnes } from "@/types/database";
 
 export async function GET(
@@ -9,16 +9,8 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'export_responses');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
@@ -111,6 +103,12 @@ export async function GET(
       });
 
       const csv = [headers.join(","), ...rows].join("\n");
+
+      await query(
+        `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
+         VALUES ($1, $2, 'responses_exported', $3::jsonb)`,
+        [eventId, auth.user.id, JSON.stringify({ count: responses.length, format: 'csv' })]
+      );
 
       return new NextResponse(csv, {
         headers: {

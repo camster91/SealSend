@@ -6,6 +6,8 @@ import { cookies } from 'next/headers';
 import { hashPassword } from '@/lib/password';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
 import { verifyCodeSchema } from '@/lib/validations';
+import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
+import { hashAuthCode } from '@/lib/auth/code-hash';
 
 async function upsertHostUser(email: string | null, phone: string | null): Promise<string | null> {
   // Hosts are stored in admin_users. OTP-only accounts get an unusable random password.
@@ -24,6 +26,13 @@ async function upsertHostUser(email: string | null, phone: string | null): Promi
        RETURNING id`,
       [email.toLowerCase(), unusablePassword, email.split('@')[0] || null]
     );
+    if (created?.id) {
+      await recordActivationEventSafely({
+        name: 'account_created',
+        userId: created.id,
+        metadata: { method: 'email' },
+      });
+    }
     return created?.id ?? null;
   }
 
@@ -44,6 +53,13 @@ async function upsertHostUser(email: string | null, phone: string | null): Promi
        RETURNING id`,
       [syntheticEmail, unusablePassword, phone]
     );
+    if (created?.id) {
+      await recordActivationEventSafely({
+        name: 'account_created',
+        userId: created.id,
+        metadata: { method: 'phone' },
+      });
+    }
     return created?.id ?? null;
   }
 
@@ -76,7 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { method, email, phone, code } = parsed.data;
+    const { method, email, phone, code, eventId } = parsed.data;
 
     let lookupValue: string | undefined = email?.toLowerCase();
     if (method === 'phone' && phone) {
@@ -107,15 +123,17 @@ export async function POST(request: NextRequest) {
       id: string;
       email: string | null;
       phone: string | null;
-      code: string;
+      code_hash: string;
       role: string;
       event_id: string | null;
     }>(
       `SELECT * FROM auth_codes
        WHERE ${method === 'email' ? 'email' : 'phone'} = $1
-         AND code = $2
-         AND expires_at > $3`,
-      [lookupValue, code, new Date().toISOString()]
+         AND code_hash = $2
+         AND role = $3
+         AND event_id IS NOT DISTINCT FROM $4
+         AND expires_at > $5`,
+      [lookupValue, hashAuthCode({ code, recipient: lookupValue!, role: eventId ? 'guest' : 'admin', eventId }), eventId ? 'guest' : 'admin', eventId ?? null, new Date().toISOString()]
     );
 
     if (!authCode) {

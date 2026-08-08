@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApiHost } from '@/lib/auth/api-auth';
-import { query, queryOne } from '@/lib/db/client';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
+import { query } from '@/lib/db/client';
 import { rsvpFieldSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -11,22 +11,8 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'view_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) {
-      return NextResponse.json(
-        { error: 'Event not found' },
-        { status: 404 }
-      );
-    }
 
     const fields = await query(
       'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
@@ -48,22 +34,8 @@ export async function PUT(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) {
-      return NextResponse.json(
-        { error: 'Event not found' },
-        { status: 404 }
-      );
-    }
 
     const body = await request.json();
 

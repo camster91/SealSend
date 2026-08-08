@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
@@ -24,17 +25,8 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'view_guest_contacts');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const { limit, offset } = parsePagination(request);
 
@@ -74,20 +66,19 @@ export async function POST(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Verify ownership
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+    const event = await queryOne<{ id: string; user_id: string; tier: string }>(
+      'SELECT id, user_id, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const [accountPlan, countRow] = await Promise.all([
-      getUserTier(user.id),
+      getUserTier(event.user_id),
       queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE event_id = $1', [eventId]),
     ]);
     const guestLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).guests;
@@ -104,6 +95,13 @@ export async function POST(
       'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
       [eventId, parsed.data.name, parsed.data.email || null, parsed.data.phone || null, parsed.data.notes || null]
     );
+
+    await recordActivationEventSafely({
+      name: "first_guest_added",
+      userId: event.user_id,
+      eventId,
+      metadata: { source: "manual" },
+    });
 
     return NextResponse.json(guest, { status: 201 });
   } catch {

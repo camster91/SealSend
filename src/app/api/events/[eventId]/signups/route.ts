@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 import type { SignupClaim, SignupItem, SignupItemWithClaims } from "@/types/database";
@@ -19,16 +19,8 @@ const signupItemSchema = z.object({
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'view_guest_contacts');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const items = await query<SignupItem>(
       'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
@@ -61,19 +53,18 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+    const event = await queryOne<{ id: string; user_id: string; tier: string }>(
+      'SELECT id, user_id, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Tier gate: sign-up board requires premium (unlocked in beta)
-    const accountPlan = await getUserTier(user.id);
+    const accountPlan = await getUserTier(event.user_id);
     if (!canUseFeature(accountPlan, event.tier as EventTier, "signupBoard")) {
       return NextResponse.json(
         { error: "Sign-up board requires a Premium upgrade" },
@@ -114,16 +105,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const { itemId } = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await query(
       'DELETE FROM event_signup_items WHERE id = $1 AND event_id = $2',

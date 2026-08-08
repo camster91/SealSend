@@ -12,13 +12,14 @@ interface InvitationEmailParams {
   dressCode?: string | null;
   rsvpDeadline?: string | null;
   eventTimezone?: string;
+  qrCodeUrl?: string;
 }
 
 export function buildInvitationEmail(params: InvitationEmailParams): {
   subject: string;
   html: string;
 } {
-  const { guestName, eventTitle, eventDate, locationName, rsvpUrl, designUrl, hostName, dressCode, rsvpDeadline, eventTimezone } = params;
+  const { guestName, eventTitle, eventDate, locationName, rsvpUrl, designUrl, hostName, dressCode, rsvpDeadline, eventTimezone, qrCodeUrl } = params;
 
   const safeGuestName = escapeHtml(guestName);
   const safeEventTitle = escapeHtml(eventTitle);
@@ -181,6 +182,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
               </p>
             </td>
           </tr>
+          ${qrCodeUrl ? `<tr><td style="padding:0 24px 24px;text-align:center;"><img src="${escapeHtml(qrCodeUrl)}" width="144" height="144" alt="Guest check-in QR code" style="display:inline-block;border:0;" /><p style="margin:6px 0 0;font-size:12px;color:#6b7280;">Show this code to event staff for check-in.</p></td></tr>` : ''}
 
           <!-- Footer -->
           <tr>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
+import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -10,14 +11,14 @@ export async function POST(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
     const user = auth.user;
 
     // Fetch the current event to get its status
     const event = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT id, status FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {
@@ -31,8 +32,8 @@ export async function POST(
     const newStatus = event.status === 'published' ? 'draft' : 'published';
 
     const updatedEvent = await queryOne(
-      'UPDATE events SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-      [newStatus, eventId, user.id]
+      'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',
+      [newStatus, eventId]
     );
 
     if (!updatedEvent) {
@@ -40,6 +41,15 @@ export async function POST(
         { error: 'Failed to update event status' },
         { status: 500 }
       );
+    }
+
+    if (newStatus === 'published') {
+      await recordActivationEventSafely({
+        name: 'event_published',
+        userId: user.id,
+        eventId,
+        metadata: { source: 'dashboard' },
+      });
     }
 
     return NextResponse.json(updatedEvent);

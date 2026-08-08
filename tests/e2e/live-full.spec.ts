@@ -36,11 +36,23 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await page.goto('/dashboard?plan=pro_annual');
     await expect(page.getByText('Continue with SealSend Pro')).toBeVisible();
     await page.goto('/templates');
-    await expect(page).toHaveURL(/\/events\/new$/);
+    await expect(page.getByRole('heading', { name: 'Event templates' })).toBeVisible();
+    await page.getByRole('link', { name: 'Use this template' }).first().click();
+    await expect(page).toHaveURL(/\/events\/new\?template=/);
     await page.goto('/ai-assistant');
     await expect(page).toHaveURL(/\/events\/new$/);
     await page.goto('/settings/team');
     await expect(page).toHaveURL(/\/settings$/);
+
+    const aiDraftResponse = await page.context().request.post('/api/ai/event-draft', { data: {
+      prompt: 'A client appreciation dinner for forty people in Toronto with business casual attire.',
+      timezone: 'America/Toronto',
+    }});
+    expect(aiDraftResponse.status()).toBe(200);
+    const aiDraft = await aiDraftResponse.json();
+    expect(aiDraft.draft.event.title).toBeTruthy();
+    const acceptDraft = await page.context().request.post(`/api/ai/event-draft/${aiDraft.generationId}/outcome`, { data: { outcome: 'accepted' } });
+    expect(acceptDraft.status()).toBe(200);
 
     const create = await page.context().request.post('/api/events', { data: {
       title: 'SealSend Production QA Event',
@@ -51,6 +63,10 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
       host_name: 'SealSend QA',
       allow_plus_ones: true,
       max_guests_per_rsvp: 3,
+      invitation_headline: aiDraft.draft.invitation.headline,
+      invitation_body: aiDraft.draft.invitation.body,
+      reminder_sequence: aiDraft.draft.reminders,
+      ai_generation_id: aiDraft.generationId,
       status: 'draft',
     }});
     expect(create.status()).toBe(201);

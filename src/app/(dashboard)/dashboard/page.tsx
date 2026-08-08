@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/lib/auth/session';
-import { getEventsByUser, getInvitedEvents } from '@/lib/events';
+import { getEventsByUser, getInvitedEvents, getCollaboratingEvents } from '@/lib/events';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
@@ -23,13 +23,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   
   // Optimized: Using Promise.all to fetch events in parallel reduces TTFB.
   // Passing both email and phone to getInvitedEvents for accurate guest lookup.
-  const [myEvents, invitedEvents, accountPlan] = await Promise.all([
+  const [myEvents, collaboratingEvents, invitedEvents, accountPlan] = await Promise.all([
     getEventsByUser(user.id),
+    getCollaboratingEvents(user.id),
     getInvitedEvents(user.email, user.phone),
     getUserTier(user.id),
   ]);
   
-  const allEvents = [...myEvents, ...invitedEvents];
+  const allEvents = Array.from(new Map([...myEvents, ...collaboratingEvents, ...invitedEvents].map((event) => [event.id, event])).values());
 
   return (
     <div className="min-h-screen bg-gray-50">

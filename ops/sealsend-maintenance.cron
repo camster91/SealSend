@@ -1,0 +1,9 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# PROVIDER GATE: enable reminders only after controlled Mailgun/Twilio delivery verification.
+# */15 * * * * root /opt/sealsend/bin/run-maintenance.sh reminders >>/var/log/sealsend-maintenance.log 2>&1
+# */5 * * * * root /opt/sealsend/bin/run-maintenance.sh announcements >>/var/log/sealsend-maintenance.log 2>&1
+# RETENTION GATE: enable cleanup only after the draft-retention policy is approved.
+# 20 3 * * * root /opt/sealsend/bin/run-maintenance.sh cleanup >>/var/log/sealsend-maintenance.log 2>&1
+30 2 * * * root /opt/sealsend/bin/backup-database.sh >>/var/log/sealsend-backup.log 2>&1

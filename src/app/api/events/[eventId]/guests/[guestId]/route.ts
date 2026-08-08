@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
 
@@ -10,16 +10,8 @@ export async function PATCH(
   try {
     const { eventId, guestId } = await params;
     const body = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const parsed = guestSchema.partial().safeParse(body);
     if (!parsed.success) {
@@ -56,16 +48,8 @@ export async function DELETE(
 ) {
   try {
     const { eventId, guestId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await query(
       'DELETE FROM guests WHERE id = $1 AND event_id = $2',

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
-import { query, queryOne } from "@/lib/db/client";
+import { requireEventPermission } from '@/lib/auth/event-api-access';
+import { query } from "@/lib/db/client";
 
 export async function DELETE(
   _request: Request,
@@ -8,16 +8,8 @@ export async function DELETE(
 ) {
   try {
     const { eventId, responseId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await query(
       'DELETE FROM rsvp_responses WHERE id = $1 AND event_id = $2',

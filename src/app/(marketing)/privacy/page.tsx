@@ -9,7 +9,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
       <h1 className="text-3xl font-bold text-neutral-900 mb-8">Privacy Policy</h1>
-      <p className="text-sm text-neutral-500 mb-8">Last updated: March 22, 2026</p>
+      <p className="text-sm text-neutral-500 mb-8">Last updated: August 8, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
@@ -18,6 +18,7 @@ export default function PrivacyPage() {
           <p><strong>Event Data:</strong> Event details, guest lists, RSVP responses, and messages you create through the Service.</p>
           <p><strong>Usage Data:</strong> Browser type, device information, IP address, pages visited, and feature usage to improve the Service.</p>
           <p><strong>Payment Data:</strong> Processed securely by Stripe. We do not store credit card numbers.</p>
+          <p><strong>AI Draft Data:</strong> If you use AI-assisted event drafting, the event description you enter is sent to our configured AI provider to create an editable draft.</p>
         </section>
 
         <section>
@@ -27,12 +28,12 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">3. Guest Data</h2>
-          <p>When you add guests to an event, we process their email addresses and phone numbers solely to deliver invitations and collect RSVPs. Guest data is not used for marketing or shared with third parties.</p>
+          <p>When you add guests to an event, we process their email addresses and phone numbers to deliver invitations, service messages, and collect RSVPs. We do not use guest data for third-party advertising. Delivery providers process the contact data needed to send messages.</p>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">4. Data Sharing</h2>
-          <p>We do not sell your data. We share data only with: Stripe (payments), Mailgun (email delivery), Twilio (SMS delivery), and as required by law.</p>
+          <p>We do not sell your data. We use service providers for payments, email delivery, SMS delivery, hosting, and, when you request an AI draft, AI processing. AI prompt content is not stored in SealSend's database; we retain generation metadata and a one-way prompt hash for security, limits, and product reliability. Provider processing remains subject to the provider's applicable data terms.</p>
         </section>
 
         <section>
@@ -42,7 +43,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">6. Data Retention</h2>
-          <p>Active account data is retained while your account exists. Deleted events are removed within 30 days. Deleted accounts and all associated data are permanently removed within 30 days.</p>
+          <p>Active account data is retained while your account exists and as needed to operate, secure, and comply with legal obligations for the Service. Contact us to request deletion. We will confirm the applicable deletion scope and timing for account data and provider records.</p>
         </section>
 
         <section>

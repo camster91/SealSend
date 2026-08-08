@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isSafeRelativeUploadPath } from "@/lib/sanitize";
+import { messageAudienceSchema } from "@/lib/messages/audience";
 
 /** Reject javascript:/data: and require https or same-origin /uploads paths */
 export function isSafeHttpUrl(value: string): boolean {
@@ -60,6 +61,7 @@ export const verifyCodeSchema = z
     email: z.string().email().optional(),
     phone: z.string().min(7).max(30).optional(),
     code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+    eventId: z.string().uuid().optional(),
   })
   .refine((data) => (data.method === "email" ? !!data.email : !!data.phone), {
     message: "Email or phone is required for the selected method",
@@ -68,6 +70,14 @@ export const verifyCodeSchema = z
 export const eventCreateSchema = z.object({
   title: z.string().min(1, "Event title is required").max(200),
   description: z.string().max(2000).optional(),
+  invitation_headline: z.string().max(200).optional(),
+  invitation_body: z.string().max(2000).optional(),
+  reminder_sequence: z.array(z.object({
+    timing: z.enum(["rsvp_deadline", "one_week_before", "one_day_before", "event_day", "after_event"]),
+    subject: z.string().min(1).max(200),
+    message: z.string().min(1).max(5000),
+  }).strict()).max(5).optional(),
+  ai_generation_id: z.string().uuid().optional(),
   event_date: z.string().optional(),
   event_end_date: z.string().optional(),
   event_timezone: z.string().min(1).max(100).default("UTC"),
@@ -147,6 +157,19 @@ export const commentSchema = z.object({
 export const announcementSchema = z.object({
   subject: z.string().min(1, "Subject is required").max(200),
   message: z.string().min(1, "Message is required").max(5000),
+  audience: messageAudienceSchema,
+  channels: z.array(z.enum(["email", "sms"])).min(1).max(2),
+  scheduledAt: z.string().datetime({ offset: true }),
+  approved: z.literal(true),
+}).strict();
+
+export const eventMemberInviteSchema = z.object({
+  email: z.string().email().max(320).transform((value) => value.toLowerCase()),
+  role: z.enum(["manager", "check_in", "viewer"]),
+});
+
+export const eventMemberRoleSchema = z.object({
+  role: z.enum(["manager", "check_in", "viewer"]),
 });
 
 export const plusOneDataSchema = z.object({

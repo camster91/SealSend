@@ -5,6 +5,7 @@ import {
   canCreateEvent,
   canUseFeature,
   getEffectiveEventLimits,
+  getTeamMemberLimit,
   type AccountPlan,
   type EventFeature,
   type EventTier,
@@ -72,4 +73,13 @@ test("unknown persisted account plans fail closed", () => {
     guests: 15,
     responses: 15,
   });
+});
+
+test("team collaboration follows account and event limits including the owner", () => {
+  assert.equal(canUseFeature("free", "free", "teamCollab"), false);
+  assert.equal(canUseFeature("free", "gold", "teamCollab"), true);
+  assert.equal(canUseFeature("pro_annual", "free", "teamCollab"), true);
+  assert.equal(getTeamMemberLimit("free", "silver"), 1);
+  assert.equal(getTeamMemberLimit("free", "gold"), 3);
+  assert.equal(getTeamMemberLimit("pro_annual", "free"), 10);
 });

@@ -4,6 +4,7 @@
  */
 
 import { sendEmail as sendMailgunEmail, isMailgunConfigured } from './mailgun';
+import { assertApprovedRecipient } from './communications-safety';
 
 export { isMailgunConfigured };
 
@@ -20,6 +21,9 @@ interface SendEmailParams {
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ id: string }> {
+  for (const recipient of Array.isArray(params.to) ? params.to : [params.to]) {
+    assertApprovedRecipient(recipient);
+  }
   if (!isMailgunConfigured()) {
     throw new Error(
       'Mailgun not configured. Set MAILGUN_API_KEY and MAILGUN_DOMAIN environment variables.'

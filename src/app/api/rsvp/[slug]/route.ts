@@ -7,6 +7,7 @@ import { escapeHtml } from "@/lib/utils";
 import type { Event, RSVPResponse } from "@/types/database";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 
 export async function POST(
   request: Request,
@@ -182,6 +183,13 @@ export async function POST(
     } finally {
       client.release();
     }
+
+    await recordActivationEventSafely({
+      name: "first_rsvp_received",
+      userId: event.user_id,
+      eventId: event.id,
+      metadata: { source: "public_event", status },
+    });
 
     // Send host notification (best-effort, don't fail the RSVP)
     try {

@@ -10,6 +10,8 @@ import StepGuests from './StepGuests';
 import StepCustomize from './StepCustomize';
 import StepRSVPFields from './StepRSVPFields';
 import StepPreview from './StepPreview';
+import { PromptToEventGenerator } from './PromptToEventGenerator';
+import type { AiEventDraft } from '@/lib/ai/event-draft-schema';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -56,6 +58,10 @@ export interface WizardFormData {
   max_guests_per_rsvp: number;
   design_url: string;
   design_type: string;
+  invitation_headline: string;
+  invitation_body: string;
+  reminder_sequence: Array<{ timing: string; subject: string; message: string }>;
+  ai_generation_id: string;
   customization: EventCustomization;
   rsvp_fields: RSVPField[];
   guests: { name: string; email: string }[];
@@ -72,6 +78,7 @@ interface WizardContainerProps {
   mode?: 'create' | 'edit';
   eventId?: string;
   initialData?: Partial<WizardFormData>;
+  draftKey?: string;
 }
 
 // ── Steps config ───────────────────────────────────────────────────────
@@ -115,6 +122,10 @@ function getInitialState(initialData?: Partial<WizardFormData>): WizardFormData 
     max_guests_per_rsvp: 10,
     design_url: '',
     design_type: 'upload',
+    invitation_headline: '',
+    invitation_body: '',
+    reminder_sequence: [],
+    ai_generation_id: '',
     customization: {
       primaryColor: '#6366f1',
       backgroundColor: '#ffffff',
@@ -171,6 +182,7 @@ export default function WizardContainer({
   mode = 'create',
   eventId,
   initialData,
+  draftKey,
 }: WizardContainerProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -178,11 +190,12 @@ export default function WizardContainer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const storageKey = draftKey ? `${STORAGE_KEY}_${draftKey}` : STORAGE_KEY;
 
   // Load from localStorage on mount (only for create mode)
   useEffect(() => {
     if (mode === 'create' && typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -193,17 +206,17 @@ export default function WizardContainer({
       }
     }
     setIsHydrated(true);
-  }, [mode]);
+  }, [mode, storageKey]);
 
   // Save to localStorage whenever formData changes (only for create mode), debounced
   useEffect(() => {
     if (mode === 'create' && isHydrated && typeof window !== 'undefined') {
       const timer = setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+        localStorage.setItem(storageKey, JSON.stringify(formData));
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [formData, mode, isHydrated]);
+  }, [formData, mode, isHydrated, storageKey]);
 
   // Auto-save indicator
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -234,6 +247,49 @@ export default function WizardContainer({
   const setGuests = useCallback((guests: { name: string; email: string }[]) => {
     dispatch({ type: 'SET_GUESTS', guests });
   }, []);
+
+  const applyAiDraft = useCallback((draft: AiEventDraft, generationId: string) => {
+    const toLocalDateTime = (value: string | null, timeZone: string) => {
+      if (!value) return '';
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(new Date(value));
+      const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+      return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+    };
+    const timeZone = draft.event.eventTimezone;
+    dispatch({ type: 'LOAD_DATA', data: {
+      title: draft.event.title,
+      description: draft.event.description,
+      event_date: toLocalDateTime(draft.event.eventDate, timeZone),
+      event_end_date: toLocalDateTime(draft.event.eventEndDate, timeZone),
+      event_timezone: timeZone,
+      location_name: draft.event.locationName ?? '',
+      location_address: draft.event.locationAddress ?? '',
+      host_name: draft.event.hostName ?? '',
+      dress_code: draft.event.dressCode ?? '',
+      rsvp_deadline: toLocalDateTime(draft.event.rsvpDeadline, timeZone),
+      max_attendees: draft.event.maxAttendees,
+      allow_plus_ones: draft.event.allowPlusOnes,
+      max_guests_per_rsvp: draft.event.maxGuestsPerRsvp,
+      invitation_headline: draft.invitation.headline,
+      invitation_body: draft.invitation.body,
+      reminder_sequence: draft.reminders,
+      ai_generation_id: generationId,
+      customization: { ...formData.customization, primaryColor: draft.theme.primaryColor, backgroundColor: draft.theme.backgroundColor },
+      rsvp_fields: draft.rsvpFields.map((field) => ({
+        field_name: field.key,
+        field_type: field.type === 'phone' ? 'tel' : field.type === 'multiselect' ? 'select' : field.type,
+        field_label: field.label,
+        is_required: field.required,
+        is_enabled: true,
+        options: field.options.length ? field.options : null,
+        placeholder: null,
+      })),
+    } });
+  }, [formData.customization]);
 
   const goNext = useCallback(() => {
     setCurrentStep((prev) => Math.min(prev + 1, 6));
@@ -266,6 +322,10 @@ export default function WizardContainer({
         design_url: formData.design_url || undefined,
         design_type: formData.design_type || 'upload',
         customization: formData.customization,
+        invitation_headline: formData.invitation_headline || undefined,
+        invitation_body: formData.invitation_body || undefined,
+        reminder_sequence: formData.reminder_sequence,
+        ai_generation_id: formData.ai_generation_id || undefined,
         status: publishOnCreate ? 'published' : 'draft',
       };
 
@@ -353,6 +413,8 @@ export default function WizardContainer({
     switch (currentStep) {
       case 1:
         return (
+          <>
+          {mode === 'create' && <PromptToEventGenerator timezone={formData.event_timezone} onApply={applyAiDraft} />}
           <StepEventDetails
             data={{
               title: formData.title,
@@ -371,6 +433,7 @@ export default function WizardContainer({
             allowPlusOnes={formData.allow_plus_ones}
             onUpdate={updateField}
           />
+          </>
         );
       case 2:
         return (
@@ -492,7 +555,7 @@ export default function WizardContainer({
       {/* ── Auto-save indicator ─────────────────────────────────────── */}
       {mode === 'create' && lastSaved && (
         <div className="mt-4 text-center text-xs text-gray-400">
-          ✓ Auto-saved at {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          Saved in this browser at {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
 

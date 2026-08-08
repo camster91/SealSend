@@ -1,6 +1,21 @@
 -- Production schema compatibility and security/performance indexes (idempotent)
 -- Apply with: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apply-security-indexes.sql
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+ALTER TABLE auth_codes ADD COLUMN IF NOT EXISTS code_hash TEXT;
+-- Existing plaintext OTPs are intentionally invalidated during this security upgrade.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'auth_codes' AND column_name = 'code') THEN
+    UPDATE auth_codes SET code_hash = encode(digest(code, 'sha256'), 'hex') WHERE code_hash IS NULL AND code IS NOT NULL;
+    ALTER TABLE auth_codes ALTER COLUMN code DROP NOT NULL;
+  END IF;
+END $$;
+DROP INDEX IF EXISTS idx_auth_codes_email_code;
+DROP INDEX IF EXISTS idx_auth_codes_phone_code;
+CREATE INDEX IF NOT EXISTS idx_auth_codes_email_context ON auth_codes(email, role, event_id) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_auth_codes_phone_context ON auth_codes(phone, role, event_id) WHERE phone IS NOT NULL;
+
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_id TEXT;
@@ -119,3 +134,146 @@ UPDATE user_subscriptions SET tier = 'pro_annual' WHERE tier = 'pro';
 ALTER TABLE user_subscriptions DROP CONSTRAINT IF EXISTS user_subscriptions_tier_check;
 ALTER TABLE user_subscriptions ADD CONSTRAINT user_subscriptions_tier_check
   CHECK (tier IN ('free', 'pro_annual'));
+
+CREATE TABLE IF NOT EXISTS activation_events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_name TEXT NOT NULL CHECK (event_name IN (
+    'account_created',
+    'event_draft_started',
+    'ai_generation_started',
+    'ai_generation_completed',
+    'ai_generation_accepted',
+    'event_published',
+    'first_guest_added',
+    'first_invitation_sent',
+    'first_rsvp_received'
+  )),
+  user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activation_events_name_created
+  ON activation_events(event_name, created_at);
+CREATE INDEX IF NOT EXISTS idx_activation_events_user_created
+  ON activation_events(user_id, created_at) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_activation_events_event_created
+  ON activation_events(event_id, created_at) WHERE event_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user
+  ON activation_events(event_name, user_id)
+  WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event
+  ON activation_events(event_name, event_id)
+  WHERE event_id IS NOT NULL AND event_name IN (
+    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received'
+  );
+
+CREATE TABLE IF NOT EXISTS event_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('manager', 'check_in', 'viewer')),
+  invited_by UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (event_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS event_member_invites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('manager', 'check_in', 'viewer')),
+  token_hash TEXT UNIQUE NOT NULL,
+  token_preview TEXT NOT NULL,
+  invited_by UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ,
+  accepted_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS event_audit_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  target_user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_members_user ON event_members(user_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_event_member_invites_event ON event_member_invites(event_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_member_invites_pending_email
+  ON event_member_invites(event_id, LOWER(email)) WHERE accepted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_audit_event_created ON event_audit_log(event_id, created_at DESC);
+
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS checked_in_by UUID REFERENCES admin_users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_guests_event_check_in ON guests(event_id, checked_in_at);
+
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS status TEXT;
+UPDATE event_announcements SET status = 'sent' WHERE status IS NULL;
+ALTER TABLE event_announcements ALTER COLUMN status SET DEFAULT 'queued';
+ALTER TABLE event_announcements ALTER COLUMN status SET NOT NULL;
+ALTER TABLE event_announcements DROP CONSTRAINT IF EXISTS event_announcements_status_check;
+ALTER TABLE event_announcements ADD CONSTRAINT event_announcements_status_check CHECK (status IN ('queued', 'processing', 'sent', 'partially_failed', 'failed', 'cancelled'));
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS audience JSONB NOT NULL DEFAULT '{"rsvpStatuses":[],"invitationStatuses":[],"tagIds":[],"unansweredOnly":false}';
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS channels TEXT[] NOT NULL DEFAULT ARRAY['email']::TEXT[];
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ;
+UPDATE event_announcements SET scheduled_at = COALESCE(created_at, NOW()) WHERE scheduled_at IS NULL;
+ALTER TABLE event_announcements ALTER COLUMN scheduled_at SET DEFAULT NOW();
+ALTER TABLE event_announcements ALTER COLUMN scheduled_at SET NOT NULL;
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+UPDATE event_announcements SET approved_at = COALESCE(created_at, NOW()) WHERE approved_at IS NULL;
+ALTER TABLE event_announcements ALTER COLUMN approved_at SET DEFAULT NOW();
+ALTER TABLE event_announcements ALTER COLUMN approved_at SET NOT NULL;
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL;
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ;
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE event_announcements ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_announcements_due ON event_announcements(status, scheduled_at) WHERE status = 'queued';
+
+CREATE TABLE IF NOT EXISTS announcement_deliveries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  announcement_id UUID NOT NULL REFERENCES event_announcements(id) ON DELETE CASCADE,
+  guest_id UUID NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK (channel IN ('email', 'sms')),
+  recipient TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'sending', 'accepted', 'delivered', 'failed', 'bounced', 'opted_out')),
+  provider_message_id TEXT,
+  error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (announcement_id, guest_id, channel)
+);
+CREATE INDEX IF NOT EXISTS idx_announcement_deliveries_status ON announcement_deliveries(announcement_id, status);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS invitation_headline TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS invitation_body TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS reminder_sequence JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS ai_generation_id UUID;
+CREATE TABLE IF NOT EXISTS ai_generations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  prompt_hash TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  schema_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('completed', 'fallback', 'failed')),
+  latency_ms INTEGER NOT NULL,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  estimated_cost_micros INTEGER,
+  outcome TEXT NOT NULL DEFAULT 'generated' CHECK (outcome IN ('generated', 'accepted', 'rejected')),
+  accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_generations_user_created ON ai_generations(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS webhook_receipts (
+  provider TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (provider, event_id)
+);

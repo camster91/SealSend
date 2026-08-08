@@ -4,6 +4,8 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 import { cookies } from 'next/headers';
 
+const DUMMY_PASSWORD_HASH = '$2b$14$EmYXdS/qveDgpqxhzH3PZuw.EJjyipeQQnabiAxhvSttfmLAFUGGu';
+
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
@@ -40,18 +42,10 @@ export async function POST(request: NextRequest) {
       [email]
     );
 
-    if (!adminUser) {
-      // Don't reveal whether email exists
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      );
-    }
+    // Always perform the same expensive password check to reduce account enumeration timing.
+    const passwordValid = await verifyPassword(password, adminUser?.password ?? DUMMY_PASSWORD_HASH);
 
-    // Verify password
-    const passwordValid = await verifyPassword(password, adminUser.password);
-
-    if (!passwordValid) {
+    if (!adminUser || !passwordValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }

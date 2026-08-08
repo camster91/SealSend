@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'clone_event');
     if (auth.error) return auth.error;
     const user = auth.user;
 
     // Get original event
     const originalEvent = await queryOne<Record<string, unknown>>(
-      'SELECT * FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT * FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!originalEvent) {

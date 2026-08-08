@@ -13,6 +13,14 @@ export function EventDetails({ event }: EventDetailsProps) {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">{event.title}</h1>
 
+      {event.invitation_headline && event.invitation_headline !== event.title && (
+        <h2 className="text-lg font-semibold text-gray-800">{event.invitation_headline}</h2>
+      )}
+
+      {event.invitation_body && (
+        <p className="whitespace-pre-wrap text-muted-foreground">{event.invitation_body}</p>
+      )}
+
       {event.description && (
         <p className="text-muted-foreground">{event.description}</p>
       )}

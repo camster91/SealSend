@@ -16,8 +16,8 @@ export const BETA_MODE = false;
  */
 export const FEATURE_FLAGS = {
   subscriptions: true,      // Enable subscription billing
-  teams: false,            // Enable team/organization features (not yet implemented)
-  templates: false,        // Enable template gallery (not yet implemented)
+  teams: true,             // Event-level co-host roles and invitations
+  templates: true,         // Curated editable event templates
   analytics: true,          // Enable advanced analytics
   aiAssistant: false,      // Enable AI design assistant (not yet implemented)
 } as const;

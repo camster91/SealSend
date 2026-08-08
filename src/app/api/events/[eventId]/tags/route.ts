@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 import { canUseFeature, type EventTier } from "@/lib/entitlements";
@@ -20,17 +20,8 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'view_guest_contacts');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const tags = await query(
       'SELECT * FROM guest_tags WHERE event_id = $1 ORDER BY created_at ASC',
@@ -50,20 +41,19 @@ export async function POST(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Verify ownership
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+    const event = await queryOne<{ id: string; user_id: string; tier: string }>(
+      'SELECT id, user_id, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Tier gate: tags require standard or premium (unlocked in beta)
-    const accountPlan = await getUserTier(user.id);
+    const accountPlan = await getUserTier(event.user_id);
     if (!canUseFeature(accountPlan, event.tier as EventTier, "guestTags")) {
       return NextResponse.json(
         { error: "Guest tags require a Standard or Premium upgrade" },
@@ -94,17 +84,8 @@ export async function DELETE(
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
-    );
-
-    if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const parsed = deleteTagSchema.safeParse(body);
     if (!parsed.success) {

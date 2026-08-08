@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
@@ -12,14 +12,13 @@ export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const body = await request.json();
-    const auth = await requireApiHost();
+    const auth = await requireEventPermission(eventId, 'manage_guests');
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Verify ownership
-    const event = await queryOne<{ id: string; tier: string }>(
-      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+    const event = await queryOne<{ id: string; user_id: string; tier: string }>(
+      'SELECT id, user_id, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -107,7 +106,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 200 });
     }
 
-    const accountPlan = await getUserTier(user.id);
+    const accountPlan = await getUserTier(event.user_id);
     const guestLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).guests;
     if (existingGuests.length + guests.length > guestLimit) {
       return NextResponse.json(

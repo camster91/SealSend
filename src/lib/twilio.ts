@@ -22,14 +22,15 @@ export function getTwilioClient() {
   return client;
 }
 
-export function getTwilioSendOptions(): { messagingServiceSid: string } | { from: string } {
+export function getTwilioSendOptions(): { messagingServiceSid?: string; from?: string; statusCallback?: string } {
+  const callback = process.env.TWILIO_WEBHOOK_URL ? { statusCallback: process.env.TWILIO_WEBHOOK_URL } : {};
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   if (messagingServiceSid) {
-    return { messagingServiceSid };
+    return { messagingServiceSid, ...callback };
   }
   const fromNumber = process.env.TWILIO_FROM_NUMBER;
   if (fromNumber) {
-    return { from: fromNumber };
+    return { from: fromNumber, ...callback };
   }
   throw new Error("Missing TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER");
 }

@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db/client';
-import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    const auth = await requireApiHost();
-    if (auth.error) return auth.error;
-    const user = auth.user;
-
     const { eventId } = await params;
+    const auth = await requireEventPermission(eventId, 'view_event');
+    if (auth.error) return auth.error;
 
     const event = await queryOne<{ slug: string }>(
-      'SELECT slug FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT slug FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {

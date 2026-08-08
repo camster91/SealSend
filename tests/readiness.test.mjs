@@ -207,3 +207,186 @@ test('public marketing does not ship invented social proof', async () => {
     assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%/i);
   }
 });
+
+test('activation analytics has a privacy-limited fresh schema and upgrade path', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  const activationTable = tableDefinition(schema, 'activation_events');
+  assert.match(activationTable, /event_name TEXT NOT NULL/);
+  assert.match(activationTable, /metadata JSONB NOT NULL DEFAULT '\{\}'/);
+  assert.doesNotMatch(activationTable, /email|phone|message|recipient/i);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS activation_events/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event/);
+  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user/);
+  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event/);
+});
+
+test('the core activation funnel is recorded at successful lifecycle boundaries', async () => {
+  const verifyCodeRoute = await read('src/app/api/auth/verify-code/route.ts');
+  const eventsRoute = await read('src/app/api/events/route.ts');
+  const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
+  const guestsRoute = await read('src/app/api/events/[eventId]/guests/route.ts');
+  const invitesRoute = await read('src/app/api/events/[eventId]/send-invites/route.ts');
+  const rsvpRoute = await read('src/app/api/rsvp/[slug]/route.ts');
+
+  assert.match(verifyCodeRoute, /created\?\.id[\s\S]*account_created/);
+  assert.doesNotMatch(verifyCodeRoute, /if \(existing\)[^{]*\{?[^}]*account_created/);
+  assert.match(eventsRoute, /recordActivationEventSafely[\s\S]*event_draft_started/);
+  assert.match(publishRoute, /newStatus === ['"]published['"][\s\S]*event_published/);
+  assert.match(guestsRoute, /recordActivationEventSafely[\s\S]*first_guest_added/);
+  assert.match(invitesRoute, /successIds\.length > 0[\s\S]*first_invitation_sent/);
+  assert.match(rsvpRoute, /COMMIT[\s\S]*first_rsvp_received/);
+});
+
+test('operations scripts schedule authenticated maintenance without exposing secrets', async () => {
+  const cron = await read('ops/run-maintenance.sh');
+  const cronDefinition = await read('ops/sealsend-maintenance.cron');
+
+  assert.match(cron, /coolify\.resourceName=seal-send/);
+  assert.match(cron, /Authorization: Bearer \$CRON_SECRET/);
+  assert.match(cron, /api\/cron\/send-reminders/);
+  assert.match(cron, /api\/cron\/cleanup-drafts/);
+  assert.doesNotMatch(cron, /echo.*CRON_SECRET|set -x/);
+  assert.match(cronDefinition, /run-maintenance\.sh reminders/);
+  assert.match(cronDefinition, /run-maintenance\.sh cleanup/);
+});
+
+test('database backup tooling uses container credentials, retention, and archive verification', async () => {
+  const backup = await read('ops/backup-database.sh');
+
+  assert.match(backup, /sealsend-postgres/);
+  assert.match(backup, /pg_dump --format=custom/);
+  assert.match(backup, /pg_restore --list/);
+  assert.match(backup, /-mtime \+30 -delete/);
+  assert.doesNotMatch(backup, /POSTGRES_PASSWORD|DATABASE_URL|set -x/);
+});
+
+test('calendar downloads expose only published events with safe response headers', async () => {
+  const route = await read('src/app/api/calendar/[slug]/route.ts');
+  const component = await read('src/components/public-event/AddToCalendar.tsx');
+
+  assert.match(route, /status = ['"]published['"]/);
+  assert.match(route, /buildIcsCalendar/);
+  assert.match(route, /text\/calendar/);
+  assert.match(route, /Content-Disposition/);
+  assert.match(route, /Cache-Control/);
+  assert.match(component, /buildCalendarLinks/);
+  assert.doesNotMatch(component, /URL\.createObjectURL|function downloadICS/);
+});
+
+test('co-hosting schemas enforce roles, uniqueness, hashed invitations, and auditability', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  const members = tableDefinition(schema, 'event_members');
+  const invites = tableDefinition(schema, 'event_member_invites');
+  const audit = tableDefinition(schema, 'event_audit_log');
+
+  assert.match(members, /UNIQUE\s*\(event_id, user_id\)/);
+  assert.match(members, /'manager'[\s\S]*'check_in'[\s\S]*'viewer'/);
+  assert.match(invites, /token_hash TEXT UNIQUE NOT NULL/);
+  assert.match(invites, /expires_at TIMESTAMPTZ NOT NULL/);
+  assert.doesNotMatch(invites, /token TEXT/);
+  assert.match(audit, /actor_user_id UUID/);
+  assert.match(audit, /action TEXT NOT NULL/);
+  for (const table of ['event_members', 'event_member_invites', 'event_audit_log']) {
+    assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
+  }
+});
+
+test('co-host invitation APIs are owner-gated, capacity-safe, and never persist raw tokens', async () => {
+  const membersRoute = await read('src/app/api/events/[eventId]/members/route.ts');
+  const memberRoute = await read('src/app/api/events/[eventId]/members/[memberId]/route.ts');
+  const acceptRoute = await read('src/app/api/team-invites/[token]/accept/route.ts');
+
+  assert.match(membersRoute, /roleCan\([^,]+, ['"]manage_members['"]\)/);
+  assert.match(membersRoute, /FOR UPDATE/);
+  assert.match(membersRoute, /getTeamMemberLimit/);
+  assert.match(membersRoute, /hashMagicToken/);
+  assert.match(membersRoute, /token_hash/);
+  const inviteInsertColumns = membersRoute.match(
+    /INSERT INTO event_member_invites\s*\(([^)]+)\)/,
+  )?.[1];
+  assert.ok(inviteInsertColumns, 'invite insert column list is present');
+  assert.doesNotMatch(inviteInsertColumns, /(^|,)\s*token\s*(,|$)/);
+  assert.match(memberRoute, /roleCan\([^,]+, ['"]manage_members['"]\)/);
+  assert.match(acceptRoute, /hashMagicToken/);
+  assert.match(acceptRoute, /LOWER\(i\.email\) = LOWER\(\$2\)/);
+  assert.match(acceptRoute, /BEGIN[\s\S]*INSERT INTO event_members[\s\S]*accepted_at[\s\S]*COMMIT/);
+});
+
+test('mobile check-in is permission-gated, auditable, and reversible', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/events/[eventId]/check-in/route.ts');
+  const page = await read('src/app/(dashboard)/events/[eventId]/check-in/page.tsx');
+
+  assert.match(schema, /checked_in_at TIMESTAMPTZ/);
+  assert.match(schema, /checked_in_by UUID REFERENCES admin_users/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ/);
+  assert.match(route, /roleCan\([^,]+, ['"]check_in_guests['"]\)/);
+  assert.match(route, /UPDATE guests[\s\S]*checked_in_at[\s\S]*RETURNING/);
+  assert.match(route, /guest_checked_(?:in|out)/);
+  assert.match(page, /aria-label=.*Search guests/);
+});
+
+test('scheduled announcements are approved, cancellable, and idempotently dispatched', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const cron = await read('src/app/api/cron/send-announcements/route.ts');
+  const route = await read('src/app/api/events/[eventId]/announcements/route.ts');
+  const cancel = await read('src/app/api/events/[eventId]/announcements/[announcementId]/route.ts');
+
+  assert.match(schema, /announcement_deliveries[\s\S]*UNIQUE \(announcement_id, guest_id, channel\)/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS announcement_deliveries/);
+  assert.match(route, /approved[\s\S]*audience[\s\S]*scheduledAt/);
+  assert.match(cancel, /status = 'cancelled'[\s\S]*status = 'queued'/);
+  assert.match(cron, /Bearer \$\{cronSecret\}/);
+  assert.match(cron, /dispatchAnnouncement/);
+  assert.match(cron, /FOR UPDATE SKIP LOCKED/);
+});
+
+test('every event mutation is routed through the explicit role permission model', async () => {
+  const mutationRoutes = [
+    'src/app/api/events/[eventId]/route.ts',
+    'src/app/api/events/[eventId]/publish/route.ts',
+    'src/app/api/events/[eventId]/clone/route.ts',
+    'src/app/api/events/[eventId]/rsvp-fields/route.ts',
+    'src/app/api/events/[eventId]/guests/route.ts',
+    'src/app/api/events/[eventId]/guests/bulk/route.ts',
+    'src/app/api/events/[eventId]/guests/[guestId]/route.ts',
+    'src/app/api/events/[eventId]/tags/route.ts',
+    'src/app/api/events/[eventId]/signups/route.ts',
+    'src/app/api/events/[eventId]/comments/route.ts',
+    'src/app/api/events/[eventId]/responses/[responseId]/route.ts',
+    'src/app/api/events/[eventId]/send-invites/route.ts',
+    'src/app/api/events/[eventId]/send-reminders/route.ts',
+    'src/app/api/events/[eventId]/announcements/route.ts',
+    'src/app/api/events/[eventId]/announcements/draft/route.ts',
+    'src/app/api/events/[eventId]/check-in/route.ts',
+    'src/app/api/events/[eventId]/members/route.ts',
+    'src/app/api/events/[eventId]/members/[memberId]/route.ts',
+  ];
+  for (const routePath of mutationRoutes) {
+    const source = await read(routePath);
+    assert.match(source, /requireEventPermission|roleCan\(/, `${routePath} must enforce a named event permission`);
+  }
+});
+
+test('authentication codes are hashed and scoped to one login context', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const send = await read('src/app/api/auth/send-code/route.ts');
+  const verify = await read('src/app/api/auth/verify-code/route.ts');
+  const password = await read('src/app/api/auth/login-password/route.ts');
+  assert.match(schema, /code_hash TEXT NOT NULL/);
+  assert.doesNotMatch(schema, /\n\s*code TEXT NOT NULL/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS code_hash/);
+  assert.match(send, /hashAuthCode/);
+  assert.match(send, /event_id IS NOT DISTINCT FROM/);
+  assert.match(verify, /code_hash = \$2/);
+  assert.match(verify, /event_id IS NOT DISTINCT FROM \$4/);
+  assert.match(password, /DUMMY_PASSWORD_HASH/);
+});

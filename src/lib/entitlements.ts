@@ -14,7 +14,8 @@ export type EventFeature =
   | "guestTags"
   | "announcements"
   | "signupBoard"
-  | "analytics";
+  | "analytics"
+  | "teamCollab";
 
 type EventLimits = {
   guests: number;
@@ -37,6 +38,17 @@ const EVENT_FEATURES: Record<EventFeature, EventTier[]> = {
   announcements: ["silver", "gold", "platinum", "diamond", "standard", "premium"],
   signupBoard: ["gold", "platinum", "diamond", "premium"],
   analytics: ["gold", "platinum", "diamond"],
+  teamCollab: ["gold", "platinum", "diamond", "premium"],
+};
+
+const EVENT_TEAM_LIMITS: Record<EventTier, number> = {
+  free: 1,
+  silver: 1,
+  gold: 3,
+  platinum: 5,
+  diamond: 10,
+  standard: 1,
+  premium: 3,
 };
 
 function isAnnualPro(accountPlan: AccountPlan): boolean {
@@ -64,4 +76,12 @@ export function canUseFeature(
   feature: EventFeature,
 ): boolean {
   return isAnnualPro(accountPlan) || EVENT_FEATURES[feature].includes(eventTier);
+}
+
+export function getTeamMemberLimit(
+  accountPlan: AccountPlan,
+  eventTier: EventTier,
+): number {
+  if (isAnnualPro(accountPlan)) return 10;
+  return EVENT_TEAM_LIMITS[eventTier] ?? 1;
 }
