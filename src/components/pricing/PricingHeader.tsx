@@ -6,7 +6,7 @@ export function PricingHeader() {
           Pay for one event, <span className="text-gradient">or host all year</span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
-          Start free. Upgrade only the event that needs more capacity, or choose annual Pro for unlimited events.
+          Built for independent planners, community organizers, and small teams. Start free with the complete event workflow; upgrade one event for capacity or choose annual Pro for recurring work.
         </p>
       </div>
     </section>

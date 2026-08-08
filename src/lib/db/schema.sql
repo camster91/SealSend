@@ -111,9 +111,21 @@ CREATE TABLE IF NOT EXISTS ai_generations (
   estimated_cost_micros INTEGER,
   outcome TEXT NOT NULL DEFAULT 'generated' CHECK (outcome IN ('generated', 'accepted', 'rejected')),
   accepted_at TIMESTAMPTZ,
+  edit_count INTEGER CHECK (edit_count IS NULL OR edit_count >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_ai_generations_user_created ON ai_generations(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS ai_message_generations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  prompt_hash TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('completed','fallback','failed')),
+  tone TEXT NOT NULL, length TEXT NOT NULL, urgency TEXT NOT NULL, channel TEXT NOT NULL,
+  outcome TEXT NOT NULL DEFAULT 'generated' CHECK (outcome IN ('generated','accepted','rejected')),
+  helpful BOOLEAN, accepted_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_message_generations_user_created ON ai_message_generations(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_auto_reminders ON events(status, auto_reminders, event_date)
   WHERE auto_reminders = TRUE;
 
@@ -497,6 +509,23 @@ CREATE INDEX IF NOT EXISTS idx_activation_events_user_created
   ON activation_events(user_id, created_at) WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_activation_events_event_created
   ON activation_events(event_id, created_at) WHERE event_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS server_error_events (
+  id BIGSERIAL PRIMARY KEY, fingerprint TEXT NOT NULL, error_name TEXT NOT NULL,
+  route TEXT NOT NULL, method TEXT NOT NULL, router_kind TEXT NOT NULL, route_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_server_error_events_created ON server_error_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_server_error_events_fingerprint ON server_error_events(fingerprint, created_at DESC);
+CREATE TABLE IF NOT EXISTS beta_feedback (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('setup','ai_draft','guest_management','communications','check_in','other')),
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5), message TEXT NOT NULL,
+  may_contact BOOLEAN NOT NULL DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','reviewing','closed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_beta_feedback_created ON beta_feedback(created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user
   ON activation_events(event_name, user_id)
   WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started');

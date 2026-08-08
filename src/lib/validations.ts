@@ -78,6 +78,7 @@ export const eventCreateSchema = z.object({
     message: z.string().min(1).max(5000),
   }).strict()).max(5).optional(),
   ai_generation_id: z.string().uuid().optional(),
+  ai_edit_count: z.number().int().min(0).max(100).optional(),
   event_date: z.string().optional(),
   event_end_date: z.string().optional(),
   event_timezone: z.string().min(1).max(100).default("UTC"),
@@ -105,6 +106,8 @@ export const eventCreateSchema = z.object({
       showCountdown: z.boolean().default(true),
       audioUrl: optionalNullableSafeHttpUrl.default(null),
       logoUrl: optionalNullableSafeHttpUrl.default(null),
+      imageFit: z.enum(["contain", "cover"]).default("contain"),
+      imagePosition: z.enum(["top", "center", "bottom"]).default("center"),
     })
     .optional(),
   status: z.enum(["draft", "published"]).default("draft"),

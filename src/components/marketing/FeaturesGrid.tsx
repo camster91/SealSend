@@ -69,11 +69,10 @@ export default function FeaturesGrid() {
             Features
           </span>
           <h2 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Everything you need for your event
+            From one idea to a guest-ready event
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-400">
-            From design to delivery, we&apos;ve got you covered with powerful tools
-            that make event planning a breeze.
+            Structure the invitation, RSVP questions, guest operations, co-host access, check-in, and host-approved communications together.
           </p>
         </motion.div>
 

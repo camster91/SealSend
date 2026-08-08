@@ -29,12 +29,12 @@ export default function CTASection() {
           <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             {BETA_MODE
               ? "Ready to create something beautiful?"
-              : "Ready to make your event unforgettable?"}
+              : "Ready to turn your event idea into an operating plan?"}
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
             {BETA_MODE
               ? "Join our beta and create stunning invitations for free. Help us shape the future of digital invitations."
-              : "Start creating beautiful invitations today. No design skills needed, no credit card required to start."}
+              : "Build the invitation, RSVP questions, guest workflow, and communication drafts together. Review every AI suggestion before anything is saved or sent."}
           </p>
 
           {/* Trust badges */}
@@ -49,7 +49,7 @@ export default function CTASection() {
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              <span>Set up in 2 minutes</span>
+              <span>AI-assisted, always host-approved</span>
             </div>
           </div>
 

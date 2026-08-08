@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { RSVPResponseWithPlusOnes } from "@/types/database";
+import { RsvpIntelligence } from "@/components/responses/RsvpIntelligence";
 
 export default function ResponsesPage() {
   const params = useParams();
@@ -63,6 +64,7 @@ export default function ResponsesPage() {
         </div>
       ) : (
         <>
+          <RsvpIntelligence eventId={eventId} />
           <div className="mb-6">
             <ResponseStats responses={responses} />
           </div>

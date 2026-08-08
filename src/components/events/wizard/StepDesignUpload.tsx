@@ -1,26 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { WizardFormData } from './WizardContainer';
-import AIPromptGenerator from './AIPromptGenerator';
-
-export interface EventDetailsForPrompt {
-  title: string;
-  description: string;
-  event_date: string;
-  event_end_date: string;
-  location_name: string;
-  location_address: string;
-  host_name: string;
-  dress_code: string;
-  rsvp_deadline: string;
-}
+import type { EventCustomization, WizardFormData } from './WizardContainer';
 
 interface StepDesignUploadProps {
   designUrl: string;
   designType: string;
   onUpdate: (field: keyof WizardFormData, value: unknown) => void;
-  eventDetails?: EventDetailsForPrompt;
+  customization: EventCustomization;
 }
 
 function isVideoType(type: string) {
@@ -35,7 +22,7 @@ export default function StepDesignUpload({
   designUrl,
   designType,
   onUpdate,
-  eventDetails,
+  customization,
 }: StepDesignUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -113,10 +100,13 @@ export default function StepDesignUpload({
   };
 
   const showVideoPreview = isVideoType(designType) || isVideoUrl(designUrl);
+  const imageFit = customization.imageFit ?? 'contain';
+  const imagePosition = customization.imagePosition ?? 'center';
+  const updateArtwork = (changes: Partial<EventCustomization>) => onUpdate('customization', { ...customization, ...changes });
   const acceptTypes =
     activeMode === 'video'
       ? 'video/mp4,video/webm'
-      : 'image/jpeg,image/png,image/gif,image/webp,image/svg+xml';
+      : 'image/jpeg,image/png,image/gif,image/webp';
 
   return (
     <div className="space-y-8">
@@ -162,8 +152,6 @@ export default function StepDesignUpload({
       </div>
 
       {/* AI Prompt Generator */}
-      <AIPromptGenerator eventDetails={eventDetails} />
-
       {/* Design type selector */}
       <div className="flex gap-3">
         {(['upload', 'video', 'url'] as const).map((mode) => {
@@ -239,7 +227,7 @@ export default function StepDesignUpload({
                     <p className="mt-1.5 text-sm text-gray-500">
                       {activeMode === 'video'
                         ? 'MP4 or WebM · Max 50MB'
-                        : 'JPEG, PNG, GIF, WebP, or SVG · Max 10MB'}
+                        : 'JPEG, PNG, GIF, or WebP · Max 10MB'}
                     </p>
                   </div>
                 </div>
@@ -258,7 +246,8 @@ export default function StepDesignUpload({
                 <img
                   src={designUrl}
                   alt="Event design preview"
-                  className="h-auto max-h-[400px] w-full object-contain"
+                  className={`aspect-[4/3] w-full ${imageFit === 'cover' ? 'object-cover' : 'object-contain'}`}
+                  style={{ objectPosition: imagePosition }}
                 />
               )}
               <button
@@ -272,6 +261,7 @@ export default function StepDesignUpload({
               </button>
             </div>
           )}
+          {!showVideoPreview && <fieldset className="mt-4 rounded-xl border p-4"><legend className="px-1 text-sm font-semibold">Artwork crop and focus</legend><div className="grid grid-cols-2 gap-3"><label className="text-sm">Fit<select value={imageFit} onChange={(event) => updateArtwork({ imageFit: event.target.value as 'contain' | 'cover' })} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="contain">Show complete artwork</option><option value="cover">Fill and crop</option></select></label><label className="text-sm">Focus<select value={imagePosition} onChange={(event) => updateArtwork({ imagePosition: event.target.value as 'top' | 'center' | 'bottom' })} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="top">Top</option><option value="center">Centre</option><option value="bottom">Bottom</option></select></label></div><p className="mt-2 text-xs text-gray-500">This changes presentation only. SealSend keeps the uploaded original.</p></fieldset>}
         </>
       ) : (
         <div className="space-y-3">
@@ -292,7 +282,8 @@ export default function StepDesignUpload({
               <img
                 src={designUrl}
                 alt="Event design preview"
-                className="h-auto max-h-[400px] w-full object-contain"
+                className={`aspect-[4/3] w-full ${imageFit === 'cover' ? 'object-cover' : 'object-contain'}`}
+                style={{ objectPosition: imagePosition }}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>

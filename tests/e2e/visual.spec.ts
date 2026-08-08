@@ -22,3 +22,17 @@ test('captures the homepage and login experience for visual review', async ({ pa
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(output, `${prefix}-login.png`), fullPage: true });
 });
+
+test('captures release pages at 375, 768, and 1440 pixels with reduced motion', async ({ page }) => {
+  const output = path.resolve('qa-screenshots', 'viewports');
+  await mkdir(output, { recursive: true });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 1000 });
+    for (const [route, name] of [['/', 'home'], ['/pricing', 'pricing'], ['/events/new', 'protected-create']] as const) {
+      await page.goto(route, { waitUntil: 'networkidle' });
+      await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});

@@ -365,6 +365,7 @@ test('every event mutation is routed through the explicit role permission model'
     'src/app/api/events/[eventId]/send-reminders/route.ts',
     'src/app/api/events/[eventId]/announcements/route.ts',
     'src/app/api/events/[eventId]/announcements/draft/route.ts',
+    'src/app/api/events/[eventId]/announcements/draft/[generationId]/route.ts',
     'src/app/api/events/[eventId]/check-in/route.ts',
     'src/app/api/events/[eventId]/members/route.ts',
     'src/app/api/events/[eventId]/members/[memberId]/route.ts',
@@ -373,6 +374,54 @@ test('every event mutation is routed through the explicit role permission model'
     const source = await read(routePath);
     assert.match(source, /requireEventPermission|roleCan\(/, `${routePath} must enforce a named event permission`);
   }
+});
+
+test('beta operations include privacy-safe error capture and authenticated feedback', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const monitoring = await read('src/lib/monitoring/server-errors.ts');
+  const instrumentation = await read('src/instrumentation.ts');
+  const feedback = await read('src/app/api/feedback/route.ts');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS server_error_events/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS beta_feedback/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS server_error_events/);
+  assert.doesNotMatch(monitoring, /error\.message|error\.stack/);
+  assert.match(instrumentation, /onRequestError/);
+  assert.match(feedback, /requireApiHost/);
+  assert.match(feedback, /rateLimit/);
+});
+
+test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
+  const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
+  const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');
+  const modal = await read('src/components/dashboard/SendAnnouncementModal.tsx');
+  assert.match(audience, /recipients:/);
+  assert.match(audience, /estimatedCostMicros/);
+  for (const control of ['tone', 'length', 'urgency', 'channel']) assert.match(draft, new RegExp(control));
+  assert.match(modal, /Review resolved recipients/);
+  assert.match(modal, /Estimated provider charge/);
+  assert.match(modal, /approve this external send/);
+  assert.doesNotMatch(draft, /dispatchAnnouncement|sendEmail|\.messages\.create/);
+});
+
+test('RSVP intelligence is aggregate, traceable, and permission gated', async () => {
+  const route = await read('src/app/api/events/[eventId]/responses/summary/route.ts');
+  const summary = await read('src/lib/rsvp-summary.ts');
+  assert.match(route, /requireEventPermission\(eventId, "export_responses"\)/);
+  assert.match(summary, /sourceResponseCount/);
+  assert.match(summary, /sourceResponseIds/);
+  assert.doesNotMatch(summary, /fetch\(|openai|sendEmail/);
+});
+
+test('invitation studio has a launch-sized accessible catalog and non-destructive crop controls', async () => {
+  const templates = await read('src/lib/event-templates.ts');
+  const uploader = await read('src/components/events/wizard/StepDesignUpload.tsx');
+  const page = await read('src/app/(dashboard)/events/new/page.tsx');
+  const count = [...templates.matchAll(/\{ id: "/g)].length;
+  assert.ok(count >= 12 && count <= 20, `expected 12-20 templates, found ${count}`);
+  assert.match(uploader, /Artwork crop and focus/);
+  assert.match(uploader, /keeps the uploaded original/);
+  assert.match(page, /getEventTemplate/);
 });
 
 test('authentication codes are hashed and scoped to one login context', async () => {

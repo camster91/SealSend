@@ -13,14 +13,18 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Pro
   const [audience, setAudience] = useState<Audience>({ rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false });
   const [channels, setChannels] = useState<Array<'email' | 'sms'>>(['email']);
   const [scheduledAt, setScheduledAt] = useState('');
-  const [preview, setPreview] = useState<{ count: number; emailCount: number; smsCount: number } | null>(null);
+  const [preview, setPreview] = useState<{ count: number; emailCount: number; smsCount: number; recipients: Array<{ id: string; name: string; channels: string[] }>; truncated: boolean; estimatedCostMicros: number | null; costConfigured: boolean } | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ status: string; sent_to_count: number; scheduled_at: string } | null>(null);
   const [tags, setTags] = useState<Array<{ id: string; tag_name: string; color: string }>>([]);
   const [draftIntent, setDraftIntent] = useState('');
-  const [aiDraft, setAiDraft] = useState<{ subject: string; message: string; cautions: string[]; fallback: boolean } | null>(null);
+  const [aiDraft, setAiDraft] = useState<{ generationId: string; subject: string; message: string; cautions: string[]; fallback: boolean } | null>(null);
+  const [draftTone, setDraftTone] = useState('warm');
+  const [draftLength, setDraftLength] = useState('standard');
+  const [draftUrgency, setDraftUrgency] = useState('normal');
+  const [draftChannel, setDraftChannel] = useState<'email' | 'sms'>('email');
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +41,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Pro
   }
   async function previewAudience() {
     setBusy(true); setError(null);
-    const response = await fetch(`/api/events/${eventId}/announcements/audience`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(audience) });
+    const response = await fetch(`/api/events/${eventId}/announcements/audience`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audience, channels }) });
     const data = await response.json();
     if (!response.ok) setError(data.error || 'Could not resolve recipients.');
     else setPreview(data);
@@ -45,11 +49,14 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Pro
   }
   async function draftWithAi() {
     setBusy(true); setError(null); setAiDraft(null);
-    const response = await fetch(`/api/events/${eventId}/announcements/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: draftIntent, tone: 'warm' }) });
+    const response = await fetch(`/api/events/${eventId}/announcements/draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: draftIntent, tone: draftTone, length: draftLength, urgency: draftUrgency, channel: draftChannel }) });
     const data = await response.json();
     if (!response.ok) setError(data.error || 'Could not create a message draft.');
-    else setAiDraft({ ...data.draft, fallback: data.fallback });
+    else setAiDraft({ generationId: data.generationId, ...data.draft, fallback: data.fallback });
     setBusy(false);
+  }
+  async function recordDraft(generationId: string, data: { outcome?: 'accepted' | 'rejected'; helpful?: boolean }) {
+    await fetch(`/api/events/${eventId}/announcements/draft/${generationId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -73,8 +80,9 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Pro
           <p className="mt-1 text-sm text-gray-600">Describe the update. Nothing is sent or scheduled until you review the final content, audience, channels, and schedule.</p>
           <label htmlFor="ann-ai-intent" className="mt-3 block text-sm font-medium">What should guests know?</label>
           <textarea id="ann-ai-intent" rows={3} maxLength={1000} value={draftIntent} onChange={(e) => setDraftIntent(e.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2" />
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"><label className="text-xs font-medium">Tone<select value={draftTone} onChange={(e) => setDraftTone(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2"><option>warm</option><option>professional</option><option>playful</option><option>formal</option><option>casual</option></select></label><label className="text-xs font-medium">Length<select value={draftLength} onChange={(e) => setDraftLength(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2"><option>short</option><option>standard</option><option>detailed</option></select></label><label className="text-xs font-medium">Urgency<select value={draftUrgency} onChange={(e) => setDraftUrgency(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2"><option>low</option><option>normal</option><option>high</option></select></label><label className="text-xs font-medium">Draft for<select value={draftChannel} onChange={(e) => setDraftChannel(e.target.value as 'email' | 'sms')} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2"><option value="email">Email</option><option value="sms">SMS</option></select></label></div>
           <Button type="button" variant="outline" className="mt-3" disabled={draftIntent.trim().length < 10} loading={busy} onClick={draftWithAi}>Create review draft</Button>
-          {aiDraft && <div className="mt-3 rounded-lg border bg-white p-3 text-sm"><p className="font-semibold">{aiDraft.subject}</p><p className="mt-1 whitespace-pre-wrap text-gray-600">{aiDraft.message}</p>{aiDraft.cautions.length > 0 && <ul className="mt-2 list-disc pl-5 text-amber-800">{aiDraft.cautions.map((item) => <li key={item}>{item}</li>)}</ul>}<Button type="button" className="mt-3" onClick={() => { setSubject(aiDraft.subject); setMessage(aiDraft.message); setApproved(false); setAiDraft(null); }}>Use this editable draft</Button></div>}
+          {aiDraft && <div className="mt-3 rounded-lg border bg-white p-3 text-sm"><p className="font-semibold">{aiDraft.subject}</p><p className="mt-1 whitespace-pre-wrap text-gray-600">{aiDraft.message}</p>{aiDraft.cautions.length > 0 && <ul className="mt-2 list-disc pl-5 text-amber-800">{aiDraft.cautions.map((item) => <li key={item}>{item}</li>)}</ul>}<div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => { void recordDraft(aiDraft.generationId, { outcome: 'accepted' }); setSubject(aiDraft.subject); setMessage(aiDraft.message); setApproved(false); setAiDraft(null); }}>Use this editable draft</Button><Button type="button" variant="outline" onClick={() => void draftWithAi()}>Regenerate</Button><button type="button" className="min-h-11 px-3" onClick={() => void recordDraft(aiDraft.generationId, { helpful: true })} aria-label="Mark draft helpful">Helpful</button><button type="button" className="min-h-11 px-3" onClick={() => void recordDraft(aiDraft.generationId, { helpful: false })} aria-label="Mark draft not helpful">Not helpful</button><button type="button" className="min-h-11 px-3" onClick={() => { void recordDraft(aiDraft.generationId, { outcome: 'rejected' }); setAiDraft(null); }}>Discard</button></div></div>}
         </section>
         <div><label htmlFor="ann-subject" className="text-sm font-medium">Subject</label><input id="ann-subject" required maxLength={200} value={subject} onChange={(e) => { setSubject(e.target.value); setApproved(false); }} className="mt-1 h-11 w-full rounded-lg border px-3" /></div>
         <div><label htmlFor="ann-message" className="text-sm font-medium">Message</label><textarea id="ann-message" required maxLength={5000} rows={5} value={message} onChange={(e) => { setMessage(e.target.value); setApproved(false); }} className="mt-1 w-full rounded-lg border px-3 py-2" /></div>
@@ -82,10 +90,10 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess }: Pro
         <fieldset><legend className="text-sm font-semibold">Target invitation state</legend><div className="mt-2 flex flex-wrap gap-3">{['not_sent','sent','delivered','failed','bounced','accepted'].map((value) => <label key={value} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={audience.invitationStatuses.includes(value)} onChange={() => toggleFilter('invitationStatuses', value)} />{value.replace('_',' ')}</label>)}</div></fieldset>
         {tags.length > 0 && <fieldset><legend className="text-sm font-semibold">Target guest tags</legend><div className="mt-2 flex flex-wrap gap-3">{tags.map((tag) => <label key={tag.id} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={audience.tagIds.includes(tag.id)} onChange={() => { setAudience((current) => ({ ...current, tagIds: current.tagIds.includes(tag.id) ? current.tagIds.filter((id) => id !== tag.id) : [...current.tagIds, tag.id] })); setPreview(null); setApproved(false); }} /><span className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />{tag.tag_name}</label>)}</div></fieldset>}
         <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={audience.unansweredOnly} onChange={(e) => { setAudience({ ...audience, unansweredOnly: e.target.checked }); setPreview(null); setApproved(false); }} />Only guests without an RSVP response</label>
-        <fieldset><legend className="text-sm font-semibold">Channels</legend><div className="mt-2 flex gap-5">{(['email','sms'] as const).map((channel) => <label key={channel} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={channels.includes(channel)} onChange={(e) => { setChannels(e.target.checked ? [...channels, channel] : channels.filter((item) => item !== channel)); setApproved(false); }} />{channel.toUpperCase()}</label>)}</div></fieldset>
+        <fieldset><legend className="text-sm font-semibold">Channels</legend><div className="mt-2 flex gap-5">{(['email','sms'] as const).map((channel) => <label key={channel} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={channels.includes(channel)} onChange={(e) => { setChannels(e.target.checked ? [...channels, channel] : channels.filter((item) => item !== channel)); setPreview(null); setApproved(false); }} />{channel.toUpperCase()}</label>)}</div></fieldset>
         <div><label htmlFor="ann-schedule" className="text-sm font-medium">Schedule (leave empty to send now)</label><input id="ann-schedule" type="datetime-local" value={scheduledAt} onChange={(e) => { setScheduledAt(e.target.value); setApproved(false); }} className="mt-1 h-11 w-full rounded-lg border px-3" /></div>
         <Button type="button" variant="outline" onClick={previewAudience} loading={busy}>Preview audience</Button>
-        {preview && <div className="rounded-xl bg-brand-50 p-4"><p className="font-semibold">Resolved audience: {preview.count} guests</p><p className="text-sm text-gray-600">{preview.emailCount} with email · {preview.smsCount} with SMS</p><label className="mt-3 flex items-start gap-2"><input className="mt-1" type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span className="text-sm">I reviewed the final content, audience, channels, and schedule and approve this external send.</span></label></div>}
+        {preview && <div className="rounded-xl bg-brand-50 p-4"><p className="font-semibold">Resolved audience: {preview.count} guests</p><p className="text-sm text-gray-600">{preview.emailCount} with email · {preview.smsCount} with SMS</p><p className="mt-1 text-sm font-medium">Estimated provider charge: {preview.costConfigured && preview.estimatedCostMicros !== null ? `$${(preview.estimatedCostMicros / 1_000_000).toFixed(4)} USD` : 'Unavailable — confirm current provider pricing before approval'}</p><details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Review resolved recipients</summary><ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white p-2 text-sm">{preview.recipients.map((recipient) => <li key={recipient.id} className="border-b px-2 py-2 last:border-0">{recipient.name || 'Unnamed guest'} — {recipient.channels.join(' + ')}</li>)}</ul>{preview.truncated && <p className="mt-1 text-xs text-gray-600">Showing the first 100 recipients.</p>}</details><label className="mt-3 flex items-start gap-2"><input className="mt-1" type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span className="text-sm">I reviewed the final content, resolved recipients, estimated cost status, channels, and schedule and approve this external send.</span></label></div>}
         {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={handleClose}>Cancel</Button><Button type="submit" loading={busy} disabled={!approved || !preview || channels.length === 0 || preview.count === 0}>{scheduledAt ? 'Schedule approved message' : 'Send approved message'}</Button></div>
       </form>}</div>

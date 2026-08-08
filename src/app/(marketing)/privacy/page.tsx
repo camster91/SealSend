@@ -19,11 +19,12 @@ export default function PrivacyPage() {
           <p><strong>Usage Data:</strong> Browser type, device information, IP address, pages visited, and feature usage to improve the Service.</p>
           <p><strong>Payment Data:</strong> Processed securely by Stripe. We do not store credit card numbers.</p>
           <p><strong>AI Draft Data:</strong> If you use AI-assisted event drafting, the event description you enter is sent to our configured AI provider to create an editable draft.</p>
+          <p><strong>Beta Feedback:</strong> If you submit in-product feedback, we store your rating, selected workflow area, written feedback, and whether you gave permission for us to contact you.</p>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">2. How We Use Your Information</h2>
-          <p>We use your data to: provide and improve the Service; send invitations and notifications on your behalf; process payments; communicate service updates; and prevent fraud.</p>
+          <p>We use your data to: provide and improve the Service; send invitations and notifications on your behalf; process payments; understand privacy-limited activation and reliability trends; respond to feedback when permitted; communicate service updates; and prevent fraud.</p>
         </section>
 
         <section>
@@ -48,7 +49,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">7. Your Rights</h2>
-          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
+          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
 
         <section>
@@ -68,7 +69,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
+          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>

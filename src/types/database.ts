@@ -25,6 +25,8 @@ export interface EventCustomization {
   showCountdown: boolean;
   audioUrl: string | null;
   logoUrl: string | null;
+  imageFit?: "contain" | "cover";
+  imagePosition?: "top" | "center" | "bottom";
 }
 
 export interface Event {

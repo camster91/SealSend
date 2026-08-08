@@ -112,7 +112,8 @@ export function EventHero({ event }: EventHeroProps) {
           <img
             src={designUrl}
             alt={event.title}
-            className="h-auto w-full object-cover"
+            className={`aspect-[4/3] w-full ${event.customization?.imageFit === 'cover' ? 'object-cover' : 'object-contain'}`}
+            style={{ objectPosition: event.customization?.imagePosition ?? 'center' }}
           />
         </div>
       )}

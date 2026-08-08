@@ -7,6 +7,7 @@ import { UsageStats } from '@/components/dashboard/UsageStats';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
 import { getUserTier } from '@/lib/subscription';
+import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -272,7 +273,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No events yet</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Get started by creating your first event or wait for an invitation.
+                Turn an event idea into an editable invitation, guest workflow, and communication plan. Start manually or use the AI-assisted draft.
               </p>
               <div className="mt-6">
                 <Link
@@ -288,6 +289,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           </div>
         )}
+        <BetaFeedback />
         {upgraded === 'true' && <UpgradeSuccessToast />}
       </div>
     </div>

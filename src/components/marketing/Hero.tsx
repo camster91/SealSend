@@ -54,9 +54,8 @@ export default function Hero() {
               variants={fadeInUp}
               className="mt-6 font-display text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl"
             >
-              Create beautiful{" "}
-              <span className="text-gradient">digital invitations</span> that
-              wow your guests
+              Turn an event idea into a{" "}
+              <span className="text-gradient">guest-ready workflow</span> in minutes
             </motion.h1>
 
             {/* Subheading */}
@@ -64,8 +63,7 @@ export default function Hero() {
               variants={fadeInUp}
               className="mt-6 text-lg text-neutral-600 sm:text-xl"
             >
-              Design stunning invitations, collect RSVPs instantly, and manage
-              your event — all in one place. No design skills needed.
+              For independent planners, community organizers, and small teams: create an editable AI-assisted invitation, RSVP flow, guest list, and ready-to-review communications in one place.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -77,7 +75,7 @@ export default function Hero() {
                 href="/signup"
                 className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-xl"
               >
-                Create Your Invitation
+                Build Your Event Draft
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link

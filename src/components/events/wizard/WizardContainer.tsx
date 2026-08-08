@@ -34,6 +34,8 @@ export interface EventCustomization {
   showCountdown: boolean;
   audioUrl: string;
   logoUrl: string;
+  imageFit?: 'contain' | 'cover';
+  imagePosition?: 'top' | 'center' | 'bottom';
 }
 
 export interface RegistryLinkEntry {
@@ -135,6 +137,8 @@ function getInitialState(initialData?: Partial<WizardFormData>): WizardFormData 
       showCountdown: true,
       audioUrl: '',
       logoUrl: '',
+      imageFit: 'contain',
+      imagePosition: 'center',
     },
     rsvp_fields: defaultRsvpFields,
     guests: [],
@@ -190,6 +194,7 @@ export default function WizardContainer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [aiBaseline, setAiBaseline] = useState<Partial<WizardFormData> | null>(null);
   const storageKey = draftKey ? `${STORAGE_KEY}_${draftKey}` : STORAGE_KEY;
 
   // Load from localStorage on mount (only for create mode)
@@ -260,7 +265,7 @@ export default function WizardContainer({
       return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
     };
     const timeZone = draft.event.eventTimezone;
-    dispatch({ type: 'LOAD_DATA', data: {
+    const appliedData: Partial<WizardFormData> = {
       title: draft.event.title,
       description: draft.event.description,
       event_date: toLocalDateTime(draft.event.eventDate, timeZone),
@@ -288,7 +293,9 @@ export default function WizardContainer({
         options: field.options.length ? field.options : null,
         placeholder: null,
       })),
-    } });
+    };
+    dispatch({ type: 'LOAD_DATA', data: appliedData });
+    setAiBaseline(appliedData);
   }, [formData.customization]);
 
   const goNext = useCallback(() => {
@@ -326,6 +333,7 @@ export default function WizardContainer({
         invitation_body: formData.invitation_body || undefined,
         reminder_sequence: formData.reminder_sequence,
         ai_generation_id: formData.ai_generation_id || undefined,
+        ai_edit_count: aiBaseline ? Object.entries(aiBaseline).filter(([key, value]) => JSON.stringify(formData[key as keyof WizardFormData]) !== JSON.stringify(value)).length : undefined,
         status: publishOnCreate ? 'published' : 'draft',
       };
 
@@ -441,17 +449,7 @@ export default function WizardContainer({
             designUrl={formData.design_url}
             designType={formData.design_type}
             onUpdate={updateField}
-            eventDetails={{
-              title: formData.title,
-              description: formData.description,
-              event_date: formData.event_date,
-              event_end_date: formData.event_end_date,
-              location_name: formData.location_name,
-              location_address: formData.location_address,
-              host_name: formData.host_name,
-              dress_code: formData.dress_code,
-              rsvp_deadline: formData.rsvp_deadline,
-            }}
+            customization={formData.customization}
           />
         );
       case 3:

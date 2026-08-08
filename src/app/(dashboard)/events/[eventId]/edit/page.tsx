@@ -87,6 +87,8 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
       showCountdown: event.customization?.showCountdown ?? true,
       audioUrl: event.customization?.audioUrl ?? '',
       logoUrl: event.customization?.logoUrl ?? '',
+      imageFit: event.customization?.imageFit ?? 'contain',
+      imagePosition: event.customization?.imagePosition ?? 'center',
     },
     rsvp_fields: (rsvpFields ?? []).map((f) => ({
       field_name: f.field_name,

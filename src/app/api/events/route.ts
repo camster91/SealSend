@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, invitation_headline, invitation_body, reminder_sequence, ai_generation_id, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const { title, description, invitation_headline, invitation_body, reminder_sequence, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
     if (ai_generation_id) {
       const generation = await queryOne("SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'", [ai_generation_id, user.id]);
       if (!generation) return NextResponse.json({ error: 'AI generation was not accepted by this host' }, { status: 400 });
@@ -160,11 +160,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (event) {
+      if (ai_generation_id && ai_edit_count !== undefined) {
+        await query('UPDATE ai_generations SET edit_count = $3 WHERE id = $1 AND user_id = $2', [ai_generation_id, user.id, ai_edit_count]);
+      }
       await recordActivationEventSafely({
         name: 'event_draft_started',
         userId: user.id,
         eventId: (event as { id: string }).id,
-        metadata: { source: 'manual', plan: accountPlan },
+        metadata: { source: ai_generation_id ? 'ai_assisted' : 'manual', plan: accountPlan },
       });
     }
 

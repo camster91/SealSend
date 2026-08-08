@@ -12,7 +12,7 @@ export default function SignupPage() {
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-bold">Get started</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enter your email to create your account
+          Create an account, then turn your event idea into an editable invitation, RSVP flow, and guest communication plan.
         </p>
       </div>
       <Suspense>

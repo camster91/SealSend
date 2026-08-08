@@ -44,7 +44,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">7. Data and Privacy</h2>
-          <p>Your use of the Service is also governed by our <a href="/privacy" className="text-primary-600 hover:underline">Privacy Policy</a>. We process guest data only as necessary to provide the Service.</p>
+          <p>Your use of the Service is also governed by our <a href="/privacy" className="font-medium text-primary-700 underline underline-offset-2">Privacy Policy</a>. We process guest data only as necessary to provide the Service.</p>
         </section>
 
         <section>
@@ -64,7 +64,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.app" className="text-primary-600 hover:underline">support@sealsend.app</a>.</p>
+          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>

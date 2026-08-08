@@ -176,7 +176,7 @@ export function SignupForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href={plan ? `/login?plan=${encodeURIComponent(plan)}` : '/login'} className="text-brand-600 hover:text-brand-700">
+        <Link href={plan ? `/login?plan=${encodeURIComponent(plan)}` : '/login'} className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
           Sign in
         </Link>
       </p>

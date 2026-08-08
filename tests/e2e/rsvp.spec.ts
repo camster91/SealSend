@@ -6,7 +6,7 @@ test.describe('Public marketing experience', () => {
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('digital invitations');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('guest-ready workflow');
     await expect(page.getByText(/all features free/i)).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /Create your invitation in 4 simple steps/i })).toBeVisible();
     expect(errors).toEqual([]);
