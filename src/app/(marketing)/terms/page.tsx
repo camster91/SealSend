@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
       <h1 className="text-3xl font-bold text-neutral-900 mb-8">Terms of Service</h1>
-      <p className="text-sm text-neutral-500 mb-8">Last updated: March 22, 2026</p>
+      <p className="text-sm text-neutral-500 mb-8">Last updated: August 8, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
@@ -49,7 +49,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">8. Termination</h2>
-          <p>We may suspend or terminate your account for violation of these terms. You may delete your account at any time. Upon deletion, we retain your data for 30 days before permanent removal.</p>
+          <p>We may suspend or terminate your account for violation of these terms. You may request account and data deletion at any time by contacting <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations.</p>
         </section>
 
         <section>

@@ -448,6 +448,17 @@ test('check-in actor IDs are explicitly typed for PostgreSQL CASE assignment', a
   assert.match(route, /checked_in_by = CASE WHEN \$3 THEN \$4::uuid ELSE NULL END/);
 });
 
+test('published retention and deletion terms match the support-request workflow', async () => {
+  const terms = await read('src/app/(marketing)/terms/page.tsx');
+  const privacy = await read('src/app/(marketing)/privacy/page.tsx');
+  for (const policy of [terms, privacy]) {
+    assert.match(policy, /request.*deletion/i);
+    assert.match(policy, /verify the request/i);
+    assert.match(policy, /within 30 days/i);
+    assert.match(policy, /legal/i);
+  }
+});
+
 test('authentication codes are hashed and scoped to one login context', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
