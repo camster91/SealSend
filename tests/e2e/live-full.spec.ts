@@ -74,6 +74,13 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     eventId = event.id;
     slug = event.slug;
 
+    const defaultFields = await page.context().request.get(`/api/events/${eventId}/rsvp-fields`);
+    expect(defaultFields.status()).toBe(200);
+    const defaultFieldData = await defaultFields.json();
+    expect(defaultFieldData).toHaveLength(6);
+    expect(defaultFieldData.find((field: { field_name: string }) => field.field_name === 'attending')?.options)
+      .toEqual(['Joyfully Accepts', 'Regretfully Declines']);
+
     const secondEvent = await page.context().request.post('/api/events', { data: { title: 'Should Be Blocked' } });
     expect(secondEvent.status()).toBe(403);
 

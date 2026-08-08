@@ -4,7 +4,7 @@ Date: 2026-08-08
 
 ## Release decision
 
-- **Controlled AI beta:** code-cleared, pending final production deployment and authenticated smoke test.
+- **Controlled AI beta:** deployed and verified for test-only operation.
 - **Paid beta:** not cleared. Stripe's complete test lifecycle and controlled Mailgun/Twilio delivery/callback tests still require verified provider configuration.
 - **Public paid launch:** not cleared. It additionally requires five real hosts to complete workflows, approved retention/support/refund policies, and observed conversion/cost evidence.
 
@@ -16,16 +16,19 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image before this release: `sealsend:20260808T130600Z`
-- Current verified source commit before this release: `253fb89`
-- Current rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Current pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260808T130520Z.dump`
+- Current verified image: `sealsend:20260808T135549Z`
+- Current verified application commit: `8e04ba4`
+- Current release source: `/opt/sealsend/releases/20260808T135549Z`
+- Immediate rollback image/source: `sealsend:20260808T134336Z` and `/opt/sealsend/releases/20260808T134336Z`
+- Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260808T134326Z.dump`
+- Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
-The current production container and database were healthy after that deployment, `/api/health` returned HTTP 200, and the disposable QA account/data were removed. This section must be updated with the new image, commit, backup, and live QA evidence after the pending release is deployed.
+The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
 
 ## Locally verified release candidate
 
-- 85 unit/readiness tests passed, including selected-channel cost-preview regressions.
+- 86 unit/readiness tests passed, including selected-channel cost-preview and atomic RSVP-field regressions.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -35,6 +38,16 @@ The current production container and database were healthy after that deployment
 - Fresh PostgreSQL 16 schema applied successfully; the production migration then applied twice successfully, proving idempotency for the tested schema.
 - Runtime dependency audit reported zero known vulnerabilities; GitHub Dependabot had zero open alerts when checked on 2026-08-08.
 - `git diff --check` passed.
+
+## Production QA evidence
+
+- A disposable production owner completed the authenticated lifecycle on Chromium; public navigation/responsive checks passed on desktop and Pixel 7 emulation.
+- Verified AI event fallback and acceptance, template-to-wizard routing, event creation/publishing, default RSVP fields and JSON options, guests/bulk guests, magic links, public RSVP plus-one, comments, response dashboard, CSV, and plan enforcement.
+- Verified aggregate RSVP summary, resolved email audience and selected-channel counts, AI message fallback and helpful/accepted feedback, and beta-feedback persistence. No announcement was scheduled or sent.
+- The monitoring test captured one sanitized `/api/monitoring/test` event. No guest content, error message, stack, token, or contact value was stored in that monitoring row.
+- Disposable account/event/feedback data was deleted; final checks returned `qa_accounts=0`, `qa_events=0`, and no orphan feedback.
+- The earlier release exposed an RSVP-option serialization defect in production logs. It was fixed in `8e04ba4`, redeployed, and the complete lifecycle plus explicit six-field/option assertions passed. The corrected release has no recurrence of that database error.
+- Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
 ## Implemented product scope
 
