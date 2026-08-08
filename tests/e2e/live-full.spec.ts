@@ -127,6 +127,44 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(responses.status()).toBe(200);
     expect((await responses.json())).toHaveLength(1);
 
+    const summary = await page.context().request.get(`/api/events/${eventId}/responses/summary`);
+    expect(summary.status()).toBe(200);
+    const summaryData = await summary.json();
+    expect(summaryData.sourceResponseCount).toBe(1);
+    expect(summaryData.attendingHeadcount).toBe(2);
+    expect(summaryData.sourceResponseIds).toHaveLength(1);
+
+    const audience = await page.context().request.post(`/api/events/${eventId}/announcements/audience`, { data: {
+      audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
+      channels: ['email'],
+    }});
+    expect(audience.status()).toBe(200);
+    const audienceData = await audience.json();
+    expect(audienceData.count).toBe(3);
+    expect(audienceData.emailCount).toBe(3);
+    expect(audienceData.smsCount).toBe(0);
+    expect(audienceData.recipients).toHaveLength(3);
+
+    const messageDraft = await page.context().request.post(`/api/events/${eventId}/announcements/draft`, { data: {
+      intent: 'Remind guests to review the event page before arriving.',
+      tone: 'warm', length: 'short', urgency: 'normal', channel: 'email',
+    }});
+    expect(messageDraft.status()).toBe(200);
+    const messageDraftData = await messageDraft.json();
+    expect(messageDraftData.generationId).toBeTruthy();
+    expect(messageDraftData.draft.message).toBeTruthy();
+    expect(messageDraftData.fallback).toBe(true);
+    const messageFeedback = await page.context().request.post(
+      `/api/events/${eventId}/announcements/draft/${messageDraftData.generationId}`,
+      { data: { outcome: 'accepted', helpful: true } },
+    );
+    expect(messageFeedback.status()).toBe(200);
+
+    const feedback = await page.context().request.post('/api/feedback', { data: {
+      category: 'setup', rating: 5, message: 'Temporary automated production QA feedback.', mayContact: false,
+    }});
+    expect(feedback.status()).toBe(201);
+
     const csv = await page.context().request.get(`/api/events/${eventId}/responses?format=csv`);
     expect(csv.status()).toBe(200);
     expect(csv.headers()['content-type']).toContain('text/csv');
