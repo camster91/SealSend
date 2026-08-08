@@ -49,6 +49,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - The earlier release exposed an RSVP-option serialization defect in production logs. It was fixed in `8e04ba4`, redeployed, and the complete lifecycle plus explicit six-field/option assertions passed. The corrected release has no recurrence of that database error.
 - A disposable check-in-only staff account passed the production least-privilege matrix at 375px: guest list, check-in, check-out, keyboard focus, and no overflow passed; event edit, response export, member administration, messaging, and checkout were denied. The test exposed and drove fixes for checkout configuration leakage and a PostgreSQL UUID assignment error before passing. Final fixture counts were zero.
 - A disposable paid-event fixture verified Google and Outlook calendar links plus a downloadable ICS with the stable event UID. A future approved email announcement remained queued with `dispatch=null`, appeared in status history, and was cancelled before dispatch. No provider send occurred and the fixture was deleted.
+- All 13 launch templates passed production QA at 375px and 1440px. Both galleries had no horizontal overflow; every template opened the correct named wizard and persisted its complete customization into an isolated editable draft; no browser runtime errors occurred. The disposable account was deleted.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
@@ -75,6 +76,8 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Set channel-specific `EMAIL_ESTIMATED_COST_MICROS` and `SMS_ESTIMATED_COST_MICROS` from current provider pricing before relying on the approval estimate.
 - Approve a retention policy before enabling draft cleanup. Reminder/announcement cron jobs remain gated until controlled delivery verification.
 - Keep `/app/uploads` on persistent storage and retain verified database backups before every migration.
+
+The read-only production provider probe on 2026-08-08 returned: Stripe authentication HTTP 200 with a live-mode key, Mailgun HTTP 401, Twilio unconfigured, and OpenAI unconfigured. Therefore provider-dependent tests remain blocked and both test-only flags remain mandatory.
 
 ## Required deployment and QA sequence
 
