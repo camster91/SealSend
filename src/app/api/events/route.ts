@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
           field.is_required,
           field.is_enabled,
           index,
-          field.options ?? null,
+          field.options ? JSON.stringify(field.options) : null,
           field.placeholder ?? null,
         );
         paramIdx += 9;

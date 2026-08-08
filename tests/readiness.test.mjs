@@ -424,6 +424,17 @@ test('invitation studio has a launch-sized accessible catalog and non-destructiv
   assert.match(page, /getEventTemplate/);
 });
 
+test('RSVP field options are valid JSON and replacement is transactional', async () => {
+  const createRoute = await read('src/app/api/events/route.ts');
+  const fieldsRoute = await read('src/app/api/events/[eventId]/rsvp-fields/route.ts');
+  assert.match(createRoute, /field\.options \? JSON\.stringify\(field\.options\) : null/);
+  assert.match(fieldsRoute, /await client\.query\('BEGIN'\)/);
+  assert.match(fieldsRoute, /await client\.query\('DELETE FROM rsvp_fields/);
+  assert.match(fieldsRoute, /f\.options \? JSON\.stringify\(f\.options\) : null/);
+  assert.match(fieldsRoute, /await client\.query\('COMMIT'\)/);
+  assert.match(fieldsRoute, /await client\.query\('ROLLBACK'\)/);
+});
+
 test('authentication codes are hashed and scoped to one login context', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
