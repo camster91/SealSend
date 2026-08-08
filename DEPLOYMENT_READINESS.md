@@ -16,10 +16,10 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260808T135549Z`
-- Current verified application commit: `8e04ba4`
-- Current release source: `/opt/sealsend/releases/20260808T135549Z`
-- Immediate rollback image/source: `sealsend:20260808T134336Z` and `/opt/sealsend/releases/20260808T134336Z`
+- Current verified image: `sealsend:20260808T140650Z`
+- Current verified application commit: `1f05323`
+- Current release source: `/opt/sealsend/releases/20260808T140650Z`
+- Immediate rollback image/source: `sealsend:20260808T140236Z` and `/opt/sealsend/releases/20260808T140236Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
 - Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260808T134326Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 86 unit/readiness tests passed, including selected-channel cost-preview and atomic RSVP-field regressions.
+- 88 unit/readiness tests passed, including selected-channel cost-preview, atomic RSVP-field, checkout-authorization-order, and check-in UUID regressions.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -47,6 +47,8 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - The monitoring test captured one sanitized `/api/monitoring/test` event. No guest content, error message, stack, token, or contact value was stored in that monitoring row.
 - Disposable account/event/feedback data was deleted; final checks returned `qa_accounts=0`, `qa_events=0`, and no orphan feedback.
 - The earlier release exposed an RSVP-option serialization defect in production logs. It was fixed in `8e04ba4`, redeployed, and the complete lifecycle plus explicit six-field/option assertions passed. The corrected release has no recurrence of that database error.
+- A disposable check-in-only staff account passed the production least-privilege matrix at 375px: guest list, check-in, check-out, keyboard focus, and no overflow passed; event edit, response export, member administration, messaging, and checkout were denied. The test exposed and drove fixes for checkout configuration leakage and a PostgreSQL UUID assignment error before passing. Final fixture counts were zero.
+- The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
 ## Implemented product scope
