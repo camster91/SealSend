@@ -41,7 +41,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const identifier = parsed.data.guestId ?? parsed.data.inviteToken;
     const result = await client.query(
       `UPDATE guests SET checked_in_at = CASE WHEN $3 THEN NOW() ELSE NULL END,
-         checked_in_by = CASE WHEN $3 THEN $4 ELSE NULL END, updated_at = NOW()
+         checked_in_by = CASE WHEN $3 THEN $4::uuid ELSE NULL END, updated_at = NOW()
        WHERE ${identifierClause} AND event_id = $2
        RETURNING id, name, rsvp_status, checked_in_at`,
       [identifier, eventId, parsed.data.checkedIn, auth.user.id],

@@ -443,6 +443,11 @@ test('event checkout verifies ownership before exposing billing configuration', 
   assert.ok(billingIndex > ownershipIndex);
 });
 
+test('check-in actor IDs are explicitly typed for PostgreSQL CASE assignment', async () => {
+  const route = await read('src/app/api/events/[eventId]/check-in/route.ts');
+  assert.match(route, /checked_in_by = CASE WHEN \$3 THEN \$4::uuid ELSE NULL END/);
+});
+
 test('authentication codes are hashed and scoped to one login context', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
