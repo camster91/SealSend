@@ -435,6 +435,14 @@ test('RSVP field options are valid JSON and replacement is transactional', async
   assert.match(fieldsRoute, /await client\.query\('ROLLBACK'\)/);
 });
 
+test('event checkout verifies ownership before exposing billing configuration', async () => {
+  const route = await read('src/app/api/checkout/route.ts');
+  const ownershipIndex = route.indexOf("SELECT id, title, tier FROM events WHERE id = $1 AND user_id = $2");
+  const billingIndex = route.indexOf('if (!isStripeKeyAllowed())');
+  assert.ok(ownershipIndex >= 0);
+  assert.ok(billingIndex > ownershipIndex);
+});
+
 test('authentication codes are hashed and scoped to one login context', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

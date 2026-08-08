@@ -26,10 +26,6 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const user = auth.user;
 
-    if (!isStripeKeyAllowed()) {
-      return NextResponse.json({ error: "Test billing is not configured" }, { status: 503 });
-    }
-
     const { rateLimit } = await import("@/lib/rate-limit");
     const { success: rateLimitOk } = await rateLimit(`checkout:${user.id}`, {
       max: 10,
@@ -61,6 +57,10 @@ export async function POST(request: NextRequest) {
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    if (!isStripeKeyAllowed()) {
+      return NextResponse.json({ error: "Test billing is not configured" }, { status: 503 });
     }
 
     // Verify event is on a lower tier
