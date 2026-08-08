@@ -18,6 +18,8 @@ export function SignupForm() {
   const searchParams = useSearchParams();
   const authService = new AuthService();
   const plan = searchParams.get("plan");
+  const planLabel = plan === 'pro_annual' ? 'SealSend Pro — $124.99 USD/year' :
+    plan ? `${plan.charAt(0).toUpperCase()}${plan.slice(1)} — one-time event upgrade` : null;
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
@@ -109,7 +111,7 @@ export function SignupForm() {
           />
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+            <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
               {error}
             </div>
           )}
@@ -142,6 +144,11 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSendCode} className="space-y-4">
+      {planLabel && (
+        <div role="status" className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
+          Selected plan: <strong>{planLabel}</strong>. You&apos;ll continue after signing in.
+        </div>
+      )}
       <Input
         id="email"
         label="Email"
@@ -154,7 +161,7 @@ export function SignupForm() {
       />
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+        <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
           {error}
         </div>
       )}
@@ -169,7 +176,7 @@ export function SignupForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="text-brand-600 hover:text-brand-700">
+        <Link href={plan ? `/login?plan=${encodeURIComponent(plan)}` : '/login'} className="text-brand-600 hover:text-brand-700">
           Sign in
         </Link>
       </p>

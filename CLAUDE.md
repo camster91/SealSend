@@ -10,7 +10,7 @@ SealSend is a modern digital invitation and RSVP management platform (competitor
 - **Styling**: Tailwind CSS 4 with custom design tokens in `globals.css`
 - **Database**: PostgreSQL via `pg` (raw SQL, no ORM)
 - **Auth**: Custom JWT sessions with email/SMS OTP (6-digit codes) + password login for admins
-- **Email**: Resend (primary), Mailgun (legacy fallback)
+- **Email**: Mailgun
 - **SMS**: Twilio with phone validation via `libphonenumber-js`
 - **Payments**: Stripe (per-event checkout + subscription billing)
 - **Animations**: Framer Motion
@@ -42,7 +42,7 @@ src/
       events/             # CRUD, send-invites, responses, guests, comments, signups, QR
       checkout/           # Per-event Stripe checkout (silver/gold/platinum/diamond)
       subscriptions/      # Subscription-based Stripe checkout (pro/business)
-      webhooks/           # Stripe, Twilio, Resend delivery tracking
+      webhooks/           # Stripe and Twilio callbacks
       cron/               # send-reminders, cleanup-drafts
     e/[slug]/             # Public event invitation pages
   components/
@@ -114,7 +114,7 @@ In `src/lib/constants.ts`:
 
 Required (see `.env.example` for full list):
 - `DATABASE_URL` - PostgreSQL connection string
-- `RESEND_API_KEY`, `FROM_EMAIL` - Email sending
+- `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL` - Email sending
 - `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_MESSAGING_SERVICE_SID` - SMS
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` - Payments
 - `CRON_SECRET` - Cron job authentication (Bearer token)
@@ -167,3 +167,13 @@ Required (see `.env.example` for full list):
 - Social login (Google OAuth): not implemented
 - Use-case page images (`public/use-cases/*.jpg`) don't exist yet
 - `console.log` statements remain in cron/webhook handlers (intentional for debugging)
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

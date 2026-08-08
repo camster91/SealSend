@@ -23,11 +23,11 @@ export function EventDetails({ event }: EventDetailsProps) {
             <Calendar className="h-5 w-5 text-brand-600" />
             <div>
               <p className="font-medium">
-                {formatDateTime(event.event_date)}
+                {formatDateTime(event.event_date, event.event_timezone)}
               </p>
               {event.event_end_date && (
                 <p className="text-muted-foreground">
-                  to {formatDateTime(event.event_end_date)}
+                  to {formatDateTime(event.event_end_date, event.event_timezone)}
                 </p>
               )}
             </div>
@@ -65,7 +65,7 @@ export function EventDetails({ event }: EventDetailsProps) {
         {event.rsvp_deadline && (
           <div className="flex items-center gap-3 text-sm">
             <CalendarClock className="h-5 w-5 text-brand-600" />
-            <p className="font-medium">RSVP by {formatDateTime(event.rsvp_deadline)}</p>
+            <p className="font-medium">RSVP by {formatDateTime(event.rsvp_deadline, event.event_timezone)}</p>
           </div>
         )}
 

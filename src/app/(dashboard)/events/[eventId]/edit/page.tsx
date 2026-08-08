@@ -13,6 +13,15 @@ interface EditEventPageProps {
   params: Promise<{ eventId: string }>;
 }
 
+function toDateTimeLocal(value: string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
 export default async function EditEventPage({ params }: EditEventPageProps) {
   const { eventId } = await params;
 
@@ -43,13 +52,23 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     title: event.title ?? '',
     description: event.description ?? '',
     event_date: event.event_date
-      ? new Date(event.event_date).toISOString().slice(0, 16)
+      ? toDateTimeLocal(event.event_date, event.event_timezone || 'UTC')
       : '',
     event_end_date: event.event_end_date
-      ? new Date(event.event_end_date).toISOString().slice(0, 16)
+      ? toDateTimeLocal(event.event_end_date, event.event_timezone || 'UTC')
       : '',
+    event_timezone: event.event_timezone || 'UTC',
     location_name: event.location_name ?? '',
     location_address: event.location_address ?? '',
+    host_name: event.host_name ?? '',
+    dress_code: event.dress_code ?? '',
+    rsvp_deadline: event.rsvp_deadline
+      ? toDateTimeLocal(event.rsvp_deadline, event.event_timezone || 'UTC')
+      : '',
+    registry_links: event.registry_links ?? [],
+    max_attendees: event.max_attendees,
+    allow_plus_ones: event.allow_plus_ones,
+    max_guests_per_rsvp: event.max_guests_per_rsvp,
     design_url: event.design_url ?? '',
     design_type: event.design_type ?? 'upload',
     customization: {

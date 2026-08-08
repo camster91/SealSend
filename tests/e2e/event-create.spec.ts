@@ -1,19 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Event Creation', () => {
-  test('should show create event form', async ({ page }) => {
-    // TODO: Authenticate first
+test.describe('Protected event creation', () => {
+  test('redirects unauthenticated visitors to login', async ({ page }) => {
     await page.goto('/events/new');
-    await expect(page.locator('form')).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?redirect=%2Fevents%2Fnew/);
+    await expect(page.getByLabel('Email')).toBeVisible();
   });
 
-  test('should create a new event', async ({ page }) => {
-    // TODO: Authenticate, fill form, submit, verify redirect
-    await page.goto('/events/new');
-  });
-
-  test('should validate required fields', async ({ page }) => {
-    // TODO: Authenticate, submit empty form, check validation errors
-    await page.goto('/events/new');
+  test('homepage CTA leads to account creation', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Create Your Invitation' }).click();
+    await expect(page).toHaveURL(/\/signup$/);
+    await expect(page.getByRole('button', { name: 'Get Started' })).toBeVisible();
   });
 });

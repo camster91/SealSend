@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/Button";
 import { Menu, X, ChevronDown, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,9 +47,6 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
               <span className="text-foreground">Seal</span>
               <span className="text-brand-600">Send</span>
             </span>
-            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700">
-              Beta
-            </span>
           </Link>
 
           {/* Desktop nav */}
@@ -65,8 +61,13 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
             {/* Use Cases dropdown */}
             <div ref={dropdownRef} className="relative">
               <button
+                aria-expanded={dropdownOpen}
+                aria-controls="desktop-use-cases-menu"
                 className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => setDropdownOpen(!dropdownOpen)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setDropdownOpen(false);
+                }}
               >
                 Use Cases
                 <ChevronDown
@@ -77,7 +78,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
                 />
               </button>
               {dropdownOpen && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-white py-1 shadow-lg animate-in fade-in slide-in-from-top-2">
+                <div id="desktop-use-cases-menu" className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-white py-1 shadow-lg animate-in fade-in slide-in-from-top-2">
                   {useCaseLinks.map((link) => (
                     <Link
                       key={link.href}
@@ -100,23 +101,17 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
             </Link>
 
             {user ? (
-              <Link href="/dashboard">
-                <Button size="sm" className="gap-2 shadow-sm transition-all hover:-translate-y-0.5">
+              <Link href="/dashboard" className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                   <UserIcon className="h-4 w-4" />
                   Dashboard
-                </Button>
               </Link>
             ) : (
               <div className="flex items-center gap-4 ml-2 border-l border-border pl-6">
-                <Link href="/login">
-                  <Button variant="outline" size="sm" className="transition-colors">
+                <Link href="/login" className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-sm font-medium transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     Sign in
-                  </Button>
                 </Link>
-                <Link href="/signup">
-                  <Button size="sm" className="shadow-sm transition-all hover:-translate-y-0.5">
+                <Link href="/signup" className="inline-flex h-8 items-center justify-center rounded-md bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     Get Started
-                  </Button>
                 </Link>
               </div>
             )}
@@ -131,6 +126,8 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
             )}
             <button
               aria-label="Toggle mobile navigation menu"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
               className="rounded-lg p-2 hover:bg-neutral-100 transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
@@ -144,12 +141,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
         </div>
 
         {/* Mobile nav */}
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-300 md:hidden bg-white/95 backdrop-blur-sm",
-            mobileOpen ? "max-h-96 border-b border-border shadow-md" : "max-h-0"
-          )}
-        >
+        {mobileOpen && <div id="mobile-navigation" className="border-b border-border bg-white/95 shadow-md backdrop-blur-sm md:hidden">
           <div className="space-y-2 px-4 pb-4">
             <Link
               href="/how-it-works"
@@ -187,20 +179,16 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
 
             {!user && (
               <div className="flex gap-2 pt-4 border-t border-border mt-2">
-                <Link href="/login" className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full">
+                <Link href="/login" className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-border text-sm font-medium hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     Sign in
-                  </Button>
                 </Link>
-                <Link href="/signup" className="flex-1">
-                  <Button size="sm" className="w-full">
+                <Link href="/signup" className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     Get Started
-                  </Button>
                 </Link>
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </nav>
     </>
   );

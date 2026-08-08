@@ -1,10 +1,9 @@
 import { notFound } from "next/navigation";
 import { USE_CASES, USE_CASE_SLUGS } from "@/lib/use-case-content";
-import { createMetadata, SITE_URL } from "@/lib/metadata";
+import { createMetadata } from "@/lib/metadata";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import UseCaseHero from "@/components/marketing/UseCaseHero";
 import UseCaseBenefits from "@/components/marketing/UseCaseBenefits";
-import UseCaseTestimonial from "@/components/marketing/UseCaseTestimonial";
 import { PricingCards } from "@/components/pricing/PricingCards";
 import UseCaseFAQ from "@/components/marketing/UseCaseFAQ";
 import CTASection from "@/components/marketing/CTASection";
@@ -61,12 +60,6 @@ export default async function UseCasePage({
         ctaText={data.ctaText}
       />
       <UseCaseBenefits benefits={data.benefits} />
-      <UseCaseTestimonial
-        quote={data.testimonial.quote}
-        name={data.testimonial.name}
-        role={data.testimonial.role}
-      />
-
       <section className="bg-neutral-50 py-20">
         <div className="mx-auto max-w-6xl px-4 text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">

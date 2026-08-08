@@ -32,7 +32,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">4. Data Sharing</h2>
-          <p>We do not sell your data. We share data only with: Stripe (payments), Mailgun/Resend (email delivery), Twilio (SMS delivery), and as required by law.</p>
+          <p>We do not sell your data. We share data only with: Stripe (payments), Mailgun (email delivery), Twilio (SMS delivery), and as required by law.</p>
         </section>
 
         <section>

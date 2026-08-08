@@ -147,6 +147,7 @@ export function EnhancedLoginForm({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
+              aria-pressed={method === 'email'}
               onClick={() => setMethod('email')}
               className={`p-4 rounded-lg border-2 text-center transition-colors ${
                 method === 'email'
@@ -164,6 +165,7 @@ export function EnhancedLoginForm({
             
             <button
               type="button"
+              aria-pressed={method === 'phone'}
               onClick={() => setMethod('phone')}
               className={`p-4 rounded-lg border-2 text-center transition-colors ${
                 method === 'phone'
@@ -186,7 +188,7 @@ export function EnhancedLoginForm({
     return (
       <div className="space-y-3">
         <div className="text-center">
-          <h3 className="text-lg font-semibold">Admin Login</h3>
+          <h2 className="text-lg font-semibold">Host sign in</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Choose your preferred login method
           </p>
@@ -195,6 +197,7 @@ export function EnhancedLoginForm({
         <div className="grid grid-cols-3 gap-3">
           <button
             type="button"
+            aria-pressed={method === 'email'}
             onClick={() => setMethod('email')}
             className={`p-4 rounded-lg border-2 text-center transition-colors ${
               method === 'email'
@@ -212,6 +215,7 @@ export function EnhancedLoginForm({
           
           <button
             type="button"
+            aria-pressed={method === 'password'}
             onClick={() => setMethod('password')}
             className={`p-4 rounded-lg border-2 text-center transition-colors ${
               method === 'password'
@@ -229,6 +233,7 @@ export function EnhancedLoginForm({
           
           <button
             type="button"
+            aria-pressed={method === 'phone'}
             onClick={() => setMethod('phone')}
             className={`p-4 rounded-lg border-2 text-center transition-colors ${
               method === 'phone'
@@ -308,13 +313,13 @@ export function EnhancedLoginForm({
         </div>
 
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+          <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+          <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
             {success}
           </div>
         )}
@@ -377,7 +382,7 @@ export function EnhancedLoginForm({
           />
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+            <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
               {error}
             </div>
           )}

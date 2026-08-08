@@ -80,8 +80,8 @@ export function PricingComparison() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <button className="text-neutral-400 hover:text-neutral-600">
-                                <HelpCircle className="h-4 w-4" />
+                              <button aria-label={`Learn more about ${featureName}`} className="text-neutral-400 hover:text-neutral-600">
+                                <HelpCircle aria-hidden="true" className="h-4 w-4" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -110,12 +110,14 @@ export function PricingComparison() {
                           {isIncluded ? (
                             <div className="flex justify-center">
                               <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100">
-                                <Check className="h-4 w-4 text-primary-600" />
+                                <Check aria-hidden="true" className="h-4 w-4 text-primary-600" />
+                                <span className="sr-only">Included</span>
                               </div>
                             </div>
                           ) : (
                             <div className="flex justify-center">
-                              <X className="h-5 w-5 text-neutral-300" />
+                              <X aria-hidden="true" className="h-5 w-5 text-neutral-300" />
+                              <span className="sr-only">Not included</span>
                             </div>
                           )}
                         </td>

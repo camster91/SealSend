@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarPlus, Settings, LayoutTemplate } from 'lucide-react';
+import { LayoutDashboard, CalendarPlus, Settings } from 'lucide-react';
 
 const tabs = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/events/new', label: 'Create', icon: CalendarPlus },
-  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

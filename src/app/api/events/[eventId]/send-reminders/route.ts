@@ -8,6 +8,10 @@ import { buildReminderSms } from "@/lib/sms-templates";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
+import type { Event, Guest } from "@/types/database";
+
+type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
+type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at">;
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -24,7 +28,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<any>(
+    const event = await queryOne<ReminderEvent>(
       'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1 AND user_id = $2',
       [eventId, user.id]
     );
@@ -41,7 +45,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that have been invited but not reminded
-    const guests = await query<any>(
+    const guests = await query<ReminderGuest>(
       `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at
        FROM guests
        WHERE event_id = $1 AND invite_status = $2 AND reminder_sent_at IS NULL`,

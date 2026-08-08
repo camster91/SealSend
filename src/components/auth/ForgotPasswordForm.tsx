@@ -6,8 +6,8 @@ export function ForgotPasswordForm() {
   return (
     <div className="space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
-        We no longer use passwords. Sign in with just your email address
-        and we&apos;ll send you a magic link.
+        Choose Email on the sign-in page. We&apos;ll send a one-time code so you
+        can regain access without knowing your password.
       </p>
       <Link
         href="/login"

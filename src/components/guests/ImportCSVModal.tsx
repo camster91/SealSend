@@ -92,7 +92,7 @@ export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVM
         } else {
           setPreview(guests.slice(0, 10)); // Show first 10 for preview
         }
-      } catch (_err) {
+      } catch {
         setError('Failed to parse CSV file. Please check the format.');
       }
     };
@@ -131,7 +131,7 @@ export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVM
         } else {
           setError(data.error || 'Failed to import guests');
         }
-      } catch (_err) {
+      } catch {
         setError('Network error. Please try again.');
       } finally {
         setImporting(false);

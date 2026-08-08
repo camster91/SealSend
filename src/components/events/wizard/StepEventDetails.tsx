@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { WizardFormData, RegistryLinkEntry } from './WizardContainer';
@@ -61,14 +61,14 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
 
   const {
     register,
-    watch,
+    control,
     formState: { errors },
   } = useForm<EventDetailsFormValues>({
     defaultValues: data,
     mode: 'onChange',
   });
 
-  const watchedValues = watch();
+  const watchedValues = useWatch({ control });
 
   useEffect(() => {
     const fields: (keyof EventDetailsFormValues)[] = [

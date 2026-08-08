@@ -11,6 +11,7 @@ const TIER_ALIAS: Record<string, string> = {
 };
 
 async function handleEventCheckout(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
   const { eventId, tier } = session.metadata || {};
 
   if (!eventId || !tier) return;
@@ -32,9 +33,10 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
   );
 }
 
-const VALID_SUBSCRIPTION_TIERS = ["pro", "business"];
+const VALID_SUBSCRIPTION_TIERS = ["pro_annual"];
 
 async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
   const { userId, tier, billing } = session.metadata || {};
   if (!userId || !tier) return;
 

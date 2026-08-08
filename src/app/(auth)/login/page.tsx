@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
 
 export const metadata: Metadata = {
-  title: "Admin Login - Seal and Send",
+  title: "Host Sign In - SealSend",
 };
 
 export default function LoginPage() {
@@ -15,7 +15,7 @@ export default function LoginPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Welcome back</h1>
         <p className="mt-2 text-gray-600">
           Sign in to manage your events and guests
         </p>

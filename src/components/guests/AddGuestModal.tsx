@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { guestSchema, type GuestInput } from "@/lib/validations";
 import { Modal } from "@/components/ui/Modal";
@@ -19,16 +19,6 @@ interface AddGuestModalProps {
   onSuccess: () => void;
 }
 
-// Format phone number as user types
-function formatPhoneNumber(value: string): string {
-  const numbers = value.replace(/\D/g, "");
-  if (numbers.length === 0) return "";
-  if (numbers.length <= 3) return numbers;
-  if (numbers.length <= 6) return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
-  if (numbers.length <= 10) return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6)}`;
-  return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
-}
-
 export function AddGuestModal({
   open,
   onClose,
@@ -44,8 +34,7 @@ export function AddGuestModal({
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<GuestInput>({
     resolver: zodResolver(guestSchema),
@@ -64,18 +53,9 @@ export function AddGuestModal({
         },
   });
 
-  const phoneValue = watch("phone");
-  const emailValue = watch("email");
-
-  // Format phone number as user types
-  useEffect(() => {
-    if (phoneValue && phoneValue !== guest?.phone) {
-      const formatted = formatPhoneNumber(phoneValue);
-      if (formatted !== phoneValue) {
-        setValue("phone", formatted);
-      }
-    }
-  }, [phoneValue, setValue, guest?.phone]);
+  const phoneValue = useWatch({ control, name: "phone" });
+  const emailValue = useWatch({ control, name: "email" });
+  const notesValue = useWatch({ control, name: "notes" });
 
   // Check for duplicates
   useEffect(() => {
@@ -174,9 +154,9 @@ export function AddGuestModal({
             error={errors.notes?.message}
             {...register("notes")}
           />
-          {watch("notes") && (
+          {notesValue && (
             <p className="mt-1 text-xs text-gray-400">
-              {watch("notes")!.length}/500 characters
+              {notesValue.length}/500 characters
             </p>
           )}
         </div>

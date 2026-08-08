@@ -306,9 +306,9 @@ export async function GET(request: NextRequest) {
             'UPDATE guests SET reminder_sent_at = $1 WHERE id = ANY($2)',
             [new Date().toISOString(), successIds]
           );
-        } catch (updateError: any) {
+        } catch (updateError: unknown) {
           console.error(`[CRON] Error updating reminder_sent_at for event ${event.id}:`, updateError);
-          errors.push(updateError.message);
+          errors.push(updateError instanceof Error ? updateError.message : String(updateError));
         }
       }
 

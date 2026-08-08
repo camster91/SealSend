@@ -3,6 +3,8 @@ import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
+import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -15,8 +17,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     const user = auth.user;
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+    const event = await queryOne<{ id: string; tier: string }>(
+      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
       [eventId, user.id]
     );
 
@@ -103,6 +105,15 @@ export async function POST(request: Request, { params }: RouteParams) {
         errors: validationErrors,
         duplicates,
       }, { status: 200 });
+    }
+
+    const accountPlan = await getUserTier(user.id);
+    const guestLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).guests;
+    if (existingGuests.length + guests.length > guestLimit) {
+      return NextResponse.json(
+        { error: `This import would exceed the event limit of ${guestLimit} guests.` },
+        { status: 403 }
+      );
     }
 
     // Build bulk INSERT with parameterized values

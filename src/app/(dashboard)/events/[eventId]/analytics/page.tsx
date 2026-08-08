@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
           setGuestCount(Array.isArray(guests) ? guests.length : 0);
         }
       }
-    } catch (error) {
+    } catch {
       console.error("Error fetching analytics data");
     } finally {
       setLoading(false);

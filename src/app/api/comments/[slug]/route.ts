@@ -30,7 +30,7 @@ export async function GET(
 
     return NextResponse.json(comments ?? []);
   } catch {
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ error: "Unable to load comments" }, { status: 500 });
   }
 }
 

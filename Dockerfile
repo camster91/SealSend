@@ -33,14 +33,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Runtime environment variables
-ARG MAILGUN_API_KEY
-ARG MAILGUN_DOMAIN
-ARG FROM_EMAIL
-ENV MAILGUN_API_KEY=$MAILGUN_API_KEY
-ENV MAILGUN_DOMAIN=$MAILGUN_DOMAIN
-ENV FROM_EMAIL=$FROM_EMAIL
-
 # Install curl for healthchecks (required by Coolify)
 RUN apk add --no-cache curl
 
@@ -49,7 +41,9 @@ RUN adduser --system --uid 1001 nextjs
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
+RUN mkdir -p /app/uploads
 RUN chown nextjs:nodejs .next
+RUN chown nextjs:nodejs /app/uploads
 
 # Automatically leverage output traces to reduce image size
 COPY --from=builder /app/public ./public
@@ -64,4 +58,6 @@ USER nextjs
 
 # Run the standalone server
 ENV HOSTNAME=0.0.0.0
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl --fail --silent --show-error http://127.0.0.1:3000/api/health >/dev/null || exit 1
 CMD ["node", "server.js"]

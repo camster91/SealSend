@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
+import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
 
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
@@ -77,12 +79,21 @@ export async function POST(
     const user = auth.user;
 
     // Verify ownership
-    const event = await queryOne(
-      'SELECT id FROM events WHERE id = $1 AND user_id = $2',
+    const event = await queryOne<{ id: string; tier: string }>(
+      'SELECT id, tier FROM events WHERE id = $1 AND user_id = $2',
       [eventId, user.id]
     );
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const [accountPlan, countRow] = await Promise.all([
+      getUserTier(user.id),
+      queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE event_id = $1', [eventId]),
+    ]);
+    const guestLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).guests;
+    if (Number(countRow?.count ?? 0) >= guestLimit) {
+      return NextResponse.json({ error: `This event is limited to ${guestLimit} guests.` }, { status: 403 });
+    }
 
     const parsed = guestSchema.safeParse(body);
     if (!parsed.success) {

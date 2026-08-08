@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
+import { canUseFeature, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
 
 const tagSchema = z.object({
   tag_name: z.string().min(1).max(50).trim(),
@@ -61,8 +63,8 @@ export async function POST(
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Tier gate: tags require standard or premium (unlocked in beta)
-    const { BETA_MODE } = await import("@/lib/constants");
-    if (!BETA_MODE && event.tier === "free") {
+    const accountPlan = await getUserTier(user.id);
+    if (!canUseFeature(accountPlan, event.tier as EventTier, "guestTags")) {
       return NextResponse.json(
         { error: "Guest tags require a Standard or Premium upgrade" },
         { status: 403 }

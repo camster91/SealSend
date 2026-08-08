@@ -11,7 +11,8 @@ All test scripts require your environment variables to be configured. Make sure 
 DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
 
 # Required for email tests
-RESEND_API_KEY=re_...
+MAILGUN_API_KEY=key-...
+MAILGUN_DOMAIN=mg.example.com
 FROM_EMAIL="Seal and Send <contact@sealsend.app>"
 
 # Required for SMS tests
@@ -22,7 +23,7 @@ TWILIO_MESSAGING_SERVICE_SID=MG_... # OR TWILIO_FROM_NUMBER
 
 ## 📧 Email Tests
 
-Test Resend email integration and all email templates.
+Test Mailgun email integration and all email templates.
 
 ```bash
 npx tsx scripts/test/test-email.ts your-email@example.com
@@ -169,12 +170,12 @@ The cleanup SQL will be printed at the end in case of failures.
 
 After running tests, verify:
 
-### Email (Resend)
+### Email (Mailgun)
 - [ ] All emails arrive in inbox (check spam too)
 - [ ] Email templates render correctly
 - [ ] Images load in invitation template
 - [ ] Links are clickable and correct
-- [ ] Resend dashboard shows delivery status
+- [ ] Mailgun dashboard shows delivery status
 
 ### SMS (Twilio)
 - [ ] All SMS messages arrive
@@ -193,14 +194,15 @@ After running tests, verify:
 
 ### Email Tests Fail
 
-**"RESEND_API_KEY not configured"**
+**"MAILGUN_API_KEY not configured"**
 ```bash
-export RESEND_API_KEY=re_your_actual_key_here
+export MAILGUN_API_KEY=key-your_actual_key_here
+export MAILGUN_DOMAIN=mg.example.com
 ```
 
 **"Email not sent"**
-- Check Resend dashboard for errors
-- Verify FROM_EMAIL domain is verified in Resend
+- Check Mailgun dashboard for errors
+- Verify FROM_EMAIL domain is verified in Mailgun
 - Check if recipient email is valid
 
 ### SMS Tests Fail
@@ -240,7 +242,8 @@ Create a `.env.test` file (do not commit to git):
 DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
 
 # Email
-RESEND_API_KEY=re_...
+MAILGUN_API_KEY=key-...
+MAILGUN_DOMAIN=mg.example.com
 FROM_EMAIL="Seal and Send <contact@sealsend.app>"
 
 # SMS

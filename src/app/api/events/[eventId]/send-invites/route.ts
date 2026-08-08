@@ -9,6 +9,12 @@ import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib
 import { rateLimit } from "@/lib/rate-limit";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
+import type { Event, Guest } from "@/types/database";
+import { canUseFeature, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
+
+type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
+type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token">;
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
   for (let i = 0; i < retries; i++) {
@@ -37,7 +43,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<any>(
+    const event = await queryOne<InviteEvent>(
       'SELECT id, title, event_date, location_name, slug, status, design_url, host_name, dress_code, rsvp_deadline, tier FROM events WHERE id = $1 AND user_id = $2',
       [eventId, user.id]
     );
@@ -54,7 +60,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that need invitations (email OR phone)
-    const guests = await query<any>(
+    const guests = await query<InviteGuest>(
       `SELECT id, name, email, phone, invite_status, invite_token FROM guests
        WHERE event_id = $1 AND invite_status IN ('not_sent', 'failed')`,
       [eventId]
@@ -68,8 +74,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     // SMS requires standard or premium tier (unlocked in beta)
-    const { BETA_MODE } = await import("@/lib/constants");
-    const smsEnabled = isTwilioConfigured() && (BETA_MODE || event.tier !== "free");
+    const accountPlan = await getUserTier(user.id);
+    const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
     const BATCH_SIZE = 10;
@@ -104,10 +110,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
           // Send email if guest has email
           if (guest.email) {
+            const guestEmail = guest.email;
             const { subject, html } = buildInvitationEmail({
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
+              eventTimezone: event.event_timezone,
               locationName: event.location_name,
               designUrl: event.design_url,
               hostName: event.host_name || undefined,
@@ -118,14 +126,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
             try {
               const result = await withRetry(() => sendEmail({
-                to: guest.email,
+                to: guestEmail,
                 subject,
                 html,
               }));
               emailOk = true;
 
               // Log successful send
-              await logSendSuccess(eventId, 'email', guest.email, {
+              await logSendSuccess(eventId, 'email', guestEmail, {
                 guestId: guest.id,
                 subject,
                 provider: 'mailgun',
@@ -136,7 +144,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               errors.push({ type: 'email', message });
               console.error(`[EMAIL FAILED] guest=${guest.id}:`, message);
 
-              await logSendFailure(eventId, 'email', guest.email, message, {
+              await logSendFailure(eventId, 'email', guestEmail, message, {
                 guestId: guest.id,
                 subject: event.title,
               });

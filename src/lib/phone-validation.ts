@@ -3,7 +3,7 @@
  * Uses libphonenumber-js for robust phone handling
  */
 
-import { parsePhoneNumber, isValidPhoneNumber } from 'libphonenumber-js';
+import { parsePhoneNumber, isValidPhoneNumber, type CountryCode } from 'libphonenumber-js';
 
 export interface PhoneValidationResult {
   valid: boolean;
@@ -21,7 +21,7 @@ export interface PhoneValidationResult {
  */
 export function validateAndFormatPhone(
   phone: string,
-  defaultCountry: string = 'US'
+  defaultCountry: CountryCode = 'US'
 ): PhoneValidationResult {
   try {
     // Basic pre-check
@@ -30,11 +30,11 @@ export function validateAndFormatPhone(
     }
 
     // Check if valid for the country
-    if (!isValidPhoneNumber(phone, defaultCountry as any)) {
+    if (!isValidPhoneNumber(phone, defaultCountry)) {
       return { valid: false, error: 'Invalid phone number format' };
     }
 
-    const parsed = parsePhoneNumber(phone, defaultCountry as any);
+    const parsed = parsePhoneNumber(phone, defaultCountry);
     
     if (!parsed || !parsed.isValid()) {
       return { valid: false, error: 'Invalid phone number' };
@@ -57,9 +57,9 @@ export function validateAndFormatPhone(
 /**
  * Quick check if phone number looks valid
  */
-export function isValidPhone(phone: string, defaultCountry: string = 'US'): boolean {
+export function isValidPhone(phone: string, defaultCountry: CountryCode = 'US'): boolean {
   try {
-    return isValidPhoneNumber(phone, defaultCountry as any);
+    return isValidPhoneNumber(phone, defaultCountry);
   } catch {
     return false;
   }
@@ -68,9 +68,9 @@ export function isValidPhone(phone: string, defaultCountry: string = 'US'): bool
 /**
  * Format phone number for display
  */
-export function formatPhoneForDisplay(phone: string, defaultCountry: string = 'US'): string {
+export function formatPhoneForDisplay(phone: string, defaultCountry: CountryCode = 'US'): string {
   try {
-    const parsed = parsePhoneNumber(phone, defaultCountry as any);
+    const parsed = parsePhoneNumber(phone, defaultCountry);
     return parsed?.formatNational() || phone;
   } catch {
     return phone;
@@ -80,9 +80,9 @@ export function formatPhoneForDisplay(phone: string, defaultCountry: string = 'U
 /**
  * Detect if phone number is international
  */
-export function isInternationalPhone(phone: string, defaultCountry: string = 'US'): boolean {
+export function isInternationalPhone(phone: string, defaultCountry: CountryCode = 'US'): boolean {
   try {
-    const parsed = parsePhoneNumber(phone, defaultCountry as any);
+    const parsed = parsePhoneNumber(phone, defaultCountry);
     return parsed?.country !== defaultCountry;
   } catch {
     return false;

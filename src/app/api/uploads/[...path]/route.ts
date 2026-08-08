@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { resolveUploadPath } from '@/lib/upload-path';
 
 const MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -29,10 +30,8 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Prevent path traversal attacks
-    const filePath = path.join(UPLOADS_DIR, ...segments);
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
+    const resolved = resolveUploadPath(UPLOADS_DIR, segments);
+    if (!resolved) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

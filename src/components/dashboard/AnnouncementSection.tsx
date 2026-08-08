@@ -7,16 +7,17 @@ import { AnnouncementHistory } from '@/components/dashboard/AnnouncementHistory'
 
 interface AnnouncementSectionProps {
   eventId: string;
+  hasAccess: boolean;
 }
 
-export function AnnouncementSection({ eventId }: AnnouncementSectionProps) {
+export function AnnouncementSection({ eventId, hasAccess }: AnnouncementSectionProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <FeatureGate
       requiredTier="pro"
-      currentTier="free"
+      currentTier={hasAccess ? "pro" : "free"}
       featureName="Announcements"
       featureDescription="Send announcements to your event guests."
       mode="banner"

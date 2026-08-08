@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { EventActionsMenu } from '@/components/dashboard/EventActionsMenu';
 import { UsageStats } from '@/components/dashboard/UsageStats';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
-import { PlanCheckoutClient } from '@/components/dashboard/PlanCheckoutClient';
 import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
-import { BETA_MODE, SUBSCRIPTION_TIERS } from '@/lib/constants';
+import { getUserTier } from '@/lib/subscription';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -24,9 +23,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   
   // Optimized: Using Promise.all to fetch events in parallel reduces TTFB.
   // Passing both email and phone to getInvitedEvents for accurate guest lookup.
-  const [myEvents, invitedEvents] = await Promise.all([
+  const [myEvents, invitedEvents, accountPlan] = await Promise.all([
     getEventsByUser(user.id),
-    getInvitedEvents(user.email, user.phone)
+    getInvitedEvents(user.email, user.phone),
+    getUserTier(user.id),
   ]);
   
   const allEvents = [...myEvents, ...invitedEvents];
@@ -34,6 +34,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {plan && (
+          <div className="mb-6 rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900">
+            <p className="font-semibold">Continue with {plan === 'pro_annual' ? 'SealSend Pro' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`}</p>
+            <p className="mt-1 text-sm">
+              {plan === 'pro_annual'
+                ? 'Review the annual plan and continue to secure Stripe checkout.'
+                : 'Create your event first, then apply this one-time event upgrade.'}
+            </p>
+            <Link href={plan === 'pro_annual' ? '/pricing' : `/events/new?plan=${encodeURIComponent(plan)}`} className="mt-3 inline-flex rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              {plan === 'pro_annual' ? 'Continue to Pro checkout' : 'Create your event'}
+            </Link>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -58,11 +71,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {/* Usage Stats */}
         <div className="mb-8">
           <UsageStats
-            tier={BETA_MODE ? 'Business (Beta)' : 'free'}
+            tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : 'free'}
             eventsUsed={myEvents.length}
-            eventsLimit={BETA_MODE ? -1 : (SUBSCRIPTION_TIERS.find(t => t.id === 'free')?.limits.events as number) ?? 3}
+            eventsLimit={accountPlan === 'pro_annual' ? -1 : 1}
             guestsUsed={0}
-            guestsLimit={BETA_MODE ? -1 : (SUBSCRIPTION_TIERS.find(t => t.id === 'free')?.limits.guestsPerEvent as number) ?? 50}
+            guestsLimit={accountPlan === 'pro_annual' ? 2500 : 15}
           />
         </div>
 
@@ -275,7 +288,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         )}
         {upgraded === 'true' && <UpgradeSuccessToast />}
-        {plan && <PlanCheckoutClient plan={plan} />}
       </div>
     </div>
   );

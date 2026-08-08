@@ -34,6 +34,7 @@ export interface Event {
   description: string | null;
   event_date: string | null;
   event_end_date: string | null;
+  event_timezone: string;
   location_name: string | null;
   location_address: string | null;
   host_name: string | null;

@@ -36,16 +36,16 @@ function checkConfig(): ConfigCheck[] {
            !process.env.DATABASE_URL?.startsWith('postgresql://') ? 'Must start with postgresql://' : undefined,
   });
 
-  // Email (Resend)
+  // Email (Mailgun)
   checks.push({
-    name: 'RESEND_API_KEY',
+    name: 'MAILGUN_API_KEY',
     required: false,
-    value: process.env.RESEND_API_KEY?.slice(0, 15) + '...',
-    valid: !!process.env.RESEND_API_KEY && 
-           process.env.RESEND_API_KEY !== 'your-resend-api-key' &&
-           process.env.RESEND_API_KEY?.startsWith('re_'),
-    error: process.env.RESEND_API_KEY === 'your-resend-api-key' ? 'Contains placeholder value' :
-           process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY?.startsWith('re_') ? 'Should start with re_' : undefined,
+    value: process.env.MAILGUN_API_KEY ? '***' : undefined,
+    valid: !!process.env.MAILGUN_API_KEY &&
+           process.env.MAILGUN_API_KEY !== 'your-mailgun-sending-key' &&
+           !!process.env.MAILGUN_DOMAIN,
+    error: process.env.MAILGUN_API_KEY === 'your-mailgun-sending-key' ? 'Contains placeholder value' :
+           process.env.MAILGUN_API_KEY && !process.env.MAILGUN_DOMAIN ? 'MAILGUN_DOMAIN is also required' : undefined,
   });
 
   checks.push({
@@ -185,10 +185,10 @@ function main(): void {
   if (allRequiredValid) {
     console.log('\n✅ All required configuration is set!');
     
-    const hasEmail = checks.find(c => c.name === 'RESEND_API_KEY')?.valid;
+    const hasEmail = checks.find(c => c.name === 'MAILGUN_API_KEY')?.valid;
     const hasSms = checks.find(c => c.name === 'TWILIO_ACCOUNT_SID')?.valid;
 
-    console.log('\n📧 Email (Resend):', hasEmail ? '✅ Configured' : '⚠️ Not configured');
+    console.log('\n📧 Email (Mailgun):', hasEmail ? '✅ Configured' : '⚠️ Not configured');
     console.log('📱 SMS (Twilio):', hasSms ? '✅ Configured' : '⚠️ Not configured');
 
     if (hasEmail && hasSms) {
@@ -201,7 +201,7 @@ function main(): void {
       console.log('\n📱 You can test SMS:');
       console.log('   npx tsx scripts/test/test-sms.ts +15551234567');
     } else {
-      console.log('\n⚠️  Configure Resend or Twilio to run tests');
+      console.log('\n⚠️  Configure Mailgun or Twilio to run tests');
     }
   } else {
     console.log('\n❌ Some required configuration is missing!');

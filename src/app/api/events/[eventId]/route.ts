@@ -70,7 +70,7 @@ export async function PATCH(
     }
 
     const ALLOWED_COLUMNS = [
-      'title', 'description', 'event_date', 'event_end_date',
+      'title', 'description', 'event_date', 'event_end_date', 'event_timezone',
       'location_name', 'location_address', 'host_name', 'dress_code',
       'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
       'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',

@@ -44,6 +44,7 @@ export interface WizardFormData {
   description: string;
   event_date: string;
   event_end_date: string;
+  event_timezone: string;
   location_name: string;
   location_address: string;
   host_name: string;
@@ -102,6 +103,7 @@ function getInitialState(initialData?: Partial<WizardFormData>): WizardFormData 
     description: '',
     event_date: '',
     event_end_date: '',
+    event_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     location_name: '',
     location_address: '',
     host_name: '',
@@ -249,13 +251,14 @@ export default function WizardContainer({
       const payload = {
         title: formData.title,
         description: formData.description || undefined,
-        event_date: formData.event_date || undefined,
-        event_end_date: formData.event_end_date || undefined,
+        event_date: formData.event_date ? new Date(formData.event_date).toISOString() : undefined,
+        event_end_date: formData.event_end_date ? new Date(formData.event_end_date).toISOString() : undefined,
+        event_timezone: formData.event_timezone,
         location_name: formData.location_name || undefined,
         location_address: formData.location_address || undefined,
         host_name: formData.host_name || undefined,
         dress_code: formData.dress_code || undefined,
-        rsvp_deadline: formData.rsvp_deadline || undefined,
+        rsvp_deadline: formData.rsvp_deadline ? new Date(formData.rsvp_deadline).toISOString() : undefined,
         registry_links: formData.registry_links.length > 0 ? formData.registry_links : undefined,
         max_attendees: formData.max_attendees,
         allow_plus_ones: formData.allow_plus_ones,
@@ -289,7 +292,8 @@ export default function WizardContainer({
           body: JSON.stringify(formData.rsvp_fields),
         });
         if (!rsvpRes.ok) {
-          console.error('Failed to update RSVP fields');
+          const error = await rsvpRes.json().catch(() => ({}));
+          throw new Error(error.error || 'The event was saved, but its RSVP fields could not be updated. Please retry.');
         }
       } else {
         const res = await fetch('/api/events', {
@@ -312,7 +316,8 @@ export default function WizardContainer({
           body: JSON.stringify(formData.rsvp_fields),
         });
         if (!rsvpRes.ok) {
-          console.error('Failed to update RSVP fields');
+          const error = await rsvpRes.json().catch(() => ({}));
+          throw new Error(error.error || 'The event was created, but its RSVP fields could not be saved. Please retry from the event editor.');
         }
       }
 
@@ -329,7 +334,8 @@ export default function WizardContainer({
           ),
         });
         if (!guestRes.ok) {
-          console.error('Failed to bulk-create guests');
+          const error = await guestRes.json().catch(() => ({}));
+          throw new Error(error.error || 'The event was saved, but its guest list could not be imported. Please retry from Guests.');
         }
       }
 

@@ -35,7 +35,7 @@ SealSend is a modern, high-performance SaaS platform for creating, sending, and 
 | Authentication | Supabase Auth / Custom JWT |
 | Styling | Tailwind CSS + Radix UI Primitives |
 | SMS | Twilio |
-| Email | Mailgun / Resend |
+| Email | Mailgun |
 | Payments | Stripe |
 | Deployment | Docker / Coolify |
 
@@ -44,7 +44,7 @@ SealSend is a modern, high-performance SaaS platform for creating, sending, and 
 - Node.js 18+
 - Supabase project (Free Tier works)
 - Twilio account (for SMS)
-- Mailgun or Resend account (for email)
+- Mailgun account (for email)
 - Stripe account (for payments)
 
 ## Installation

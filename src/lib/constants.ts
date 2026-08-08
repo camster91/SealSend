@@ -103,9 +103,6 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
       monthly: 8.99,
       yearly: 8.99,
     },
-    stripePriceId: {
-      monthly: process.env.STRIPE_SILVER_PRICE_ID,
-    },
     limits: {
       events: 1,
       guestsPerEvent: 50,
@@ -139,9 +136,6 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     price: {
       monthly: 17.99,
       yearly: 17.99,
-    },
-    stripePriceId: {
-      monthly: process.env.STRIPE_GOLD_PRICE_ID,
     },
     limits: {
       events: 1,
@@ -195,6 +189,15 @@ export const PRO_ANNUAL = {
   events: "unlimited",
   stripePriceId: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
 };
+
+export const PUBLIC_PRICING_PLANS = [
+  { id: "free", name: "Free", price: 0, period: "", description: "Try SealSend with one small event", events: "1", guests: "15", features: ["Email invitations", "RSVP tracking", "Guest management"] },
+  { id: "silver", name: "Silver", price: 8.99, period: "/event", description: "Birthdays, dinners, and showers", events: "1", guests: "50", features: ["Email and SMS invitations", "Guest tags", "Announcements"] },
+  { id: "gold", name: "Gold", price: 17.99, period: "/event", description: "Weddings and larger celebrations", events: "1", guests: "150", features: ["Everything in Silver", "Sign-up board", "Analytics"] },
+  { id: "platinum", name: "Platinum", price: 34.99, period: "/event", description: "Galas and company events", events: "1", guests: "500", features: ["Everything in Gold", "Higher guest capacity", "Email and SMS invitations"] },
+  { id: "diamond", name: "Diamond", price: 49.99, period: "/event", description: "Your largest one-off events", events: "1", guests: "750", features: ["Everything in Platinum", "Highest one-time capacity", "Priority handling"] },
+  { id: "pro_annual", name: "SealSend Pro", price: 124.99, period: "/year", description: "For repeat hosts and event planners", events: "Unlimited", guests: "2,500", features: ["All shipped premium features", "Unlimited events", "2,500 guests per event"], popular: true },
+] as const;
 
 // ========================================
 // LEGACY EVENT TIERS (Per-Event - Deprecated)

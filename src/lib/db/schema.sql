@@ -62,8 +62,11 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT,
   event_date TIMESTAMPTZ,
   event_end_date TIMESTAMPTZ,
+  event_timezone TEXT NOT NULL DEFAULT 'UTC',
   location_name TEXT,
   location_address TEXT,
+  location_lat DOUBLE PRECISION,
+  location_lng DOUBLE PRECISION,
   host_name TEXT,
   dress_code TEXT,
   rsvp_deadline TIMESTAMPTZ,
@@ -80,6 +83,7 @@ CREATE TABLE IF NOT EXISTS events (
   auto_reminders BOOLEAN DEFAULT FALSE,
   reminder_days_before INTEGER DEFAULT 2,
   reminder_sent_at TIMESTAMPTZ,
+  payment_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -124,7 +128,7 @@ CREATE TABLE IF NOT EXISTS guests (
   invite_token TEXT UNIQUE,
   invite_sent BOOLEAN DEFAULT FALSE,
   invite_sent_at TIMESTAMPTZ,
-  invite_status TEXT DEFAULT 'pending' CHECK (invite_status IN ('pending', 'sent', 'delivered', 'bounced', 'failed')),
+  invite_status TEXT DEFAULT 'not_sent' CHECK (invite_status IN ('not_sent', 'pending', 'sent', 'delivered', 'bounced', 'failed', 'accepted')),
   invite_error TEXT,
   rsvp_status TEXT DEFAULT 'pending',
   notes TEXT,
@@ -132,6 +136,9 @@ CREATE TABLE IF NOT EXISTS guests (
   parent_guest_id UUID REFERENCES guests(id) ON DELETE CASCADE,
   magic_token TEXT UNIQUE,
   magic_token_expires_at TIMESTAMPTZ,
+  phone_invalid_at TIMESTAMPTZ,
+  reminder_sent_at TIMESTAMPTZ,
+  tags JSONB DEFAULT '[]',
   last_login_at TIMESTAMPTZ,
   login_count INTEGER DEFAULT 0,
   user_id UUID,
@@ -153,7 +160,7 @@ CREATE INDEX IF NOT EXISTS idx_guests_event_reminder ON guests(event_id, reminde
 CREATE TABLE IF NOT EXISTS guest_tags (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
   color TEXT DEFAULT '#6366f1',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -178,6 +185,7 @@ CREATE TABLE IF NOT EXISTS rsvp_responses (
   headcount INTEGER DEFAULT 1,
   response_data JSONB DEFAULT '{}',
   plus_ones_data JSONB DEFAULT '[]',
+  submitted_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -193,10 +201,15 @@ CREATE TABLE IF NOT EXISTS plus_ones (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   rsvp_response_id UUID REFERENCES rsvp_responses(id) ON DELETE CASCADE,
+  guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   email TEXT,
   status TEXT DEFAULT 'attending',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  invite_token TEXT UNIQUE,
+  invite_status TEXT DEFAULT 'not_sent',
+  invite_sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_plus_ones_event ON plus_ones(event_id);
@@ -211,7 +224,7 @@ CREATE TABLE IF NOT EXISTS event_comments (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
   author_name TEXT NOT NULL,
-  content TEXT NOT NULL,
+  message TEXT NOT NULL,
   is_private BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -225,10 +238,9 @@ CREATE INDEX IF NOT EXISTS idx_event_comments_event ON event_comments(event_id);
 CREATE TABLE IF NOT EXISTS event_announcements (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  title TEXT,
+  subject TEXT NOT NULL,
   message TEXT NOT NULL,
-  sent_at TIMESTAMPTZ DEFAULT NOW(),
-  sent_count INTEGER DEFAULT 0,
+  sent_to_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -256,7 +268,8 @@ CREATE TABLE IF NOT EXISTS event_signup_items (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
-  quantity INTEGER DEFAULT 1,
+  category TEXT,
+  slots INTEGER DEFAULT 1 CHECK (slots > 0),
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -265,14 +278,14 @@ CREATE INDEX IF NOT EXISTS idx_signup_items_event ON event_signup_items(event_id
 
 CREATE TABLE IF NOT EXISTS event_signup_claims (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  signup_item_id UUID NOT NULL REFERENCES event_signup_items(id) ON DELETE CASCADE,
-  guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
-  claimer_name TEXT NOT NULL,
-  claimer_email TEXT,
-  claimed_at TIMESTAMPTZ DEFAULT NOW()
+  item_id UUID NOT NULL REFERENCES event_signup_items(id) ON DELETE CASCADE,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  claimant_name TEXT NOT NULL,
+  claimant_email TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_signup_claims_item ON event_signup_claims(signup_item_id);
+CREATE INDEX IF NOT EXISTS idx_signup_claims_item ON event_signup_claims(item_id);
 
 -- =====================
 -- SEND LOGS
@@ -280,17 +293,24 @@ CREATE INDEX IF NOT EXISTS idx_signup_claims_item ON event_signup_claims(signup_
 
 CREATE TABLE IF NOT EXISTS send_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   guest_id UUID REFERENCES guests(id) ON DELETE SET NULL,
-  channel TEXT NOT NULL CHECK (channel IN ('email', 'sms')),
-  status TEXT NOT NULL CHECK (status IN ('sent', 'failed', 'bounced', 'delivered')),
-  recipient TEXT,
+  send_type TEXT NOT NULL CHECK (send_type IN ('email', 'sms')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed', 'bounced', 'delivered')),
+  recipient TEXT NOT NULL,
+  subject TEXT,
   error_message TEXT,
-  sent_at TIMESTAMPTZ DEFAULT NOW()
+  provider TEXT,
+  provider_message_id TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_send_logs_event ON send_logs(event_id);
 CREATE INDEX IF NOT EXISTS idx_send_logs_guest ON send_logs(guest_id);
+CREATE INDEX IF NOT EXISTS idx_send_logs_status ON send_logs(status);
+CREATE INDEX IF NOT EXISTS idx_send_logs_created ON send_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_send_logs_provider_message_id ON send_logs(provider_message_id)
   WHERE provider_message_id IS NOT NULL;
 
@@ -301,14 +321,16 @@ CREATE INDEX IF NOT EXISTS idx_send_logs_provider_message_id ON send_logs(provid
 CREATE TABLE IF NOT EXISTS guest_magic_tokens (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   guest_id UUID NOT NULL REFERENCES guests(id) ON DELETE CASCADE,
-  token TEXT UNIQUE NOT NULL,
+  token_hash TEXT UNIQUE NOT NULL,
+  token_preview TEXT NOT NULL,
   event_id UUID REFERENCES events(id) ON DELETE CASCADE,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
+  created_by UUID NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_magic_tokens_token ON guest_magic_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_magic_tokens_token_hash ON guest_magic_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_magic_tokens_guest ON guest_magic_tokens(guest_id);
 
 -- =====================
@@ -332,7 +354,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   user_id UUID NOT NULL,
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT UNIQUE,
-  tier TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free', 'pro', 'business')),
+  tier TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free', 'pro_annual')),
   billing_cycle TEXT CHECK (billing_cycle IN ('monthly', 'yearly')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'past_due', 'canceled', 'trialing')),
   current_period_end TIMESTAMPTZ,

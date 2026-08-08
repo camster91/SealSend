@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
-import type { PlusOne } from "@/types/database";
+import type { PlusOne, RSVPResponse, RSVPResponseWithPlusOnes } from "@/types/database";
 
 export async function GET(
   request: Request,
@@ -29,13 +29,13 @@ export async function GET(
     const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
     // Fetch responses (paginated for JSON; higher cap for CSV export)
-    const responses = await query(
+    const responses = await query<RSVPResponse>(
       'SELECT * FROM rsvp_responses WHERE event_id = $1 ORDER BY submitted_at DESC LIMIT $2 OFFSET $3',
       [eventId, limit, offset]
     );
 
     // Fetch plus_ones for these responses
-    const responseIds = responses.map((r: any) => r.id);
+    const responseIds = responses.map((response) => response.id);
     let plusOnes: PlusOne[] = [];
 
     if (responseIds.length > 0) {
@@ -56,7 +56,7 @@ export async function GET(
     }, {} as Record<string, PlusOne[]>);
 
     // Attach plus_ones to responses
-    const responsesWithPlusOnes = responses.map((r: any) => ({
+    const responsesWithPlusOnes: RSVPResponseWithPlusOnes[] = responses.map((r) => ({
       ...r,
       plus_ones: plusOnesByResponse[r.id] || [],
     }));
@@ -76,7 +76,7 @@ export async function GET(
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
-      responses.forEach((r: any) => {
+      responses.forEach((r) => {
         if (r.response_data && typeof r.response_data === "object") {
           Object.keys(r.response_data as Record<string, unknown>).forEach((k) => dataKeys.add(k));
         }
@@ -84,7 +84,7 @@ export async function GET(
       const dataKeysList = Array.from(dataKeys);
       headers.push(...dataKeysList);
 
-      const rows = responsesWithPlusOnes.map((r: any) => {
+      const rows = responsesWithPlusOnes.map((r) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");

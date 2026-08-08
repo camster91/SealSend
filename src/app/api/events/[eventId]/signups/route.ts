@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
+import type { SignupClaim, SignupItem, SignupItemWithClaims } from "@/types/database";
+import { canUseFeature, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -27,25 +30,25 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const items = await query(
+    const items = await query<SignupItem>(
       'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
       [eventId]
     );
 
     // Fetch claims for all items
-    const itemIds = items.map((i: any) => i.id);
-    let claims: any[] = [];
+    const itemIds = items.map((item) => item.id);
+    let claims: SignupClaim[] = [];
     if (itemIds.length > 0) {
-      claims = await query(
+      claims = await query<SignupClaim>(
         'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
         [itemIds]
       );
     }
 
     // Attach claims to items
-    const itemsWithClaims = items.map((item: any) => ({
+    const itemsWithClaims: SignupItemWithClaims[] = items.map((item) => ({
       ...item,
-      claims: claims.filter((c: any) => c.item_id === item.id),
+      claims: claims.filter((claim) => claim.item_id === item.id),
     }));
 
     return NextResponse.json(itemsWithClaims);
@@ -70,8 +73,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Tier gate: sign-up board requires premium (unlocked in beta)
-    const { BETA_MODE } = await import("@/lib/constants");
-    if (!BETA_MODE && event.tier !== "premium") {
+    const accountPlan = await getUserTier(user.id);
+    if (!canUseFeature(accountPlan, event.tier as EventTier, "signupBoard")) {
       return NextResponse.json(
         { error: "Sign-up board requires a Premium upgrade" },
         { status: 403 }

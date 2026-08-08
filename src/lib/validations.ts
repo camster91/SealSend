@@ -70,6 +70,7 @@ export const eventCreateSchema = z.object({
   description: z.string().max(2000).optional(),
   event_date: z.string().optional(),
   event_end_date: z.string().optional(),
+  event_timezone: z.string().min(1).max(100).default("UTC"),
   location_name: z.string().max(200).optional(),
   location_address: z.string().max(500).optional(),
   host_name: z.string().max(200).optional(),

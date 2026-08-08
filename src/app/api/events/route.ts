@@ -4,6 +4,8 @@ import { requireApiHost } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
 import { DEFAULT_RSVP_FIELDS } from '@/lib/constants';
+import { canCreateEvent } from '@/lib/entitlements';
+import { getUserTier } from '@/lib/subscription';
 
 export async function GET() {
   try {
@@ -31,6 +33,17 @@ export async function POST(request: NextRequest) {
     if (auth.error) return auth.error;
     const user = auth.user;
 
+    const [accountPlan, eventCount] = await Promise.all([
+      getUserTier(user.id),
+      queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1', [user.id]),
+    ]);
+    if (!canCreateEvent(accountPlan, Number(eventCount?.count ?? 0))) {
+      return NextResponse.json(
+        { error: 'Free accounts can create one event. Upgrade to annual Pro for unlimited events.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const parsed = eventCreateSchema.safeParse(body);
 
@@ -41,7 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, event_date, event_end_date, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const { title, description, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
 
     // Retry slug generation on collision (unique constraint)
     let event = null;
@@ -51,12 +64,12 @@ export async function POST(request: NextRequest) {
       try {
         event = await queryOne(
           `INSERT INTO events (
-            user_id, title, slug, description, event_date, event_end_date,
+            user_id, title, slug, description, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code,
             rsvp_deadline, registry_links, max_attendees, allow_plus_ones,
             max_guests_per_rsvp, design_url, design_type, customization, status
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
           ) RETURNING *`,
           [
             user.id,
@@ -65,6 +78,7 @@ export async function POST(request: NextRequest) {
             description ?? null,
             event_date ?? null,
             event_end_date ?? null,
+            event_timezone,
             location_name ?? null,
             location_address ?? null,
             host_name ?? null,

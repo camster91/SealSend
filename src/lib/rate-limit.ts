@@ -1,4 +1,4 @@
-import { query } from "@/lib/db/client";
+import { getDb } from "@/lib/db/client";
 
 interface RateLimitOptions {
   /** Max requests allowed in the window */
@@ -20,33 +20,49 @@ export async function rateLimit(
   const now = new Date();
   const windowStart = new Date(now.getTime() - options.windowSeconds * 1000);
   const resetAt = now.getTime() + options.windowSeconds * 1000;
+  const client = await getDb().connect();
 
-  // Delete old entries older than window
-  await query(
-    'DELETE FROM rate_limit_attempts WHERE key = $1 AND created_at < $2',
-    [key, windowStart.toISOString()]
-  );
+  try {
+    await client.query('BEGIN');
 
-  // Count recent entries for the key
-  const rows = await query<{ count: string }>(
-    'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
-    [key, windowStart.toISOString()]
-  );
+    // Serialize only attempts for this key. This closes the race where parallel
+    // requests could all count below the limit before any of them inserted.
+    await client.query(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+      [key]
+    );
 
-  const currentCount = parseInt(rows[0]?.count ?? '0', 10);
+    await client.query(
+      'DELETE FROM rate_limit_attempts WHERE key = $1 AND created_at < $2',
+      [key, windowStart.toISOString()]
+    );
 
-  if (currentCount >= options.max) {
-    return { success: false, remaining: 0, resetAt };
+    const result = await client.query<{ count: string }>(
+      'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
+      [key, windowStart.toISOString()]
+    );
+
+    const currentCount = parseInt(result.rows[0]?.count ?? '0', 10);
+
+    if (currentCount >= options.max) {
+      await client.query('COMMIT');
+      return { success: false, remaining: 0, resetAt };
+    }
+
+    await client.query('INSERT INTO rate_limit_attempts (key) VALUES ($1)', [key]);
+    await client.query('COMMIT');
+
+    return {
+      success: true,
+      remaining: options.max - currentCount - 1,
+      resetAt,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  // Insert new entry
-  await query('INSERT INTO rate_limit_attempts (key) VALUES ($1)', [key]);
-
-  return {
-    success: true,
-    remaining: options.max - currentCount - 1,
-    resetAt,
-  };
 }
 
 const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
@@ -70,7 +86,7 @@ function isPlausibleIp(value: string): boolean {
  * x-forwarded-for hop when TRUST_PROXY_HEADERS=true (Coolify/nginx setups).
  */
 export function getClientIp(request: Request): string {
-  const trustProxy = process.env.TRUST_PROXY_HEADERS !== 'false';
+  const trustProxy = process.env.TRUST_PROXY_HEADERS === 'true';
 
   if (trustProxy) {
     const realIp = request.headers.get("x-real-ip");

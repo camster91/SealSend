@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db/client";
+import { getDb, query, queryOne } from "@/lib/db/client";
 import { z } from "zod";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import type { SignupClaim, SignupItem, SignupItemWithClaims } from "@/types/database";
 
 type RouteParams = { params: Promise<{ slug: string }> };
 
@@ -23,37 +24,39 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     if (!event) return NextResponse.json([], { status: 200 });
 
-    const items = await query(
+    const items = await query<SignupItem>(
       'SELECT * FROM event_signup_items WHERE event_id = $1 ORDER BY sort_order ASC',
       [event.id]
     );
 
     // Fetch claims for all items
-    const itemIds = items.map((i: any) => i.id);
-    let claims: any[] = [];
+    const itemIds = items.map((item) => item.id);
+    let claims: SignupClaim[] = [];
     if (itemIds.length > 0) {
-      claims = await query(
+      claims = await query<SignupClaim>(
         'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
         [itemIds]
       );
     }
 
     // Attach claims to items — redact emails from public API
-    const itemsWithClaims = items.map((item: any) => ({
+    const itemsWithClaims: SignupItemWithClaims[] = items.map((item) => ({
       ...item,
       claims: claims
-        .filter((c: any) => (c.item_id ?? c.signup_item_id) === item.id)
-        .map((c: any) => ({
-          id: c.id,
-          item_id: c.item_id ?? c.signup_item_id,
-          claimant_name: c.claimant_name ?? c.claimer_name,
-          created_at: c.created_at ?? c.claimed_at,
+        .filter((claim) => claim.item_id === item.id)
+        .map((claim) => ({
+          id: claim.id,
+          item_id: claim.item_id,
+          claimant_name: claim.claimant_name,
+          claimant_email: null,
+          event_id: claim.event_id,
+          created_at: claim.created_at,
         })),
     }));
 
     return NextResponse.json(itemsWithClaims);
   } catch {
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ error: "Unable to load sign-up items" }, { status: 500 });
   }
 }
 
@@ -83,39 +86,50 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    // Verify item exists and belongs to this event
-    const item = await queryOne<{ id: string; slots: number }>(
-      'SELECT id, slots FROM event_signup_items WHERE id = $1 AND event_id = $2',
-      [parsed.data.item_id, event.id]
-    );
+    const client = await getDb().connect();
+    try {
+      await client.query('BEGIN');
+      const itemResult = await client.query<{ id: string; slots: number }>(
+        'SELECT id, slots FROM event_signup_items WHERE id = $1 AND event_id = $2 FOR UPDATE',
+        [parsed.data.item_id, event.id]
+      );
+      const item = itemResult.rows[0];
 
-    if (!item) {
-      return NextResponse.json({ error: "Item not found" }, { status: 404 });
-    }
+      if (!item) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
 
     // Check if slots are available
-    const countResult = await queryOne<{ count: string }>(
+      const countResult = await client.query<{ count: string }>(
       'SELECT COUNT(*) as count FROM event_signup_claims WHERE item_id = $1',
       [item.id]
     );
-    const count = countResult ? parseInt(countResult.count, 10) : 0;
+      const count = parseInt(countResult.rows[0]?.count || '0', 10);
 
-    if (count >= item.slots) {
-      return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
-    }
+      if (count >= item.slots) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
+      }
 
-    const claim = await queryOne(
+      const claimResult = await client.query(
       `INSERT INTO event_signup_claims (item_id, event_id, claimant_name, claimant_email)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
       [parsed.data.item_id, event.id, parsed.data.claimant_name, parsed.data.claimant_email || null]
     );
+      const claim = claimResult.rows[0];
 
-    if (!claim) {
-      return NextResponse.json({ error: "Failed to create claim" }, { status: 500 });
+      if (!claim) throw new Error('Claim insert returned no row');
+      await client.query('COMMIT');
+
+      return NextResponse.json(claim, { status: 201 });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return NextResponse.json(claim, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

@@ -17,6 +17,7 @@ export function UsageStats({ tier, eventsUsed, eventsLimit, guestsUsed, guestsLi
     free: 'bg-gray-100 text-gray-700',
     pro: 'bg-brand-100 text-brand-700',
     business: 'bg-amber-100 text-amber-700',
+    'SealSend Pro': 'bg-brand-100 text-brand-700',
     'Business (Beta)': 'bg-emerald-100 text-emerald-700',
   };
 

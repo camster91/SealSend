@@ -3,6 +3,7 @@ import { requireApiHost } from '@/lib/auth/api-auth';
 import { queryOne } from "@/lib/db/client";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
+import { isStripeKeyAllowed } from '@/lib/billing';
 
 const checkoutSchema = z.object({
   eventId: z.string().uuid(),
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireApiHost();
     if (auth.error) return auth.error;
     const user = auth.user;
+
+    if (!isStripeKeyAllowed()) {
+      return NextResponse.json({ error: "Test billing is not configured" }, { status: 503 });
+    }
 
     const { rateLimit } = await import("@/lib/rate-limit");
     const { success: rateLimitOk } = await rateLimit(`checkout:${user.id}`, {

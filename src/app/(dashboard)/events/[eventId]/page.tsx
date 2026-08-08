@@ -11,6 +11,8 @@ import { UpgradeButton } from '@/components/events/UpgradeButton';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { ExportTools } from '@/components/dashboard/ExportTools';
 import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
+import { canUseFeature, type EventTier } from '@/lib/entitlements';
+import { getUserTier } from '@/lib/subscription';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -48,6 +50,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const isPublished = event.status === 'published';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const publicUrl = `${siteUrl}/e/${event.slug}`;
+  const accountPlan = await getUserTier(user.id);
+  const canSendAnnouncements = canUseFeature(accountPlan, event.tier as EventTier, 'announcements');
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -253,7 +257,6 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         {/* Marketing Tools */}
         <div className="mt-6">
           <ExportTools
-            eventId={eventId}
             eventTitle={event.title as string}
             eventDate={event.event_date as string}
             eventLocation={event.location_name as string}
@@ -265,7 +268,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         {/* Announcements */}
         {isPublished && (
           <div className="mt-6">
-            <AnnouncementSection eventId={eventId} />
+            <AnnouncementSection eventId={eventId} hasAccess={canSendAnnouncements} />
           </div>
         )}
 

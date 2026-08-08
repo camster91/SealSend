@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Play, Star, Users, Zap } from "lucide-react";
 import { motion } from "framer-motion";
+import { BETA_MODE } from "@/lib/constants";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -43,7 +44,7 @@ export default function Hero() {
                 className="group inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-sm font-medium text-primary-700 shadow-sm transition-all hover:border-primary-300 hover:shadow-md"
               >
                 <Zap className="h-4 w-4 text-accent-500" />
-                <span>Now in Beta — All features free!</span>
+                <span>{BETA_MODE ? "Now in Beta — All features free!" : "Start free — upgrade when you need more"}</span>
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
@@ -88,34 +89,10 @@ export default function Hero() {
               </Link>
             </motion.div>
 
-            {/* Social proof */}
             <motion.div variants={fadeInUp} className="mt-10">
-              <div className="flex items-center gap-4">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="h-10 w-10 rounded-full border-2 border-white bg-gradient-to-br from-primary-300 to-primary-500 shadow-sm"
-                    />
-                  ))}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Star
-                        key={i}
-                        className="h-4 w-4 fill-accent-400 text-accent-400"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-sm text-neutral-600">
-                    <span className="font-semibold text-neutral-900">
-                      2,000+
-                    </span>{" "}
-                    events created this month
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm font-medium text-neutral-600">
+                No app download for guests. Start free with no credit card.
+              </p>
             </motion.div>
           </div>
 

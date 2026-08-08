@@ -7,9 +7,6 @@ import {
   LayoutDashboard,
   CalendarPlus,
   Settings,
-  LayoutTemplate,
-  Users,
-  Sparkles,
   LogOut,
 } from "lucide-react";
 import { clientSignOut } from "@/lib/auth/client-auth";
@@ -18,9 +15,6 @@ import { useRouter } from "next/navigation";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/events/new", label: "Create Event", icon: CalendarPlus },
-  { href: "/templates", label: "Templates", icon: LayoutTemplate },
-  { href: "/ai-assistant", label: "AI Design", icon: Sparkles },
-  { href: "/settings/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -44,9 +38,6 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
           <span className="text-xl font-bold">
             <span className="text-foreground">Seal</span>
             <span className="text-brand-600">Send</span>
-          </span>
-          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700">
-            Beta
           </span>
         </Link>
       </div>

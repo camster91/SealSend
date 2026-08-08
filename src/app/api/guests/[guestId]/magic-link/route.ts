@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { query, queryOne } from "@/lib/db/client";
-import { randomBytes, createHash } from "crypto";
 import { rateLimit } from "@/lib/rate-limit";
-
-// Generate a secure random token (URL-safe base64)
-function generateSecureToken(): string {
-  // 32 bytes = 256 bits of entropy
-  return randomBytes(32).toString("base64url");
-}
-
-// Hash token for storage (SHA-256)
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-// Get token preview (last 4 chars)
-function getTokenPreview(token: string): string {
-  return token.slice(-4);
-}
+import { generateMagicToken, hashMagicToken, previewMagicToken } from '@/lib/magic-token';
 
 type RouteParams = { params: Promise<{ guestId: string }> };
 
@@ -72,9 +56,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Generate secure token
-    const rawToken = generateSecureToken();
-    const tokenHash = hashToken(rawToken);
-    const tokenPreview = getTokenPreview(rawToken);
+    const rawToken = generateMagicToken();
+    const tokenHash = hashMagicToken(rawToken);
+    const tokenPreview = previewMagicToken(rawToken);
 
     // Set expiration to 7 days from now
     const expiresAt = new Date();

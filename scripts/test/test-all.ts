@@ -196,7 +196,7 @@ async function main(): Promise<void> {
     console.log('\n⚠️  Some tests failed. Check the output above for details.');
     console.log('\n🔧 Troubleshooting:');
     console.log('   - Verify all environment variables are set correctly');
-    console.log('   - Check that Resend/Twilio accounts are active');
+    console.log('   - Check that Mailgun/Twilio accounts are active');
     console.log('   - Ensure domains and phone numbers are verified');
     console.log('   - Review error messages in the test output above');
     process.exit(1);

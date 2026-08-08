@@ -6,44 +6,29 @@ import { cn } from "@/lib/utils";
 
 const faqs = [
   {
-    question: "Can I switch plans at any time?",
+    question: "What is the difference between an event upgrade and annual Pro?",
     answer:
-      "Yes! You can upgrade or downgrade your plan at any time. When you upgrade, you'll be charged the prorated difference. When you downgrade, your new rate will take effect at the next billing cycle.",
+      "Silver through Diamond are one-time upgrades for a single event. Annual Pro covers unlimited events for one year, with up to 2,500 guests per event.",
   },
   {
     question: "What happens when I hit my event or guest limit?",
     answer:
-      "You'll receive a friendly notification when you're approaching your limits. You can upgrade to a higher plan instantly, or archive old events to make room for new ones. Your existing events will always remain accessible.",
+      "SealSend stops new guests or responses at the event's limit. You can upgrade that event, or use annual Pro for the highest capacity.",
   },
   {
-    question: "Do you offer refunds?",
+    question: "Does canceling Pro change event upgrades I already purchased?",
     answer:
-      "Yes, we offer a 14-day money-back guarantee on all paid plans. If you're not satisfied, contact us within 14 days for a full refund, no questions asked.",
+      "No. A separately purchased Silver, Gold, Platinum, or Diamond event keeps its event-level capacity after annual Pro ends.",
   },
   {
-    question: "Can I use my own domain?",
+    question: "How many events can I create for free?",
     answer:
-      "Yes! Pro and Business plans allow you to use a custom domain for your event pages (e.g., events.yourdomain.com). We provide SSL certificates automatically.",
+      "A free account can create one event for up to 15 guests. Annual Pro allows unlimited events during the active subscription.",
   },
   {
     question: "What payment methods do you accept?",
     answer:
-      "We accept all major credit cards (Visa, Mastercard, American Express) through our secure payment processor, Stripe. We also support PayPal for Business plans.",
-  },
-  {
-    question: "Is there a discount for nonprofits or education?",
-    answer:
-      "Yes! We offer 50% off for registered nonprofits and educational institutions. Contact our support team with your organization details to apply.",
-  },
-  {
-    question: "What happens to my data if I cancel?",
-    answer:
-      "Your data belongs to you. If you cancel, you can export all your guest lists, RSVPs, and event data. We'll keep your data for 30 days in case you change your mind, then it's permanently deleted.",
-  },
-  {
-    question: "Do you offer team or enterprise plans?",
-    answer:
-      "Our Business plan supports teams up to 10 members. For larger organizations with custom needs, contact us for an Enterprise quote with dedicated support and custom features.",
+      "Checkout is securely processed by Stripe. The payment methods shown at checkout depend on the methods enabled for SealSend's Stripe account.",
   },
 ];
 
@@ -72,6 +57,8 @@ export function PricingFAQ() {
               className="rounded-xl border border-neutral-200 bg-white shadow-sm transition-shadow hover:shadow-md"
             >
               <button
+                aria-expanded={openIndex === index}
+                aria-controls={`pricing-faq-answer-${index}`}
                 onClick={() =>
                   setOpenIndex(openIndex === index ? null : index)
                 }
@@ -88,6 +75,8 @@ export function PricingFAQ() {
                 />
               </button>
               <div
+                id={`pricing-faq-answer-${index}`}
+                hidden={openIndex !== index}
                 className={cn(
                   "grid transition-all duration-200",
                   openIndex === index
@@ -111,7 +100,7 @@ export function PricingFAQ() {
             Still have questions?
           </h3>
           <p className="mt-2 text-primary-100">
-            Our team is here to help. Reach out and we&apos;ll get back to you within 24 hours.
+            Email us with a pricing or billing question.
           </p>
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a
@@ -119,12 +108,6 @@ export function PricingFAQ() {
               className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50"
             >
               Contact Support
-            </a>
-            <a
-              href="/help"
-              className="inline-flex items-center justify-center rounded-lg border border-primary-400 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              Visit Help Center
             </a>
           </div>
         </div>

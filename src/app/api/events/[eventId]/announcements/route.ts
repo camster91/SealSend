@@ -9,6 +9,8 @@ import { announcementSchema } from "@/lib/validations";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
+import { canUseFeature, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -76,8 +78,8 @@ export async function POST(
     }
 
     // Tier gate: announcements require standard or premium (unlocked in beta)
-    const { BETA_MODE } = await import("@/lib/constants");
-    if (!BETA_MODE && event.tier === "free") {
+    const accountPlan = await getUserTier(user.id);
+    if (!canUseFeature(accountPlan, event.tier as EventTier, "announcements")) {
       return NextResponse.json(
         { error: "Announcements require a Standard or Premium upgrade" },
         { status: 403 }

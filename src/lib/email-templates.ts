@@ -11,13 +11,14 @@ interface InvitationEmailParams {
   hostName?: string;
   dressCode?: string | null;
   rsvpDeadline?: string | null;
+  eventTimezone?: string;
 }
 
 export function buildInvitationEmail(params: InvitationEmailParams): {
   subject: string;
   html: string;
 } {
-  const { guestName, eventTitle, eventDate, locationName, rsvpUrl, designUrl, hostName, dressCode, rsvpDeadline } = params;
+  const { guestName, eventTitle, eventDate, locationName, rsvpUrl, designUrl, hostName, dressCode, rsvpDeadline, eventTimezone } = params;
 
   const safeGuestName = escapeHtml(guestName);
   const safeEventTitle = escapeHtml(eventTitle);
@@ -38,7 +39,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
             </td>
             <td style="padding-left:12px;">
               <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">When</p>
-              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(eventDate))}</p>
+              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(eventDate, eventTimezone))}</p>
             </td>
           </tr></table>
         </td>
@@ -102,7 +103,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
             </td>
             <td style="padding-left:12px;">
               <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">RSVP By</p>
-              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(rsvpDeadline))}</p>
+              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(rsvpDeadline, eventTimezone))}</p>
             </td>
           </tr></table>
         </td>

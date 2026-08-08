@@ -15,8 +15,8 @@ export function PricingCTA() {
         </h2>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
           {BETA_MODE
-            ? "Join thousands of hosts using SealSend during our beta. All features are free!"
-            : "Join thousands of happy hosts creating beautiful invitations and managing their events with ease."}
+            ? "Try every SealSend feature during the beta at no cost."
+            : "Create beautiful invitations and manage your event in one place."}
         </p>
 
         {/* Trust badges */}
@@ -31,7 +31,7 @@ export function PricingCTA() {
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            <span>Set up in 2 minutes</span>
+            <span>Simple setup</span>
           </div>
         </div>
 
@@ -41,7 +41,7 @@ export function PricingCTA() {
             href="/signup"
             className="group inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-primary-600 shadow-lg transition-all hover:bg-primary-50 hover:shadow-xl"
           >
-            {BETA_MODE ? "Get Started Free" : "Start Free Trial"}
+            Get Started Free
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
           </Link>
           <Link
@@ -54,16 +54,8 @@ export function PricingCTA() {
 
         {/* Social proof */}
         <div className="mt-12">
-          <div className="flex items-center justify-center -space-x-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="h-10 w-10 rounded-full border-2 border-white bg-gradient-to-br from-primary-300 to-primary-500"
-              />
-            ))}
-          </div>
           <p className="mt-4 text-sm text-white/80">
-            <span className="font-semibold text-white">2,000+</span> events created this month
+            Start free. No credit card required.
           </p>
         </div>
       </div>

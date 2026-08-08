@@ -23,8 +23,17 @@ export function formatDate(date: string | Date): string {
   return format(new Date(date), "MMM d, yyyy");
 }
 
-export function formatDateTime(date: string | Date): string {
-  return format(new Date(date), "MMM d, yyyy 'at' h:mm a");
+export function formatDateTime(date: string | Date, timeZone?: string): string {
+  if (!timeZone) return format(new Date(date), "MMM d, yyyy 'at' h:mm a");
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+    }).format(new Date(date));
+  } catch {
+    return format(new Date(date), "MMM d, yyyy 'at' h:mm a");
+  }
 }
 
 export function formatRelative(date: string | Date): string {

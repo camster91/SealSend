@@ -34,7 +34,7 @@ function isValidOrigin(request: NextRequest): boolean {
   return false;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // CSRF protection: validate origin on state-changing API requests
@@ -64,6 +64,7 @@ export async function middleware(request: NextRequest) {
     '/robots.txt',
     '/sitemap.xml',
     '/invite/accept',
+    '/guest/update',
   ];
 
   const isPublicRoute =
