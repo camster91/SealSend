@@ -5,6 +5,8 @@ import { guestSchema } from "@/lib/validations";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { validateAndFormatPhone } from "@/lib/phone-validation";
+import type { CountryCode } from "libphonenumber-js";
 
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
@@ -91,9 +93,18 @@ export async function POST(
       return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
     }
 
+    let phone = parsed.data.phone || null;
+    if (phone) {
+      const validation = validateAndFormatPhone(phone, (process.env.DEFAULT_COUNTRY || "US") as CountryCode);
+      if (!validation.valid || !validation.formatted) {
+        return NextResponse.json({ error: validation.error || "Invalid phone number" }, { status: 400 });
+      }
+      phone = validation.formatted;
+    }
+
     const guest = await queryOne(
       'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
-      [eventId, parsed.data.name, parsed.data.email || null, parsed.data.phone || null, parsed.data.notes || null]
+      [eventId, parsed.data.name, parsed.data.email || null, phone, parsed.data.notes || null]
     );
 
     await recordActivationEventSafely({

@@ -179,7 +179,8 @@ test('event instants preserve the host timezone across browser, database, and in
 
   assert.match(tableDefinition(schema, 'events'), /event_timezone TEXT NOT NULL DEFAULT 'UTC'/);
   assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_timezone/);
-  assert.match(wizard, /new Date\(formData\.event_date\)\.toISOString\(\)/);
+  assert.match(wizard, /zonedLocalDateTimeToInstant\(formData\.event_date, formData\.event_timezone\)/);
+  assert.doesNotMatch(wizard, /new Date\(formData\.event_date\)\.toISOString\(\)/);
   assert.match(invitation, /formatDateTime\(eventDate, eventTimezone\)/);
 });
 
@@ -457,6 +458,66 @@ test('published retention and deletion terms match the support-request workflow'
     assert.match(policy, /within 30 days/i);
     assert.match(policy, /legal/i);
   }
+});
+
+test('verified account deletion is cancellable, subscription-safe, and executed by authenticated maintenance', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/account/deletion/route.ts');
+  const cron = await read('src/app/api/cron/delete-accounts/route.ts');
+  const settings = await read('src/app/(dashboard)/settings/page.tsx');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS account_deletion_requests/);
+  assert.match(route, /requireApiHost/);
+  assert.match(route, /INTERVAL '7 days'/);
+  assert.match(route, /Cancel the active subscription/);
+  assert.match(cron, /FOR UPDATE SKIP LOCKED/);
+  assert.match(cron, /DELETE FROM events WHERE user_id/);
+  assert.match(cron, /DELETE FROM admin_users/);
+  assert.match(cron, /deleted_account_upload_cleanup/);
+  assert.match(settings, /Download account export/);
+  assert.match(settings, /Schedule account deletion/);
+});
+
+test('storage is quota-backed and destructive retention jobs default off', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const upload = await read('src/app/api/upload/route.ts');
+  const drafts = await read('src/app/api/cron/cleanup-drafts/route.ts');
+  const uploads = await read('src/app/api/cron/cleanup-uploads/route.ts');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS upload_assets/);
+  assert.match(upload, /pg_advisory_xact_lock/);
+  assert.match(upload, /Storage quota exceeded/);
+  assert.match(drafts, /ENABLE_STALE_DRAFT_CLEANUP/);
+  assert.match(drafts, /updated_at < \$2/);
+  assert.match(uploads, /ENABLE_ORPHAN_UPLOAD_CLEANUP/);
+  assert.match(uploads, /NOT EXISTS \(SELECT 1 FROM events/);
+});
+
+test('operations metrics are secret-gated and exclude guest content', async () => {
+  const route = await read('src/app/api/operations/metrics/route.ts');
+  assert.match(route, /OPERATIONS_SECRET/);
+  assert.match(route, /status: 404/);
+  assert.match(route, /activation_events/);
+  assert.doesNotMatch(route, /respondent_name|respondent_email|message\s+FROM|recipient/);
+});
+
+test('host lifecycle emails are deduplicated, controlled, and disabled by default', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
+  const example = await read('.env.example');
+  assert.match(schema, /scope_key TEXT UNIQUE NOT NULL/);
+  assert.match(route, /ENABLE_HOST_LIFECYCLE_EMAILS/);
+  assert.match(route, /sendEmail/);
+  assert.match(route, /ON CONFLICT \(scope_key\) DO NOTHING/);
+  assert.match(example, /ENABLE_HOST_LIFECYCLE_EMAILS=false/);
+});
+
+test('checkout conversion telemetry is recorded only at real lifecycle boundaries', async () => {
+  const eventCheckout = await read('src/app/api/checkout/route.ts');
+  const annualCheckout = await read('src/app/api/subscriptions/checkout/route.ts');
+  const webhook = await read('src/app/api/webhooks/stripe/route.ts');
+  assert.match(eventCheckout, /name: 'checkout_started'/);
+  assert.match(annualCheckout, /name: "checkout_started"/);
+  assert.match(webhook, /name: "checkout_completed"/);
+  assert.match(webhook, /payment_status !== "paid"/);
 });
 
 test('authentication codes are hashed and scoped to one login context', async () => {

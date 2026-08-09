@@ -3,6 +3,7 @@ import { query } from "@/lib/db/client";
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 
 // Map legacy tier names to unified names
 const TIER_ALIAS: Record<string, string> = {
@@ -31,6 +32,8 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
     'UPDATE events SET tier = $1, max_responses = $2, payment_id = $3 WHERE id = $4',
     [tierKey, maxResponses, session.id, eventId]
   );
+  const userId = session.metadata?.userId;
+  await recordActivationEventSafely({ name: "checkout_completed", userId, eventId, metadata: { plan: tier } });
 }
 
 const VALID_SUBSCRIPTION_TIERS = ["pro_annual"];
@@ -65,6 +68,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
        updated_at = EXCLUDED.updated_at`,
     [userId, stripeCustomerId, stripeSubscriptionId, tier, billing ?? null, "active", new Date().toISOString()]
   );
+  await recordActivationEventSafely({ name: "checkout_completed", userId, metadata: { plan: tier } });
 }
 
 async function handleSubscriptionUpdated(

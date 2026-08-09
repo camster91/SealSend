@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { getStripe } from "@/lib/stripe";
 import { buildAnnualProCheckoutParams, isAnnualProCheckoutAvailable } from "@/lib/billing";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiHost();
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    await recordActivationEventSafely({ name: "checkout_started", userId: user.id, metadata: { plan: "pro_annual" } });
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

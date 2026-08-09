@@ -8,6 +8,7 @@ export function PricingHeader() {
         <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
           Built for independent planners, community organizers, and small teams. Start free with the complete event workflow; upgrade one event for capacity or choose annual Pro for recurring work.
         </p>
+        <p className="mt-3 text-sm font-medium text-neutral-500">All prices are in USD. Applicable taxes are shown at checkout.</p>
       </div>
     </section>
   );

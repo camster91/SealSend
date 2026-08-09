@@ -8,6 +8,8 @@ import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
 import { getUserTier } from '@/lib/subscription';
 import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
+import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist';
+import { queryOne } from '@/lib/db/client';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -32,6 +34,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
   
   const allEvents = Array.from(new Map([...myEvents, ...collaboratingEvents, ...invitedEvents].map((event) => [event.id, event])).values());
+  const firstOwnedEvent = myEvents[0];
+  const onboarding = firstOwnedEvent ? await queryOne<{ guest_count: string; sent_count: string }>(
+    `SELECT COUNT(*)::text AS guest_count,
+            COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
+       FROM guests WHERE event_id = $1`,
+    [firstOwnedEvent.id],
+  ) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,6 +78,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
           </div>
         </div>
+
+        <OnboardingChecklist
+          eventId={firstOwnedEvent?.id}
+          hasEvent={Boolean(firstOwnedEvent)}
+          hasGuest={Number(onboarding?.guest_count ?? 0) > 0}
+          isPublished={firstOwnedEvent?.status === 'published'}
+          hasInvitation={Number(onboarding?.sent_count ?? 0) > 0}
+        />
 
         {/* Usage Stats */}
         <div className="mb-8">

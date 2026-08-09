@@ -44,7 +44,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">6. Data Retention</h2>
-          <p>Active account data is retained while your account exists and as needed to operate, secure, and comply with legal obligations for the Service. You may request deletion by contacting support. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations. We will identify any provider records outside that scope when confirming the request.</p>
+          <p>Active account data is retained while your account exists and as needed to operate, secure, and comply with legal obligations for the Service. You may request deletion from your authenticated Settings page or by contacting support. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations. We will identify any provider records outside that scope when confirming the request.</p>
         </section>
 
         <section>

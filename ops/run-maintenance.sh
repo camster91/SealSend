@@ -6,7 +6,10 @@ case "$job" in
   reminders) endpoint="/api/cron/send-reminders" ;;
   announcements) endpoint="/api/cron/send-announcements" ;;
   cleanup) endpoint="/api/cron/cleanup-drafts" ;;
-  *) echo "Usage: $0 reminders|announcements|cleanup" >&2; exit 64 ;;
+  cleanup-uploads) endpoint="/api/cron/cleanup-uploads" ;;
+  delete-accounts) endpoint="/api/cron/delete-accounts" ;;
+  host-lifecycle) endpoint="/api/cron/send-host-lifecycle" ;;
+  *) echo "Usage: $0 reminders|announcements|cleanup|cleanup-uploads|delete-accounts|host-lifecycle" >&2; exit 64 ;;
 esac
 
 container="$(docker ps \

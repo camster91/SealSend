@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/readiness.test.mjs tests/rate-limit.test.ts tests/upload-path.test.ts tests/magic-token.test.ts tests/auth-code.test.ts tests/entitlements.test.ts tests/billing.test.ts tests/ai-event-draft.test.ts tests/ai-fallback.test.ts tests/activation-events.test.ts tests/calendar.test.ts tests/event-access.test.ts tests/message-audience.test.ts tests/message-cost-estimate.test.ts tests/communications-safety.test.ts tests/rsvp-summary.test.ts tests/server-monitoring.test.ts tests/event-templates.test.ts",
+    "test": "node --import tsx --test tests/readiness.test.mjs tests/rate-limit.test.ts tests/storage.test.ts tests/datetime.test.ts tests/upload-path.test.ts tests/magic-token.test.ts tests/auth-code.test.ts tests/entitlements.test.ts tests/billing.test.ts tests/ai-event-draft.test.ts tests/ai-fallback.test.ts tests/activation-events.test.ts tests/calendar.test.ts tests/event-access.test.ts tests/message-audience.test.ts tests/message-cost-estimate.test.ts tests/communications-safety.test.ts tests/rsvp-summary.test.ts tests/server-monitoring.test.ts tests/event-templates.test.ts",
     "test:e2e": "playwright test",
     "test:config": "npx tsx scripts/test/check-config.ts",
     "test:email": "npx tsx scripts/test/test-email.ts",

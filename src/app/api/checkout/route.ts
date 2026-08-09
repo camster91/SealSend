@@ -4,6 +4,7 @@ import { queryOne } from "@/lib/db/client";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
 import { isStripeKeyAllowed } from '@/lib/billing';
+import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 
 const checkoutSchema = z.object({
   eventId: z.string().uuid(),
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       eventTitle: event.title,
     });
+    await recordActivationEventSafely({ name: 'checkout_started', userId: user.id, eventId, metadata: { plan: tier } });
 
     return NextResponse.json({ url });
   } catch {

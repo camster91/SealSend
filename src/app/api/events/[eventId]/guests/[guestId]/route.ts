@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
+import { validateAndFormatPhone } from "@/lib/phone-validation";
+import type { CountryCode } from "libphonenumber-js";
 
 export async function PATCH(
   request: Request,
@@ -16,6 +18,13 @@ export async function PATCH(
     const parsed = guestSchema.partial().safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
+    }
+    if (parsed.data.phone) {
+      const validation = validateAndFormatPhone(parsed.data.phone, (process.env.DEFAULT_COUNTRY || "US") as CountryCode);
+      if (!validation.valid || !validation.formatted) {
+        return NextResponse.json({ error: validation.error || "Invalid phone number" }, { status: 400 });
+      }
+      parsed.data.phone = validation.formatted;
     }
 
     // Build dynamic SET clause from parsed fields (whitelist columns)

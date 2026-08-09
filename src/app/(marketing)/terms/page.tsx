@@ -49,7 +49,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-semibold mt-8 mb-4">8. Termination</h2>
-          <p>We may suspend or terminate your account for violation of these terms. You may request account and data deletion at any time by contacting <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations.</p>
+          <p>We may suspend or terminate your account for violation of these terms. You may request account and data deletion at any time from your authenticated Settings page or by contacting <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations.</p>
         </section>
 
         <section>

@@ -14,11 +14,21 @@ interface PaidEvent {
   updated_at: string;
 }
 
+interface DeletionRequest {
+  status: "pending" | "cancelled" | "completed";
+  requested_at: string;
+  scheduled_for: string;
+}
+
 export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<string | null>(null);
   const [paidEvents, setPaidEvents] = useState<PaidEvent[]>([]);
   const [billingLoading, setBillingLoading] = useState(true);
+  const [deletionRequest, setDeletionRequest] = useState<DeletionRequest | null>(null);
+  const [deletionConfirmation, setDeletionConfirmation] = useState("");
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -45,7 +55,31 @@ export default function SettingsPage() {
       .catch(() => {
         setBillingLoading(false);
       });
+    fetch("/api/account/deletion", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { request: null }))
+      .then((data: { request: DeletionRequest | null }) => setDeletionRequest(data.request))
+      .catch(() => setDeletionRequest(null));
   }, []);
+
+  const updateDeletion = async (method: "POST" | "DELETE") => {
+    setPrivacyLoading(true);
+    setPrivacyMessage(null);
+    try {
+      const response = await fetch("/api/account/deletion", { method });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to update deletion request");
+      setDeletionRequest(data.request);
+      setDeletionConfirmation("");
+      setPrivacyMessage({
+        type: "success",
+        text: method === "POST" ? "Account deletion scheduled. You can cancel during the cooling-off period." : "Account deletion cancelled.",
+      });
+    } catch (error) {
+      setPrivacyMessage({ type: "error", text: error instanceof Error ? error.message : "Unable to update deletion request" });
+    } finally {
+      setPrivacyLoading(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +148,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
+              id="account-email"
               label="Email"
               value={email}
               disabled
@@ -129,6 +164,7 @@ export default function SettingsPage() {
             <CardContent>
               <form onSubmit={handlePasswordChange} className="space-y-4">
                 <Input
+                  id="current-password"
                   label="Current Password"
                   type="password"
                   value={currentPassword}
@@ -136,6 +172,7 @@ export default function SettingsPage() {
                   required
                 />
                 <Input
+                  id="new-password"
                   label="New Password"
                   type="password"
                   value={newPassword}
@@ -143,6 +180,7 @@ export default function SettingsPage() {
                   required
                 />
                 <Input
+                  id="confirm-new-password"
                   label="Confirm New Password"
                   type="password"
                   value={confirmPassword}
@@ -215,6 +253,47 @@ export default function SettingsPage() {
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Privacy and account data</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Download your data</p>
+              <p className="mt-1 text-sm text-muted-foreground">Export your account, events, guests, responses, comments, and signup claims as JSON.</p>
+              <a
+                href="/api/account/export"
+                className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              >
+                Download account export
+              </a>
+            </div>
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-sm font-medium text-red-700">Delete account</p>
+              {deletionRequest?.status === "pending" ? (
+                <div className="mt-2 space-y-3">
+                  <p className="text-sm text-gray-700">
+                    Deletion is scheduled for {new Date(deletionRequest.scheduled_for).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}. Your owned events and related guest data will be permanently removed.
+                  </p>
+                  <button type="button" disabled={privacyLoading} onClick={() => updateDeletion("DELETE")} className="min-h-11 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+                    Cancel deletion
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-3">
+                  <p className="text-sm text-gray-700">Deletion has a seven-day cooling-off period. Active subscriptions must be cancelled first. Download an export before continuing.</p>
+                  <Input id="account-deletion-confirmation" label={'Type "DELETE" to confirm'} value={deletionConfirmation} onChange={(event) => setDeletionConfirmation(event.target.value)} autoComplete="off" />
+                  <button type="button" disabled={privacyLoading || deletionConfirmation !== "DELETE"} onClick={() => updateDeletion("POST")} className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">
+                    Schedule account deletion
+                  </button>
+                </div>
+              )}
+              {privacyMessage && <p role={privacyMessage.type === "error" ? "alert" : "status"} className={`mt-3 text-sm ${privacyMessage.type === "error" ? "text-red-700" : "text-green-700"}`}>{privacyMessage.text}</p>}
+            </div>
           </CardContent>
         </Card>
       </div>

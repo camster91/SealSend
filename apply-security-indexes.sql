@@ -146,7 +146,10 @@ CREATE TABLE IF NOT EXISTS activation_events (
     'event_published',
     'first_guest_added',
     'first_invitation_sent',
-    'first_rsvp_received'
+    'first_rsvp_received',
+    'checkout_started',
+    'checkout_completed',
+    'account_exported'
   )),
   user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   event_id UUID REFERENCES events(id) ON DELETE SET NULL,
@@ -162,12 +165,67 @@ CREATE INDEX IF NOT EXISTS idx_activation_events_event_created
   ON activation_events(event_id, created_at) WHERE event_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user
   ON activation_events(event_name, user_id)
-  WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started');
+  WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started', 'account_exported');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event
   ON activation_events(event_name, event_id)
   WHERE event_id IS NOT NULL AND event_name IN (
-    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received'
+    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed'
   );
+ALTER TABLE activation_events DROP CONSTRAINT IF EXISTS activation_events_event_name_check;
+ALTER TABLE activation_events ADD CONSTRAINT activation_events_event_name_check CHECK (event_name IN (
+  'account_created','event_draft_started','ai_generation_started','ai_generation_completed','ai_generation_accepted',
+  'event_published','first_guest_added','first_invitation_sent','first_rsvp_received',
+  'checkout_started','checkout_completed','account_exported'
+));
+DROP INDEX IF EXISTS idx_activation_first_user;
+DROP INDEX IF EXISTS idx_activation_first_event;
+CREATE UNIQUE INDEX idx_activation_first_user
+  ON activation_events(event_name, user_id)
+  WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started', 'account_exported');
+CREATE UNIQUE INDEX idx_activation_first_event
+  ON activation_events(event_name, event_id)
+  WHERE event_id IS NOT NULL AND event_name IN (
+    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed'
+  );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_account_checkout
+  ON activation_events(event_name, user_id)
+  WHERE event_name = 'checkout_completed' AND user_id IS NOT NULL AND event_id IS NULL;
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'cancelled', 'completed')),
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  scheduled_for TIMESTAMPTZ NOT NULL,
+  cancelled_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_due
+  ON account_deletion_requests(status, scheduled_for) WHERE status = 'pending';
+CREATE TABLE IF NOT EXISTS deleted_account_upload_cleanup (
+  user_directory UUID PRIMARY KEY,
+  queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  attempt_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS upload_assets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  path TEXT UNIQUE NOT NULL,
+  byte_size BIGINT NOT NULL CHECK (byte_size > 0),
+  media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video', 'audio')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_upload_assets_user ON upload_assets(user_id, created_at);
+CREATE TABLE IF NOT EXISTS host_lifecycle_notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+  notification_type TEXT NOT NULL CHECK (notification_type IN ('getting_started', 'finish_draft', 'event_approaching')),
+  scope_key TEXT UNIQUE NOT NULL,
+  provider_message_id TEXT,
+  sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_host_lifecycle_user ON host_lifecycle_notifications(user_id, sent_at);
 
 CREATE TABLE IF NOT EXISTS event_members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

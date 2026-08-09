@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiHost } from '@/lib/auth/api-auth';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import sharp from 'sharp';
+import { getDb } from '@/lib/db/client';
+import { canReserveStorage, storageQuotaBytes } from '@/lib/storage';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -90,7 +93,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const uploadType = request.nextUrl.searchParams.get('type') || 'image';
+    const requestedType = request.nextUrl.searchParams.get('type') || 'image';
+    const uploadType = ['image', 'video', 'audio'].includes(requestedType) ? requestedType : 'image';
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -157,8 +161,7 @@ export async function POST(request: NextRequest) {
 
     // Sanitize the original filename: keep only safe characters
     const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const timestamp = Date.now();
-    const fileName = `${timestamp}-${originalName}`;
+    const fileName = `${Date.now()}-${randomUUID()}-${originalName}`;
 
     // If compression changed the extension, update the filename
     const nameWithoutExt = fileName.replace(/\.[^.]+$/, '');
@@ -170,14 +173,39 @@ export async function POST(request: NextRequest) {
     // Ensure the user's upload directory exists
     await mkdir(userDir, { recursive: true });
 
-    // Write the file to disk
-    await writeFile(filePath, buffer);
-
     const urlPath = `/uploads/${user.id}/${finalFileName}`;
 
-    return NextResponse.json({
-      url: urlPath,
-    });
+    const db = getDb();
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`upload:${user.id}`]);
+      const [usageResult, planResult, paidEventResult] = await Promise.all([
+        client.query<{ used: string }>('SELECT COALESCE(SUM(byte_size), 0)::text AS used FROM upload_assets WHERE user_id = $1', [user.id]),
+        client.query<{ tier: string }>("SELECT tier FROM user_subscriptions WHERE user_id = $1 AND status IN ('active','trialing') ORDER BY updated_at DESC LIMIT 1", [user.id]),
+        client.query("SELECT 1 FROM events WHERE user_id = $1 AND tier <> 'free' LIMIT 1", [user.id]),
+      ]);
+      const usedBytes = Number(usageResult.rows[0]?.used ?? 0);
+      const quotaBytes = storageQuotaBytes(planResult.rows[0]?.tier ?? 'free', Boolean(paidEventResult.rowCount));
+      if (!canReserveStorage(usedBytes, buffer.length, quotaBytes)) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: 'Storage quota exceeded. Remove unused media or upgrade your plan.', usedBytes, quotaBytes }, { status: 413 });
+      }
+      await writeFile(filePath, buffer);
+      await client.query(
+        'INSERT INTO upload_assets (user_id, path, byte_size, media_type) VALUES ($1, $2, $3, $4)',
+        [user.id, urlPath, buffer.length, uploadType],
+      );
+      await client.query('COMMIT');
+      return NextResponse.json({ url: urlPath, storage: { usedBytes: usedBytes + buffer.length, quotaBytes } });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      await unlink(filePath).catch(() => undefined);
+      console.error('[upload] Failed to reserve storage', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    } finally {
+      client.release();
+    }
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

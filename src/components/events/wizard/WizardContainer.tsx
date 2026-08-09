@@ -12,6 +12,7 @@ import StepRSVPFields from './StepRSVPFields';
 import StepPreview from './StepPreview';
 import { PromptToEventGenerator } from './PromptToEventGenerator';
 import type { AiEventDraft } from '@/lib/ai/event-draft-schema';
+import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from '@/lib/datetime';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -254,28 +255,18 @@ export default function WizardContainer({
   }, []);
 
   const applyAiDraft = useCallback((draft: AiEventDraft, generationId: string) => {
-    const toLocalDateTime = (value: string | null, timeZone: string) => {
-      if (!value) return '';
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-      }).formatToParts(new Date(value));
-      const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
-      return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
-    };
     const timeZone = draft.event.eventTimezone;
     const appliedData: Partial<WizardFormData> = {
       title: draft.event.title,
       description: draft.event.description,
-      event_date: toLocalDateTime(draft.event.eventDate, timeZone),
-      event_end_date: toLocalDateTime(draft.event.eventEndDate, timeZone),
+      event_date: draft.event.eventDate ? instantToZonedLocalDateTime(draft.event.eventDate, timeZone) : '',
+      event_end_date: draft.event.eventEndDate ? instantToZonedLocalDateTime(draft.event.eventEndDate, timeZone) : '',
       event_timezone: timeZone,
       location_name: draft.event.locationName ?? '',
       location_address: draft.event.locationAddress ?? '',
       host_name: draft.event.hostName ?? '',
       dress_code: draft.event.dressCode ?? '',
-      rsvp_deadline: toLocalDateTime(draft.event.rsvpDeadline, timeZone),
+      rsvp_deadline: draft.event.rsvpDeadline ? instantToZonedLocalDateTime(draft.event.rsvpDeadline, timeZone) : '',
       max_attendees: draft.event.maxAttendees,
       allow_plus_ones: draft.event.allowPlusOnes,
       max_guests_per_rsvp: draft.event.maxGuestsPerRsvp,
@@ -314,14 +305,14 @@ export default function WizardContainer({
       const payload = {
         title: formData.title,
         description: formData.description || undefined,
-        event_date: formData.event_date ? new Date(formData.event_date).toISOString() : undefined,
-        event_end_date: formData.event_end_date ? new Date(formData.event_end_date).toISOString() : undefined,
+        event_date: formData.event_date ? zonedLocalDateTimeToInstant(formData.event_date, formData.event_timezone) : undefined,
+        event_end_date: formData.event_end_date ? zonedLocalDateTimeToInstant(formData.event_end_date, formData.event_timezone) : undefined,
         event_timezone: formData.event_timezone,
         location_name: formData.location_name || undefined,
         location_address: formData.location_address || undefined,
         host_name: formData.host_name || undefined,
         dress_code: formData.dress_code || undefined,
-        rsvp_deadline: formData.rsvp_deadline ? new Date(formData.rsvp_deadline).toISOString() : undefined,
+        rsvp_deadline: formData.rsvp_deadline ? zonedLocalDateTimeToInstant(formData.rsvp_deadline, formData.event_timezone) : undefined,
         registry_links: formData.registry_links.length > 0 ? formData.registry_links : undefined,
         max_attendees: formData.max_attendees,
         allow_plus_ones: formData.allow_plus_ones,

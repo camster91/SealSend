@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { WizardFormData } from './WizardContainer';
+import { zonedLocalDateTimeToInstant } from '@/lib/datetime';
 
 interface StepPreviewProps {
   formData: WizardFormData;
@@ -25,13 +26,15 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
   const formatDate = (dateStr: string) => {
     if (!dateStr) return null;
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
+      return new Date(zonedLocalDateTimeToInstant(dateStr, formData.event_timezone)).toLocaleString(undefined, {
+        timeZone: formData.event_timezone,
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        timeZoneName: 'short',
       });
     } catch {
       return dateStr;

@@ -10,6 +10,9 @@ export const ACTIVATION_EVENT_NAMES = [
   "first_guest_added",
   "first_invitation_sent",
   "first_rsvp_received",
+  "checkout_started",
+  "checkout_completed",
+  "account_exported",
 ] as const;
 
 export type ActivationEventName = (typeof ACTIVATION_EVENT_NAMES)[number];

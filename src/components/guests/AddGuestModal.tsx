@@ -135,13 +135,14 @@ export function AddGuestModal({
             id="phone"
             label="Phone Number"
             type="tel"
-            placeholder="(555) 000-0000"
+            placeholder="+1 416 555 0123"
+            autoComplete="tel"
             error={errors.phone?.message}
             {...register("phone")}
           />
           {phoneValue && (
             <p className="mt-1 text-xs text-gray-400">
-              {phoneValue.replace(/\D/g, "").length}/10 digits
+              Include the country calling code for international delivery.
             </p>
           )}
         </div>
