@@ -55,6 +55,47 @@ Record the measurement window and denominator for every rate.
 | Backup restore rehearsal | | Pass | Pending |
 | Willingness to pay | | Recorded for all five hosts | Pending |
 
+## Real-device accessibility evidence
+
+Automated emulation is supporting evidence only. Record the physical device, operating-system version, browser or assistive technology, tester, date, and result. Do not record participant account credentials.
+
+| Device and OS | Browser/AT | Viewports/workflows | Keyboard, focus and announcements | Result | Tester | Date |
+|---|---|---|---|---|---|---|
+| iPhone (supported iOS) | Safari + VoiceOver | Marketing, signup, login, wizard, public RSVP | Pending | Pending | | |
+| iPad (supported iPadOS) | Safari + VoiceOver | Dashboard, wizard, guest management | Pending | Pending | | |
+| macOS | Safari + VoiceOver | Complete host and guest critical path | Pending | Pending | | |
+| Windows | Edge + NVDA | Complete host and guest critical path | Pending | Pending | | |
+| Android | Chrome + TalkBack | Marketing, signup, login, public RSVP, check-in | Pending | Pending | | |
+
+Acceptance requires no critical or serious WCAG 2.2 AA defect in a launch-critical workflow, no keyboard trap, visible focus, correctly announced errors/status changes, and usable 200% zoom/reflow.
+
+## Professional review tracking
+
+Internal implementation review does not replace qualified legal or accounting advice. Store engagement letters and advice outside the repository; record only the outcome and approved policy version here.
+
+| Review | Reviewer/firm | Jurisdiction/scope | Required evidence | Status | Approval date |
+|---|---|---|---|---|---|
+| Privacy and Terms | | Canada and intended customer markets | Written approval or tracked amendments | Pending | |
+| Data retention/deletion | | Personal and guest data | Approved periods, exceptions, processor duties | Pending | |
+| Refund/cancellation policy | | Annual and per-event purchases | Approved eligibility and entitlement treatment | Pending | |
+| Sales tax | | Canada plus intended markets | Registration, collection and remittance decision | Pending | |
+| Email/SMS compliance | | CASL/TCPA and intended markets | Consent, identification, unsubscribe and records decision | Pending | |
+| Accessibility risk | | Intended markets | Remediation/statement decision | Pending | |
+
+## Load and recovery evidence
+
+Run `npm run test:load` against the intended public origin. Defaults are bounded to 200 read-only requests at concurrency 10, require zero failures, and require p95 latency no greater than 1500 ms. Record the command environment, result JSON, server health, and log review.
+
+Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VPS. It creates an isolated PostgreSQL container, restores the backup, starts the supplied image on an isolated Docker network, verifies health and the unauthenticated API boundary, and removes all rehearsal containers/network on exit. It never connects to the production database.
+
+| Gate | Artifact | Result | Verified by | Date |
+|---|---|---|---|---|
+| Bounded public load | 200 requests, concurrency 10, 0 failures, p95 286 ms, max 629 ms; production remained healthy | Pass | Codex QA | 2026-08-08 |
+| RSVP capacity concurrency | 10 simultaneous attempts for 3 seats: 3 accepted, 7 capacity-rejected, persisted 3 responses/3 attendees; fixture removed | Pass | Codex QA | 2026-08-08 |
+| Current-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T012633Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
+| Rollback-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T003511Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
+| Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
+
 ## Go/no-go record
 
 - Decision date:

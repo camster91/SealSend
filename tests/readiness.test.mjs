@@ -254,6 +254,28 @@ test('operations scripts schedule authenticated maintenance without exposing sec
   assert.match(cronDefinition, /run-maintenance\.sh cleanup/);
 });
 
+test('load and recovery gates are bounded, read-only, and isolated from production data', async () => {
+  const load = await read('scripts/load/public-readiness.mjs');
+  const capacity = await read('scripts/load/rsvp-capacity.mjs');
+  const recovery = await read('ops/rehearse-release.sh');
+  assert.match(load, /requestCount > 5000/);
+  assert.match(load, /concurrency > 50/);
+  assert.match(load, /method|fetch/);
+  assert.doesNotMatch(load, /method:\s*["'](?:POST|PUT|PATCH|DELETE)/);
+  assert.match(load, /failures: 0/);
+  assert.match(load, /p95Ms/);
+  assert.match(capacity, /ALLOW_MUTATING_LOAD_TEST/);
+  assert.match(capacity, /ALLOW_PRODUCTION_MUTATING_LOAD_TEST/);
+  assert.match(capacity, /qa-capacity-/);
+  assert.match(capacity, /attempts > 25/);
+  assert.match(recovery, /sealsend-rehearsal-/);
+  assert.match(recovery, /postgres:16-alpine/);
+  assert.match(recovery, /pg_restore --exit-on-error/);
+  assert.match(recovery, /PAYMENTS_TEST_ONLY=true/);
+  assert.match(recovery, /COMMUNICATIONS_TEST_ONLY=true/);
+  assert.doesNotMatch(recovery, /sealsend-postgres/);
+});
+
 test('database backup tooling uses container credentials, retention, and archive verification', async () => {
   const backup = await read('ops/backup-database.sh');
 
