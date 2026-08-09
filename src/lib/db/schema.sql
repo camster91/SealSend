@@ -558,6 +558,15 @@ CREATE TABLE IF NOT EXISTS server_error_events (
 );
 CREATE INDEX IF NOT EXISTS idx_server_error_events_created ON server_error_events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_server_error_events_fingerprint ON server_error_events(fingerprint, created_at DESC);
+CREATE TABLE IF NOT EXISTS monitoring_alert_deliveries (
+  fingerprint TEXT PRIMARY KEY,
+  last_attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_delivered_at TIMESTAMPTZ,
+  last_delivery_status TEXT NOT NULL DEFAULT 'pending' CHECK (last_delivery_status IN ('pending', 'delivered', 'failed')),
+  attempt_count INTEGER NOT NULL DEFAULT 1 CHECK (attempt_count > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_monitoring_alert_deliveries_attempted
+  ON monitoring_alert_deliveries(last_attempted_at DESC);
 CREATE TABLE IF NOT EXISTS beta_feedback (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,

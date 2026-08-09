@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 108 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, and operational cron safeguards.
+- 109 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -60,6 +60,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - A bounded production-safe load run completed 200 read-only requests at concurrency 10 with zero failures, 286 ms p95, and 629 ms maximum latency. A disposable capacity test sent ten simultaneous RSVPs to a three-seat event; exactly three persisted and seven were rejected, proving the production serialization boundary without overbooking. All fixtures were removed.
 - The latest 33-table backup restored into isolated PostgreSQL 16 and booted both `sealsend:20260809T012633Z` and rollback image `sealsend:20260809T003511Z`; each returned health 200 and unauthenticated events 401. The rehearsal used isolated Docker networks and removed its containers after each run.
 - Firefox, desktop WebKit, and iPhone WebKit emulation passed 27/27 live accessibility and public regression checks. The initial desktop WebKit run caught a transient reduced-motion hero contrast failure; the deployed fix suppresses entrance/floating motion for reduced-motion users and the complete production rerun passed.
+- Alert delivery now verifies a successful webhook response, stores only a safe fingerprint/status/timestamps, suppresses successful repeats for 15 minutes by default, and retries failed delivery after one minute. Fresh PostgreSQL 16 schema plus the production migration succeeded twice idempotently with 34 public tables.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries] = await Promise.all([
+  const [totals, funnel, deliveries, alerts] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
         WHERE created_at >= NOW() - INTERVAL '30 days'
         GROUP BY status ORDER BY status`,
     ),
+    query<{ status: string; count: string }>(
+      `SELECT last_delivery_status AS status, COUNT(*)::text AS count FROM monitoring_alert_deliveries
+        WHERE last_attempted_at >= NOW() - INTERVAL '30 days'
+        GROUP BY last_delivery_status ORDER BY last_delivery_status`,
+    ),
   ]);
-  return NextResponse.json({ generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts }, { headers: { "Cache-Control": "no-store" } });
 }

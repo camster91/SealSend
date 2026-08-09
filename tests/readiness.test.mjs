@@ -418,9 +418,12 @@ test('beta operations include privacy-safe error capture and authenticated feedb
   const instrumentation = await read('src/instrumentation.ts');
   const feedback = await read('src/app/api/feedback/route.ts');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS server_error_events/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS monitoring_alert_deliveries/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS beta_feedback/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS server_error_events/);
   assert.doesNotMatch(monitoring, /error\.message|error\.stack/);
+  assert.match(monitoring, /last_delivered_at/);
+  assert.match(monitoring, /response\.ok/);
   assert.match(instrumentation, /onRequestError/);
   assert.match(feedback, /requireApiHost/);
   assert.match(feedback, /rateLimit/);

@@ -49,6 +49,8 @@ Recruit one host from each segment: private celebration, wedding, community/non-
 5. OpenAI is optional for beta because deterministic fallback is shipped. Before advertising AI generation, configure a model/key and verify schema rejection, timeout/failure fallback, quotas, latency, and cost against the approved evaluation set.
 6. Configure and deliver a synthetic `ERROR_ALERT_WEBHOOK_URL` event before relying on incident alerting. Keep all external-send flags closed until the corresponding evidence is recorded.
 
+Alert delivery is fingerprinted from sanitized error metadata. Successful webhook deliveries are suppressed for the configured cooldown (15 minutes by default); failed deliveries retry after the configured delay (one minute by default). Operators can inspect only aggregate alert delivery states through the authenticated operations metrics endpoint.
+
 ## Market and locale scope
 
 - The controlled beta is English-language and USD-priced. Do not advertise localized-language support until a complete translated workflow and assistive-technology review pass.
