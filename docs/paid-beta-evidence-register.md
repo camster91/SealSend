@@ -98,6 +98,8 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 
 ## Go/no-go record
 
+The authoritative machine-readable gate status is `config/launch-evidence.json`. Run `npm run launch:decision`; it exits non-zero and reports `NO_GO` until every required gate has evidence. Human gates cannot pass without both a named approver and an ISO approval date. A successful result authorizes staged activation planning only; it does not itself enable payments, communications, destructive cleanup, or public launch.
+
 - Decision date:
 - Decision owner:
 - Evidence window:
