@@ -560,6 +560,16 @@ test('checkout conversion telemetry is recorded only at real lifecycle boundarie
   assert.match(webhook, /payment_status !== "paid"/);
 });
 
+test('checkout failures are retained as accessible inline errors rather than browser alerts', async () => {
+  const pricing = await read('src/components/pricing/PricingCards.tsx');
+  const upgrade = await read('src/components/events/UpgradeButton.tsx');
+  for (const source of [pricing, upgrade]) {
+    assert.match(source, /role="alert"/);
+    assert.match(source, /checkoutError/);
+    assert.doesNotMatch(source, /\balert\(/);
+  }
+});
+
 test('provider callbacks are authenticated, replay-safe, and retry transient failures', async () => {
   const stripe = await read('src/app/api/webhooks/stripe/route.ts');
   const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');

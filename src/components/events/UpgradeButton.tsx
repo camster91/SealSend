@@ -51,6 +51,7 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   const [loading, setLoading] = useState<UpgradeTier | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   if (BETA_MODE) {
     return (
@@ -72,6 +73,7 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   if (availableUpgrades.length === 0) return null;
 
   async function handleUpgrade(tier: UpgradeTier) {
+    setCheckoutError(null);
     setLoading(tier);
     try {
       const res = await fetch("/api/checkout", {
@@ -83,21 +85,27 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to create checkout session");
+        setCheckoutError(data.error || "Failed to create checkout session");
         return;
       }
 
       window.location.href = data.url;
     } catch {
-      alert("Something went wrong. Please try again.");
+      setCheckoutError("Something went wrong. Please try again.");
     } finally {
       setLoading(null);
     }
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {availableUpgrades.map((tier) => {
+    <div>
+      {checkoutError && (
+        <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {checkoutError}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {availableUpgrades.map((tier) => {
         const info = UPGRADE_TIERS[tier];
         const isLoading = loading === tier;
         return (
@@ -120,7 +128,8 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
             {info.name} {info.price}
           </button>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }

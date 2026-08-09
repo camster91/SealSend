@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     const user = getClientUser();
@@ -18,6 +19,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
   }, []);
 
   async function startAnnualProCheckout() {
+    setCheckoutError(null);
     setLoading(true);
     try {
       const response = await fetch("/api/subscriptions/checkout", {
@@ -29,13 +31,20 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
       if (!response.ok) throw new Error(data.error || "Checkout could not be started");
       window.location.href = data.url;
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Checkout could not be started");
+      setCheckoutError(error instanceof Error ? error.message : "Checkout could not be started");
       setLoading(false);
     }
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <div>
+      {checkoutError && (
+        <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">Checkout could not be started</p>
+          <p className="mt-1">{checkoutError}</p>
+        </div>
+      )}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
       {PUBLIC_PRICING_PLANS.map((plan) => (
         <article key={plan.id} className={cn("relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm", plan.id === "pro_annual" ? "border-primary-500 shadow-lg" : "border-neutral-200")}>
           {plan.id === "pro_annual" && <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-primary-600 px-3 py-1 text-xs font-medium text-white"><Sparkles className="h-3.5 w-3.5" />Best for repeat hosts</span>}
@@ -66,6 +75,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
           )}
         </article>
       ))}
+      </div>
     </div>
   );
 }

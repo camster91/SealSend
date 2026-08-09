@@ -5,7 +5,7 @@
   "lastReviewed": "2026-08-08",
   "gates": [
     { "id": "production_safety", "kind": "automated", "status": "pass", "evidence": ["DEPLOYMENT_READINESS.md: PAYMENTS_TEST_ONLY and COMMUNICATIONS_TEST_ONLY verified true; destructive automation flags false"] },
-    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["109 tests, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; permanent Chromium, Firefox and desktop/mobile WebKit matrix"] },
+    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["110 tests, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; permanent Chromium, Firefox and desktop/mobile WebKit matrix"] },
     { "id": "load_capacity", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 200-request public load and 10-way RSVP capacity concurrency"] },
     { "id": "backup_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest 33-table backup restored with current image health 200"] },
     { "id": "rollback_image_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest backup restored with immediate rollback image health 200"] },
