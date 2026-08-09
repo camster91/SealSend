@@ -6,7 +6,7 @@ Date: 2026-08-08
 
 - **Controlled AI beta:** deployed and verified for test-only operation.
 - **Paid beta:** not cleared. Stripe's complete test lifecycle and controlled Mailgun/Twilio delivery/callback tests still require verified provider configuration.
-- **Public paid launch:** not cleared. It additionally requires five real hosts to complete workflows, approved retention/support/refund policies, and observed conversion/cost evidence.
+- **Public paid launch:** not cleared. It additionally requires five real hosts to complete workflows, professional legal/accounting review, and observed conversion/cost evidence.
 
 Payments and external communications must remain explicitly test-only until their provider gates pass. A green local build is not evidence of a completed charge or delivered message.
 
@@ -16,26 +16,26 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260808T142000Z`
-- Current verified application commit: `db858e9`
-- Current release source: `/opt/sealsend/releases/20260808T142000Z`
-- Immediate rollback image/source: `sealsend:20260808T140650Z` and `/opt/sealsend/releases/20260808T140650Z`
+- Current verified image: `sealsend:20260809T003511Z`
+- Current verified application commit: `687d3ea8cc14c541f7b1e25fddd59daf87e7ce45`
+- Current release source: `/opt/sealsend/releases/20260809T003511Z`
+- Immediate rollback image/source: `sealsend:20260808T142000Z` and `/opt/sealsend/releases/20260808T142000Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260808T134326Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T003501Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
 
 ## Locally verified release candidate
 
-- 89 unit/readiness tests passed, including selected-channel cost-preview, atomic RSVP-field, checkout-authorization-order, check-in UUID, and published deletion-policy regressions.
+- 99 unit/readiness tests passed, including account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
-- Playwright passed 34 applicable desktop/mobile tests; four production-credential tests were intentionally skipped locally.
+- The complete local Playwright run passed 31 tests with 12 intentional credential skips; three tests that timed out only under six-worker development-server load then passed serially (six accessibility and four visual checks).
 - Axe found no serious or critical violations on the audited public routes at 375, 768, and 1440 pixels.
 - Visual/responsive coverage ran at 375, 768, and 1440 pixels with reduced motion.
-- Fresh PostgreSQL 16 schema applied successfully; the production migration then applied twice successfully, proving idempotency for the tested schema.
+- Fresh PostgreSQL 16 schema and the production migration applied successfully, and the migration applied a second time successfully to prove idempotency; 33 public tables were verified.
 - Runtime dependency audit reported zero known vulnerabilities; GitHub Dependabot had zero open alerts when checked on 2026-08-08.
 - `git diff --check` passed.
 
@@ -51,6 +51,9 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - A disposable paid-event fixture verified Google and Outlook calendar links plus a downloadable ICS with the stable event UID. A future approved email announcement remained queued with `dispatch=null`, appeared in status history, and was cancelled before dispatch. No provider send occurred and the fixture was deleted.
 - All 13 launch templates passed production QA at 375px and 1440px. Both galleries had no horizontal overflow; every template opened the correct named wizard and persisted its complete customization into an isolated editable draft; no browser runtime errors occurred. The disposable account was deleted.
 - The deployed Terms and Privacy pages match the verified support-request deletion workflow. Health and both policy pages returned HTTP 200, and 12 production desktop/mobile marketing and accessibility checks passed with no serious or critical Axe findings.
+- A disposable production owner passed the new account-privacy lifecycle: authenticated JSON export, deletion scheduling, cooling-off cancellation, and settings accessibility. The account was removed directly after the non-destructive test; final counts showed zero QA accounts and zero pending QA deletion requests.
+- Production contains the account-deletion, upload-asset, host-lifecycle-notification, and deleted-account-upload-cleanup tables. The revised maintenance runner was installed with backups; draft cleanup, orphan cleanup, and host lifecycle jobs passed in report-only/disabled mode.
+- The current release keeps `PAYMENTS_TEST_ONLY=true`, `COMMUNICATIONS_TEST_ONLY=true`, all three automation enable flags false, and draft retention at 90 days. Public export and cron routes reject unauthenticated access, while the operations endpoint remains hidden until configured.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
@@ -66,6 +69,10 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Traceable aggregate RSVP intelligence that excludes guest free text from AI interpretation.
 - Thirteen editable templates, template-to-wizard population, safe artwork upload, and non-destructive crop/focus controls.
 - Privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
+- Self-service portable JSON export plus scheduled account deletion with a seven-day cooling-off period, paid-subscription protection, cancellation, and retry-safe upload cleanup.
+- Per-account upload accounting and serialized quotas: 250 MB free, 1 GB paid-event, and 5 GB annual Pro; orphan deletion remains report-only until explicitly enabled.
+- First-event onboarding, checkout lifecycle analytics, aggregate secret-gated operational metrics, and deduplicated host lifecycle messaging that remains disabled until provider verification.
+- Explicit English/USD controlled-beta scope, locale-aware previews, selected event-timezone conversion, DST validation, and international E.164 guest phone handling.
 
 ## Production configuration gates
 
@@ -76,6 +83,8 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Configure `ERROR_ALERT_WEBHOOK_URL`, then call the secret-protected monitoring test route and verify receipt. The health cron alone does not prove alert delivery.
 - Set channel-specific `EMAIL_ESTIMATED_COST_MICROS` and `SMS_ESTIMATED_COST_MICROS` from current provider pricing before relying on the approval estimate.
 - Approve a retention policy before enabling draft cleanup. Reminder/announcement cron jobs remain gated until controlled delivery verification.
+- Keep `ENABLE_STALE_DRAFT_CLEANUP=false`, `ENABLE_ORPHAN_UPLOAD_CLEANUP=false`, and `ENABLE_HOST_LIFECYCLE_EMAILS=false` until retention/provider gates are approved and verified.
+- Configure a strong `OPERATIONS_SECRET` before consuming aggregate operational metrics; the endpoint intentionally returns 404 while unconfigured.
 - Keep `/app/uploads` on persistent storage and retain verified database backups before every migration.
 
 The read-only production provider probe on 2026-08-08 returned: Stripe authentication HTTP 200 with a live-mode key, Mailgun HTTP 401, Twilio unconfigured, and OpenAI unconfigured. Therefore provider-dependent tests remain blocked and both test-only flags remain mandatory.
