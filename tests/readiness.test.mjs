@@ -124,6 +124,18 @@ test('package exposes unit, typecheck, and e2e test commands', async () => {
   assert.equal(typeof pkg.scripts['test:e2e'], 'string');
 });
 
+test('browser QA permanently covers Chromium, Firefox, and desktop/mobile WebKit', async () => {
+  const config = await read('playwright.config.ts');
+  assert.match(config, /Desktop Chrome/);
+  assert.match(config, /Pixel 7/);
+  assert.match(config, /Desktop Firefox/);
+  assert.match(config, /Desktop Safari/);
+  assert.match(config, /iPhone 15/);
+  const hero = await read('src/components/marketing/Hero.tsx');
+  assert.match(hero, /useReducedMotion/);
+  assert.match(hero, /initial=\{shouldReduceMotion \? false/);
+});
+
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
   const config = await read('next.config.ts');
   const proxy = await read('src/proxy.ts');

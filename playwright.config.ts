@@ -12,6 +12,9 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'mobile-webkit', use: { ...devices['iPhone 15'] } },
   ],
   webServer: process.env.NEXT_PUBLIC_SITE_URL
     ? undefined

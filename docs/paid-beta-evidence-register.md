@@ -59,6 +59,8 @@ Record the measurement window and denominator for every rate.
 
 Automated emulation is supporting evidence only. Record the physical device, operating-system version, browser or assistive technology, tester, date, and result. Do not record participant account credentials.
 
+The permanent Playwright matrix covers Chromium/Pixel, Firefox, desktop WebKit, and iPhone WebKit emulation. These checks catch engine-specific regressions but do not satisfy the physical-device or assistive-technology gates below.
+
 | Device and OS | Browser/AT | Viewports/workflows | Keyboard, focus and announcements | Result | Tester | Date |
 |---|---|---|---|---|---|---|
 | iPhone (supported iOS) | Safari + VoiceOver | Marketing, signup, login, wizard, public RSVP | Pending | Pending | | |
@@ -66,6 +68,8 @@ Automated emulation is supporting evidence only. Record the physical device, ope
 | macOS | Safari + VoiceOver | Complete host and guest critical path | Pending | Pending | | |
 | Windows | Edge + NVDA | Complete host and guest critical path | Pending | Pending | | |
 | Android | Chrome + TalkBack | Marketing, signup, login, public RSVP, check-in | Pending | Pending | | |
+
+Supporting engine evidence: Firefox passed 9/9 live public accessibility/regression checks; desktop WebKit passed 8/9 initially, exposing a reduced-motion hero contrast defect; the corrected 768px WebKit regression then passed locally. Mobile WebKit passed 9/9 live checks. Production verification of the corrected WebKit case is required after deployment.
 
 Acceptance requires no critical or serious WCAG 2.2 AA defect in a launch-critical workflow, no keyboard trap, visible focus, correctly announced errors/status changes, and usable 200% zoom/reflow.
 

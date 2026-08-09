@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Play, Star, Users, Zap } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { BETA_MODE } from "@/lib/constants";
 
 const fadeInUp = {
@@ -20,6 +20,7 @@ const staggerContainer = {
 };
 
 export default function Hero() {
+  const shouldReduceMotion = useReducedMotion();
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-primary-50 via-white to-white">
       {/* Background decoration */}
@@ -31,7 +32,7 @@ export default function Hero() {
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         <motion.div
           className="grid gap-12 lg:grid-cols-2 lg:gap-8"
-          initial="initial"
+          initial={shouldReduceMotion ? false : "initial"}
           animate="animate"
           variants={staggerContainer}
         >
@@ -126,8 +127,8 @@ export default function Hero() {
               {/* Floating elements */}
               <motion.div
                 className="absolute -left-8 top-1/4 rounded-xl bg-white p-4 shadow-xl"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                animate={shouldReduceMotion ? { y: 0 } : { y: [0, -10, 0] }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-100">
@@ -142,8 +143,8 @@ export default function Hero() {
 
               <motion.div
                 className="absolute -right-4 bottom-1/4 rounded-xl bg-white p-4 shadow-xl"
-                animate={{ y: [0, 10, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                animate={shouldReduceMotion ? { y: 0 } : { y: [0, 10, 0] }}
+                transition={shouldReduceMotion ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-100">
