@@ -69,7 +69,7 @@ The permanent Playwright matrix covers Chromium/Pixel, Firefox, desktop WebKit, 
 | Windows | Edge + NVDA | Complete host and guest critical path | Pending | Pending | | |
 | Android | Chrome + TalkBack | Marketing, signup, login, public RSVP, check-in | Pending | Pending | | |
 
-Supporting engine evidence: Firefox passed 9/9 live public accessibility/regression checks; desktop WebKit passed 8/9 initially, exposing a reduced-motion hero contrast defect; the corrected 768px WebKit regression then passed locally. Mobile WebKit passed 9/9 live checks. Production verification of the corrected WebKit case is required after deployment.
+Supporting engine evidence: Firefox, desktop WebKit, and mobile WebKit each passed 9/9 live public accessibility/regression checks (27/27 total). The first desktop WebKit run exposed a reduced-motion hero contrast defect at 768px; the corrected release passed that case and the entire matrix in production. This engine evidence does not replace physical hardware or screen-reader testing.
 
 Acceptance requires no critical or serious WCAG 2.2 AA defect in a launch-critical workflow, no keyboard trap, visible focus, correctly announced errors/status changes, and usable 200% zoom/reflow.
 

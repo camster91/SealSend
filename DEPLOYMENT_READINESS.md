@@ -16,12 +16,12 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260809T012633Z`
-- Current verified application commit: `78549e78f0bd400a9765342f0db42a08b1c8ef89`
-- Current release source: `/opt/sealsend/releases/20260809T012633Z`
-- Immediate rollback image/source: `sealsend:20260809T003511Z` and `/opt/sealsend/releases/20260809T003511Z`
+- Current verified image: `sealsend:20260809T031926Z`
+- Current verified application commit: `89720622a9349e36a99eea7da3807093cfa93caa`
+- Current release source: `/opt/sealsend/releases/20260809T031926Z`
+- Immediate rollback image/source: `sealsend:20260809T012633Z` and `/opt/sealsend/releases/20260809T012633Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T012633Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T031926Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
@@ -59,6 +59,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - After the provider hardening deployment, 12 desktop/mobile public marketing and Axe checks passed at 375, 768, and 1440 pixels; the container remained healthy with no recent error, fatal, or panic log entries.
 - A bounded production-safe load run completed 200 read-only requests at concurrency 10 with zero failures, 286 ms p95, and 629 ms maximum latency. A disposable capacity test sent ten simultaneous RSVPs to a three-seat event; exactly three persisted and seven were rejected, proving the production serialization boundary without overbooking. All fixtures were removed.
 - The latest 33-table backup restored into isolated PostgreSQL 16 and booted both `sealsend:20260809T012633Z` and rollback image `sealsend:20260809T003511Z`; each returned health 200 and unauthenticated events 401. The rehearsal used isolated Docker networks and removed its containers after each run.
+- Firefox, desktop WebKit, and iPhone WebKit emulation passed 27/27 live accessibility and public regression checks. The initial desktop WebKit run caught a transient reduced-motion hero contrast failure; the deployed fix suppresses entrance/floating motion for reduced-motion users and the complete production rerun passed.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
