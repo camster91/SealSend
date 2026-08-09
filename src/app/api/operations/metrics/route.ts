@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
+import { isOperationsAuthorized } from "@/lib/operations-auth";
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.OPERATIONS_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const [totals, funnel, deliveries] = await Promise.all([

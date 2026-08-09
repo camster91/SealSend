@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import { getDb } from '@/lib/db/client';
 
 /**
  * Twilio webhook handler for SMS status callbacks
@@ -55,21 +55,22 @@ export async function POST(request: NextRequest) {
     // Map Twilio status to our status
     const status = mapTwilioStatus(data.MessageStatus);
 
-    if (status) {
-      await updateSmsStatus(data.MessageSid, status, {
+    if (status && data.MessageSid && data.To) {
+      const processed = await updateSmsStatus(data.MessageSid, data.MessageStatus, status, {
         to: data.To,
         from: data.From,
         errorCode: data.ErrorCode,
         errorMessage: getErrorMessage(data.ErrorCode),
       });
+      if (!processed) return NextResponse.json({ received: true, duplicate: true });
     }
 
     // Twilio expects a 200 OK response
     return new NextResponse(null, { status: 200 });
   } catch (error) {
     console.error('[Twilio Webhook] Error:', error);
-    // Still return 200 so Twilio doesn't retry
-    return new NextResponse(null, { status: 200 });
+    // Fail transient processing errors so Twilio retries instead of silently losing delivery state.
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
 
@@ -132,6 +133,7 @@ function getErrorMessage(errorCode?: string): string | undefined {
 
 async function updateSmsStatus(
   messageSid: string,
+  providerStatus: string,
   status: 'sent' | 'delivered' | 'failed' | 'bounced',
   metadata: {
     to: string;
@@ -140,25 +142,48 @@ async function updateSmsStatus(
     errorMessage?: string;
   }
 ) {
+  const client = await getDb().connect();
   try {
+    await client.query('BEGIN');
+    const receipt = await client.query(
+      `INSERT INTO webhook_receipts (provider, event_id)
+       VALUES ('twilio', $1)
+       ON CONFLICT DO NOTHING
+       RETURNING event_id`,
+      [`${messageSid}:${providerStatus}`]
+    );
+    if (!receipt.rows[0]) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
     const deliveryStatus = status === 'sent' ? 'accepted' : status;
-    await query(
-      `UPDATE announcement_deliveries SET status = $1, error = $2, updated_at = NOW()
+    await client.query(
+      `UPDATE announcement_deliveries SET
+         status = CASE
+           WHEN status IN ('delivered', 'bounced', 'opted_out') THEN status
+           ELSE $1
+         END,
+         error = $2,
+         updated_at = NOW()
        WHERE provider_message_id = $3`,
       [deliveryStatus, metadata.errorMessage || null, messageSid]
     );
 
-    // Find the send log by provider message ID (Twilio SID)
-    const sendLog = await queryOne<{ id: string; metadata: Record<string, unknown> | null }>(
+    const sendLogResult = await client.query<{ id: string; metadata: Record<string, unknown> | null }>(
       'SELECT id, metadata FROM send_logs WHERE provider_message_id = $1',
       [messageSid]
     );
+    const sendLog = sendLogResult.rows[0];
 
     if (!sendLog) console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
 
-    // Update the send log
-    if (sendLog) await query(
-      `UPDATE send_logs SET status = $1, error_message = $2, metadata = $3, updated_at = $4
+    if (sendLog) await client.query(
+      `UPDATE send_logs SET
+         status = CASE WHEN status IN ('delivered', 'bounced') THEN status ELSE $1 END,
+         error_message = $2,
+         metadata = $3,
+         updated_at = $4
        WHERE id = $5`,
       [
         status,
@@ -176,23 +201,19 @@ async function updateSmsStatus(
       ]
     );
 
-    // If failed or bounced, mark the phone as invalid
     if (status === 'failed' || status === 'bounced') {
-      await markPhoneInvalid(metadata.to);
+      await client.query(
+        'UPDATE guests SET phone_invalid_at = $1, updated_at = $2 WHERE phone = $3',
+        [new Date().toISOString(), new Date().toISOString(), metadata.to]
+      );
     }
+    await client.query('COMMIT');
+    return true;
   } catch (error) {
-    console.error('[Twilio Webhook] Error updating SMS status:', error);
-  }
-}
-
-async function markPhoneInvalid(phone: string) {
-  try {
-    await query(
-      'UPDATE guests SET phone_invalid_at = $1, updated_at = $2 WHERE phone = $3',
-      [new Date().toISOString(), new Date().toISOString(), phone]
-    );
-  } catch (error) {
-    console.error('[Twilio Webhook] Error marking phone invalid:', error);
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
 

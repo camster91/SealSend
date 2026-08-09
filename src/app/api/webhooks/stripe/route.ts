@@ -4,6 +4,7 @@ import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { toStoredSubscriptionStatus } from "@/lib/billing";
 
 // Map legacy tier names to unified names
 const TIER_ALIAS: Record<string, string> = {
@@ -82,13 +83,12 @@ async function handleSubscriptionUpdated(
     tier = subscription.metadata.tier;
   }
 
-  const status = subscription.status === "active" ? "active" : subscription.status;
-  const currentPeriodEnd = new Date(
-    ((subscription as unknown as { current_period_end: number }).current_period_end ?? 0) * 1000
-  ).toISOString();
+  const status = toStoredSubscriptionStatus(subscription.status);
+  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
+  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
   const updatedAt = new Date().toISOString();
 
-  if (tier) {
+  if (tier && VALID_SUBSCRIPTION_TIERS.includes(tier)) {
     await query(
       `UPDATE user_subscriptions SET status = $1, current_period_end = $2, updated_at = $3, tier = $4, stripe_subscription_id = $5
        WHERE stripe_subscription_id = $5`,
@@ -129,6 +129,22 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   );
 }
 
+async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
+  const subscriptionId =
+    typeof invoiceAny.subscription === "string"
+      ? invoiceAny.subscription
+      : invoiceAny.subscription?.id;
+
+  if (!subscriptionId) return;
+
+  await query(
+    `UPDATE user_subscriptions SET status = $1, updated_at = $2
+     WHERE stripe_subscription_id = $3 AND status <> 'canceled'`,
+    ["active", new Date().toISOString(), subscriptionId]
+  );
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
@@ -153,31 +169,48 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.mode === "subscription") {
-        await handleSubscriptionCheckout(session);
-      } else {
-        await handleEventCheckout(session);
+  const receipt = await query<{ event_id: string }>(
+    `INSERT INTO webhook_receipts (provider, event_id)
+     VALUES ('stripe', $1)
+     ON CONFLICT DO NOTHING
+     RETURNING event_id`,
+    [event.id]
+  );
+  if (!receipt[0]) return NextResponse.json({ received: true, duplicate: true });
+
+  try {
+    switch (event.type) {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === "subscription") {
+          await handleSubscriptionCheckout(session);
+        } else {
+          await handleEventCheckout(session);
+        }
+        break;
       }
-      break;
+      case "customer.subscription.updated": {
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        break;
+      }
+      case "customer.subscription.deleted": {
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
+      }
+      case "invoice.payment_failed": {
+        await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+      }
+      case "invoice.paid": {
+        await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+        break;
+      }
     }
-    case "customer.subscription.updated": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await handleSubscriptionUpdated(subscription);
-      break;
-    }
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await handleSubscriptionDeleted(subscription);
-      break;
-    }
-    case "invoice.payment_failed": {
-      const invoice = event.data.object as Stripe.Invoice;
-      await handlePaymentFailed(invoice);
-      break;
-    }
+  } catch (error) {
+    // Release the receipt so Stripe can retry a transient database/runtime failure.
+    await query("DELETE FROM webhook_receipts WHERE provider = 'stripe' AND event_id = $1", [event.id]);
+    throw error;
   }
 
   return NextResponse.json({ received: true });

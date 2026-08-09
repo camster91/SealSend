@@ -493,7 +493,10 @@ test('storage is quota-backed and destructive retention jobs default off', async
 
 test('operations metrics are secret-gated and exclude guest content', async () => {
   const route = await read('src/app/api/operations/metrics/route.ts');
-  assert.match(route, /OPERATIONS_SECRET/);
+  const auth = await read('src/lib/operations-auth.ts');
+  assert.match(route, /isOperationsAuthorized/);
+  assert.match(auth, /OPERATIONS_SECRET/);
+  assert.match(auth, /timingSafeEqual/);
   assert.match(route, /status: 404/);
   assert.match(route, /activation_events/);
   assert.doesNotMatch(route, /respondent_name|respondent_email|message\s+FROM|recipient/);
@@ -518,6 +521,31 @@ test('checkout conversion telemetry is recorded only at real lifecycle boundarie
   assert.match(annualCheckout, /name: "checkout_started"/);
   assert.match(webhook, /name: "checkout_completed"/);
   assert.match(webhook, /payment_status !== "paid"/);
+});
+
+test('provider callbacks are authenticated, replay-safe, and retry transient failures', async () => {
+  const stripe = await read('src/app/api/webhooks/stripe/route.ts');
+  const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');
+  const twilio = await read('src/app/api/webhooks/twilio/route.ts');
+  assert.match(stripe, /constructEvent/);
+  assert.match(stripe, /checkout\.session\.async_payment_succeeded/);
+  assert.match(stripe, /invoice\.paid/);
+  assert.match(stripe, /INSERT INTO webhook_receipts/);
+  assert.match(stripe, /DELETE FROM webhook_receipts/);
+  assert.match(mailgun, /timingSafeEqual/);
+  assert.match(mailgun, /INSERT INTO webhook_receipts/);
+  assert.match(twilio, /timingSafeEqual/);
+  assert.match(twilio, /INSERT INTO webhook_receipts/);
+  assert.match(twilio, /status: 500/);
+});
+
+test('operations readiness is secret-gated and never returns credential values', async () => {
+  const route = await read('src/app/api/operations/readiness/route.ts');
+  const readiness = await read('src/lib/provider-readiness.ts');
+  assert.match(route, /isOperationsAuthorized/);
+  assert.match(route, /status: 404/);
+  assert.match(route, /Cache-Control.*no-store/);
+  assert.doesNotMatch(readiness, /return.*STRIPE_SECRET_KEY|return.*MAILGUN_API_KEY|return.*TWILIO_AUTH_TOKEN/);
 });
 
 test('authentication codes are hashed and scoped to one login context', async () => {

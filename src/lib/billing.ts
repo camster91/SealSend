@@ -16,6 +16,15 @@ export function isAnnualProCheckoutAvailable(): boolean {
   return isStripeKeyAllowed() && Boolean(process.env.STRIPE_PRO_YEARLY_PRICE_ID);
 }
 
+export type StoredSubscriptionStatus = "active" | "past_due" | "canceled" | "trialing";
+
+export function toStoredSubscriptionStatus(status: Stripe.Subscription.Status): StoredSubscriptionStatus {
+  if (status === "active") return "active";
+  if (status === "trialing") return "trialing";
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") return "canceled";
+  return "past_due";
+}
+
 export function buildAnnualProCheckoutParams({ userId, userEmail, priceId, siteUrl }: AnnualProCheckoutInput): Stripe.Checkout.SessionCreateParams {
   if (!priceId) throw new Error("Missing STRIPE_PRO_YEARLY_PRICE_ID environment variable");
 

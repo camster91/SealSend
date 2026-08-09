@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAnnualProCheckoutParams, isStripeKeyAllowed } from "../src/lib/billing";
+import { buildAnnualProCheckoutParams, isStripeKeyAllowed, toStoredSubscriptionStatus } from "../src/lib/billing";
 
 test("annual Pro checkout uses the configured recurring Stripe price", () => {
   const params = buildAnnualProCheckoutParams({
@@ -45,4 +45,15 @@ test("test-only billing refuses live Stripe keys", () => {
     if (previous === undefined) delete process.env.PAYMENTS_TEST_ONLY;
     else process.env.PAYMENTS_TEST_ONLY = previous;
   }
+});
+
+test("Stripe subscription states fail closed to entitlement-safe stored states", () => {
+  assert.equal(toStoredSubscriptionStatus("active"), "active");
+  assert.equal(toStoredSubscriptionStatus("trialing"), "trialing");
+  assert.equal(toStoredSubscriptionStatus("past_due"), "past_due");
+  assert.equal(toStoredSubscriptionStatus("incomplete"), "past_due");
+  assert.equal(toStoredSubscriptionStatus("paused"), "past_due");
+  assert.equal(toStoredSubscriptionStatus("unpaid"), "canceled");
+  assert.equal(toStoredSubscriptionStatus("incomplete_expired"), "canceled");
+  assert.equal(toStoredSubscriptionStatus("canceled"), "canceled");
 });

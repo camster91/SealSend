@@ -40,6 +40,15 @@
 
 Recruit one host from each segment: private celebration, wedding, community/non-profit, corporate/team, and repeat planner. Each host must complete account access, event creation, customization, publishing, guest import, a controlled invitation, RSVP, announcement/reminder review, calendar addition, check-in, export, and feedback. Record only consented operational observations—no guest content. A paid launch decision requires provider delivery evidence, funnel completion, unresolved severity, support effort, and willingness-to-pay results.
 
+## Provider readiness and lifecycle evidence
+
+1. Configure a separate, strong `OPERATIONS_SECRET`, then request `GET /api/operations/readiness` with `Authorization: Bearer <secret>`. The response contains booleans and modes only; it never returns credential values and is configuration evidence, not proof of provider reachability.
+2. Stripe sandbox acceptance requires a test key, annual recurring price, webhook signing secret, and signed lifecycle evidence for completed checkout, delayed-payment success, duplicate webhook replay, renewal payment, failed payment, recovery, subscription update, and cancellation. Confirm the stored entitlement after every transition.
+3. Mailgun acceptance requires an API key, verified domain, webhook signing key, and signed accepted, delivered, temporary failure, permanent failure/bounce, complaint, and unsubscribe callbacks. Confirm duplicate callbacks do not duplicate state changes.
+4. Twilio acceptance requires sending credentials, a sender, `TWILIO_AUTH_TOKEN` for callback signature validation, and the exact public webhook URL. Verify sent, delivered, failed, undelivered, duplicate, invalid-signature, and transient-database retry behavior.
+5. OpenAI is optional for beta because deterministic fallback is shipped. Before advertising AI generation, configure a model/key and verify schema rejection, timeout/failure fallback, quotas, latency, and cost against the approved evaluation set.
+6. Configure and deliver a synthetic `ERROR_ALERT_WEBHOOK_URL` event before relying on incident alerting. Keep all external-send flags closed until the corresponding evidence is recorded.
+
 ## Market and locale scope
 
 - The controlled beta is English-language and USD-priced. Do not advertise localized-language support until a complete translated workflow and assistive-technology review pass.
