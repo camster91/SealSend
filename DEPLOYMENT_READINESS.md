@@ -55,7 +55,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Production contains the account-deletion, upload-asset, host-lifecycle-notification, and deleted-account-upload-cleanup tables. The revised maintenance runner was installed with backups; draft cleanup, orphan cleanup, and host lifecycle jobs passed in report-only/disabled mode.
 - The current release keeps `PAYMENTS_TEST_ONLY=true`, `COMMUNICATIONS_TEST_ONLY=true`, all three automation enable flags false, and draft retention at 90 days. Public export and cron routes reject unauthenticated access, while the operations endpoint remains hidden until configured.
 - Stripe now handles delayed-payment success, failed-payment recovery, safe subscription-state mapping, and replay claims. Twilio callbacks update delivery state transactionally, reject replays, preserve terminal states, and return 500 on transient processing failures so the provider can retry.
-- The secret-gated provider-readiness endpoint reports configuration booleans and key mode without returning credentials. Production returns 404 while `OPERATIONS_SECRET` is absent; unsigned Stripe and Twilio probes returned 400 and 401 respectively.
+- The secret-gated provider-readiness endpoint reports configuration booleans and key mode without returning credentials. Production returns 404 without valid authorization; unsigned Stripe and Twilio probes returned 400 and 401 respectively.
 - After the provider hardening deployment, 12 desktop/mobile public marketing and Axe checks passed at 375, 768, and 1440 pixels; the container remained healthy with no recent error, fatal, or panic log entries.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
@@ -87,10 +87,12 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Set channel-specific `EMAIL_ESTIMATED_COST_MICROS` and `SMS_ESTIMATED_COST_MICROS` from current provider pricing before relying on the approval estimate.
 - Approve a retention policy before enabling draft cleanup. Reminder/announcement cron jobs remain gated until controlled delivery verification.
 - Keep `ENABLE_STALE_DRAFT_CLEANUP=false`, `ENABLE_ORPHAN_UPLOAD_CLEANUP=false`, and `ENABLE_HOST_LIFECYCLE_EMAILS=false` until retention/provider gates are approved and verified.
-- Configure a strong `OPERATIONS_SECRET` before consuming aggregate operational metrics; the endpoint intentionally returns 404 while unconfigured.
+- Keep the configured `OPERATIONS_SECRET` private, rotate it after any suspected exposure, and retrieve aggregate operational metrics only from an approved operator context.
 - Keep `/app/uploads` on persistent storage and retain verified database backups before every migration.
 
 The read-only production provider probe on 2026-08-08 returned: Stripe authentication HTTP 200 with a live-mode key, Mailgun HTTP 401, Twilio unconfigured, and OpenAI unconfigured. Therefore provider-dependent tests remain blocked and both test-only flags remain mandatory.
+
+On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the protected Coolify environment after backing it up to `/opt/sealsend/backups/20260809T014642Z-coolify.env`. The authenticated readiness endpoint worked without returning credential values. Fresh read-only probes returned Stripe HTTP 200 in live mode, Mailgun HTTP 401, and Twilio HTTP 401; the connected Stripe app also required reauthentication. No charge, message, refund, provider mutation, or guest-data submission occurred.
 
 ## Required deployment and QA sequence
 
