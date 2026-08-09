@@ -16,19 +16,19 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260809T003511Z`
-- Current verified application commit: `687d3ea8cc14c541f7b1e25fddd59daf87e7ce45`
-- Current release source: `/opt/sealsend/releases/20260809T003511Z`
-- Immediate rollback image/source: `sealsend:20260808T142000Z` and `/opt/sealsend/releases/20260808T142000Z`
+- Current verified image: `sealsend:20260809T012633Z`
+- Current verified application commit: `78549e78f0bd400a9765342f0db42a08b1c8ef89`
+- Current release source: `/opt/sealsend/releases/20260809T012633Z`
+- Immediate rollback image/source: `sealsend:20260809T003511Z` and `/opt/sealsend/releases/20260809T003511Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T003501Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T012633Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
 
 ## Locally verified release candidate
 
-- 99 unit/readiness tests passed, including account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, and operational cron safeguards.
+- 104 unit/readiness tests passed, including provider readiness, replay-safe callbacks, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -54,6 +54,9 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - A disposable production owner passed the new account-privacy lifecycle: authenticated JSON export, deletion scheduling, cooling-off cancellation, and settings accessibility. The account was removed directly after the non-destructive test; final counts showed zero QA accounts and zero pending QA deletion requests.
 - Production contains the account-deletion, upload-asset, host-lifecycle-notification, and deleted-account-upload-cleanup tables. The revised maintenance runner was installed with backups; draft cleanup, orphan cleanup, and host lifecycle jobs passed in report-only/disabled mode.
 - The current release keeps `PAYMENTS_TEST_ONLY=true`, `COMMUNICATIONS_TEST_ONLY=true`, all three automation enable flags false, and draft retention at 90 days. Public export and cron routes reject unauthenticated access, while the operations endpoint remains hidden until configured.
+- Stripe now handles delayed-payment success, failed-payment recovery, safe subscription-state mapping, and replay claims. Twilio callbacks update delivery state transactionally, reject replays, preserve terminal states, and return 500 on transient processing failures so the provider can retry.
+- The secret-gated provider-readiness endpoint reports configuration booleans and key mode without returning credentials. Production returns 404 while `OPERATIONS_SECRET` is absent; unsigned Stripe and Twilio probes returned 400 and 401 respectively.
+- After the provider hardening deployment, 12 desktop/mobile public marketing and Axe checks passed at 375, 768, and 1440 pixels; the container remained healthy with no recent error, fatal, or panic log entries.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
