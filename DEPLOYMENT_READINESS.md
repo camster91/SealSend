@@ -16,12 +16,12 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260809T031926Z`
-- Current verified application commit: `89720622a9349e36a99eea7da3807093cfa93caa`
-- Current release source: `/opt/sealsend/releases/20260809T031926Z`
-- Immediate rollback image/source: `sealsend:20260809T012633Z` and `/opt/sealsend/releases/20260809T012633Z`
+- Current verified image: `sealsend:20260809T170408Z`
+- Current verified application commit: `bb7c882309215c4d578b1fe8f49a4cc63e1b87a3`
+- Current release source: `/opt/sealsend/releases/20260809T170408Z`
+- Immediate rollback image/source: `sealsend:20260809T031926Z` and `/opt/sealsend/releases/20260809T031926Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T031926Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T170408Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
@@ -35,7 +35,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - The complete local Playwright run passed 31 tests with 12 intentional credential skips; three tests that timed out only under six-worker development-server load then passed serially (six accessibility and four visual checks).
 - Axe found no serious or critical violations on the audited public routes at 375, 768, and 1440 pixels.
 - Visual/responsive coverage ran at 375, 768, and 1440 pixels with reduced motion.
-- Fresh PostgreSQL 16 schema and the production migration applied successfully, and the migration applied a second time successfully to prove idempotency; 33 public tables were verified.
+- Fresh PostgreSQL 16 schema and the production migration applied successfully, and the migration applied a second time successfully to prove idempotency; 34 public tables were verified.
 - Runtime dependency audit reported zero known vulnerabilities; GitHub Dependabot had zero open alerts when checked on 2026-08-08.
 - `git diff --check` passed.
 
@@ -61,6 +61,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - The latest 33-table backup restored into isolated PostgreSQL 16 and booted both `sealsend:20260809T012633Z` and rollback image `sealsend:20260809T003511Z`; each returned health 200 and unauthenticated events 401. The rehearsal used isolated Docker networks and removed its containers after each run.
 - Firefox, desktop WebKit, and iPhone WebKit emulation passed 27/27 live accessibility and public regression checks. The initial desktop WebKit run caught a transient reduced-motion hero contrast failure; the deployed fix suppresses entrance/floating motion for reduced-motion users and the complete production rerun passed.
 - Alert delivery now verifies a successful webhook response, stores only a safe fingerprint/status/timestamps, suppresses successful repeats for 15 minutes by default, and retries failed delivery after one minute. Fresh PostgreSQL 16 schema plus the production migration succeeded twice idempotently with 34 public tables.
+- The alert-delivery release `sealsend:20260809T170408Z` was deployed on 2026-08-09. Its container is healthy at application commit `bb7c882309215c4d578b1fe8f49a4cc63e1b87a3`; public health returned 200/no-store, unauthenticated operational metrics returned 404, and authorized aggregate metrics returned 200 with an empty alert-delivery summary. An alert receiver is still required to prove external alert receipt.
 - The `20260808T134326Z` production backup restored successfully into an isolated PostgreSQL 16 container with 26 public tables. The restore container was removed after the rehearsal.
 - Parallel Playwright navigation produced two Next.js “destination stream closed early” client-disconnect logs without failed assertions, unhealthy state, or persisted-data errors. Track recurrence, but this is not currently a release blocker.
 
