@@ -16,12 +16,12 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260809T220256Z`
-- Current verified application commit: `19348ccbecea0a4367adb0f6b6bb9ac02dd324b9`
-- Current release source: `/opt/sealsend/releases/20260809T220256Z`
-- Immediate rollback image/source: `sealsend:20260809T170408Z` and `/opt/sealsend/releases/20260809T170408Z`
+- Current verified image: `sealsend:20260811T013748Z`
+- Current verified application commit: `2d406a1819a986da536b89785605ccc18d02e621`
+- Current release source: `/opt/sealsend/releases/20260811T013748Z`
+- Immediate rollback image/source: `sealsend:20260809T220256Z` and `/opt/sealsend/releases/20260809T220256Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260809T220256Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260811T013748Z.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
