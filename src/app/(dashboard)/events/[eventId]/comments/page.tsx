@@ -13,6 +13,7 @@ export default function CommentsPage() {
   const eventId = params.eventId as string;
   const [comments, setComments] = useState<EventComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -30,17 +31,22 @@ export default function CommentsPage() {
 
   async function handleDelete(commentId: string) {
     if (!confirm('Delete this comment?')) return;
+    setDeleteError(null);
 
-    const res = await fetch(`/api/events/${eventId}/comments`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commentId }),
-    });
+    try {
+      const res = await fetch(`/api/events/${eventId}/comments`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId }),
+      });
 
-    if (res.ok) {
-      fetchComments();
-    } else {
-      alert('Failed to delete comment.');
+      if (res.ok) {
+        fetchComments();
+      } else {
+        setDeleteError('Failed to delete comment. Please try again.');
+      }
+    } catch {
+      setDeleteError('Failed to delete comment. Check your connection and try again.');
     }
   }
 
@@ -59,6 +65,12 @@ export default function CommentsPage() {
           {comments.length} comment{comments.length !== 1 ? 's' : ''}
         </p>
       </div>
+
+      {deleteError && (
+        <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {deleteError}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

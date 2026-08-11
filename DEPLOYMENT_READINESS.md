@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 110 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout failures, and operational cron safeguards.
+- 111 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.

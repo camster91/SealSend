@@ -570,6 +570,18 @@ test('checkout failures are retained as accessible inline errors rather than bro
   }
 });
 
+test('host management failures are retained as accessible inline errors rather than browser alerts', async () => {
+  const sources = await Promise.all([
+    read('src/components/dashboard/CloneEventButton.tsx'),
+    read('src/app/(dashboard)/events/[eventId]/guests/page.tsx'),
+    read('src/app/(dashboard)/events/[eventId]/comments/page.tsx'),
+  ]);
+  for (const source of sources) {
+    assert.match(source, /role=(?:"alert"|\{notice\.tone === "error" \? "alert" : "status"\})/);
+    assert.doesNotMatch(source, /\balert\(/);
+  }
+});
+
 test('provider callbacks are authenticated, replay-safe, and retry transient failures', async () => {
   const stripe = await read('src/app/api/webhooks/stripe/route.ts');
   const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');

@@ -13,8 +13,10 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
   const router = useRouter();
   const [isCloning, setIsCloning] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [cloneError, setCloneError] = useState<string | null>(null);
 
   const handleClone = async () => {
+    setCloneError(null);
     setIsCloning(true);
     try {
       const res = await fetch(`/api/events/${eventId}/clone`, { method: 'POST' });
@@ -29,11 +31,11 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
         }, 1500);
       } else {
         setIsCloning(false);
-        alert(data.error || 'Failed to clone event');
+        setCloneError(data.error || 'Failed to clone event');
       }
     } catch {
       setIsCloning(false);
-      alert('An error occurred while cloning the event');
+      setCloneError('An error occurred while cloning the event');
     }
   };
 
@@ -60,6 +62,7 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
   // Menu item variant (for dropdown menus)
   if (variant === 'menu-item') {
     return (
+      <div>
       <button
         type="button"
         onClick={handleClone}
@@ -83,11 +86,14 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
           </>
         )}
       </button>
+      {cloneError && <p role="alert" className="px-4 pb-2 text-sm text-red-700">{cloneError}</p>}
+      </div>
     );
   }
 
   // Button variant (default)
   return (
+    <div>
     <button
       type="button"
       onClick={handleClone}
@@ -111,5 +117,7 @@ export function CloneEventButton({ eventId, eventTitle, variant = 'button' }: Cl
         </>
       )}
     </button>
+    {cloneError && <p role="alert" className="mt-2 text-sm text-red-700">{cloneError}</p>}
+    </div>
   );
 }

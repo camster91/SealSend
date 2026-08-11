@@ -20,6 +20,7 @@ export default function GuestsPage() {
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [sending, setSending] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "error" | "success"; message: string } | null>(null);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
@@ -51,12 +52,13 @@ export default function GuestsPage() {
   }
 
   async function handleSendInvites() {
+    setNotice(null);
     const pendingCount = guests.filter(
       (g) => (g.email || g.phone) && (g.invite_status === "not_sent" || g.invite_status === "failed")
     ).length;
 
     if (pendingCount === 0) {
-      alert("No guests with unsent invitations.");
+      setNotice({ tone: "error", message: "No guests with unsent invitations." });
       return;
     }
 
@@ -72,30 +74,31 @@ export default function GuestsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to send invitations.");
+        setNotice({ tone: "error", message: data.error || "Failed to send invitations." });
       } else {
         const parts: string[] = [];
         if (data.sent > 0) parts.push(`${data.sent} email${data.sent !== 1 ? "s" : ""} sent`);
         if (data.failed > 0) parts.push(`${data.failed} email${data.failed !== 1 ? "s" : ""} failed`);
         if (data.sms_sent > 0) parts.push(`${data.sms_sent} SMS sent`);
         if (data.sms_failed > 0) parts.push(`${data.sms_failed} SMS failed`);
-        alert(parts.join(", ") || "No invitations to send.");
+        setNotice({ tone: data.failed || data.sms_failed ? "error" : "success", message: parts.join(", ") || "No invitations to send." });
         fetchGuests();
       }
     } catch {
-      alert("Failed to send invitations.");
+      setNotice({ tone: "error", message: "Failed to send invitations." });
     } finally {
       setSending(false);
     }
   }
 
   async function handleSendReminders() {
+    setNotice(null);
     const reminderCount = guests.filter(
       (g) => (g.email || g.phone) && g.invite_status === "sent" && !g.reminder_sent_at
     ).length;
 
     if (reminderCount === 0) {
-      alert("No guests eligible for reminders.");
+      setNotice({ tone: "error", message: "No guests eligible for reminders." });
       return;
     }
 
@@ -111,18 +114,18 @@ export default function GuestsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to send reminders.");
+        setNotice({ tone: "error", message: data.error || "Failed to send reminders." });
       } else {
         const parts: string[] = [];
         if (data.sent > 0) parts.push(`${data.sent} email${data.sent !== 1 ? "s" : ""} sent`);
         if (data.failed > 0) parts.push(`${data.failed} email${data.failed !== 1 ? "s" : ""} failed`);
         if (data.sms_sent > 0) parts.push(`${data.sms_sent} SMS sent`);
         if (data.sms_failed > 0) parts.push(`${data.sms_failed} SMS failed`);
-        alert(parts.join(", ") || "No reminders to send.");
+        setNotice({ tone: data.failed || data.sms_failed ? "error" : "success", message: parts.join(", ") || "No reminders to send." });
         fetchGuests();
       }
     } catch {
-      alert("Failed to send reminders.");
+      setNotice({ tone: "error", message: "Failed to send reminders." });
     } finally {
       setSendingReminders(false);
     }
@@ -185,6 +188,15 @@ export default function GuestsPage() {
           </div>
         </div>
       </div>
+
+      {notice && (
+        <div
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={`mb-5 rounded-xl border p-4 text-sm ${notice.tone === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-green-200 bg-green-50 text-green-800"}`}
+        >
+          {notice.message}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
