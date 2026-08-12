@@ -42,7 +42,7 @@ Recruit one host from each segment: private celebration, wedding, community/non-
 
 ## Provider readiness and lifecycle evidence
 
-1. Configure a separate, strong `OPERATIONS_SECRET`, then request `GET /api/operations/readiness` with `Authorization: Bearer <secret>`. The response contains booleans and modes only; it never returns credential values and is configuration evidence, not proof of provider reachability.
+1. Configure a separate, strong `OPERATIONS_SECRET`, then request `GET /api/operations/readiness` with `Authorization: Bearer <secret>`. On the VPS, `ops/check-provider-readiness.sh` reads the secret only inside the running app container and prints the same sanitized JSON. The response contains booleans and modes only; it never returns credential values and is configuration evidence, not proof of provider reachability.
 2. Stripe sandbox acceptance requires a test key, annual recurring price, webhook signing secret, and signed lifecycle evidence for completed checkout, delayed-payment success, duplicate webhook replay, renewal payment, failed payment, recovery, subscription update, and cancellation. Confirm the stored entitlement after every transition.
 3. Mailgun acceptance requires an API key, verified domain, webhook signing key, and signed accepted, delivered, temporary failure, permanent failure/bounce, complaint, and unsubscribe callbacks. Confirm duplicate callbacks do not duplicate state changes.
 4. Twilio acceptance requires sending credentials, a sender, `TWILIO_AUTH_TOKEN` for callback signature validation, and the exact public webhook URL. Verify sent, delivered, failed, undelivered, duplicate, invalid-signature, and transient-database retry behavior.

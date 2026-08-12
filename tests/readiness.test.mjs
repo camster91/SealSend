@@ -601,10 +601,15 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
 test('operations readiness is secret-gated and never returns credential values', async () => {
   const route = await read('src/app/api/operations/readiness/route.ts');
   const readiness = await read('src/lib/provider-readiness.ts');
+  const operatorScript = await read('ops/check-provider-readiness.sh');
   assert.match(route, /isOperationsAuthorized/);
   assert.match(route, /status: 404/);
   assert.match(route, /Cache-Control.*no-store/);
   assert.doesNotMatch(readiness, /return.*STRIPE_SECRET_KEY|return.*MAILGUN_API_KEY|return.*TWILIO_AUTH_TOKEN/);
+  assert.match(operatorScript, /coolify\.resourceName=seal-send/);
+  assert.match(operatorScript, /Authorization: Bearer \$OPERATIONS_SECRET/);
+  assert.match(operatorScript, /api\/operations\/readiness/);
+  assert.doesNotMatch(operatorScript, /echo.*OPERATIONS_SECRET|set -x/);
 });
 
 test('authentication codes are hashed and scoped to one login context', async () => {
