@@ -23,6 +23,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -36,6 +37,20 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Close mobile nav on Escape and restore focus to the toggle. Listener is
+  // only attached while the drawer is open, so no global handler leaks.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        mobileToggleRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [mobileOpen]);
 
   return (
     <>
@@ -125,6 +140,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
               </Link>
             )}
             <button
+              ref={mobileToggleRef}
               aria-label="Toggle mobile navigation menu"
               aria-expanded={mobileOpen}
               aria-controls="mobile-navigation"
