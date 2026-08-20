@@ -1,12 +1,43 @@
 name: Lint
 
-# Lint workflow. Runs the project's `lint` script on PRs and pushes.
-# Fails the build if lint errors are found.
+# Fast lint feedback on PRs and pushes to `master`. Runs in parallel with
+# `ci.yml` (which also lints) to surface lint errors before the heavier
+# typecheck / build / e2e steps complete.
 #
-# DISABLED: automatic triggers removed due to GitHub Actions billing limits.
-# Re-enable by restoring push/pull_request triggers below.
-
+# Triggers:
+#   - pull_request: every PR (path-filtered to skip docs-only changes)
+#   - push to master: every commit to the default branch
+#   - workflow_dispatch: manual re-run
+#
+# No deploy, no production secrets, no concurrency concerns.
 on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'CHANGES_SUMMARY.md'
+      - 'DEPLOYMENT_*.md'
+      - 'DEPLOY_*.md'
+      - 'AUTHENTICATION_*.md'
+      - 'CORE_FEATURES_*.md'
+      - 'DASHBOARD_*.md'
+      - 'CHANGES_*.md'
+      - '.github/ashbi-local-ci-validation.md'
+      - 'dev_server.log'
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'CHANGES_SUMMARY.md'
+      - 'DEPLOYMENT_*.md'
+      - 'DEPLOY_*.md'
+      - 'AUTHENTICATION_*.md'
+      - 'CORE_FEATURES_*.md'
+      - 'DASHBOARD_*.md'
+      - 'CHANGES_*.md'
+      - '.github/ashbi-local-ci-validation.md'
+      - 'dev_server.log'
   workflow_dispatch:
 
 permissions:
