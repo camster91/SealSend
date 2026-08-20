@@ -100,9 +100,20 @@ function DataTable<T extends Record<string, unknown>>({
                 <tr
                   key={keyExtractor(item)}
                   onClick={() => onRowClick?.(item)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLTableRowElement>) => {
+                    if (!onRowClick) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onRowClick(item);
+                    }
+                  }}
+                  role={onRowClick ? "button" : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={onRowClick ? "Open row details" : undefined}
                   className={cn(
                     "border-b border-border last:border-0",
-                    onRowClick && "cursor-pointer hover:bg-neutral-50",
+                    onRowClick &&
+                      "cursor-pointer hover:bg-neutral-50 focus:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
                     renderExpandedRow && "cursor-pointer"
                   )}
                 >
