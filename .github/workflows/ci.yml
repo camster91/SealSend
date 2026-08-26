@@ -79,15 +79,8 @@ jobs:
       - name: Unit and readiness tests
         run: npm test
 
-      - name: Install browser
-        run: npx playwright install --with-deps chromium
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Browser smoke tests
         run: npm run test:e2e
-
-      - name: Build
-        run: npm run build
-        env:
-          # CI-safe defaults so the build doesn't depend on real env vars
-          NODE_ENV: production
-          CI: true

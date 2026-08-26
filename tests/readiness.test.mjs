@@ -124,7 +124,7 @@ test('package exposes unit, typecheck, and e2e test commands', async () => {
   assert.equal(typeof pkg.scripts['test:e2e'], 'string');
 });
 
-test('browser QA permanently covers Chromium, Firefox, and desktop/mobile WebKit', async () => {
+test('browser QA covers five engines and the hero is hydration-safe with reduced motion', async () => {
   const config = await read('playwright.config.ts');
   assert.match(config, /Desktop Chrome/);
   assert.match(config, /Pixel 7/);
@@ -132,8 +132,9 @@ test('browser QA permanently covers Chromium, Firefox, and desktop/mobile WebKit
   assert.match(config, /Desktop Safari/);
   assert.match(config, /iPhone 15/);
   const hero = await read('src/components/marketing/Hero.tsx');
-  assert.match(hero, /useReducedMotion/);
-  assert.match(hero, /initial=\{shouldReduceMotion \? false/);
+  assert.match(hero, /initial=\{false\}/);
+  assert.doesNotMatch(hero, /useReducedMotion/);
+  assert.doesNotMatch(hero, /repeat:\s*Infinity/);
 });
 
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
@@ -141,6 +142,7 @@ test('Next.js uses the repository as its build root and the current proxy conven
   const proxy = await read('src/proxy.ts');
 
   assert.match(config, /turbopack:\s*\{[\s\S]*?root:\s*process\.cwd\(\)/);
+  assert.match(config, /NEXT_PUBLIC_SITE_URL\?\.startsWith\('https:\/\/'\)/);
   assert.match(proxy, /export async function proxy\(/);
 });
 
