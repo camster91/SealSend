@@ -13,10 +13,10 @@ interface NavbarUser {
 }
 
 const useCaseLinks = [
-  { label: "Weddings", href: "/use-cases/weddings" },
-  { label: "Baby Showers", href: "/use-cases/baby-showers" },
-  { label: "Birthday Parties", href: "/use-cases/birthday-parties" },
-  { label: "Corporate Events", href: "/use-cases/corporate-events" },
+  { label: "Community Events", href: "/use-cases/community-events" },
+  { label: "Local Nonprofits", href: "/use-cases/nonprofit-events" },
+  { label: "Clubs & Associations", href: "/use-cases/clubs-associations" },
+  { label: "Professional Gatherings", href: "/use-cases/professional-gatherings" },
 ];
 
 export function Navbar({ user }: { user?: NavbarUser | null }) {

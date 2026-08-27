@@ -40,3 +40,22 @@ test('disabled placeholder features route to working product areas', async ({ pa
     expect(destination).toMatch(/^\//);
   }
 });
+
+test('organizer use cases are reachable and legacy links redirect', async ({ page }) => {
+  await page.goto('/use-cases');
+  for (const route of [
+    '/use-cases/community-events',
+    '/use-cases/nonprofit-events',
+    '/use-cases/clubs-associations',
+    '/use-cases/professional-gatherings',
+  ]) {
+    await expect(page.locator('main').locator(`a[href="${route}"]`)).toHaveCount(1);
+    const response = await page.goto(route);
+    expect(response?.status()).toBeLessThan(400);
+    await expect(page.getByText(/^Run one active event with up to 100 guests\./i)).toBeVisible();
+    await page.goBack();
+  }
+
+  await page.goto('/use-cases/weddings');
+  await expect(page).toHaveURL(/\/use-cases\/professional-gatherings$/);
+});

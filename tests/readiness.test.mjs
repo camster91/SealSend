@@ -215,6 +215,7 @@ test('public marketing does not ship invented social proof', async () => {
   const hero = await read('src/components/marketing/Hero.tsx');
   const pricingCta = await read('src/components/pricing/PricingCTA.tsx');
   const cta = await read('src/components/marketing/CTASection.tsx');
+  const openGraphImage = await read('src/app/opengraph-image.tsx');
   const marketingDirectory = new URL('../src/components/marketing/', import.meta.url);
   const marketingComponents = await Promise.all(
     (await readdir(marketingDirectory))
@@ -231,6 +232,9 @@ test('public marketing does not ship invented social proof', async () => {
     assert.doesNotMatch(source, /10,000\+|200,000\+|500K\+|4\.9\/5|99% satisfaction/i);
     assert.doesNotMatch(source, /Sarah Mitchell|David Chen|Emily Rodriguez/);
   }
+  assert.doesNotMatch(openGraphImage, /10,000\+|200,000\+|500K\+|4\.9\/5|99%/i);
+  assert.match(openGraphImage, /Controlled Beta/);
+  assert.match(openGraphImage, /One Event · Up to 100 Guests/);
 });
 
 test('public offer is a bounded controlled beta for recurring community organizers', async () => {
@@ -255,6 +259,48 @@ test('public offer is a bounded controlled beta for recurring community organize
   assert.match(pricingCards, /BETA_MODE\s*\?\s*\[CONTROLLED_BETA_PRICING_PLAN\]/);
   assert.match(pricingFaq, /one active event for up to 100 guests/i);
   assert.match(pricingFaq, /paid checkout is disabled/i);
+});
+
+test('organizer use cases and comparison stay inside the shipped product scope', async () => {
+  const content = await read('src/lib/use-case-content.ts');
+  const indexPage = await read('src/app/(marketing)/use-cases/page.tsx');
+  const detailPage = await read('src/app/(marketing)/use-cases/[useCase]/page.tsx');
+  const navbar = await read('src/components/layout/Navbar.tsx');
+  const footer = await read('src/components/layout/Footer.tsx');
+  const sitemap = await read('src/app/sitemap.ts');
+  const home = await read('src/app/(marketing)/page.tsx');
+  const organizerFit = await read('src/components/marketing/OrganizerFit.tsx');
+
+  for (const slug of [
+    'community-events',
+    'nonprofit-events',
+    'clubs-associations',
+    'professional-gatherings',
+  ]) {
+    assert.match(content, new RegExp(`slug: ["']${slug}["']`));
+    for (const navigationSource of [navbar, footer, sitemap]) {
+      assert.match(navigationSource, new RegExp(`/use-cases/${slug}`));
+    }
+  }
+
+  assert.match(indexPage, /USE_CASES/);
+  assert.doesNotMatch(indexPage, /const useCases =/);
+  assert.match(detailPage, /one active event with up to 100 guests/i);
+  assert.match(content, /LEGACY_USE_CASE_REDIRECTS/);
+  assert.match(detailPage, /redirect\(`\/use-cases\/\$\{canonicalUseCase\}`\)/);
+  assert.doesNotMatch(content, /testimonial\s*:|Twyla Tyler|Monica W|Ashley Corbett|Brian Stuart/);
+  assert.doesNotMatch(content, /music\s*(?:&|and)\s*video|photo sharing|gift tracking|1,200 replies/i);
+
+  assert.match(home, /<OrganizerFit\s*\/>/);
+  for (const alternative of [
+    'Spreadsheets and group chats',
+    'Invitation-first tools',
+    'Enterprise event platforms',
+  ]) {
+    assert.match(organizerFit, new RegExp(alternative, 'i'));
+  }
+  assert.match(organizerFit, /product-scope comparison/i);
+  assert.match(organizerFit, /not a claim about every competitor/i);
 });
 
 test('activation analytics has a privacy-limited fresh schema and upgrade path', async () => {

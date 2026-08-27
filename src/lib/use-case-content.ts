@@ -1,320 +1,125 @@
 export interface UseCaseData {
   slug: string;
+  indexIcon: "Users" | "Heart" | "BadgeCheck" | "Briefcase";
+  indexDescription: string;
+  indexFeatures: string[];
   metaTitle: string;
   metaDescription: string;
   heroHeadline: string;
   heroSubtext: string;
-  benefits: {
-    icon: string;
-    title: string;
-    description: string;
-  }[];
-  testimonial: {
-    quote: string;
-    name: string;
-    role: string;
-  };
-  faqs: {
-    question: string;
-    answer: string;
-  }[];
+  benefits: { icon: string; title: string; description: string }[];
+  faqs: { question: string; answer: string }[];
   ctaText: string;
   keywords: string[];
 }
 
+const betaCapacityAnswer =
+  "The controlled beta supports one active event with up to 100 guests. Paid checkout is disabled while SealSend completes provider, compliance, accessibility, and real-event launch evidence.";
+
 export const USE_CASES: Record<string, UseCaseData> = {
-  weddings: {
-    slug: "weddings",
-    metaTitle:
-      "Wedding Invitations Online — Free Digital Wedding Invites",
-    metaDescription:
-      "Create elegant digital wedding invitations, collect RSVPs, track meal choices, and manage your guest list — all in one beautiful platform. Free to start.",
-    heroHeadline: "Elegant Digital Wedding Invitations",
-    heroSubtext:
-      "Set the tone for your big day with beautiful, personalized wedding invitations. Collect RSVPs, meal preferences, and plus-one details effortlessly.",
+  "community-events": {
+    slug: "community-events",
+    indexIcon: "Users",
+    indexDescription: "Keep invitations, RSVPs, guest segments, approved updates, and arrival status connected for a real community gathering.",
+    indexFeatures: ["Guest tags", "Co-host roles", "Mobile check-in", "Approved updates"],
+    metaTitle: "Community Event Invitations and RSVP Workflow",
+    metaDescription: "Run a community event from an editable invitation and RSVP through guest updates and check-in in SealSend's controlled beta.",
+    heroHeadline: "One Guest Workflow for Community Events",
+    heroSubtext: "For creative communities, alumni groups, neighborhood organizers, and recurring gatherings that need more than a link and a spreadsheet.",
     benefits: [
-      {
-        icon: "Heart",
-        title: "Stunning Designs",
-        description:
-          "Upload your own artwork or use customizable colors and backgrounds to match your wedding theme perfectly.",
-      },
-      {
-        icon: "Users",
-        title: "Guest List Management",
-        description:
-          "Track RSVPs, headcounts, meal choices, and dietary requirements from a single dashboard.",
-      },
-      {
-        icon: "Share2",
-        title: "Easy Sharing",
-        description:
-          "Share your invitation via email, text, WhatsApp, or a custom link — reach every guest on their preferred platform.",
-      },
-      {
-        icon: "Calendar",
-        title: "Calendar Integration",
-        description:
-          "Guests can add your wedding to their calendar in one click so nobody forgets the date.",
-      },
+      { icon: "ClipboardList", title: "Start from the event brief", description: "Build an editable event page and RSVP questions from the details your organizing team already has." },
+      { icon: "Tag", title: "Keep the guest list actionable", description: "Use tags, response status, plus-ones, and custom fields to identify who needs an answer or update." },
+      { icon: "Megaphone", title: "Approve updates before sending", description: "Review the resolved audience, channel, schedule, and available cost estimate before an external communication starts." },
+      { icon: "Users", title: "Share event-day work", description: "Give a small co-host team permission-based access and keep guest check-in status current from a mobile browser." },
     ],
-    testimonial: {
-      quote:
-        "Seal and Send made our wedding planning so much easier. We saved money on postage and the RSVP tracking was incredibly helpful. Our guests loved the interactive invitation!",
-      name: "Twyla Tyler",
-      role: "Bride, Summer 2025",
-    },
     faqs: [
-      {
-        question: "Can I customize the design to match my wedding theme?",
-        answer:
-          "Yes! You have full control over colors, backgrounds, logos, and images. Upload your own design or customize directly in Seal and Send to match your wedding palette.",
-      },
-      {
-        question: "How do guests RSVP?",
-        answer:
-          "Guests click the link in their invitation and fill out a simple RSVP form. You can collect attendance, meal choices, dietary requirements, plus-one names, and more.",
-      },
-      {
-        question: "Can I send reminders to guests who haven't responded?",
-        answer:
-          "Yes! You can send follow-up emails and announcements directly from Seal and Send to remind guests to RSVP.",
-      },
-      {
-        question: "Is there a limit on the number of guests I can invite?",
-        answer:
-          "The Free plan includes 15 guest replies. The Standard plan ($5) supports 50 replies, and Premium ($10) allows up to 1,200 replies — plenty for even the largest weddings.",
-      },
+      { question: "What size community event fits the beta?", answer: betaCapacityAnswer },
+      { question: "Do guests need a SealSend account?", answer: "No. Guests open the published event link in a browser and submit the RSVP form without creating an account or installing an app." },
+      { question: "Can several organizers help?", answer: "Yes. The controlled beta allows up to three team members including the owner, with manager, check-in, and viewer roles." },
+      { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Live email and SMS are enabled only after provider readiness is confirmed for the consented beta host." },
     ],
-    ctaText: "Create Your Wedding Invitation",
-    keywords: [
-      "wedding invitations online",
-      "digital wedding invites",
-      "free wedding invitations",
-      "wedding RSVP",
-      "online wedding RSVP",
-    ],
+    ctaText: "Start a Community Event",
+    keywords: ["community event RSVP", "community event invitations", "event guest list", "community event check in"],
   },
+  "nonprofit-events": {
+    slug: "nonprofit-events",
+    indexIcon: "Heart",
+    indexDescription: "Coordinate local nonprofit gatherings, volunteer events, and supporter briefings without adopting enterprise event software.",
+    indexFeatures: ["Custom RSVP fields", "Sign-up board", "Guest export", "Co-host access"],
+    metaTitle: "Local Nonprofit Event Invitations and RSVP",
+    metaDescription: "Coordinate a local nonprofit or volunteer event with custom RSVP questions, sign-ups, guest updates, and check-in.",
+    heroHeadline: "Practical Event Operations for Local Nonprofits",
+    heroSubtext: "Collect the participation details your team needs, coordinate volunteer responsibilities, and keep the guest record usable through event day.",
+    benefits: [
+      { icon: "ClipboardList", title: "Ask the questions that affect delivery", description: "Add custom RSVP fields for accessibility needs, dietary requirements, roles, or other event-specific planning details." },
+      { icon: "Calendar", title: "Coordinate sign-up needs", description: "Use the event sign-up board for bounded roles or items, with availability kept alongside the event." },
+      { icon: "Mail", title: "Keep communication deliberate", description: "Resolve the intended audience and require host approval before email or SMS communication leaves SealSend." },
+      { icon: "BarChart3", title: "Retain a usable record", description: "Review aggregate response status and export guest information for an authorized operational follow-up or event-day fallback." },
+    ],
+    faqs: [
+      { question: "What is included during the controlled beta?", answer: betaCapacityAnswer },
+      { question: "Can SealSend collect donations or sell tickets?", answer: "No. SealSend does not currently process donations or ticket sales. You can place an approved external link on the event page when another service owns that transaction." },
+      { question: "Can we collect accessibility or volunteer details?", answer: "Yes. Organizers can configure custom RSVP questions and use a sign-up board for event-specific roles or items." },
+      { question: "How is guest communication controlled?", answer: "The organizer reviews recipients, channels, schedule, and the available cost estimate before approving an external send. Provider readiness remains a separate beta gate." },
+    ],
+    ctaText: "Start a Nonprofit Event",
+    keywords: ["nonprofit event RSVP", "volunteer event invitations", "nonprofit guest management", "community nonprofit events"],
+  },
+  "clubs-associations": {
+    slug: "clubs-associations",
+    indexIcon: "BadgeCheck",
+    indexDescription: "Run chapter meetings, member gatherings, workshops, and annual events from a repeatable organizer workflow.",
+    indexFeatures: ["Clone events", "Member tags", "RSVP status", "Calendar links"],
+    metaTitle: "Club and Association Event RSVP Workflow",
+    metaDescription: "Create repeatable club and association events with invitations, custom RSVP questions, member tags, updates, and check-in.",
+    heroHeadline: "A Repeatable Event Workflow for Clubs and Associations",
+    heroSubtext: "Give recurring organizers a reliable starting point without turning SealSend into a membership database or enterprise event suite.",
+    benefits: [
+      { icon: "Calendar", title: "Reuse a proven starting point", description: "Clone an existing event, then review dates, location, RSVP fields, artwork, and communications before publishing the next one." },
+      { icon: "Tag", title: "Organize event participants", description: "Apply guest tags and response filters for chapters, committees, attendance types, or other event-specific segments." },
+      { icon: "Users", title: "Track responses and plus-ones", description: "Keep invitations, replies, headcount, plus-ones, and response corrections connected to the event record." },
+      { icon: "Share2", title: "Give guests the current details", description: "Publish a browser-based event page and provide calendar links so approved event details remain easy to revisit." },
+    ],
+    faqs: [
+      { question: "How many events can a beta organizer run?", answer: betaCapacityAnswer },
+      { question: "Is SealSend a membership management system?", answer: "No. SealSend manages an event and its guests. It does not currently manage dues, membership renewals, or a permanent member directory." },
+      { question: "Can an organizer reuse a previous event?", answer: "Yes. An authorized organizer can clone an event as a new draft and review its details before publishing." },
+      { question: "Can guests correct an RSVP?", answer: "The host can manage responses and send a scoped guest update link when an invited guest needs to revise submitted information." },
+    ],
+    ctaText: "Start a Club Event",
+    keywords: ["club event RSVP", "association event invitations", "member event guest list", "chapter event check in"],
+  },
+  "professional-gatherings": {
+    slug: "professional-gatherings",
+    indexIcon: "Briefcase",
+    indexDescription: "Operate workshops, networking nights, alumni gatherings, and small professional events with clear approvals.",
+    indexFeatures: ["Uploaded artwork", "Custom questions", "Guest segments", "Check-in and export"],
+    metaTitle: "Small Professional Event Invitations and RSVP",
+    metaDescription: "Run a workshop, networking event, or small professional gathering with custom RSVP fields, guest updates, and check-in.",
+    heroHeadline: "Professional Guest Operations Without Enterprise Overhead",
+    heroSubtext: "For independent planners and small teams that need a polished event page, actionable attendee information, and a controlled event-day workflow.",
+    benefits: [
+      { icon: "Share2", title: "Use approved event artwork", description: "Choose a shipped template or upload invitation artwork while preserving the original file and reviewing the crop." },
+      { icon: "ClipboardList", title: "Collect operational details", description: "Configure RSVP questions for attendance, dietary needs, accessibility, sessions, or other facts the event team needs." },
+      { icon: "Megaphone", title: "Target an approved audience", description: "Filter by guest and response status, review resolved recipients, and approve an update before sending or scheduling it." },
+      { icon: "BarChart3", title: "Prepare for event day", description: "Use aggregate response status, authorized exports, co-host roles, and mobile check-in as one connected workflow." },
+    ],
+    faqs: [
+      { question: "What event size is supported in the beta?", answer: betaCapacityAnswer },
+      { question: "Does SealSend replace an enterprise event platform?", answer: "No. SealSend is intentionally scoped to a small organizer's invitation-to-check-in workflow. It does not currently provide ticketing, sponsor management, venue sourcing, or CRM integrations." },
+      { question: "Can we use our own invitation artwork?", answer: "Yes. Organizers can upload supported artwork, review the displayed crop, and retain the uploaded original." },
+      { question: "Can attendee information be exported?", answer: "Yes. An authorized organizer can export event-scoped guest or response information for legitimate event operations." },
+    ],
+    ctaText: "Start a Professional Gathering",
+    keywords: ["professional event RSVP", "networking event invitations", "workshop guest management", "small event check in"],
+  },
+};
 
-  "baby-showers": {
-    slug: "baby-showers",
-    metaTitle:
-      "Digital Baby Shower Invitations — Free Online Invites & RSVP",
-    metaDescription:
-      "Create adorable digital baby shower invitations. Collect RSVPs, share gift registry links, and coordinate everything in one place. Free to start.",
-    heroHeadline: "Adorable Digital Baby Shower Invitations",
-    heroSubtext:
-      "Celebrate the newest arrival with charming invitations that delight your guests. Manage RSVPs, gift registries, and all the details in one place.",
-    benefits: [
-      {
-        icon: "Baby",
-        title: "Charming Designs",
-        description:
-          "Create invitations as sweet as your baby-to-be. Customize colors, upload photos, and add a personal touch.",
-      },
-      {
-        icon: "Gift",
-        title: "Gift Registry Links",
-        description:
-          "Add gift registry links directly to your invitation so guests can easily find and purchase the perfect gift.",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Collect Guest Details",
-        description:
-          "Gather headcounts, dietary preferences, and any other info you need to plan the perfect shower.",
-      },
-      {
-        icon: "Mail",
-        title: "Email Invitations",
-        description:
-          "Send beautiful email invitations or share a custom link — perfect for reaching friends and family everywhere.",
-      },
-    ],
-    testimonial: {
-      quote:
-        "The invitations looked gorgeous and everyone RSVP'd within a day! Adding the gift registry link was so convenient. Highly recommend for any mom-to-be.",
-      name: "Monica W",
-      role: "Mother-to-be",
-    },
-    faqs: [
-      {
-        question: "Can I add a gift registry link to the invitation?",
-        answer:
-          "Absolutely! Seal and Send lets you add gift registry links directly to your event page so guests can easily find your wishlist.",
-      },
-      {
-        question: "Can I include a map or directions to the venue?",
-        answer:
-          "Yes! You can add location blocks with address details to your event page so guests know exactly where to go.",
-      },
-      {
-        question: "Is it possible to track who has RSVP'd?",
-        answer:
-          "Yes! Your dashboard shows all responses in real-time, including who has accepted, declined, and who hasn't replied yet.",
-      },
-      {
-        question: "Can I send the invitation to people who don't have email?",
-        answer:
-          "Yes! You can share your event via a custom link that works on any platform — text, WhatsApp, social media, or any messaging app.",
-      },
-    ],
-    ctaText: "Create Your Baby Shower Invitation",
-    keywords: [
-      "baby shower invitations",
-      "digital baby shower invites",
-      "free baby shower invitations",
-      "online baby shower RSVP",
-      "baby shower planning",
-    ],
-  },
-
-  "birthday-parties": {
-    slug: "birthday-parties",
-    metaTitle:
-      "Birthday Party Invitations Online — Free Digital Invites",
-    metaDescription:
-      "Create fun, vibrant digital birthday party invitations. Collect RSVPs, manage your guest list, and make every birthday celebration unforgettable. Free to start.",
-    heroHeadline: "Fun Digital Birthday Party Invitations",
-    heroSubtext:
-      "Make every birthday unforgettable with vibrant, personalized digital invitations. Track RSVPs and manage all the party details effortlessly.",
-    benefits: [
-      {
-        icon: "Cake",
-        title: "Vibrant Designs",
-        description:
-          "Create eye-catching invitations for any age — from first birthdays to milestone celebrations.",
-      },
-      {
-        icon: "Music",
-        title: "Add Music & Video",
-        description:
-          "Make your invitation interactive with music, slideshows, and video to set the party mood.",
-      },
-      {
-        icon: "Users",
-        title: "Headcount Tracking",
-        description:
-          "Know exactly how many guests are coming with real-time RSVP tracking and headcount details.",
-      },
-      {
-        icon: "MapPin",
-        title: "Venue Details",
-        description:
-          "Include location, time blocks, and all essential info so guests have everything they need.",
-      },
-    ],
-    testimonial: {
-      quote:
-        "My daughter's birthday invitations were a huge hit! The video invitation feature blew everyone away. So much easier than paper invites and way more fun.",
-      name: "Ashley Corbett",
-      role: "Parent, kids' birthday party",
-    },
-    faqs: [
-      {
-        question: "Can I create video or animated birthday invitations?",
-        answer:
-          "Yes! Seal and Send lets you turn your design into a video or slideshow with music, making your birthday invitation truly stand out.",
-      },
-      {
-        question:
-          "Is this suitable for kids' birthday parties?",
-        answer:
-          "Absolutely! Seal and Send works great for kids' parties. Parents love the easy RSVP system and the ability to collect headcounts for party planning.",
-      },
-      {
-        question: "Can guests RSVP for multiple people?",
-        answer:
-          "Yes! Guests can specify how many people they're bringing, including separate adult and child headcounts if you enable that option.",
-      },
-      {
-        question: "Can I update the invitation after sending it?",
-        answer:
-          "Yes! If details change (like venue or time), you can update your event page and send an announcement to all guests.",
-      },
-    ],
-    ctaText: "Create Your Birthday Invitation",
-    keywords: [
-      "birthday party invitations online",
-      "digital birthday invites",
-      "free birthday invitations",
-      "birthday party RSVP",
-      "kids birthday invitations",
-    ],
-  },
-
-  "corporate-events": {
-    slug: "corporate-events",
-    metaTitle:
-      "Corporate Event Invitations — Professional Digital Invites",
-    metaDescription:
-      "Create professional digital invitations for corporate events, conferences, galas, and team gatherings. Track RSVPs and manage attendees efficiently.",
-    heroHeadline: "Professional Corporate Event Invitations",
-    heroSubtext:
-      "Impress attendees with polished, branded digital invitations. Manage RSVPs, collect attendee information, and coordinate every detail with ease.",
-    benefits: [
-      {
-        icon: "Briefcase",
-        title: "Brand Consistency",
-        description:
-          "Upload your company logo and use your brand colors for a cohesive, professional look across all communications.",
-      },
-      {
-        icon: "BarChart3",
-        title: "Attendee Analytics",
-        description:
-          "Track registration numbers, response rates, and attendee details in real-time from your dashboard.",
-      },
-      {
-        icon: "Tag",
-        title: "Guest Tags & Groups",
-        description:
-          "Organize attendees by department, VIP status, or custom tags for targeted communication.",
-      },
-      {
-        icon: "Megaphone",
-        title: "Announcements & Updates",
-        description:
-          "Send agenda updates, reminders, and important announcements to all attendees or specific groups.",
-      },
-    ],
-    testimonial: {
-      quote:
-        "We used Seal and Send for our annual company gala and it streamlined everything. The branding options made it look incredibly professional, and tracking RSVPs was effortless.",
-      name: "Brian Stuart",
-      role: "Event Manager, Tech Corp",
-    },
-    faqs: [
-      {
-        question: "Can I use my company's branding on the invitations?",
-        answer:
-          "Yes! Upload your logo, set your brand colors, and add custom backgrounds. Standard and Premium plans also remove the Seal and Send branding for a fully professional look.",
-      },
-      {
-        question: "Can I collect specific attendee information?",
-        answer:
-          "Absolutely! Customize your RSVP form to collect any information you need — dietary preferences, session selections, accessibility requirements, and more.",
-      },
-      {
-        question: "Is there a way to send different invitations to different groups?",
-        answer:
-          "Yes! Use guest tags to organize attendees into groups, then send targeted announcements and updates to specific segments.",
-      },
-      {
-        question: "How many attendees can I manage?",
-        answer:
-          "The Premium plan ($10/event) supports up to 1,200 replies — perfect for large corporate events, conferences, and galas.",
-      },
-    ],
-    ctaText: "Create Your Corporate Invitation",
-    keywords: [
-      "corporate event invitations",
-      "business event RSVP",
-      "professional digital invitations",
-      "conference invitations",
-      "corporate event management",
-    ],
-  },
+export const LEGACY_USE_CASE_REDIRECTS: Record<string, keyof typeof USE_CASES> = {
+  weddings: "professional-gatherings",
+  "baby-showers": "community-events",
+  "birthday-parties": "community-events",
+  "corporate-events": "professional-gatherings",
 };
 
 export const USE_CASE_SLUGS = Object.keys(USE_CASES);

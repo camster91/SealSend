@@ -9,7 +9,7 @@ test.describe('Protected event creation', () => {
 
   test('homepage CTA leads to account creation', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: 'Build Your Event Draft' }).click();
+    await page.getByRole('link', { name: 'Build Your Event Workflow' }).click();
     await expect(page).toHaveURL(/\/signup$/);
     await expect(page.getByRole('button', { name: 'Get Started' })).toBeVisible();
   });

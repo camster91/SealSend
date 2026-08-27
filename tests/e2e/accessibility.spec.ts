@@ -5,7 +5,19 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
   test(`public release pages have no serious accessibility violations at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    for (const route of ["/", "/pricing", "/how-it-works", "/signup", "/login", "/privacy"]) {
+    for (const route of [
+      "/",
+      "/pricing",
+      "/how-it-works",
+      "/use-cases",
+      "/use-cases/community-events",
+      "/use-cases/nonprofit-events",
+      "/use-cases/clubs-associations",
+      "/use-cases/professional-gatherings",
+      "/signup",
+      "/login",
+      "/privacy",
+    ]) {
       await page.goto(route, { waitUntil: "networkidle" });
       const results = await new AxeBuilder({ page }).analyze();
       const blocking = results.violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious");
