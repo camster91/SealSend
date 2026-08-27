@@ -65,7 +65,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden items-center gap-6 md:flex">
+          <div className="hidden items-center gap-6 lg:flex">
             <Link
               href="/how-it-works"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -133,7 +133,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
           </div>
 
           {/* Mobile menu button */}
-          <div className="flex items-center gap-4 md:hidden">
+          <div className="flex items-center gap-4 lg:hidden">
             {user && (
               <Link href="/dashboard" className="text-sm font-medium text-brand-600">
                 Dashboard
@@ -157,7 +157,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
         </div>
 
         {/* Mobile nav */}
-        {mobileOpen && <div id="mobile-navigation" className="border-b border-border bg-white/95 shadow-md backdrop-blur-sm md:hidden">
+        {mobileOpen && <div id="mobile-navigation" className="border-b border-border bg-white/95 shadow-md backdrop-blur-sm lg:hidden">
           <div className="space-y-2 px-4 pb-4">
             <Link
               href="/how-it-works"
