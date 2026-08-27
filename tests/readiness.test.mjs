@@ -489,6 +489,25 @@ test('mobile check-in is permission-gated, auditable, and reversible', async () 
   assert.match(page, /aria-label=.*Search guests/);
 });
 
+test('event owners can download a privacy-limited check-in fallback', async () => {
+  const route = await read('src/app/api/events/[eventId]/guests/route.ts');
+  const page = await read('src/app/(dashboard)/events/[eventId]/guests/page.tsx');
+  const live = await read('tests/e2e/live-full.spec.ts');
+
+  assert.match(route, /format\s*===\s*["']check-in-csv["']/);
+  assert.match(route, /format\s*===\s*["']check-in-csv["']\s*\?\s*["']export_responses["']\s*:\s*["']view_guest_contacts["']/);
+  assert.match(route, /SELECT name, rsvp_status, invite_status, checked_in_at/);
+  assert.doesNotMatch(route, /SELECT name, rsvp_status, invite_status, checked_in_at[^;]*email/i);
+  assert.match(route, /guest_check_in_fallback_exported/);
+  assert.match(route, /Content-Disposition[\s\S]*check-in-fallback/);
+  assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
+  assert.match(route, /\^\[=\+\\-@\\t\\r\]/);
+  assert.match(page, /Download check-in fallback/);
+  assert.match(page, /format=check-in-csv/);
+  assert.match(live, /format=check-in-csv/);
+  assert.match(live, /not\.toContain\(['"]qa-guest-one@example\.com['"]\)/);
+});
+
 test('scheduled announcements are approved, cancellable, and idempotently dispatched', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

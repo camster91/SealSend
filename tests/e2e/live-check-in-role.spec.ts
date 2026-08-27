@@ -29,6 +29,7 @@ test('check-in-only staff can check in guests and nothing more', async ({ page }
 
   expect((await page.context().request.patch(`/api/events/${eventId}`, { data: { title: 'Forbidden edit' } })).status()).toBe(404);
   expect((await page.context().request.get(`/api/events/${eventId}/responses?format=csv`)).status()).toBe(404);
+  expect((await page.context().request.get(`/api/events/${eventId}/guests?format=check-in-csv`)).status()).toBe(404);
   expect((await page.context().request.get(`/api/events/${eventId}/members`)).status()).toBe(404);
   expect((await page.context().request.post(`/api/events/${eventId}/announcements/audience`, {
     data: { audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false }, channels: ['email'] },

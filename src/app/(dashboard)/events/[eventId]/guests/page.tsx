@@ -6,7 +6,7 @@ import { GuestTable } from "@/components/guests/GuestTable";
 import { AddGuestModal } from "@/components/guests/AddGuestModal";
 import { ImportCSVModal } from "@/components/guests/ImportCSVModal";
 import { Button } from "@/components/ui/Button";
-import { UserPlus, ArrowLeft, Mail, Loader2, Upload, Bell } from "lucide-react";
+import { UserPlus, ArrowLeft, Mail, Loader2, Upload, Bell, Download } from "lucide-react";
 import Link from "next/link";
 import type { Guest } from "@/types/database";
 
@@ -149,14 +149,14 @@ export default function GuestsPage() {
           <ArrowLeft className="h-4 w-4" />
           Back to event
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Guest List</h1>
             <p className="text-sm text-muted-foreground">
               {guests.length} guest{guests.length !== 1 ? "s" : ""}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {hasRemindable && (
               <Button variant="outline" onClick={handleSendReminders} disabled={sendingReminders}>
                 {sendingReminders ? (
@@ -181,6 +181,14 @@ export default function GuestsPage() {
               <Upload className="mr-2 h-4 w-4" />
               Import CSV
             </Button>
+            <a
+              href={`/api/events/${eventId}/guests?format=check-in-csv`}
+              download
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download check-in fallback
+            </a>
             <Button onClick={() => setModalOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Guest

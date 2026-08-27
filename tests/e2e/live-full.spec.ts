@@ -109,6 +109,15 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(bulk.status()).toBe(201);
     expect((await bulk.json()).inserted).toBe(2);
 
+    const checkInFallback = await page.context().request.get(`/api/events/${eventId}/guests?format=check-in-csv`);
+    expect(checkInFallback.status()).toBe(200);
+    expect(checkInFallback.headers()['content-type']).toContain('text/csv');
+    expect(checkInFallback.headers()['cache-control']).toContain('no-store');
+    expect(checkInFallback.headers()['content-disposition']).toContain('check-in-fallback');
+    const fallbackCsv = await checkInFallback.text();
+    expect(fallbackCsv).toContain('QA Guest One');
+    expect(fallbackCsv).not.toContain('qa-guest-one@example.com');
+
     const tagCreate = await page.context().request.post(`/api/events/${eventId}/tags`, { data: { tag_name: 'VIP' } });
     expect(tagCreate.status()).toBe(201);
     expect((await tagCreate.json()).tag_name).toBe('VIP');
