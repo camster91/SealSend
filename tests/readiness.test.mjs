@@ -654,6 +654,8 @@ test('controlled beta evidence requires explicit consent, supports withdrawal, a
   assert.match(calendar, /name:\s*["']calendar_exported["']/);
   assert.match(checkIn, /name:\s*["']first_guest_checked_in["']/);
   assert.match(metrics, /betaParticipants/);
+  assert.match(metrics, /computeBetaCohortMetrics/);
+  assert.match(metrics, /betaCohort/);
   assert.match(metrics, /withdrawn_at IS NULL/);
   assert.doesNotMatch(metrics, /participant_label|respondent_name|respondent_email|message\s+FROM|recipient/);
   assert.match(live, /api\/beta\/participation/);

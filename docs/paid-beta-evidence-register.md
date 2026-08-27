@@ -45,6 +45,8 @@ The release candidate records a versioned consent timestamp, a pseudonymous part
 
 Record the measurement window and denominator for every rate.
 
+The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, and average feedback rating without returning participant identifiers.
+
 | Measure | Result | Acceptance threshold | Decision |
 |---|---:|---:|---|
 | Account-to-first-event activation | | Defined before beta | Pending |

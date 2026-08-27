@@ -5,7 +5,7 @@
   "lastReviewed": "2026-08-27",
   "gates": [
     { "id": "production_safety", "kind": "automated", "status": "pass", "evidence": ["DEPLOYMENT_READINESS.md: PAYMENTS_TEST_ONLY and COMMUNICATIONS_TEST_ONLY verified true; destructive automation flags false"] },
-    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["133 application checks, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; 100 applicable Chromium, Firefox and desktop/mobile WebKit checks passed with 30 authenticated cases deployment-gated"] },
+    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["136 application checks, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; 100 applicable Chromium, Firefox and desktop/mobile WebKit checks passed with 30 authenticated cases deployment-gated"] },
     { "id": "load_capacity", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 200-request public load and 10-way RSVP capacity concurrency"] },
     { "id": "backup_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest 33-table backup restored with current image health 200"] },
     { "id": "rollback_image_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest backup restored with immediate rollback image health 200"] },
@@ -21,7 +21,7 @@
     { "id": "refund_cancellation_legal", "kind": "human", "status": "pending", "blocker": "Qualified review of refund, cancellation and entitlement treatment is not recorded" },
     { "id": "tax_accounting", "kind": "human", "status": "pending", "blocker": "Qualified sales-tax registration, collection and remittance decision is not recorded" },
     { "id": "email_sms_compliance", "kind": "human", "status": "pending", "blocker": "Qualified CASL/TCPA consent and unsubscribe review is not recorded" },
-    { "id": "launch_metrics", "kind": "human", "status": "pending", "blocker": "Privacy-limited activation and beta-cohort collection exists, but approved thresholds and completed activation, conversion, delivery, support and willingness-to-pay evidence are still absent" }
+    { "id": "launch_metrics", "kind": "human", "status": "pending", "blocker": "Privacy-limited cohort rates now preserve explicit numerators, denominators and zero-evidence nulls, but approved thresholds and completed activation, conversion, delivery, support and willingness-to-pay evidence are still absent" }
   ],
   "optional": [
     { "id": "openai_live_generation", "status": "pending", "note": "Optional because deterministic fallback is shipped; required before marketing live AI generation" }
