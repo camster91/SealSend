@@ -24,6 +24,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   let replacementEventId = '';
   let repeatedEventId = '';
   let slug = '';
+  let betaJoined = false;
   try {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Password' }).click();
@@ -34,6 +35,15 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await page.context().setExtraHTTPHeaders({ Origin: 'https://sealsend.app' });
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
+
+    const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {
+      segment: 'repeat_planner', consent: true,
+    }});
+    expect(betaEnrollment.status()).toBe(201);
+    const initialBeta = await betaEnrollment.json();
+    expect(initialBeta.participant.active).toBe(true);
+    expect(initialBeta.progress.completedRequired).toBe(1);
+    betaJoined = true;
 
     await page.goto('/dashboard?plan=pro_annual');
     await expect(page.getByText('Continue with SealSend Pro')).toHaveCount(0);
@@ -134,6 +144,15 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(publish.status()).toBe(200);
     expect((await publish.json()).status).toBe('published');
 
+    const calendar = await page.context().request.get(`/api/calendar/${slug}`);
+    expect(calendar.status()).toBe(200);
+    expect(calendar.headers()['content-type']).toContain('text/calendar');
+
+    const checkIn = await page.context().request.patch(`/api/events/${eventId}/check-in`, { data: {
+      guestId: guest.id, checkedIn: true,
+    }});
+    expect(checkIn.status()).toBe(200);
+
     await page.goto(`/events/${eventId}`);
     await expect(page.getByText('SealSend Production QA Event').first()).toBeVisible();
     await page.screenshot({ path: path.join(output, '02-event-dashboard-desktop.png'), fullPage: true });
@@ -193,6 +212,16 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     );
     expect(messageFeedback.status()).toBe(200);
 
+    const scheduledAnnouncement = await page.context().request.post(`/api/events/${eventId}/announcements`, { data: {
+      subject: 'Temporary QA announcement',
+      message: 'This approved QA announcement is scheduled beyond the test and removed during cleanup.',
+      audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
+      channels: ['email'],
+      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+      approved: true,
+    }});
+    expect(scheduledAnnouncement.status()).toBe(201);
+
     const feedback = await page.context().request.post('/api/feedback', { data: {
       category: 'setup', rating: 5, message: 'Temporary automated production QA feedback.', mayContact: false,
     }});
@@ -201,6 +230,9 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const csv = await page.context().request.get(`/api/events/${eventId}/responses?format=csv`);
     expect(csv.status()).toBe(200);
     expect(csv.headers()['content-type']).toContain('text/csv');
+
+    const accountExport = await page.context().request.get('/api/account/export');
+    expect(accountExport.status()).toBe(200);
 
     await page.goto(`/events/${eventId}/responses`);
     await expect(page.getByText('QA Respondent').first()).toBeVisible();
@@ -246,12 +278,20 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(repeatedSignupData[0].title).toBe('Bring dessert');
     expect(repeatedSignupData[0].claims).toHaveLength(0);
 
+    const betaEvidence = await page.context().request.get('/api/beta/participation');
+    expect(betaEvidence.status()).toBe(200);
+    const betaEvidenceData = await betaEvidence.json();
+    expect(betaEvidenceData.progress.completedRequired).toBe(9);
+    expect(betaEvidenceData.progress.steps.controlledInvite).toBe(false);
+    expect(betaEvidenceData.progress.steps.repeatEvent).toBe(true);
+
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
     if (repeatedEventId) await page.context().request.delete(`/api/events/${repeatedEventId}`);
     if (replacementEventId) await page.context().request.delete(`/api/events/${replacementEventId}`);
     if (eventId) await page.context().request.delete(`/api/events/${eventId}`);
+    if (betaJoined) await page.context().request.fetch('/api/beta/participation', { method: 'DELETE' });
     await page.context().request.post('/api/auth/logout');
   }
 });

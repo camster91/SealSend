@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TIERS } from "@/lib/constants";
 import { getClientUser } from "@/lib/auth/client-auth";
+import { BetaParticipation } from "@/components/dashboard/BetaParticipation";
 
 interface PaidEvent {
   id: string;
@@ -296,6 +297,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {role === "admin" && <BetaParticipation />}
       </div>
     </div>
   );

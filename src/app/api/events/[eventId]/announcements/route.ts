@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
@@ -56,6 +57,11 @@ export async function POST(request: Request, { params }: RouteParams) {
      VALUES ($1, $2, 'announcement_approved', $3::jsonb)`,
     [eventId, auth.user.id, JSON.stringify({ announcementId: announcement.id, scheduledAt: scheduledAt.toISOString(), channels: parsed.data.channels })],
   );
+  await recordActivationEventSafely({
+    name: "announcement_approved",
+    userId: event.user_id,
+    eventId,
+  });
   const immediate = scheduledAt.getTime() <= Date.now() + 5_000;
   const result = immediate ? await dispatchAnnouncement(announcement.id) : null;
   const saved = await queryOne<Record<string, unknown>>("SELECT * FROM event_announcements WHERE id = $1", [announcement.id]);

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
 import { getDb } from "@/lib/db/client";
 import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
@@ -189,6 +190,11 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     await client.query("COMMIT");
+    await recordActivationEventSafely({
+      name: "event_repeated",
+      userId: auth.user.id,
+      eventId: newEvent.id,
+    });
     return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount }, { status: 201 });
   } catch (error) {
     await client.query("ROLLBACK");

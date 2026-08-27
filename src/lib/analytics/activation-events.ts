@@ -13,6 +13,11 @@ export const ACTIVATION_EVENT_NAMES = [
   "checkout_started",
   "checkout_completed",
   "account_exported",
+  "event_repeated",
+  "guest_import_completed",
+  "announcement_approved",
+  "calendar_exported",
+  "first_guest_checked_in",
 ] as const;
 
 export type ActivationEventName = (typeof ACTIVATION_EVENT_NAMES)[number];

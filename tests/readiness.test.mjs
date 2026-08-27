@@ -610,6 +610,57 @@ test('beta operations include privacy-safe error capture and authenticated feedb
   assert.match(feedback, /rateLimit/);
 });
 
+test('controlled beta evidence requires explicit consent, supports withdrawal, and records real milestones', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/participation/route.ts');
+  const panel = await read('src/components/dashboard/BetaParticipation.tsx');
+  const settings = await read('src/app/(dashboard)/settings/page.tsx');
+  const activation = await read('src/lib/analytics/activation-events.ts');
+  const repeat = await read('src/app/api/events/[eventId]/clone/route.ts');
+  const guestImport = await read('src/app/api/events/[eventId]/guests/bulk/route.ts');
+  const announcement = await read('src/app/api/events/[eventId]/announcements/route.ts');
+  const calendar = await read('src/app/api/calendar/[slug]/route.ts');
+  const checkIn = await read('src/app/api/events/[eventId]/check-in/route.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const live = await read('tests/e2e/live-full.spec.ts');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_participants/);
+    assert.match(sql, /consent_version TEXT NOT NULL/);
+    assert.match(sql, /consented_at TIMESTAMPTZ NOT NULL/);
+    assert.match(sql, /withdrawn_at TIMESTAMPTZ/);
+    for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
+      assert.match(sql, new RegExp(`['"]${milestone}['"]`));
+    }
+  }
+  assert.match(route, /requireApiHost/);
+  assert.match(route, /parseBetaEnrollment/);
+  assert.match(route, /deriveBetaProgress/);
+  assert.match(route, /withdrawn_at = NOW\(\)/);
+  assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
+  assert.doesNotMatch(route, /SELECT \*/);
+  assert.match(panel, /Join controlled beta/);
+  assert.match(panel, /workflow milestones/);
+  assert.match(panel, /does not record guest names, contact details, message bodies, or response content/);
+  assert.match(panel, /Withdraw beta consent/);
+  assert.match(settings, /BetaParticipation/);
+  for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
+    assert.match(activation, new RegExp(`["']${milestone}["']`));
+  }
+  assert.match(repeat, /name:\s*["']event_repeated["']/);
+  assert.match(guestImport, /name:\s*["']guest_import_completed["']/);
+  assert.match(announcement, /name:\s*["']announcement_approved["']/);
+  assert.match(calendar, /name:\s*["']calendar_exported["']/);
+  assert.match(checkIn, /name:\s*["']first_guest_checked_in["']/);
+  assert.match(metrics, /betaParticipants/);
+  assert.match(metrics, /withdrawn_at IS NULL/);
+  assert.doesNotMatch(metrics, /participant_label|respondent_name|respondent_email|message\s+FROM|recipient/);
+  assert.match(live, /api\/beta\/participation/);
+  assert.match(live, /completedRequired\)\.toBe\(9\)/);
+  assert.match(live, /method:\s*['"]DELETE['"]/);
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');

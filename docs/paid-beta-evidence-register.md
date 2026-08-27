@@ -31,6 +31,8 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 
 Each participant must consent to beta observation. Use one participant for each segment: private celebration, wedding, community/non-profit, corporate/team, and repeat planner.
 
+The release candidate records a versioned consent timestamp, a pseudonymous participant label, segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
+
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | host-01 | Private celebration | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |

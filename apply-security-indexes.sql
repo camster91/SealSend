@@ -160,7 +160,12 @@ CREATE TABLE IF NOT EXISTS activation_events (
     'first_rsvp_received',
     'checkout_started',
     'checkout_completed',
-    'account_exported'
+    'account_exported',
+    'event_repeated',
+    'guest_import_completed',
+    'announcement_approved',
+    'calendar_exported',
+    'first_guest_checked_in'
   )),
   user_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   event_id UUID REFERENCES events(id) ON DELETE SET NULL,
@@ -180,13 +185,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event
   ON activation_events(event_name, event_id)
   WHERE event_id IS NOT NULL AND event_name IN (
-    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed'
+    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed',
+    'event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in'
   );
 ALTER TABLE activation_events DROP CONSTRAINT IF EXISTS activation_events_event_name_check;
 ALTER TABLE activation_events ADD CONSTRAINT activation_events_event_name_check CHECK (event_name IN (
   'account_created','event_draft_started','ai_generation_started','ai_generation_completed','ai_generation_accepted',
   'event_published','first_guest_added','first_invitation_sent','first_rsvp_received',
-  'checkout_started','checkout_completed','account_exported'
+  'checkout_started','checkout_completed','account_exported','event_repeated','guest_import_completed',
+  'announcement_approved','calendar_exported','first_guest_checked_in'
 ));
 DROP INDEX IF EXISTS idx_activation_first_user;
 DROP INDEX IF EXISTS idx_activation_first_event;
@@ -196,7 +203,8 @@ CREATE UNIQUE INDEX idx_activation_first_user
 CREATE UNIQUE INDEX idx_activation_first_event
   ON activation_events(event_name, event_id)
   WHERE event_id IS NOT NULL AND event_name IN (
-    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed'
+    'event_published', 'first_guest_added', 'first_invitation_sent', 'first_rsvp_received', 'checkout_completed',
+    'event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in'
   );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_account_checkout
   ON activation_events(event_name, user_id)
@@ -384,3 +392,15 @@ CREATE TABLE IF NOT EXISTS beta_feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_beta_feedback_created ON beta_feedback(created_at DESC);
+CREATE TABLE IF NOT EXISTS beta_participants (
+  user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
+  participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
+  segment TEXT NOT NULL CHECK (segment IN ('private_celebration','wedding','community_nonprofit','corporate_team','repeat_planner')),
+  consent_version TEXT NOT NULL,
+  consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  withdrawn_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
+  ON beta_participants(segment) WHERE withdrawn_at IS NULL;
