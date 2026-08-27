@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-export const BETA_CONSENT_VERSION = "beta-observation-2026-08-27";
+export const BETA_CONSENT_VERSION = "beta-observation-recurring-community-2026-08-27";
 
 export const BETA_SEGMENTS = [
-  "private_celebration",
-  "wedding",
-  "community_nonprofit",
-  "corporate_team",
+  "club_association",
+  "volunteer_nonprofit",
+  "creative_community",
+  "alumni_professional",
   "repeat_planner",
 ] as const;
 

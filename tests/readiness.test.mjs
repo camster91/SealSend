@@ -631,10 +631,15 @@ test('controlled beta evidence requires explicit consent, supports withdrawal, a
     assert.match(sql, /consent_version TEXT NOT NULL/);
     assert.match(sql, /consented_at TIMESTAMPTZ NOT NULL/);
     assert.match(sql, /withdrawn_at TIMESTAMPTZ/);
+    for (const segment of ['club_association', 'volunteer_nonprofit', 'creative_community', 'alumni_professional', 'repeat_planner']) {
+      assert.match(sql, new RegExp(`['"]${segment}['"]`));
+    }
     for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
       assert.match(sql, new RegExp(`['"]${milestone}['"]`));
     }
   }
+  assert.match(migration, /DROP CONSTRAINT IF EXISTS beta_participants_segment_check/);
+  assert.match(migration, /withdrawn_at = COALESCE\(withdrawn_at, NOW\(\)\)/);
   assert.match(route, /requireApiHost/);
   assert.match(route, /parseBetaEnrollment/);
   assert.match(route, /deriveBetaProgress/);

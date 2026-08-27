@@ -35,7 +35,7 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
     },
     {
       participantId: "withdrawn-host",
-      segment: "wedding",
+      segment: "creative_community",
       consentedAt: "2026-08-27T12:00:00.000Z",
       withdrawnAt: "2026-08-27T13:00:00.000Z",
       activationEvents: [{ name: "event_published", createdAt: "2026-08-27T12:10:00.000Z" }],
@@ -65,7 +65,7 @@ test("repeat-use rate uses repeat planners rather than the whole cohort as its d
     },
     {
       participantId: "community-a",
-      segment: "community_nonprofit",
+      segment: "volunteer_nonprofit",
       consentedAt: "2026-08-27T12:00:00.000Z",
       withdrawnAt: null,
       activationEvents: [{ name: "event_repeated", createdAt: "2026-08-27T13:00:00.000Z" }],

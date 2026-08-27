@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Segment = "private_celebration" | "wedding" | "community_nonprofit" | "corporate_team" | "repeat_planner";
+type Segment = "club_association" | "volunteer_nonprofit" | "creative_community" | "alumni_professional" | "repeat_planner";
 
 interface ParticipationResponse {
   participant: null | {
@@ -22,10 +22,10 @@ interface ParticipationResponse {
 }
 
 const SEGMENTS: Array<{ value: Segment; label: string }> = [
-  { value: "private_celebration", label: "Private celebration" },
-  { value: "wedding", label: "Wedding" },
-  { value: "community_nonprofit", label: "Community or non-profit" },
-  { value: "corporate_team", label: "Corporate or team" },
+  { value: "club_association", label: "Club or association" },
+  { value: "volunteer_nonprofit", label: "Volunteer group or local non-profit" },
+  { value: "creative_community", label: "Creative community" },
+  { value: "alumni_professional", label: "Alumni or small professional community" },
   { value: "repeat_planner", label: "Repeat planner" },
 ];
 
@@ -44,7 +44,7 @@ const STEPS = [
 
 export function BetaParticipation() {
   const [data, setData] = useState<ParticipationResponse | null>(null);
-  const [segment, setSegment] = useState<Segment>("community_nonprofit");
+  const [segment, setSegment] = useState<Segment>("club_association");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);

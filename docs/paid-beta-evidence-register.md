@@ -29,16 +29,16 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 
 ## Five-host acceptance
 
-Each participant must consent to beta observation. Use one participant for each segment: private celebration, wedding, community/non-profit, corporate/team, and repeat planner.
+Each participant must consent to beta observation. Recruit within the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner.
 
 The release candidate records a versioned consent timestamp, a pseudonymous participant label, segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
 
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| host-01 | Private celebration | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-02 | Wedding | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-03 | Community/non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-04 | Corporate/team | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-01 | Club/association | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-02 | Volunteer/local non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-03 | Creative community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-04 | Alumni/small professional community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
 | host-05 | Repeat planner | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
 
 ## Launch measures

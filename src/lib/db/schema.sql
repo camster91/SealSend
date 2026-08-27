@@ -604,7 +604,7 @@ CREATE INDEX IF NOT EXISTS idx_beta_feedback_created ON beta_feedback(created_at
 CREATE TABLE IF NOT EXISTS beta_participants (
   user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
-  segment TEXT NOT NULL CHECK (segment IN ('private_celebration','wedding','community_nonprofit','corporate_team','repeat_planner')),
+  segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner','legacy_out_of_scope')),
   consent_version TEXT NOT NULL,
   consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   withdrawn_at TIMESTAMPTZ,

@@ -395,12 +395,24 @@ CREATE INDEX IF NOT EXISTS idx_beta_feedback_created ON beta_feedback(created_at
 CREATE TABLE IF NOT EXISTS beta_participants (
   user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
-  segment TEXT NOT NULL CHECK (segment IN ('private_celebration','wedding','community_nonprofit','corporate_team','repeat_planner')),
+  segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner','legacy_out_of_scope')),
   consent_version TEXT NOT NULL,
   consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   withdrawn_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+DO $$
+BEGIN
+  ALTER TABLE beta_participants DROP CONSTRAINT IF EXISTS beta_participants_segment_check;
+  UPDATE beta_participants
+     SET segment = 'legacy_out_of_scope',
+         withdrawn_at = COALESCE(withdrawn_at, NOW()),
+         updated_at = NOW()
+   WHERE segment IN ('private_celebration','wedding','community_nonprofit','corporate_team');
+  ALTER TABLE beta_participants
+    ADD CONSTRAINT beta_participants_segment_check
+    CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner','legacy_out_of_scope'));
+END $$;
 CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
   ON beta_participants(segment) WHERE withdrawn_at IS NULL;

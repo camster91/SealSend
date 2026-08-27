@@ -3,18 +3,27 @@ import test from "node:test";
 
 import {
   BETA_CONSENT_VERSION,
+  BETA_SEGMENTS,
   deriveBetaProgress,
   isBetaParticipationActive,
   parseBetaEnrollment,
 } from "../src/lib/beta-participation";
 
 test("beta enrollment requires explicit current-version consent and a supported segment", () => {
+  assert.deepEqual(BETA_SEGMENTS, [
+    "club_association",
+    "volunteer_nonprofit",
+    "creative_community",
+    "alumni_professional",
+    "repeat_planner",
+  ]);
   assert.deepEqual(
-    parseBetaEnrollment({ segment: "community_nonprofit", consent: true }),
-    { segment: "community_nonprofit", consentVersion: BETA_CONSENT_VERSION },
+    parseBetaEnrollment({ segment: "club_association", consent: true }),
+    { segment: "club_association", consentVersion: BETA_CONSENT_VERSION },
   );
-  assert.throws(() => parseBetaEnrollment({ segment: "community_nonprofit", consent: false }));
+  assert.throws(() => parseBetaEnrollment({ segment: "club_association", consent: false }));
   assert.throws(() => parseBetaEnrollment({ segment: "consumer_party", consent: true }));
+  assert.throws(() => parseBetaEnrollment({ segment: "wedding", consent: true }));
   assert.throws(() => parseBetaEnrollment({ segment: "wedding", consent: true, email: "not-allowed@example.com" }));
 });
 
