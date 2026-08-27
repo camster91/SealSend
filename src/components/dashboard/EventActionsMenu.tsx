@@ -6,9 +6,10 @@ import { CloneEventButton } from './CloneEventButton';
 interface EventActionsMenuProps {
   eventId: string;
   eventTitle: string;
+  eventTimezone?: string;
 }
 
-export function EventActionsMenu({ eventId, eventTitle }: EventActionsMenuProps) {
+export function EventActionsMenu({ eventId, eventTitle, eventTimezone }: EventActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +43,7 @@ export function EventActionsMenu({ eventId, eventTitle }: EventActionsMenuProps)
             <CloneEventButton 
               eventId={eventId} 
               eventTitle={eventTitle} 
+              eventTimezone={eventTimezone}
               variant="menu-item"
             />
           </div>

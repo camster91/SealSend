@@ -275,6 +275,32 @@ test('controlled beta remains free and enforces one active event throughout the 
   assert.match(events, /one active event/i);
 });
 
+test('repeat organizers get an explicit, atomic, privacy-limited next-event workflow', async () => {
+  const route = await read('src/app/api/events/[eventId]/clone/route.ts');
+  const control = await read('src/components/dashboard/CloneEventButton.tsx');
+
+  assert.match(route, /parseRepeatEventRequest/);
+  assert.match(route, /pg_advisory_xact_lock/);
+  assert.match(route, /status\s*<>\s*['"]archived['"]/i);
+  assert.match(route, /canCreateEvent/);
+  assert.match(route, /BEGIN/);
+  assert.match(route, /COMMIT/);
+  assert.match(route, /ROLLBACK/);
+  assert.match(route, /includeGuests/);
+  assert.match(route, /guest_tags/);
+  assert.match(route, /guest_tag_assignments/);
+  assert.doesNotMatch(route, /SELECT \* FROM events/);
+  assert.doesNotMatch(route, /guest\.notes/);
+
+  assert.match(control, /Repeat event/);
+  assert.match(control, /type="datetime-local"/);
+  assert.match(control, /includeGuests/);
+  assert.match(control, /does not copy responses, check-ins, messages, or guest notes/i);
+  assert.match(control, /zonedLocalDateTimeToInstant/);
+  assert.match(control, /event\.key\s*===\s*['"]Escape['"]/);
+  assert.match(control, /titleInputRef\.current\?\.focus\(\)/);
+});
+
 test('root discovery metadata matches the recurring-organizer controlled beta', async () => {
   const layout = await read('src/app/layout.tsx');
   const manifest = await read('public/manifest.json');

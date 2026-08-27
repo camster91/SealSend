@@ -22,6 +22,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
 
   let eventId = '';
   let replacementEventId = '';
+  let repeatedEventId = '';
   let slug = '';
   try {
     await page.goto('/login');
@@ -209,9 +210,46 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(checkout.status()).toBe(503);
     expect((await checkout.json()).error).toContain('controlled beta');
 
+    const archiveForRepeat = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
+    expect(archiveForRepeat.status()).toBe(200);
+    await page.goto(`/events/${eventId}`);
+    await page.getByRole('button', { name: 'Repeat event' }).click();
+    const repeatDialog = page.getByRole('dialog', { name: 'Repeat event' });
+    await expect(repeatDialog).toBeVisible();
+    await repeatDialog.getByLabel('New event title').fill('SealSend Production QA Repeat');
+    const repeatStart = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
+    await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
+    await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
+    await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
+    await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
+    repeatedEventId = page.url().split('/').pop() || '';
+    expect(repeatedEventId).toBeTruthy();
+
+    const repeatedGuests = await page.context().request.get(`/api/events/${repeatedEventId}/guests`);
+    expect(repeatedGuests.status()).toBe(200);
+    const repeatedGuestData = await repeatedGuests.json();
+    expect(repeatedGuestData).toHaveLength(3);
+    expect(repeatedGuestData.find((entry: { name: string }) => entry.name === 'QA Guest One')?.notes).toBeNull();
+    expect(repeatedGuestData.every((entry: { invite_status: string; reminder_sent_at: string | null }) =>
+      entry.invite_status === 'not_sent' && entry.reminder_sent_at === null)).toBe(true);
+
+    const repeatedResponses = await page.context().request.get(`/api/events/${repeatedEventId}/responses`);
+    expect(repeatedResponses.status()).toBe(200);
+    expect(await repeatedResponses.json()).toHaveLength(0);
+    const repeatedTags = await page.context().request.get(`/api/events/${repeatedEventId}/tags`);
+    expect(repeatedTags.status()).toBe(200);
+    expect((await repeatedTags.json()).map((entry: { tag_name: string }) => entry.tag_name)).toContain('VIP');
+    const repeatedSignups = await page.context().request.get(`/api/events/${repeatedEventId}/signups`);
+    expect(repeatedSignups.status()).toBe(200);
+    const repeatedSignupData = await repeatedSignups.json();
+    expect(repeatedSignupData).toHaveLength(1);
+    expect(repeatedSignupData[0].title).toBe('Bring dessert');
+    expect(repeatedSignupData[0].claims).toHaveLength(0);
+
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
+    if (repeatedEventId) await page.context().request.delete(`/api/events/${repeatedEventId}`);
     if (replacementEventId) await page.context().request.delete(`/api/events/${replacementEventId}`);
     if (eventId) await page.context().request.delete(`/api/events/${eventId}`);
     await page.context().request.post('/api/auth/logout');

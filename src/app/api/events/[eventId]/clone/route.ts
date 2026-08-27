@@ -1,154 +1,200 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db/client";
-import { requireEventPermission } from '@/lib/auth/event-api-access';
+import { requireEventPermission } from "@/lib/auth/event-api-access";
+import { getDb } from "@/lib/db/client";
+import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
+import { parseRepeatEventRequest } from "@/lib/repeat-event";
+import { getUserTier } from "@/lib/subscription";
+import { generateSlug } from "@/lib/utils";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
+type SourceEvent = {
+  description: string | null;
+  invitation_headline: string | null;
+  invitation_body: string | null;
+  reminder_sequence: unknown;
+  event_timezone: string;
+  location_name: string | null;
+  location_address: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  host_name: string | null;
+  dress_code: string | null;
+  registry_links: unknown;
+  max_attendees: number | null;
+  allow_plus_ones: boolean;
+  max_guests_per_rsvp: number;
+  design_url: string | null;
+  design_type: string;
+  customization: unknown;
+};
+
+type SourceGuest = { id: string; name: string; email: string | null; phone: string | null; tags: unknown };
+type SourceTag = { id: string; tag_name: string; color: string };
+type SourceAssignment = { guest_id: string; tag_id: string };
+
+function valuesSql(rowCount: number, columnCount: number): string {
+  return Array.from({ length: rowCount }, (_, rowIndex) => {
+    const start = rowIndex * columnCount + 1;
+    return `(${Array.from({ length: columnCount }, (__, columnIndex) => `$${start + columnIndex}`).join(", ")})`;
+  }).join(", ");
+}
+
 export async function POST(request: Request, { params }: RouteParams) {
+  const { eventId } = await params;
+  const auth = await requireEventPermission(eventId, "clone_event");
+  if (auth.error) return auth.error;
+
+  let repeatRequest;
   try {
-    const { eventId } = await params;
-    const auth = await requireEventPermission(eventId, 'clone_event');
-    if (auth.error) return auth.error;
-    const user = auth.user;
-
-    // Get original event
-    const originalEvent = await queryOne<Record<string, unknown>>(
-      'SELECT * FROM events WHERE id = $1',
-      [eventId]
+    repeatRequest = parseRepeatEventRequest(await request.json());
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid repeat-event request" },
+      { status: 400 },
     );
+  }
 
-    if (!originalEvent) {
+  const accountPlan = await getUserTier(auth.user.id);
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [auth.user.id]);
+
+    const activeResult = await client.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
+      [auth.user.id],
+    );
+    if (!canCreateEvent(accountPlan, Number(activeResult.rows[0]?.count ?? 0))) {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: "This plan supports one active event. Archive the current event before repeating it." },
+        { status: 403 },
+      );
+    }
+
+    const originalResult = await client.query<SourceEvent>(
+      `SELECT description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
+              location_name, location_address, location_lat, location_lng, host_name, dress_code,
+              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
+              design_url, design_type, customization
+       FROM events WHERE id = $1`,
+      [eventId],
+    );
+    const original = originalResult.rows[0];
+    if (!original) {
+      await client.query("ROLLBACK");
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Get RSVP fields
-    const rsvpFields = await query<Record<string, unknown>>(
-      'SELECT * FROM rsvp_fields WHERE event_id = $1',
-      [eventId]
+    const limits = getEffectiveEventLimits(accountPlan, "free");
+    const insertedEvent = await client.query<{ id: string; title: string }>(
+      `INSERT INTO events (
+         user_id, title, slug, description, invitation_headline, invitation_body, reminder_sequence,
+         event_date, event_end_date, event_timezone, location_name, location_address,
+         location_lat, location_lng, host_name, dress_code, rsvp_deadline, registry_links,
+         max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type,
+         customization, status, tier, max_responses, auto_reminders, reminder_sent_at, payment_id,
+         ai_generation_id
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, NULL
+       ) RETURNING id, title`,
+      [
+        auth.user.id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
+        original.invitation_headline, original.invitation_body, original.reminder_sequence,
+        repeatRequest.eventDate, repeatRequest.eventEndDate, original.event_timezone,
+        original.location_name, original.location_address, original.location_lat, original.location_lng,
+        original.host_name, original.dress_code, repeatRequest.rsvpDeadline, original.registry_links,
+        original.max_attendees, original.allow_plus_ones, original.max_guests_per_rsvp,
+        original.design_url, original.design_type, original.customization, limits.responses,
+      ],
+    );
+    const newEvent = insertedEvent.rows[0];
+
+    await client.query(
+      `INSERT INTO rsvp_fields
+         (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
+       SELECT $1, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder
+       FROM rsvp_fields WHERE event_id = $2`,
+      [newEvent.id, eventId],
+    );
+    await client.query(
+      `INSERT INTO event_signup_items (event_id, title, description, category, slots, sort_order)
+       SELECT $1, title, description, category, slots, sort_order
+       FROM event_signup_items WHERE event_id = $2`,
+      [newEvent.id, eventId],
     );
 
-    // Get guests
-    const guests = await query<{ name: string; email: string; phone: string; notes: string }>(
-      'SELECT name, email, phone, notes FROM guests WHERE event_id = $1',
-      [eventId]
-    );
-
-    // Create new event (clone) — reset billing/lifecycle fields so paid tiers are not copied
-    const {
-      title,
-      status: _status,
-      created_at: _created_at,
-      updated_at: _updated_at,
-      id: _id,
-      tier: _tier,
-      max_responses: _max_responses,
-      auto_reminders: _auto_reminders,
-      reminder_days_before: _reminder_days_before,
-      reminder_sent_at: _reminder_sent_at,
-      slug: _slug,
-      user_id: _user_id,
-      ...eventData
-    } = originalEvent;
-
-    const columns = Object.keys(eventData);
-    const paramIndices = columns.map((_, i) => `$${i + 1}`);
-    // Add title, status, user_id, tier, max_responses, slug
-    const extraCols = ['title', 'status', 'user_id', 'tier', 'max_responses', 'slug'];
-    for (const col of extraCols) {
-      columns.push(col);
-      paramIndices.push(`$${columns.length}`);
-    }
-
-    const { generateSlug } = await import('@/lib/utils');
-    const values = [
-      ...Object.values(eventData),
-      `${title} (Copy)`,
-      'draft',
-      user.id,
-      'free',
-      15,
-      generateSlug(String(title) + '-copy'),
-    ];
-
-    const newEvent = await queryOne<Record<string, unknown>>(
-      `INSERT INTO events (${columns.join(', ')}) VALUES (${paramIndices.join(', ')}) RETURNING *`,
-      values
-    );
-
-    if (!newEvent) {
-      console.error("Clone error: insert returned no rows");
-      return NextResponse.json({ error: "Failed to clone event" }, { status: 500 });
-    }
-
-    // Clone RSVP fields
-    if (rsvpFields.length > 0) {
-      const placeholders: string[] = [];
-      const fieldValues: unknown[] = [];
-      let paramIdx = 1;
-
-      for (const field of rsvpFields) {
-        const { id: _id, event_id: _eventId, created_at: _createdAt, ...fieldData } = field;
-        const fieldKeys = Object.keys(fieldData);
-
-        if (paramIdx === 1) {
-          // Build column list from first row
-          const colList = ['event_id', ...fieldKeys];
-          const ph = colList.map((_, i) => `$${paramIdx + i}`);
-          placeholders.push(`(${ph.join(', ')})`);
-          fieldValues.push(newEvent.id, ...Object.values(fieldData));
-          paramIdx += colList.length;
-        } else {
-          const colCount = fieldKeys.length + 1;
-          const ph = Array.from({ length: colCount }, (_, i) => `$${paramIdx + i}`);
-          placeholders.push(`(${ph.join(', ')})`);
-          fieldValues.push(newEvent.id, ...Object.values(fieldData));
-          paramIdx += colCount;
-        }
-      }
-
-      // Get column names from first field
-      const { id: _id, event_id: _eventId, created_at: _createdAt, ...firstFieldData } = rsvpFields[0];
-      const colNames = ['event_id', ...Object.keys(firstFieldData)];
-
-      await query(
-        `INSERT INTO rsvp_fields (${colNames.join(', ')}) VALUES ${placeholders.join(', ')}`,
-        fieldValues
+    let copiedGuestCount = 0;
+    if (repeatRequest.includeGuests) {
+      const guestResult = await client.query<SourceGuest>(
+        `SELECT id, name, email, phone, tags FROM guests
+         WHERE event_id = $1 AND COALESCE(is_plus_one, FALSE) = FALSE ORDER BY created_at ASC`,
+        [eventId],
       );
-    }
-
-    // Clone guests (optional - could be disabled)
-    if (guests.length > 0) {
-      const placeholders: string[] = [];
-      const guestValues: unknown[] = [];
-      let paramIdx = 1;
-
-      for (const guest of guests) {
-        placeholders.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6})`);
-        guestValues.push(
-          newEvent.id,
-          guest.name,
-          guest.email,
-          guest.phone,
-          guest.notes,
-          'not_sent',
-          null,
+      if (guestResult.rows.length > limits.guests) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          { error: `This plan can repeat at most ${limits.guests} guests.` },
+          { status: 403 },
         );
-        paramIdx += 7;
       }
 
-      await query(
-        `INSERT INTO guests (event_id, name, email, phone, notes, invite_status, reminder_sent_at) VALUES ${placeholders.join(', ')}`,
-        guestValues
+      const tagResult = await client.query<SourceTag>(
+        "SELECT id, tag_name, color FROM guest_tags WHERE event_id = $1 ORDER BY created_at ASC",
+        [eventId],
       );
+      const assignmentResult = await client.query<SourceAssignment>(
+        `SELECT assignment.guest_id, assignment.tag_id
+         FROM guest_tag_assignments assignment
+         JOIN guests ON guests.id = assignment.guest_id
+         JOIN guest_tags ON guest_tags.id = assignment.tag_id
+         WHERE guests.event_id = $1 AND guest_tags.event_id = $1`,
+        [eventId],
+      );
+
+      const guestIds = new Map(guestResult.rows.map((guest) => [guest.id, randomUUID()]));
+      const tagIds = new Map(tagResult.rows.map((tag) => [tag.id, randomUUID()]));
+      if (tagResult.rows.length > 0) {
+        await client.query(
+          `INSERT INTO guest_tags (id, event_id, tag_name, color) VALUES ${valuesSql(tagResult.rows.length, 4)}`,
+          tagResult.rows.flatMap((tag) => [tagIds.get(tag.id), newEvent.id, tag.tag_name, tag.color]),
+        );
+      }
+      if (guestResult.rows.length > 0) {
+        await client.query(
+          `INSERT INTO guests (id, event_id, name, email, phone, tags)
+           VALUES ${valuesSql(guestResult.rows.length, 6)}`,
+          guestResult.rows.flatMap((guest) => [
+            guestIds.get(guest.id), newEvent.id, guest.name, guest.email, guest.phone, guest.tags,
+          ]),
+        );
+      }
+
+      const copiedAssignments = assignmentResult.rows.flatMap((assignment) => {
+        const guestId = guestIds.get(assignment.guest_id);
+        const tagId = tagIds.get(assignment.tag_id);
+        return guestId && tagId ? [[guestId, tagId]] : [];
+      });
+      if (copiedAssignments.length > 0) {
+        await client.query(
+          `INSERT INTO guest_tag_assignments (guest_id, tag_id)
+           VALUES ${valuesSql(copiedAssignments.length, 2)}`,
+          copiedAssignments.flat(),
+        );
+      }
+      copiedGuestCount = guestResult.rows.length;
     }
 
-    return NextResponse.json({
-      success: true,
-      event: newEvent,
-      message: `Event cloned successfully with ${guests.length || 0} guests`
-    });
+    await client.query("COMMIT");
+    return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount }, { status: 201 });
   } catch (error) {
-    console.error("Clone error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    await client.query("ROLLBACK");
+    console.error("Repeat event failed:", error);
+    return NextResponse.json({ error: "Failed to repeat event" }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
