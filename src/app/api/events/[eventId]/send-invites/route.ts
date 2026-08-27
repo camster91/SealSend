@@ -14,9 +14,10 @@ import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
+import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
-type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token">;
+type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "phone_invalid_at">;
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
   for (let i = 0; i < retries; i++) {
@@ -63,21 +64,30 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Fetch guests that need invitations (email OR phone)
     const guests = await query<InviteGuest>(
-      `SELECT id, name, email, phone, invite_status, invite_token FROM guests
+      `SELECT id, name, email, phone, invite_status, invite_token, phone_invalid_at FROM guests
        WHERE event_id = $1 AND invite_status IN ('not_sent', 'failed')`,
       [eventId]
     );
-
-    // Filter to guests that have email or phone
-    const sendableGuests = guests.filter((g) => g.email || g.phone);
-    if (sendableGuests.length === 0) {
-      return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
-    }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     // SMS requires standard or premium tier (unlocked in beta)
     const accountPlan = await getUserTier(event.user_id);
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
+    const suppressions = await getCommunicationSuppressions(event.user_id);
+    const sendableGuests = guests.map((guest) => {
+      const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
+        ? guest.email
+        : null;
+      let phone = smsEnabled && !guest.phone_invalid_at ? guest.phone : null;
+      if (phone) {
+        const validation = validateAndFormatPhone(phone);
+        if (validation.valid && validation.formatted && isCommunicationSuppressed(suppressions, "sms", validation.formatted)) phone = null;
+      }
+      return { ...guest, email, phone };
+    }).filter((guest) => guest.email || guest.phone);
+    if (sendableGuests.length === 0) {
+      return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
+    }
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
     const BATCH_SIZE = 10;
@@ -160,6 +170,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             const phoneValidation = validateAndFormatPhone(guest.phone);
 
             if (!phoneValidation.valid) {
+              await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 

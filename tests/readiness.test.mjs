@@ -753,6 +753,36 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /status: 500/);
 });
 
+test('complaints, unsubscribes, bounces, and invalid phones block future guest communications', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');
+  const invitations = await read('src/app/api/events/[eventId]/send-invites/route.ts');
+  const reminders = await read('src/app/api/events/[eventId]/send-reminders/route.ts');
+  const scheduledReminders = await read('src/app/api/cron/send-reminders/route.ts');
+  const announcements = await read('src/lib/messages/dispatch-announcement.ts');
+  const guestUpdate = await read('src/app/api/events/[eventId]/guests/[guestId]/route.ts');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /communication_suppressions/);
+    assert.match(sql, /recipient_hash/);
+    assert.match(sql, /(?:UNIQUE|PRIMARY KEY)\s*\(user_id, channel, recipient_hash\)/);
+  }
+  assert.match(mailgun, /recordCommunicationSuppression/);
+  assert.match(mailgun, /unsubscribed[\s\S]*complained[\s\S]*bounced/);
+  for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
+    assert.match(sender, /getCommunicationSuppressions/);
+    assert.match(sender, /isCommunicationSuppressed/);
+  }
+  assert.match(invitations, /phone_invalid_at/);
+  assert.match(reminders, /phone_invalid_at/);
+  assert.match(scheduledReminders, /phone_invalid_at/);
+  for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
+    assert.match(sender, /SET phone_invalid_at = NOW\(\)/);
+  }
+  assert.match(guestUpdate, /phone_invalid_at = NULL/);
+});
+
 test('operations readiness is secret-gated and never returns credential values', async () => {
   const route = await read('src/app/api/operations/readiness/route.ts');
   const readiness = await read('src/lib/provider-readiness.ts');

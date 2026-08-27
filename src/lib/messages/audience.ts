@@ -35,7 +35,7 @@ export function buildAudienceQuery(eventId: string, audience: MessageAudience) {
     )`);
   }
   return {
-    sql: `SELECT g.id, g.name, g.email, g.phone, g.invite_token
+    sql: `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token
       FROM guests g WHERE ${clauses.join(" AND ")} ORDER BY g.name ASC`,
     params,
   };

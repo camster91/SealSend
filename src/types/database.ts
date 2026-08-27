@@ -89,6 +89,7 @@ export interface Guest {
   invite_token: string | null;
   invite_status: InviteStatus;
   invite_sent_at: string | null;
+  phone_invalid_at: string | null;
   reminder_sent_at: string | null;
   checked_in_at: string | null;
   checked_in_by: string | null;

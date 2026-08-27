@@ -10,9 +10,10 @@ import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import type { Event, Guest } from "@/types/database";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
+import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 
 type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
-type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at">;
+type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at" | "phone_invalid_at">;
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -29,8 +30,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Ownership + status check
-    const event = await queryOne<ReminderEvent>(
-      'SELECT id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1',
+    const event = await queryOne<ReminderEvent & { user_id: string }>(
+      'SELECT id, user_id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1',
       [eventId]
     );
 
@@ -47,14 +48,24 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Fetch guests that have been invited but not reminded
     const guests = await query<ReminderGuest>(
-      `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at
+      `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at, phone_invalid_at
        FROM guests
        WHERE event_id = $1 AND invite_status = $2 AND reminder_sent_at IS NULL`,
       [eventId, 'sent']
     );
 
-    // Filter to guests with email or phone
-    const sendableGuests = guests.filter((g) => g.email || g.phone);
+    const suppressions = await getCommunicationSuppressions(event.user_id);
+    const sendableGuests = guests.map((guest) => {
+      const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
+        ? guest.email
+        : null;
+      let phone = smsEnabled && !guest.phone_invalid_at ? guest.phone : null;
+      if (phone) {
+        const validation = validateAndFormatPhone(phone);
+        if (validation.valid && validation.formatted && isCommunicationSuppressed(suppressions, "sms", validation.formatted)) phone = null;
+      }
+      return { ...guest, email, phone };
+    }).filter((guest) => guest.email || guest.phone);
     if (sendableGuests.length === 0) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
@@ -124,6 +135,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             const phoneValidation = validateAndFormatPhone(guest.phone);
 
             if (!phoneValidation.valid) {
+              await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[REMINDER SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 

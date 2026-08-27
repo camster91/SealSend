@@ -235,6 +235,18 @@ CREATE INDEX IF NOT EXISTS idx_guests_magic_token ON guests(magic_token);
 CREATE INDEX IF NOT EXISTS idx_guests_event_reminder ON guests(event_id, reminder_sent_at);
 CREATE INDEX IF NOT EXISTS idx_guests_event_check_in ON guests(event_id, checked_in_at);
 
+CREATE TABLE IF NOT EXISTS communication_suppressions (
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK (channel IN ('email', 'sms')),
+  recipient_hash TEXT NOT NULL CHECK (recipient_hash ~ '^[a-f0-9]{64}$'),
+  reason TEXT NOT NULL CHECK (reason IN ('unsubscribed', 'complained', 'bounced', 'manual')),
+  provider TEXT NOT NULL CHECK (provider IN ('mailgun', 'twilio', 'manual')),
+  source_event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, channel, recipient_hash)
+);
+
 -- =====================
 -- GUEST TAGS
 -- =====================

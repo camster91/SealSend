@@ -23,6 +23,17 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_id TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone_invalid_at TIMESTAMPTZ;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS communication_suppressions (
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL CHECK (channel IN ('email', 'sms')),
+  recipient_hash TEXT NOT NULL CHECK (recipient_hash ~ '^[a-f0-9]{64}$'),
+  reason TEXT NOT NULL CHECK (reason IN ('unsubscribed', 'complained', 'bounced', 'manual')),
+  provider TEXT NOT NULL CHECK (provider IN ('mailgun', 'twilio', 'manual')),
+  source_event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, channel, recipient_hash)
+);
 ALTER TABLE guests ALTER COLUMN invite_status SET DEFAULT 'not_sent';
 ALTER TABLE guests DROP CONSTRAINT IF EXISTS guests_invite_status_check;
 ALTER TABLE guests ADD CONSTRAINT guests_invite_status_check
