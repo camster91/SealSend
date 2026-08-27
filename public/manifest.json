@@ -1,8 +1,9 @@
 {
-  "name": "Seal and Send - Digital Invitations",
-  "short_name": "Seal and Send",
-  "description": "Create beautiful digital invitations, collect RSVPs, and manage your event guests.",
-  "start_url": "/dashboard",
+  "name": "SealSend — Approved Guest Workflows",
+  "short_name": "SealSend",
+  "description": "An approved guest workflow for recurring community organizers, from event brief through RSVP tracking and check-in.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#7c3aed",
@@ -15,5 +16,5 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["lifestyle", "social"]
+  "categories": ["business", "productivity"]
 }

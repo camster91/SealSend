@@ -275,6 +275,32 @@ test('controlled beta remains free and enforces one active event throughout the 
   assert.match(events, /one active event/i);
 });
 
+test('root discovery metadata matches the recurring-organizer controlled beta', async () => {
+  const layout = await read('src/app/layout.tsx');
+  const manifest = await read('public/manifest.json');
+  const icon = await read('public/icons/icon.svg');
+
+  for (const source of [layout, manifest]) {
+    assert.match(source, /recurring (community )?organizers/i);
+    assert.match(source, /approved guest workflow/i);
+    assert.doesNotMatch(source, /wedding invitations|party invitations|beautiful digital invitations/i);
+  }
+  assert.match(layout, /manifest:\s*["']\/manifest\.json["']/);
+  assert.doesNotMatch(layout, /\/og-image\.jpg/);
+  assert.match(layout, /\/opengraph-image/);
+  assert.match(manifest, /\/icons\/icon\.svg/);
+  assert.match(icon, /<svg/);
+});
+
+test('the optional service worker never caches authenticated or API responses', async () => {
+  const worker = await read('public/sw.js');
+  assert.doesNotMatch(worker, /PRECACHE_URLS\s*=\s*\[[^\]]*['"]\/dashboard['"]/);
+  assert.match(worker, /pathname\.startsWith\(['"]\/api\/['"]\)/);
+  assert.match(worker, /pathname\.startsWith\(['"]\/dashboard['"]\)/);
+  assert.match(worker, /cache-control/i);
+  assert.match(worker, /no-store/i);
+});
+
 test('organizer use cases and comparison stay inside the shipped product scope', async () => {
   const content = await read('src/lib/use-case-content.ts');
   const indexPage = await read('src/app/(marketing)/use-cases/page.tsx');
