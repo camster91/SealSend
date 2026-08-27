@@ -114,7 +114,9 @@ export const eventCreateSchema = z.object({
   auto_reminders: z.boolean().optional(),
 });
 
-export const eventUpdateSchema = eventCreateSchema.partial();
+export const eventUpdateSchema = eventCreateSchema.partial().extend({
+  status: z.enum(["draft", "published", "archived"]).optional(),
+});
 
 export const rsvpFieldSchema = z.object({
   field_name: z.string().min(1),
