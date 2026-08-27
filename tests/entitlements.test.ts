@@ -41,6 +41,29 @@ test("free accounts can create one event and no more", () => {
   assert.equal(canCreateEvent("free", 1), false);
 });
 
+test("controlled beta accounts can run one complete 100-guest event", () => {
+  const betaPlan = "beta" as AccountPlan;
+  const shippedFeatures: EventFeature[] = [
+    "smsInvites",
+    "guestTags",
+    "announcements",
+    "signupBoard",
+    "analytics",
+    "teamCollab",
+  ];
+
+  assert.equal(canCreateEvent(betaPlan, 0), true);
+  assert.equal(canCreateEvent(betaPlan, 1), false);
+  assert.deepEqual(getEffectiveEventLimits(betaPlan, "free"), {
+    guests: 100,
+    responses: 100,
+  });
+  for (const feature of shippedFeatures) {
+    assert.equal(canUseFeature(betaPlan, "free", feature), true);
+  }
+  assert.equal(getTeamMemberLimit(betaPlan, "free"), 3);
+});
+
 test("losing annual Pro never downgrades a separately purchased event tier", () => {
   const beforeCancellation = getEffectiveEventLimits("pro_annual", "diamond");
   const afterCancellation = getEffectiveEventLimits("free", "diamond");

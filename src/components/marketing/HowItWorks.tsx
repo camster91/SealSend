@@ -1,39 +1,39 @@
 "use client";
 
-import { Paintbrush, UserPlus, BarChart3, PartyPopper } from "lucide-react";
+import { ClipboardCheck, FileText, ListChecks, ScanLine } from "lucide-react";
 import { motion } from "framer-motion";
 
 const steps = [
   {
-    icon: Paintbrush,
+    icon: FileText,
     step: "01",
-    title: "Design Your Invitation",
+    title: "Start from the event brief",
     description:
-      "Choose from beautiful templates or upload your own design. Customize colors, fonts, and add your event details.",
+      "Turn the event details into an editable invitation, RSVP questions, and initial guest workflow.",
     color: "from-primary-500 to-primary-600",
   },
   {
-    icon: UserPlus,
+    icon: ClipboardCheck,
     step: "02",
-    title: "Add Your Guests",
+    title: "Review the invitation and RSVP",
     description:
-      "Import your guest list or add contacts manually. Organize with tags and manage plus-ones easily.",
+      "Approve every generated detail before publishing. Nothing is sent to guests automatically.",
     color: "from-accent-500 to-accent-600",
   },
   {
-    icon: BarChart3,
+    icon: ListChecks,
     step: "03",
-    title: "Track RSVPs",
+    title: "Act on the guest list",
     description:
-      "Send invitations via email or SMS. Watch responses roll in real-time with beautiful analytics.",
+      "Organize guests, plus-ones, tags, responses, and host-approved updates from one working list.",
     color: "from-success-500 to-success-600",
   },
   {
-    icon: PartyPopper,
+    icon: ScanLine,
     step: "04",
-    title: "Enjoy Your Event",
+    title: "Run event day",
     description:
-      "Focus on hosting while we handle the logistics. Send updates and collect messages from guests.",
+      "Give co-hosts the information they need and use the check-in view to keep arrival status current.",
     color: "from-purple-500 to-purple-600",
   },
 ];
@@ -73,11 +73,11 @@ export default function HowItWorks() {
             How It Works
           </span>
           <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl lg:text-5xl">
-            Create your invitation in 4 simple steps
+            One approved workflow from brief to check-in
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
-            From design to delivery, we make it easy to create stunning
-            invitations and manage your event.
+            SealSend keeps the invitation, guest decisions, communications,
+            and event-day status connected without taking control away from the host.
           </p>
         </motion.div>
 

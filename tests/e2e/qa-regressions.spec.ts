@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 test('navigation and pricing expose one accessible control per action', async ({ page }) => {
   await page.goto('/pricing');
   await expect(page.locator('a button')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Test billing setup pending' })).toBeDisabled();
+  await expect(page.locator('article').getByRole('link', { name: 'Join controlled beta' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Test billing setup pending' })).toHaveCount(0);
 
   const mobileToggle = page.getByRole('button', { name: 'Toggle mobile navigation menu' });
   if (await mobileToggle.isVisible()) {
@@ -14,7 +15,7 @@ test('navigation and pricing expose one accessible control per action', async ({
     await expect(page.locator('#mobile-navigation')).toBeVisible();
   }
 
-  const faq = page.getByRole('button', { name: /difference between an event upgrade/i });
+  const faq = page.getByRole('button', { name: /what is included in the controlled beta/i });
   await expect(faq).toHaveAttribute('aria-expanded', 'false');
   await faq.click();
   await expect(faq).toHaveAttribute('aria-expanded', 'true');

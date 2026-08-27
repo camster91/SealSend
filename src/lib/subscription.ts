@@ -3,7 +3,7 @@ import { BETA_MODE } from "@/lib/constants";
 import type { AccountPlan } from "@/lib/entitlements";
 
 export async function getUserTier(userId: string): Promise<AccountPlan> {
-  if (BETA_MODE) return "pro_annual";
+  if (BETA_MODE) return "beta";
 
   const data = await queryOne<{ tier: string; status: string }>(
     "SELECT tier, status FROM user_subscriptions WHERE user_id = $1 AND status IN ('active', 'trialing') LIMIT 1",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -215,12 +215,46 @@ test('public marketing does not ship invented social proof', async () => {
   const hero = await read('src/components/marketing/Hero.tsx');
   const pricingCta = await read('src/components/pricing/PricingCTA.tsx');
   const cta = await read('src/components/marketing/CTASection.tsx');
+  const marketingDirectory = new URL('../src/components/marketing/', import.meta.url);
+  const marketingComponents = await Promise.all(
+    (await readdir(marketingDirectory))
+      .filter((file) => file.endsWith('.tsx'))
+      .map((file) => read(`src/components/marketing/${file}`)),
+  );
 
   assert.doesNotMatch(marketingPage, /<Testimonials\s*\/>/);
   assert.doesNotMatch(useCasePage, /<UseCaseTestimonial\b/);
   for (const source of [hero, pricingCta, cta]) {
     assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%/i);
   }
+  for (const source of marketingComponents) {
+    assert.doesNotMatch(source, /10,000\+|200,000\+|500K\+|4\.9\/5|99% satisfaction/i);
+    assert.doesNotMatch(source, /Sarah Mitchell|David Chen|Emily Rodriguez/);
+  }
+});
+
+test('public offer is a bounded controlled beta for recurring community organizers', async () => {
+  const constants = await read('src/lib/constants.ts');
+  const hero = await read('src/components/marketing/Hero.tsx');
+  const howItWorks = await read('src/components/marketing/HowItWorks.tsx');
+  const pricingCards = await read('src/components/pricing/PricingCards.tsx');
+  const pricingFaq = await read('src/components/pricing/PricingFAQ.tsx');
+
+  assert.match(constants, /export const BETA_MODE = true/);
+  assert.match(constants, /CONTROLLED_BETA_PRICING_PLAN[\s\S]*guests:\s*"100"/);
+  assert.match(hero, /recurring community organizers/i);
+  assert.match(hero, /approved guest workflow/i);
+  for (const stage of [
+    'Start from the event brief',
+    'Review the invitation and RSVP',
+    'Act on the guest list',
+    'Run event day',
+  ]) {
+    assert.match(howItWorks, new RegExp(stage, 'i'));
+  }
+  assert.match(pricingCards, /BETA_MODE\s*\?\s*\[CONTROLLED_BETA_PRICING_PLAN\]/);
+  assert.match(pricingFaq, /one active event for up to 100 guests/i);
+  assert.match(pricingFaq, /paid checkout is disabled/i);
 });
 
 test('activation analytics has a privacy-limited fresh schema and upgrade path', async () => {
