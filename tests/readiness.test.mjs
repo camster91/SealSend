@@ -261,6 +261,20 @@ test('public offer is a bounded controlled beta for recurring community organize
   assert.match(pricingFaq, /paid checkout is disabled/i);
 });
 
+test('controlled beta remains free and enforces one active event throughout the authenticated app', async () => {
+  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
+  const checkout = await read('src/app/api/subscriptions/checkout/route.ts');
+  const events = await read('src/app/api/events/route.ts');
+
+  assert.match(dashboard, /BETA_MODE/);
+  assert.match(dashboard, /!BETA_MODE\s*&&\s*plan/);
+  assert.match(dashboard, /accountPlan\s*===\s*['"]beta['"]\s*\?\s*100/);
+  assert.match(checkout, /if\s*\(BETA_MODE\)/);
+  assert.match(checkout, /controlled beta/i);
+  assert.match(events, /status\s*<>\s*['"]archived['"]/i);
+  assert.match(events, /one active event/i);
+});
+
 test('organizer use cases and comparison stay inside the shipped product scope', async () => {
   const content = await read('src/lib/use-case-content.ts');
   const indexPage = await read('src/app/(marketing)/use-cases/page.tsx');
@@ -708,4 +722,13 @@ test('authentication codes are hashed and scoped to one login context', async ()
   assert.match(verify, /code_hash = \$2/);
   assert.match(verify, /event_id IS NOT DISTINCT FROM \$4/);
   assert.match(password, /DUMMY_PASSWORD_HASH/);
+});
+
+test('operator-created admin accounts require a hashed password and never print credentials', async () => {
+  const script = await read('scripts/create-admin.ts');
+  assert.match(script, /SEALSEND_ADMIN_PASSWORD/);
+  assert.match(script, /hashPassword/);
+  assert.match(script, /INSERT INTO admin_users \(email, password, name\)/);
+  assert.doesNotMatch(script, /console\.log\([^\n]*password/i);
+  assert.doesNotMatch(script, /INSERT INTO admin_users \(email\) VALUES/);
 });

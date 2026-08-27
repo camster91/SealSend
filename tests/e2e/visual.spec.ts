@@ -13,7 +13,7 @@ test('captures the homepage and login experience for visual review', async ({ pa
   await page.screenshot({ path: path.join(output, `${prefix}-homepage.png`), fullPage: true });
 
   await page.goto('/pricing');
-  await expect(page.getByRole('heading', { level: 1, name: /pay for one event/i })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /run one complete event in the controlled beta/i })).toBeVisible();
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(output, `${prefix}-pricing.png`), fullPage: true });
 

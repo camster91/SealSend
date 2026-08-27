@@ -21,6 +21,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   });
 
   let eventId = '';
+  let replacementEventId = '';
   let slug = '';
   try {
     await page.goto('/login');
@@ -34,7 +35,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
     await page.goto('/dashboard?plan=pro_annual');
-    await expect(page.getByText('Continue with SealSend Pro')).toBeVisible();
+    await expect(page.getByText('Continue with SealSend Pro')).toHaveCount(0);
     await page.goto('/templates');
     await expect(page.getByRole('heading', { name: 'Event templates' })).toBeVisible();
     await page.getByRole('link', { name: 'Use this template' }).first().click();
@@ -84,6 +85,17 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const secondEvent = await page.context().request.post('/api/events', { data: { title: 'Should Be Blocked' } });
     expect(secondEvent.status()).toBe(403);
 
+    const archive = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
+    expect(archive.status()).toBe(200);
+    const replacement = await page.context().request.post('/api/events', { data: { title: 'Temporary Replacement Event' } });
+    expect(replacement.status()).toBe(201);
+    const replacementEvent = await replacement.json();
+    replacementEventId = replacementEvent.id;
+    expect((await page.context().request.delete(`/api/events/${replacementEventId}`)).status()).toBe(200);
+    replacementEventId = '';
+    const restore = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'draft' } });
+    expect(restore.status()).toBe(200);
+
     const guestCreate = await page.context().request.post(`/api/events/${eventId}/guests`, { data: {
       name: 'QA Guest One', email: 'qa-guest-one@example.com', notes: 'Temporary QA record',
     }});
@@ -97,8 +109,12 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(bulk.status()).toBe(201);
     expect((await bulk.json()).inserted).toBe(2);
 
-    expect((await page.context().request.post(`/api/events/${eventId}/tags`, { data: { tag_name: 'VIP' } })).status()).toBe(403);
-    expect((await page.context().request.post(`/api/events/${eventId}/signups`, { data: { title: 'Bring dessert', slots: 2 } })).status()).toBe(403);
+    const tagCreate = await page.context().request.post(`/api/events/${eventId}/tags`, { data: { tag_name: 'VIP' } });
+    expect(tagCreate.status()).toBe(201);
+    expect((await tagCreate.json()).tag_name).toBe('VIP');
+    const signupCreate = await page.context().request.post(`/api/events/${eventId}/signups`, { data: { title: 'Bring dessert', slots: 2 } });
+    expect(signupCreate.status()).toBe(201);
+    expect((await signupCreate.json()).title).toBe('Bring dessert');
 
     const magic = await page.context().request.post(`/api/guests/${guest.id}/magic-link`);
     expect(magic.status()).toBe(200);
@@ -182,11 +198,12 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
 
     const checkout = await page.context().request.post('/api/subscriptions/checkout', { data: { plan: 'pro_annual' } });
     expect(checkout.status()).toBe(503);
-    expect((await checkout.json()).error).toContain('not configured');
+    expect((await checkout.json()).error).toContain('controlled beta');
 
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
+    if (replacementEventId) await page.context().request.delete(`/api/events/${replacementEventId}`);
     if (eventId) await page.context().request.delete(`/api/events/${eventId}`);
     await page.context().request.post('/api/auth/logout');
   }
