@@ -7,3 +7,9 @@ test("event updates allow an event to be archived", () => {
 
   assert.equal(result.success, true);
 });
+
+test("event updates do not inject create-time defaults", () => {
+  const result = eventUpdateSchema.parse({ status: "archived" });
+
+  assert.deepEqual(result, { status: "archived" });
+});
