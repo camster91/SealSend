@@ -22,8 +22,29 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       const results = await new AxeBuilder({ page }).analyze();
       const blocking = results.violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious");
       expect(blocking, `${route}: ${blocking.map((item) => `${item.id} (${item.nodes.length})`).join(", ")}`).toEqual([]);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(overflow, `${route}: horizontal overflow`).toBeLessThanOrEqual(1);
+      const overflow = await page.evaluate(() => {
+        const viewportWidth = window.innerWidth;
+        const offenders = Array.from(document.querySelectorAll("body *"))
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              element: `${element.tagName.toLowerCase()}.${Array.from(element.classList).slice(0, 4).join(".")}`,
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width),
+            };
+          })
+          .filter((rect) => rect.left < -1 || rect.right > viewportWidth + 1)
+          .slice(0, 10);
+        return {
+          amount: document.documentElement.scrollWidth - viewportWidth,
+          viewportWidth,
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          offenders,
+        };
+      });
+      expect(overflow.amount, `${route}: horizontal overflow ${JSON.stringify(overflow)}`).toBeLessThanOrEqual(1);
     }
   });
 }
