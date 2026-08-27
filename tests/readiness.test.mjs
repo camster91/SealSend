@@ -430,6 +430,7 @@ test('load and recovery gates are bounded, read-only, and isolated from producti
   assert.match(capacity, /attempts > 25/);
   assert.match(recovery, /sealsend-rehearsal-/);
   assert.match(recovery, /postgres:16-alpine/);
+  assert.match(recovery, /PostgreSQL init process complete; ready for start up/);
   assert.match(recovery, /pg_restore --exit-on-error/);
   assert.match(recovery, /PAYMENTS_TEST_ONLY=true/);
   assert.match(recovery, /COMMUNICATIONS_TEST_ONLY=true/);

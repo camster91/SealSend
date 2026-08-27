@@ -1,6 +1,6 @@
 # SealSend deployment readiness
 
-Date: 2026-08-08
+Date: 2026-08-27
 
 ## Release decision
 
@@ -16,19 +16,19 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260811T013748Z`
-- Current verified application commit: `2d406a1819a986da536b89785605ccc18d02e621`
-- Current release source: `/opt/sealsend/releases/20260811T013748Z`
-- Immediate rollback image/source: `sealsend:20260809T220256Z` and `/opt/sealsend/releases/20260809T220256Z`
+- Current verified image: `sealsend:20260827T213741Z`
+- Current verified application commit: `10e05912a062919a0da71999c43340317b57970a`
+- Current release source: `/opt/sealsend/releases/20260827T213741Z`
+- Immediate rollback image/source: `sealsend:20260827T195857Z` and `/opt/sealsend/releases/20260827T195857Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260811T013748Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/20260827T194856Z/sealsend-predeploy.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
 
 ## Locally verified release candidate
 
-- 111 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 138 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -40,6 +40,12 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - `git diff --check` passed.
 
 ## Production QA evidence
+
+- On 2026-08-27, exact application revision `10e05912a062919a0da71999c43340317b57970a` was deployed as `sealsend:20260827T213741Z`; the container was running and healthy, public home and health returned 200, and payments and communications remained test-only.
+- The deployed authenticated host/guest/check-in/repeat-event lifecycle and public responsive suite passed 2/2. The repeat-event assertions verified explicit contact reuse, guest-note exclusion, reset occurrence state, tag remapping, and empty signup claims.
+- The disposable QA account and event records were removed. One orphaned repeat-event fixture caused by an earlier test-navigation race was deleted by exact UUID; subsequent checks found zero matching QA events, beta participation, beta feedback, admin accounts, and event announcements.
+- The `20260827T194856Z` pre-deploy backup restored 34 public tables with current image `sealsend:20260827T213741Z` and immediate rollback image `sealsend:20260827T195857Z`; both rehearsals returned health 200 and unauthenticated events 401 on isolated Docker networks.
+- The recovery rehearsal initially exposed a PostgreSQL initialization race: `pg_isready` could accept the image's temporary initialization server immediately before shutdown. The runner now waits for the official image's initialization-complete marker before checking readiness; a regression assertion covers that ordering.
 
 - A disposable production owner completed the authenticated lifecycle on Chromium; public navigation/responsive checks passed on desktop and Pixel 7 emulation.
 - Verified AI event fallback and acceptance, template-to-wizard routing, event creation/publishing, default RSVP fields and JSON options, guests/bulk guests, magic links, public RSVP plus-one, comments, response dashboard, CSV, and plan enforcement.

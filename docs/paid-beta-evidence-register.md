@@ -100,8 +100,8 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 |---|---|---|---|---|
 | Bounded public load | 200 requests, concurrency 10, 0 failures, p95 286 ms, max 629 ms; production remained healthy | Pass | Codex QA | 2026-08-08 |
 | RSVP capacity concurrency | 10 simultaneous attempts for 3 seats: 3 accepted, 7 capacity-rejected, persisted 3 responses/3 attendees; fixture removed | Pass | Codex QA | 2026-08-08 |
-| Current-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T012633Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
-| Rollback-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T003511Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
+| Current-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T213741Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
+| Rollback-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T195857Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
 
 ## Go/no-go record

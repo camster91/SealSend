@@ -5,10 +5,10 @@
   "lastReviewed": "2026-08-27",
   "gates": [
     { "id": "production_safety", "kind": "automated", "status": "pass", "evidence": ["DEPLOYMENT_READINESS.md: PAYMENTS_TEST_ONLY and COMMUNICATIONS_TEST_ONLY verified true; destructive automation flags false"] },
-    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["136 application checks, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; 100 applicable Chromium, Firefox and desktop/mobile WebKit checks passed with 30 authenticated cases deployment-gated"] },
+    { "id": "repository_quality", "kind": "automated", "status": "pass", "evidence": ["Revision 10e05912a062919a0da71999c43340317b57970a: 138 application checks, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities; 100 applicable Chromium, Firefox and desktop/mobile WebKit checks passed; the deployed authenticated host/guest/check-in/repeat-event lifecycle and public responsive suite passed 2/2 on 2026-08-27"] },
     { "id": "load_capacity", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 200-request public load and 10-way RSVP capacity concurrency"] },
-    { "id": "backup_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest 33-table backup restored with current image health 200"] },
-    { "id": "rollback_image_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: latest backup restored with immediate rollback image health 200"] },
+    { "id": "backup_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 20260827T194856Z pre-deploy backup restored 34 public tables with current image sealsend:20260827T213741Z; health 200 and unauthenticated events 401"] },
+    { "id": "rollback_image_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: the same 20260827T194856Z backup restored 34 public tables with immediate rollback image sealsend:20260827T195857Z; health 200 and unauthenticated events 401"] },
     { "id": "stripe_test_lifecycle", "kind": "external", "status": "pending", "blocker": "Stripe app requires reauthentication and no test-mode annual price is configured" },
     { "id": "mailgun_delivery_lifecycle", "kind": "external", "status": "pending", "blocker": "Current Mailgun credentials return HTTP 401 and webhook signing key is absent" },
     { "id": "twilio_delivery_lifecycle", "kind": "external", "status": "pending", "blocker": "Current Twilio credentials return HTTP 401 and callback authentication is incomplete" },
