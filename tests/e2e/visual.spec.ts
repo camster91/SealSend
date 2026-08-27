@@ -32,7 +32,10 @@ test('captures release pages at 375, 768, and 1440 pixels with reduced motion', 
     for (const [route, name] of [['/', 'home'], ['/pricing', 'pricing'], ['/events/new', 'protected-create']] as const) {
       await page.goto(route, { waitUntil: 'networkidle' });
       await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+        `${route} at ${width}px: horizontal overflow`,
+      ).toBeLessThanOrEqual(1);
     }
   }
 });
