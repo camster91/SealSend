@@ -489,6 +489,20 @@ test('mobile check-in is permission-gated, auditable, and reversible', async () 
   assert.match(page, /aria-label=.*Search guests/);
 });
 
+test('event-day check-in refreshes safely for reconnects and multiple staff', async () => {
+  const page = await read('src/app/(dashboard)/events/[eventId]/check-in/page.tsx');
+  const live = await read('tests/e2e/live-check-in-role.spec.ts');
+
+  assert.match(page, /Refresh guest list/);
+  assert.match(page, /visibilitychange/);
+  assert.match(page, /window\.addEventListener\(["']online["'][\s\S]*load/);
+  assert.match(page, /setInterval\([\s\S]*15_000/);
+  assert.match(page, /document\.visibilityState\s*===\s*["']visible["']/);
+  assert.match(page, /aria-busy=\{refreshing\}/);
+  assert.match(live, /getByRole\(["']button["'],\s*\{\s*name:\s*["']Refresh guest list["']/);
+  assert.match(live, /toContainText\(["']Check in["']\)/);
+});
+
 test('event owners can download a privacy-limited check-in fallback', async () => {
   const route = await read('src/app/api/events/[eventId]/guests/route.ts');
   const page = await read('src/app/(dashboard)/events/[eventId]/guests/page.tsx');
