@@ -526,6 +526,11 @@ test('event-day check-in refreshes safely for reconnects and multiple staff', as
   assert.match(page, /setInterval\([\s\S]*15_000/);
   assert.match(page, /document\.visibilityState\s*===\s*["']visible["']/);
   assert.match(page, /aria-busy=\{refreshing\}/);
+  assert.match(page, /Last confirmed/);
+  assert.match(page, /Print loaded guest list/);
+  assert.match(page, /window\.print\(\)/);
+  assert.match(page, /hidden print:table/);
+  assert.match(page, /manual check-in[\s\S]*reconcile after reconnecting/i);
   assert.match(live, /getByRole\(["']button["'],\s*\{\s*name:\s*["']Refresh guest list["']/);
   assert.match(live, /toContainText\(["']Check in["']\)/);
 });
