@@ -4,9 +4,9 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-5">
+        <div className="grid gap-8 lg:grid-cols-5">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="lg:col-span-2">
             <span className="text-xl font-bold">
               <span className="text-foreground">Seal</span>
               <span className="text-brand-600">Send</span>
