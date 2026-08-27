@@ -53,7 +53,7 @@ export function UsageStats({ tier, eventsUsed, eventsLimit, guestsUsed, guestsLi
         {/* Guests usage */}
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-600">Guests</span>
+            <span className="text-gray-600">Guests in largest event</span>
             <span className="font-medium text-gray-900">
               {guestsUsed} / {isUnlimited(guestsLimit) ? '∞' : guestsLimit}
             </span>

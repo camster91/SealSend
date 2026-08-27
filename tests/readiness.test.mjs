@@ -275,6 +275,17 @@ test('controlled beta remains free and enforces one active event throughout the 
   assert.match(events, /one active event/i);
 });
 
+test('dashboard reports truthful per-event guest usage', async () => {
+  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
+  const usage = await read('src/components/dashboard/UsageStats.tsx');
+
+  assert.match(dashboard, /MAX\(event_guest_count\)/);
+  assert.match(dashboard, /events\.status\s*<>\s*['"]archived['"]/i);
+  assert.match(dashboard, /guestsUsed=\{Number\(guestUsage\?\.largest_event_guest_count\s*\?\?\s*0\)\}/);
+  assert.doesNotMatch(dashboard, /guestsUsed=\{0\}/);
+  assert.match(usage, /Guests in largest event/);
+});
+
 test('repeat organizers get an explicit, atomic, privacy-limited next-event workflow', async () => {
   const route = await read('src/app/api/events/[eventId]/clone/route.ts');
   const control = await read('src/components/dashboard/CloneEventButton.tsx');

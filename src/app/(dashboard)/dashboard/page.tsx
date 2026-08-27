@@ -37,12 +37,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const allEvents = Array.from(new Map([...myEvents, ...collaboratingEvents, ...invitedEvents].map((event) => [event.id, event])).values());
   const activeOwnedEvents = myEvents.filter((event) => event.status !== 'archived');
   const firstOwnedEvent = activeOwnedEvents[0];
-  const onboarding = firstOwnedEvent ? await queryOne<{ guest_count: string; sent_count: string }>(
-    `SELECT COUNT(*)::text AS guest_count,
-            COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
-       FROM guests WHERE event_id = $1`,
-    [firstOwnedEvent.id],
-  ) : null;
+  const [onboarding, guestUsage] = await Promise.all([
+    firstOwnedEvent ? queryOne<{ guest_count: string; sent_count: string }>(
+      `SELECT COUNT(*)::text AS guest_count,
+              COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
+         FROM guests WHERE event_id = $1`,
+      [firstOwnedEvent.id],
+    ) : null,
+    queryOne<{ largest_event_guest_count: string }>(
+      `SELECT COALESCE(MAX(event_guest_count), 0)::text AS largest_event_guest_count
+         FROM (
+           SELECT COUNT(guests.id) AS event_guest_count
+             FROM events
+             LEFT JOIN guests ON guests.event_id = events.id
+            WHERE events.user_id = $1 AND events.status <> 'archived'
+            GROUP BY events.id
+         ) active_event_usage`,
+      [user.id],
+    ),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,7 +108,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : accountPlan === 'beta' ? 'Controlled Beta' : 'free'}
             eventsUsed={activeOwnedEvents.length}
             eventsLimit={accountPlan === 'pro_annual' ? -1 : 1}
-            guestsUsed={0}
+            guestsUsed={Number(guestUsage?.largest_event_guest_count ?? 0)}
             guestsLimit={accountPlan === 'beta' ? 100 : accountPlan === 'pro_annual' ? 2500 : 15}
           />
         </div>
