@@ -253,6 +253,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
     await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
+    await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);
     await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
     repeatedEventId = page.url().split('/').pop() || '';
     expect(repeatedEventId).toBeTruthy();
