@@ -10,9 +10,11 @@ import {
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { getDb, query, queryOne } from "@/lib/db/client";
 import { hashMagicToken } from "@/lib/magic-token";
+import betaAcceptancePolicy from "../../../../../config/beta-acceptance-policy.json";
 
 interface ParticipantRow {
   participant_label: string;
+  cohort_version: string;
   segment: BetaSegment;
   consent_version: string;
   consented_at: string;
@@ -26,9 +28,9 @@ const noStore = (body: unknown, init?: { status?: number }) => NextResponse.json
 
 async function getParticipation(userId: string) {
   const participant = await queryOne<ParticipantRow>(
-    `SELECT participant_label, segment, consent_version, consented_at, withdrawn_at
-     FROM beta_participants WHERE user_id = $1`,
-    [userId],
+    `SELECT participant_label, cohort_version, segment, consent_version, consented_at, withdrawn_at
+     FROM beta_participants WHERE user_id = $1 AND cohort_version = $2`,
+    [userId, betaAcceptancePolicy.cohortVersion],
   );
   if (!participant) return { participant: null, progress: null };
 
@@ -53,6 +55,7 @@ async function getParticipation(userId: string) {
   return {
     participant: {
       label: participant.participant_label,
+      cohortVersion: participant.cohort_version,
       segment: participant.segment,
       consentVersion: participant.consent_version,
       consentedAt: participant.consented_at,
@@ -75,6 +78,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireApiHost();
   if (auth.error) return auth.error;
+  if (betaAcceptancePolicy.status !== "approved") {
+    return noStore({ error: "Beta enrollment is not open until the cohort policy is approved." }, { status: 409 });
+  }
   let enrollment;
   try {
     enrollment = parseBetaEnrollment(await request.json());
@@ -88,16 +94,18 @@ export async function POST(request: Request) {
     const inviteResult = await client.query<{
       id: string;
       participant_label: string;
+      cohort_version: string;
       segment: BetaSegment;
     }>(
-      `SELECT id, participant_label, segment
+      `SELECT id, participant_label, cohort_version, segment
          FROM beta_enrollment_invites
         WHERE token_hash = $1
           AND accepted_at IS NULL
           AND revoked_at IS NULL
           AND expires_at > NOW()
+          AND cohort_version = $2
         FOR UPDATE`,
-      [hashMagicToken(enrollment.inviteToken)],
+      [hashMagicToken(enrollment.inviteToken), betaAcceptancePolicy.cohortVersion],
     );
     const invite = inviteResult.rows[0];
     if (!invite) {
@@ -107,16 +115,17 @@ export async function POST(request: Request) {
 
     await client.query(
       `INSERT INTO beta_participants
-         (user_id, participant_label, segment, consent_version, consented_at, withdrawn_at, updated_at)
-       VALUES ($1, $2, $3, $4, NOW(), NULL, NOW())
+         (user_id, participant_label, segment, cohort_version, consent_version, consented_at, withdrawn_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NULL, NOW())
        ON CONFLICT (user_id) DO UPDATE SET
          participant_label = EXCLUDED.participant_label,
          segment = EXCLUDED.segment,
+         cohort_version = EXCLUDED.cohort_version,
          consent_version = EXCLUDED.consent_version,
          consented_at = NOW(),
          withdrawn_at = NULL,
          updated_at = NOW()`,
-      [auth.user.id, invite.participant_label, invite.segment, enrollment.consentVersion],
+      [auth.user.id, invite.participant_label, invite.segment, invite.cohort_version, enrollment.consentVersion],
     );
     await client.query(
       `UPDATE beta_enrollment_invites

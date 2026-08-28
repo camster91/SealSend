@@ -398,6 +398,7 @@ CREATE TABLE IF NOT EXISTS beta_enrollment_invites (
   token_preview TEXT NOT NULL CHECK (char_length(token_preview) = 4),
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
   segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner')),
+  cohort_version TEXT NOT NULL CHECK (cohort_version ~ '^[a-z0-9][a-z0-9-]{2,63}$'),
   expires_at TIMESTAMPTZ NOT NULL,
   accepted_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   accepted_at TIMESTAMPTZ,
@@ -407,16 +408,24 @@ CREATE TABLE IF NOT EXISTS beta_enrollment_invites (
 );
 CREATE INDEX IF NOT EXISTS idx_beta_enrollment_invites_available
   ON beta_enrollment_invites(expires_at) WHERE accepted_at IS NULL AND revoked_at IS NULL;
+ALTER TABLE beta_enrollment_invites
+  ADD COLUMN IF NOT EXISTS cohort_version TEXT NOT NULL DEFAULT 'legacy-unassigned';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_invites_open_cohort_segment
+  ON beta_enrollment_invites(cohort_version, segment)
+  WHERE accepted_at IS NULL AND revoked_at IS NULL AND cohort_version <> 'legacy-unassigned';
 CREATE TABLE IF NOT EXISTS beta_participants (
   user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
   segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner','legacy_out_of_scope')),
+  cohort_version TEXT NOT NULL CHECK (cohort_version ~ '^[a-z0-9][a-z0-9-]{2,63}$'),
   consent_version TEXT NOT NULL,
   consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   withdrawn_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE beta_participants
+  ADD COLUMN IF NOT EXISTS cohort_version TEXT NOT NULL DEFAULT 'legacy-unassigned';
 DO $$
 BEGIN
   ALTER TABLE beta_participants DROP CONSTRAINT IF EXISTS beta_participants_segment_check;
@@ -431,6 +440,9 @@ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
   ON beta_participants(segment) WHERE withdrawn_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_active_cohort_segment
+  ON beta_participants(cohort_version, segment)
+  WHERE withdrawn_at IS NULL AND cohort_version <> 'legacy-unassigned';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent
   ON beta_participants(user_id, consented_at);
 CREATE TABLE IF NOT EXISTS beta_outcomes (

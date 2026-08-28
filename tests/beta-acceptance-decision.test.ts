@@ -13,6 +13,7 @@ const requiredSegments = [
 
 const approvedPolicy = {
   schemaVersion: 1,
+  cohortVersion: "recurring-community-v1",
   status: "approved",
   approvedBy: "Cameron Ashley",
   approvedAt: "2026-08-27T10:00:00.000Z",
@@ -50,12 +51,26 @@ const completeMetrics = {
 
 test("pending beta policy cannot produce an acceptance pass", () => {
   const result = evaluateBetaAcceptance({
-    policy: { schemaVersion: 1, status: "pending", approvedBy: null, approvedAt: null, thresholds: null },
+    policy: { schemaVersion: 1, cohortVersion: "recurring-community-v1", status: "pending", approvedBy: null, approvedAt: null, thresholds: null },
     metrics: completeMetrics,
     cohortStartedAt: null,
   });
   assert.equal(result.decision, "POLICY_NOT_APPROVED");
   assert.equal(result.passed, false);
+});
+
+test("beta policy rejects unsafe or missing cohort versions", () => {
+  const missing = { ...approvedPolicy } as Record<string, unknown>;
+  delete missing.cohortVersion;
+  const missingResult = evaluateBetaAcceptance({ policy: missing, metrics: completeMetrics, cohortStartedAt: null });
+  assert.equal(missingResult.decision, "INVALID_POLICY");
+
+  const unsafeResult = evaluateBetaAcceptance({
+    policy: { ...approvedPolicy, cohortVersion: "../../all-hosts" },
+    metrics: completeMetrics,
+    cohortStartedAt: null,
+  });
+  assert.equal(unsafeResult.decision, "INVALID_POLICY");
 });
 
 test("beta policy approval must predate the first consented host", () => {

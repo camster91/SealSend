@@ -880,6 +880,7 @@ test('beta acceptance is evaluated only against pre-approved, pre-cohort thresho
   const operations = await read('docs/launch-operations.md');
 
   assert.equal(policy.schemaVersion, 1);
+  assert.match(policy.cohortVersion, /^[a-z0-9][a-z0-9-]{2,63}$/);
   assert.equal(policy.status, 'pending');
   assert.equal(policy.approvedBy, null);
   assert.equal(policy.approvedAt, null);
@@ -894,6 +895,37 @@ test('beta acceptance is evaluated only against pre-approved, pre-cohort thresho
   assert.match(metrics, /betaAcceptance/);
   assert.match(operations, /must be approved before the first host consents/i);
   assert.match(operations, /must not be changed after beta evidence exists/i);
+});
+
+test('beta evidence is isolated to one approved cohort with one active host per segment', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const createInvite = await read('scripts/create-beta-invite.ts');
+  const listInvites = await read('scripts/list-beta-invites.ts');
+  const participation = await read('src/app/api/beta/participation/route.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const report = await read('scripts/report-beta-participants.ts');
+  const operations = await read('docs/launch-operations.md');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /beta_enrollment_invites[\s\S]*cohort_version TEXT NOT NULL/);
+    assert.match(sql, /beta_participants[\s\S]*cohort_version TEXT NOT NULL/);
+    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_active_cohort_segment/);
+    assert.match(sql, /ON beta_participants\(cohort_version, segment\)/);
+    assert.match(sql, /WHERE withdrawn_at IS NULL AND cohort_version <> 'legacy-unassigned'/);
+    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_invites_open_cohort_segment/);
+  }
+  assert.match(createInvite, /betaAcceptancePolicy/);
+  assert.match(createInvite, /status !== "approved"/);
+  assert.match(createInvite, /cohort_version/);
+  assert.match(listInvites, /cohort_version/);
+  assert.match(participation, /betaAcceptancePolicy/);
+  assert.match(participation, /cohort_version/);
+  assert.match(participation, /status !== "approved"/);
+  assert.match(metrics, /participants\.cohort_version = \$1/);
+  assert.match(report, /participants\.cohort_version = \$1/);
+  assert.match(operations, /one active host per required segment/i);
+  assert.match(operations, /legacy-unassigned/i);
 });
 
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {

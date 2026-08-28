@@ -7,6 +7,7 @@ import type { BetaWillingnessToPay } from "./beta-outcome";
 
 interface BetaParticipantReportInput {
   participantLabel: string;
+  cohortVersion: string;
   segment: BetaSegment;
   consentVersion: string;
   consentedAt: string;
@@ -46,6 +47,7 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
 
   return {
     participantLabel: input.participantLabel,
+    cohortVersion: input.cohortVersion,
     segment: input.segment,
     consentVersion: input.consentVersion,
     consentedAt: input.consentedAt,

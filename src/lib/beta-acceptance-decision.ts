@@ -9,6 +9,7 @@ const segments = [
 ] as const;
 
 const rateThreshold = z.number().min(0).max(1);
+const cohortVersion = z.string().regex(/^[a-z0-9][a-z0-9-]{2,63}$/);
 const thresholdsSchema = z.object({
   minimumCohortSize: z.number().int().min(5),
   requiredSegments: z.array(z.enum(segments)).length(5).refine(
@@ -31,6 +32,7 @@ const thresholdsSchema = z.object({
 const policySchema = z.discriminatedUnion("status", [
   z.object({
     schemaVersion: z.literal(1),
+    cohortVersion,
     status: z.literal("pending"),
     approvedBy: z.null(),
     approvedAt: z.null(),
@@ -38,6 +40,7 @@ const policySchema = z.discriminatedUnion("status", [
   }).strict(),
   z.object({
     schemaVersion: z.literal(1),
+    cohortVersion,
     status: z.literal("approved"),
     approvedBy: z.string().trim().min(2).max(100),
     approvedAt: z.string().datetime(),

@@ -6,6 +6,7 @@ import { buildBetaParticipantReport } from "../src/lib/beta-participant-report";
 test("per-host beta report includes only pseudonymous acceptance evidence after consent", () => {
   const report = buildBetaParticipantReport({
     participantLabel: "host-abcdef123456",
+    cohortVersion: "recurring-community-v1",
     segment: "repeat_planner",
     consentVersion: "beta-observation-recurring-community-2026-08-27",
     consentedAt: "2026-08-27T12:00:00.000Z",
@@ -40,6 +41,7 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
   });
 
   assert.equal(report.participantLabel, "host-abcdef123456");
+  assert.equal(report.cohortVersion, "recurring-community-v1");
   assert.equal(report.segment, "repeat_planner");
   assert.equal(report.active, true);
   assert.equal(report.progress.steps.eventAndDesign, true);
@@ -69,6 +71,7 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
 test("withdrawn beta host remains visible without being reported as active", () => {
   const report = buildBetaParticipantReport({
     participantLabel: "host-fedcba654321",
+    cohortVersion: "recurring-community-v1",
     segment: "creative_community",
     consentVersion: "beta-observation-recurring-community-2026-08-27",
     consentedAt: "2026-08-27T12:00:00.000Z",

@@ -39,24 +39,27 @@ export async function GET(request: NextRequest) {
     ),
     query<{ participant_id: string; segment: BetaSegment; consented_at: string }>(
       `SELECT user_id::text AS participant_id, segment, consented_at FROM beta_participants
-       WHERE withdrawn_at IS NULL ORDER BY consented_at ASC`,
+       WHERE cohort_version = $1 AND withdrawn_at IS NULL ORDER BY consented_at ASC`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; event_name: BetaMilestoneName; created_at: string }>(
       `SELECT participants.user_id::text AS participant_id, events.event_name, events.created_at
        FROM beta_participants participants
        JOIN activation_events events
          ON events.user_id = participants.user_id AND events.created_at >= participants.consented_at
-       WHERE participants.withdrawn_at IS NULL AND events.event_name = ANY($1::text[])
+       WHERE participants.cohort_version = $1
+         AND participants.withdrawn_at IS NULL AND events.event_name = ANY($2::text[])
        ORDER BY participants.user_id, events.created_at`,
-      [BETA_MILESTONE_NAMES],
+      [betaAcceptancePolicy.cohortVersion, BETA_MILESTONE_NAMES],
     ),
     query<{ participant_id: string; rating: number }>(
       `SELECT participants.user_id::text AS participant_id, feedback.rating
        FROM beta_participants participants
        JOIN beta_feedback feedback
          ON feedback.user_id = participants.user_id AND feedback.created_at >= participants.consented_at
-       WHERE participants.withdrawn_at IS NULL
+       WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
       ORDER BY participants.user_id, feedback.created_at`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; willingness_to_pay: BetaWillingnessToPay; repeat_intent: number; self_reported_support_minutes: number }>(
       `SELECT participants.user_id::text AS participant_id,
@@ -66,8 +69,9 @@ export async function GET(request: NextRequest) {
        FROM beta_participants participants
        JOIN beta_outcomes outcomes
          ON outcomes.user_id = participants.user_id AND outcomes.consented_at = participants.consented_at
-       WHERE participants.withdrawn_at IS NULL
+       WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
       ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; unresolved_severity_1: number; unresolved_severity_2: number }>(
       `SELECT participants.user_id::text AS participant_id,
@@ -76,8 +80,9 @@ export async function GET(request: NextRequest) {
          FROM beta_participants participants
          JOIN beta_defect_reviews reviews
            ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
-        WHERE participants.withdrawn_at IS NULL
+        WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
       ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; operator_recorded_support_minutes: number }>(
       `SELECT participants.user_id::text AS participant_id,
@@ -85,8 +90,9 @@ export async function GET(request: NextRequest) {
          FROM beta_participants participants
          JOIN beta_support_reviews reviews
            ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
-        WHERE participants.withdrawn_at IS NULL
+        WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
         ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
   ]);
   const participantMap = new Map<string, BetaCohortParticipant>(
