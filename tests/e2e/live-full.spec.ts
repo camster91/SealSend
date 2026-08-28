@@ -271,8 +271,8 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
     await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);
-    await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
-    repeatedEventId = page.url().split('/').pop() || '';
+    await expect(page).toHaveURL(/\/events\/[0-9a-f-]+\/edit$/);
+    repeatedEventId = new URL(page.url()).pathname.split('/')[2] || '';
     expect(repeatedEventId).toBeTruthy();
 
     const repeatedEventResponse = await page.context().request.get(`/api/events/${repeatedEventId}`);

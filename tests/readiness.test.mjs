@@ -179,6 +179,8 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
   const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
   const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
   const preview = await read('src/components/events/wizard/StepPreview.tsx');
+  const eventPage = await read('src/app/(dashboard)/events/[eventId]/page.tsx');
+  const publishControl = await read('src/components/dashboard/PublishEventButton.tsx');
 
   for (const source of [createRoute, updateRoute, publishRoute, preview]) {
     assert.match(source, /getPublicationReadiness/);
@@ -188,6 +190,12 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
   assert.match(updateRoute, /targetStatus\s*===\s*['"]published['"]/);
   assert.match(publishRoute, /readiness\.ready/);
   assert.match(preview, /Complete before publishing/);
+  assert.doesNotMatch(eventPage, /UPDATE events SET status/);
+  assert.match(eventPage, /PublishEventButton/);
+  assert.match(publishControl, /\/api\/events\/\$\{eventId\}\/publish/);
+  assert.match(publishControl, /blockers/);
+  assert.match(publishControl, /Review event details/);
+  assert.match(publishControl, /role=["']alert["']/);
 });
 
 test('manual event creation exposes every required publication decision', async () => {
@@ -432,6 +440,7 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(control, /does not copy responses, check-ins, messages, or guest notes/i);
   assert.match(control, /audience carries forward/i);
   assert.match(control, /accessibility and communication decisions must be reviewed again/i);
+  assert.match(control, /router\.push\(`\/events\/\$\{data\.event\.id\}\/edit`\)/);
   assert.match(control, /zonedLocalDateTimeToInstant/);
   assert.match(control, /event\.key\s*===\s*['"]Escape['"]/);
   assert.match(control, /titleInputRef\.current\?\.focus\(\)/);

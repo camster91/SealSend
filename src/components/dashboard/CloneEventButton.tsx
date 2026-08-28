@@ -78,7 +78,7 @@ export function CloneEventButton({
       setIsOpen(false);
       setShowSuccess(true);
       setTimeout(() => {
-        router.push(`/events/${data.event.id}`);
+        router.push(`/events/${data.event.id}/edit`);
         router.refresh();
       }, 900);
     } catch (error) {
