@@ -70,6 +70,12 @@ export async function PATCH(
       );
     }
     const targetStatus = parsed.data.status ?? existing.status;
+    if (existing.status === 'archived' && targetStatus !== 'archived') {
+      return NextResponse.json(
+        { error: 'Archived events cannot be reactivated directly. Use Repeat event to create a reviewed new draft.' },
+        { status: 409 },
+      );
+    }
     if (targetStatus === 'published') {
       const readiness = getPublicationReadiness({ ...existing, ...parsed.data });
       if (!readiness.ready) {

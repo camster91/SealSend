@@ -238,7 +238,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </div>
                   </Link>
                   <div className="px-4 py-4 sm:px-2">
-                    <EventActionsMenu eventId={event.id} eventTitle={event.title} eventTimezone={event.event_timezone} />
+                    <EventActionsMenu
+                      eventId={event.id}
+                      eventTitle={event.title}
+                      eventTimezone={event.event_timezone}
+                      eventStatus={event.status}
+                      canKeepCurrentActive={accountPlan === 'pro_annual'}
+                    />
                   </div>
                 </li>
               ))}

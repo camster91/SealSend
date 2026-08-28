@@ -54,6 +54,13 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const guestCount = event.guest_count ?? 0;
 
   const isPublished = event.status === 'published';
+  const isArchived = event.status === 'archived';
+  const statusLabel = isPublished ? 'Published' : isArchived ? 'Archived' : 'Draft';
+  const statusClass = isPublished
+    ? 'bg-green-500/90 text-white'
+    : isArchived
+      ? 'bg-slate-700/90 text-white'
+      : 'bg-amber-500/90 text-white';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const publicUrl = `${siteUrl}/e/${event.slug}`;
   const accountPlan = await getUserTier(event.user_id as string);
@@ -105,13 +112,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <div className="flex items-end justify-between">
                   <div>
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm ${
-                        isPublished
-                          ? 'bg-green-500/90 text-white'
-                          : 'bg-amber-500/90 text-white'
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm ${statusClass}`}
                     >
-                      {isPublished ? 'Published' : 'Draft'}
+                      {statusLabel}
                     </span>
                     <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
                   </div>
@@ -121,13 +124,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           ) : (
             <div className="relative bg-gradient-to-r from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  isPublished
-                    ? 'bg-green-500/90 text-white'
-                    : 'bg-white/20 text-white'
-                }`}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
               >
-                {isPublished ? 'Published' : 'Draft'}
+                {statusLabel}
               </span>
               <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
               {event.description && (
@@ -151,12 +150,12 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             }`}>
               {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
             </span>
-            {access.role === 'owner' && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
+            {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
           </div>
 
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-4 sm:flex sm:gap-2">
-            {canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
+            {!isArchived && canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
             {canExport && <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />}
             {canManageGuests && <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount} />}
             {canManageGuests && <ActionLink href={`/events/${eventId}/signups`} icon="signups" label="Sign-ups" />}
@@ -211,7 +210,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             )}
 
             {/* Auto Reminders */}
-            {roleCan(access.role, 'send_messages') && <AutoRemindersToggle
+            {!isArchived && roleCan(access.role, 'send_messages') && <AutoRemindersToggle
               eventId={eventId}
               initialEnabled={!!event.auto_reminders}
               eventDate={event.event_date as string | null}
@@ -220,8 +219,20 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
             {/* Publish / delete / clone */}
             <div className="space-y-2">
-              {canEdit && <PublishEventButton eventId={eventId} isPublished={isPublished} />}
-              {access.role === 'owner' && <CloneEventButton eventId={eventId} eventTitle={event.title as string} eventTimezone={event.event_timezone} />}
+              {isArchived && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-900">Archived event history</p>
+                  <p className="mt-1">This event cannot be republished directly. Use Repeat event to create a reviewed new draft.</p>
+                </div>
+              )}
+              {!isArchived && canEdit && <PublishEventButton eventId={eventId} isPublished={isPublished} />}
+              {access.role === 'owner' && <CloneEventButton
+                eventId={eventId}
+                eventTitle={event.title as string}
+                eventTimezone={event.event_timezone}
+                eventStatus={event.status}
+                canKeepCurrentActive={accountPlan === 'pro_annual'}
+              />}
               {access.role === 'owner' && <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />}
             </div>
           </div>

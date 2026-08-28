@@ -31,6 +31,13 @@ export async function POST(
       );
     }
 
+    if (event.status === 'archived') {
+      return NextResponse.json(
+        { error: 'Archived events cannot be published directly. Use Repeat event to create a reviewed new draft.' },
+        { status: 409 },
+      );
+    }
+
     // Toggle status between draft and published
     const newStatus = event.status === 'published' ? 'draft' : 'published';
     if (newStatus === 'published') {

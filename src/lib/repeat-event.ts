@@ -9,6 +9,7 @@ export const repeatEventRequestSchema = z.object({
   eventEndDate: nullableInstant,
   rsvpDeadline: nullableInstant,
   includeGuests: z.boolean().optional().default(false),
+  archiveSource: z.boolean().optional().default(false),
 }).strict();
 
 export type RepeatEventRequest = {
@@ -17,6 +18,7 @@ export type RepeatEventRequest = {
   eventEndDate: string | null;
   rsvpDeadline: string | null;
   includeGuests: boolean;
+  archiveSource: boolean;
 };
 
 export function parseRepeatEventRequest(input: unknown, referenceInstant = new Date()): RepeatEventRequest {
@@ -39,6 +41,7 @@ export function parseRepeatEventRequest(input: unknown, referenceInstant = new D
     eventEndDate: parsed.eventEndDate ?? null,
     rsvpDeadline: parsed.rsvpDeadline ?? null,
     includeGuests: parsed.includeGuests,
+    archiveSource: parsed.archiveSource,
   };
 }
 

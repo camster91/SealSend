@@ -11,6 +11,7 @@ import { generateSlug } from "@/lib/utils";
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 type SourceEvent = {
+  status: "draft" | "published" | "archived";
   description: string | null;
   invitation_headline: string | null;
   invitation_body: string | null;
@@ -64,6 +65,29 @@ export async function POST(request: Request, { params }: RouteParams) {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [auth.user.id]);
 
+    const originalResult = await client.query<SourceEvent>(
+      `SELECT status, description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
+              location_name, location_address, location_lat, location_lng, host_name, dress_code,
+              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
+              design_url, design_type, customization, event_brief
+       FROM events WHERE id = $1 AND user_id = $2`,
+      [eventId, auth.user.id],
+    );
+    const original = originalResult.rows[0];
+    if (!original) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    let sourceArchived = false;
+    if (repeatRequest.archiveSource && original.status !== "archived") {
+      await client.query(
+        "UPDATE events SET status = 'archived' WHERE id = $1 AND user_id = $2",
+        [eventId, auth.user.id],
+      );
+      sourceArchived = true;
+    }
+
     const activeResult = await client.query<{ count: string }>(
       "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
       [auth.user.id],
@@ -71,23 +95,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!canCreateEvent(accountPlan, Number(activeResult.rows[0]?.count ?? 0))) {
       await client.query("ROLLBACK");
       return NextResponse.json(
-        { error: "This plan supports one active event. Archive the current event before repeating it." },
-        { status: 403 },
+        {
+          error: original.status === "archived"
+            ? "This plan already has another active event. Archive it before repeating this event."
+            : "This plan supports one active event. Approve archiving the current event to create the next draft.",
+          requiresArchive: original.status !== "archived",
+        },
+        { status: 409 },
       );
-    }
-
-    const originalResult = await client.query<SourceEvent>(
-      `SELECT description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
-              location_name, location_address, location_lat, location_lng, host_name, dress_code,
-              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
-              design_url, design_type, customization, event_brief
-       FROM events WHERE id = $1`,
-      [eventId],
-    );
-    const original = originalResult.rows[0];
-    if (!original) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     const repeatedEventBrief = buildRepeatedEventBrief(original.event_brief);
 
@@ -198,7 +213,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       userId: auth.user.id,
       eventId: newEvent.id,
     });
-    return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount }, { status: 201 });
+    return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount, sourceArchived }, { status: 201 });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Repeat event failed:", error);

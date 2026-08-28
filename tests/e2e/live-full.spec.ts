@@ -259,8 +259,6 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(checkout.status()).toBe(503);
     expect((await checkout.json()).error).toContain('controlled beta');
 
-    const archiveForRepeat = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
-    expect(archiveForRepeat.status()).toBe(200);
     await page.goto(`/events/${eventId}`);
     await page.getByRole('button', { name: 'Repeat event' }).click();
     const repeatDialog = page.getByRole('dialog', { name: 'Repeat event' });
@@ -268,6 +266,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await repeatDialog.getByLabel('New event title').fill('SealSend Production QA Repeat');
     const repeatStart = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
     await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
+    await expect(repeatDialog.getByLabel('Archive the current event')).toBeChecked();
     await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
     await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);
@@ -284,6 +283,10 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
       accessibilityNotes: null,
       communicationPreference: 'undecided',
     });
+
+    const sourceEventResponse = await page.context().request.get(`/api/events/${eventId}`);
+    expect(sourceEventResponse.status()).toBe(200);
+    expect((await sourceEventResponse.json()).status).toBe('archived');
 
     const repeatedGuests = await page.context().request.get(`/api/events/${repeatedEventId}/guests`);
     expect(repeatedGuests.status()).toBe(200);

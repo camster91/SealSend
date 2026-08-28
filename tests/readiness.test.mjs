@@ -188,7 +188,9 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
   assert.match(createRoute, /status\s*===\s*['"]published['"]/);
   assert.match(updateRoute, /targetStatus\s*=\s*parsed\.data\.status\s*\?\?\s*existing\.status/);
   assert.match(updateRoute, /targetStatus\s*===\s*['"]published['"]/);
+  assert.match(updateRoute, /existing\.status\s*===\s*['"]archived['"][\s\S]*targetStatus\s*!==\s*['"]archived['"]/);
   assert.match(publishRoute, /readiness\.ready/);
+  assert.match(publishRoute, /event\.status\s*===\s*['"]archived['"]/);
   assert.match(preview, /Complete before publishing/);
   assert.doesNotMatch(eventPage, /UPDATE events SET status/);
   assert.match(eventPage, /PublishEventButton/);
@@ -423,6 +425,9 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(route, /pg_advisory_xact_lock/);
   assert.match(route, /status\s*<>\s*['"]archived['"]/i);
   assert.match(route, /canCreateEvent/);
+  assert.match(route, /archiveSource/);
+  assert.match(route, /UPDATE events SET status = ['"]archived['"]/i);
+  assert.match(route, /requiresArchive/);
   assert.match(route, /BEGIN/);
   assert.match(route, /COMMIT/);
   assert.match(route, /ROLLBACK/);
@@ -437,6 +442,9 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(control, /Repeat event/);
   assert.match(control, /type="datetime-local"/);
   assert.match(control, /includeGuests/);
+  assert.match(control, /archiveSource/);
+  assert.match(control, /Archive the current event/i);
+  assert.match(control, /one-active-event/i);
   assert.match(control, /does not copy responses, check-ins, messages, or guest notes/i);
   assert.match(control, /audience carries forward/i);
   assert.match(control, /accessibility and communication decisions must be reviewed again/i);
@@ -444,6 +452,11 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(control, /zonedLocalDateTimeToInstant/);
   assert.match(control, /event\.key\s*===\s*['"]Escape['"]/);
   assert.match(control, /titleInputRef\.current\?\.focus\(\)/);
+
+  const eventPage = await read('src/app/(dashboard)/events/[eventId]/page.tsx');
+  assert.match(eventPage, /const isArchived\s*=\s*event\.status\s*===\s*['"]archived['"]/);
+  assert.match(eventPage, /!isArchived\s*&&\s*canEdit/);
+  assert.match(eventPage, /Archived/);
 });
 
 test('root discovery metadata matches the recurring-organizer controlled beta', async () => {
