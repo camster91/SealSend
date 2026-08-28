@@ -733,6 +733,27 @@ test('accepted beta invitations survive account deletion without retaining the a
   }
 });
 
+test('operators can inspect and revoke beta invitations without exposing raw codes', async () => {
+  const listCommand = await read('scripts/list-beta-invites.ts');
+  const revokeCommand = await read('scripts/revoke-beta-invite.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  assert.match(listCommand, /participant_label/);
+  assert.match(listCommand, /token_preview/);
+  assert.match(listCommand, /classifyBetaInvite/);
+  assert.doesNotMatch(listCommand, /token_hash/);
+  assert.doesNotMatch(listCommand, /Invitation code/);
+
+  assert.match(revokeCommand, /parseBetaInviteLabel/);
+  assert.match(revokeCommand, /accepted_at IS NULL/);
+  assert.match(revokeCommand, /revoked_at IS NULL/);
+  assert.match(revokeCommand, /SET revoked_at = NOW\(\)/);
+  assert.doesNotMatch(revokeCommand, /token_hash/);
+
+  assert.equal(pkg.scripts['list-beta-invites'], 'npx tsx scripts/list-beta-invites.ts');
+  assert.equal(pkg.scripts['revoke-beta-invite'], 'npx tsx scripts/revoke-beta-invite.ts');
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');
