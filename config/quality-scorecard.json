@@ -85,8 +85,8 @@
           "id": "trust_proof",
           "maximum": 20,
           "earned": 5,
-          "evidence": ["config/launch-evidence.json#repository_quality", "docs/paid-beta-evidence-register.md"],
-          "missingEvidence": ["Permissioned real-host case evidence", "Provider delivery evidence", "Published support expectations", "Qualified compliance review"]
+          "evidence": ["config/launch-evidence.json#repository_quality", "docs/paid-beta-evidence-register.md", "src/app/(marketing)/support/page.tsx", "tests/readiness.test.mjs"],
+          "missingEvidence": ["Permissioned real-host case evidence", "Provider delivery evidence", "Candidate support expectations require production deployment verification", "Qualified compliance review"]
         },
         {
           "id": "product_led_differentiation",

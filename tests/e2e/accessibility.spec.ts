@@ -17,6 +17,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       "/signup",
       "/login",
       "/privacy",
+      "/support",
     ]) {
       await page.goto(route, { waitUntil: "networkidle" });
       const results = await new AxeBuilder({ page }).analyze();

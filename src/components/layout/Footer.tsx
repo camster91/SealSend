@@ -107,9 +107,14 @@ export function Footer() {
             </h3>
             <ul className="mt-3 space-y-2">
               <li>
-                <span className="text-sm text-muted-foreground">
+                <Link href="/support" className="text-sm text-muted-foreground hover:text-foreground">
+                  Support expectations
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:support@sealsend.app" className="text-sm text-muted-foreground hover:text-foreground">
                   support@sealsend.app
-                </span>
+                </a>
               </li>
             </ul>
           </div>

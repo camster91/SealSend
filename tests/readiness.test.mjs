@@ -531,6 +531,18 @@ test('every sitemap marketing page declares a canonical URL', async () => {
   }
 });
 
+test('candidate publishes factual support expectations without promising round-the-clock service', async () => {
+  const support = await read('src/app/(marketing)/support/page.tsx');
+  const footer = await read('src/components/layout/Footer.tsx');
+  const sitemap = await read('src/app/sitemap.ts');
+  assert.match(support, /within two business days/i);
+  assert.match(support, /not a 24\/7 or guaranteed resolution time/i);
+  assert.match(support, /Never email passwords, one-time codes, session cookies, payment-card data/i);
+  assert.match(support, /controlled beta/i);
+  assert.match(footer, /href="\/support"/);
+  assert.match(sitemap, /`\$\{SITE_URL\}\/support`/);
+});
+
 test('the optional service worker never caches authenticated or API responses', async () => {
   const worker = await read('public/sw.js');
   assert.doesNotMatch(worker, /PRECACHE_URLS\s*=\s*\[[^\]]*['"]\/dashboard['"]/);
