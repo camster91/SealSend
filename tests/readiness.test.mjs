@@ -274,6 +274,43 @@ test('public offer is a bounded controlled beta for recurring community organize
   assert.match(pricingFaq, /paid checkout is disabled/i);
 });
 
+test('public feature marketing stays inside the shipped approval-controlled workflow', async () => {
+  const constants = await read('src/lib/constants.ts');
+  const features = await read('src/components/marketing/FeaturesGrid.tsx');
+  const metadata = await read('src/lib/metadata.ts');
+
+  for (const staleClaim of [
+    'opens in real-time',
+    'Magical Experience',
+    'social media',
+    'instantly',
+    'Registry Integration',
+    'And much more',
+    'Try it free',
+  ]) {
+    assert.doesNotMatch(`${constants}\n${features}`, new RegExp(staleClaim, 'i'));
+  }
+
+  for (const shippedCapability of [
+    'Invitation studio',
+    'Host-approved communications',
+    'RSVP operations',
+    'Actionable guest list',
+    'Published guest experience',
+    'Calendar and QR access',
+    'Co-hosts and check-in',
+    'Next-event workflow',
+  ]) {
+    assert.match(constants, new RegExp(shippedCapability, 'i'));
+  }
+  assert.match(constants, /resolved audience/i);
+  assert.match(constants, /required new schedule/i);
+  assert.match(constants, /guest contact reuse/i);
+  assert.match(features, /Join controlled beta/);
+  assert.match(metadata, /approved guest workflow/i);
+  assert.match(metadata, /recurring community organizers/i);
+});
+
 test('controlled beta remains free and enforces one active event throughout the authenticated app', async () => {
   const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
   const checkout = await read('src/app/api/subscriptions/checkout/route.ts');
