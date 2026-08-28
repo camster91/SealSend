@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { parseGuestCsv, type GuestCsvIssue } from '@/lib/guest-import';
 
 interface GuestEntry {
   name: string;
@@ -18,19 +19,24 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
   const [error, setError] = useState('');
   const [csvText, setCsvText] = useState('');
   const [showCsvImport, setShowCsvImport] = useState(false);
-  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; issues: GuestCsvIssue[] } | null>(null);
 
   const handleAdd = () => {
     if (!name.trim()) {
       setError('Name is required');
       return;
     }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setError('Please enter a valid email');
       return;
     }
+    if (normalizedEmail && guests.some((guest) => guest.email.trim().toLowerCase() === normalizedEmail)) {
+      setError('This email is already on the guest list');
+      return;
+    }
     setError('');
-    onUpdate([...guests, { name: name.trim(), email: email.trim() }]);
+    onUpdate([...guests, { name: name.trim(), email: normalizedEmail }]);
     setName('');
     setEmail('');
   };
@@ -39,53 +45,12 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
     onUpdate(guests.filter((_, i) => i !== index));
   };
 
-  const parseCsvLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-    result.push(current.trim());
-    return result;
-  };
-
   const handleCsvImport = () => {
     if (!csvText.trim()) return;
-    const lines = csvText.trim().split('\n');
-    const newGuests: GuestEntry[] = [];
-
-    for (const line of lines) {
-      const parts = parseCsvLine(line);
-      const guestName = parts[0];
-      const guestEmail = parts[1] || '';
-      if (guestName) {
-        newGuests.push({ name: guestName, email: guestEmail });
-      }
-    }
-
-    const skipped = lines.length - newGuests.length;
-    if (newGuests.length > 0) {
-      onUpdate([...guests, ...newGuests]);
-      setCsvText('');
-      setImportResult(`${newGuests.length} guest${newGuests.length !== 1 ? 's' : ''} imported${skipped > 0 ? `, ${skipped} row${skipped !== 1 ? 's' : ''} skipped` : ''}`);
-      setTimeout(() => setImportResult(null), 5000);
-    } else {
-      setImportResult('No valid guests found. Format: Name, Email (one per line)');
-    }
+    const result = parseGuestCsv(csvText, guests);
+    if (result.guests.length > 0) onUpdate([...guests, ...result.guests]);
+    if (result.issues.length === 0) setCsvText('');
+    setImportResult({ imported: result.guests.length, issues: result.issues });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -125,6 +90,7 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
             <div className="flex-1">
               <input
                 type="text"
+                aria-label="Guest name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -136,6 +102,7 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
             <div className="flex-1">
               <input
                 type="email"
+                aria-label="Guest email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -170,6 +137,7 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
             <div className="space-y-3 rounded-xl bg-gray-50 p-4">
               <p className="text-xs text-gray-500">Paste CSV data: one guest per line, format: <code className="rounded bg-gray-200 px-1">Name, Email</code></p>
               <textarea
+                aria-label="Guest CSV data"
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
                 rows={4}
@@ -184,9 +152,21 @@ export default function StepGuests({ guests, onUpdate }: StepGuestsProps) {
                 Import Guests
               </button>
               {importResult && (
-                <p className={`text-xs ${importResult.includes('skipped') || importResult.includes('No valid') ? 'text-amber-600' : 'text-green-600'}`}>
-                  {importResult}
-                </p>
+                <div role="status" className={`text-xs ${importResult.issues.length > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                  <p>
+                    {importResult.imported > 0
+                      ? `${importResult.imported} guest${importResult.imported === 1 ? '' : 's'} added to this draft.`
+                      : 'No guests were added.'}
+                    {importResult.issues.length > 0 && ` ${importResult.issues.length} row${importResult.issues.length === 1 ? '' : 's'} need attention.`}
+                  </p>
+                  {importResult.issues.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {importResult.issues.map((issue) => (
+                        <li key={`${issue.row}-${issue.message}`}>Row {issue.row}: {issue.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
           )}

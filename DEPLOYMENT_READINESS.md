@@ -1,6 +1,6 @@
 # SealSend deployment readiness
 
-Date: 2026-08-27
+Date: 2026-08-28
 
 ## Release decision
 
@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 150 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 183 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, guest-ready publication enforcement, partial CSV import and duplicate-contact handling, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -118,6 +118,6 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 9. Run `npm run report-beta-participants`, verify the QA participant contains only pseudonymous acceptance fields and `criticalDefects: null`, then withdraw the participant and remove all disposable QA accounts/events/feedback. Verify cleanup counts.
 10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates. Do not convert `criticalDefects: null` into zero without human severity triage.
 
-## Known informational warning
+## Known evidence gap
 
-Next.js 16 reports that the Edge Runtime used by the framework proxy convention is deprecated. The production build succeeds; track the supported migration path in a later framework upgrade.
+The current candidate changes authenticated event creation and guest import. Its unit contracts and production build pass, but the changed wizard still requires authorized mobile/tablet/desktop visual QA and a disposable authenticated lifecycle after deployment.
