@@ -7,9 +7,8 @@ const qaPassword = process.env.SEALSEND_QA_PASSWORD;
 const qaBetaInviteToken = process.env.SEALSEND_QA_BETA_INVITE_TOKEN;
 const output = path.resolve('qa-screenshots', 'live-full');
 
-test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required');
-
 test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
+  test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required');
   test.skip(testInfo.project.name !== 'chromium', 'Run the stateful production lifecycle once.');
   await mkdir(output, { recursive: true });
   const pageErrors: string[] = [];

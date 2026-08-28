@@ -179,6 +179,17 @@ test('browser CI serves the same standalone artifact shape as production', async
   assert.match(server, /standalone[\\/]public/);
 });
 
+test('public browser QA remains runnable without authenticated QA credentials', async () => {
+  const browserSpec = await read('tests/e2e/live-full.spec.ts');
+  const authenticatedTest = browserSpec.indexOf("test('authenticated host and guest lifecycle'");
+  const credentialGuard = browserSpec.indexOf(
+    "test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required')",
+  );
+
+  assert.ok(authenticatedTest >= 0, 'authenticated lifecycle test must exist');
+  assert.ok(credentialGuard > authenticatedTest, 'credential guard must be scoped inside the authenticated lifecycle test');
+});
+
 test('every publication boundary enforces the shared guest-ready contract', async () => {
   const createRoute = await read('src/app/api/events/route.ts');
   const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
