@@ -109,6 +109,8 @@ Internal implementation review does not replace qualified legal or accounting ad
 | Email/SMS compliance | | CASL/TCPA and intended markets | Consent, identification, unsubscribe and records decision | Pending | |
 | Accessibility risk | | Intended markets | Remediation/statement decision | Pending | |
 
+The repository-controlled retention-period decision is documented in `docs/retention-policy-decision.md`. It remains owner-pending, keeps destructive cleanup disabled, and does not replace the qualified privacy/deletion review tracked above.
+
 ## Load and recovery evidence
 
 Run `npm run test:load` against the intended public origin. Defaults are bounded to 200 read-only requests at concurrency 10, require zero failures, and require p95 latency no greater than 1500 ms. Record the command environment, result JSON, server health, and log review.
