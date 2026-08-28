@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { title, description, invitation_headline, invitation_body, reminder_sequence, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const { title, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
     if (ai_generation_id) {
       const generation = await queryOne("SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'", [ai_generation_id, user.id]);
       if (!generation) return NextResponse.json({ error: 'AI generation was not accepted by this host' }, { status: 400 });
@@ -83,12 +83,12 @@ export async function POST(request: NextRequest) {
       try {
         event = await queryOne(
           `INSERT INTO events (
-            user_id, title, slug, description, invitation_headline, invitation_body, reminder_sequence, ai_generation_id, event_date, event_end_date, event_timezone,
+            user_id, title, slug, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code,
             rsvp_deadline, registry_links, max_attendees, allow_plus_ones,
             max_guests_per_rsvp, design_url, design_type, customization, status
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
           ) RETURNING *`,
           [
             user.id,
@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
             invitation_headline ?? null,
             invitation_body ?? null,
             JSON.stringify(reminder_sequence ?? []),
+            event_brief ? JSON.stringify(event_brief) : null,
             ai_generation_id ?? null,
             event_date ?? null,
             event_end_date ?? null,

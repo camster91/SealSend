@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS events (
   invitation_headline TEXT,
   invitation_body TEXT,
   reminder_sequence JSONB NOT NULL DEFAULT '[]',
+  event_brief JSONB,
   ai_generation_id UUID,
   event_date TIMESTAMPTZ,
   event_end_date TIMESTAMPTZ,

@@ -41,6 +41,7 @@ ALTER TABLE guests ADD CONSTRAINT guests_invite_status_check
 UPDATE guests SET invite_status = 'not_sent' WHERE invite_status = 'pending';
 
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_timezone TEXT NOT NULL DEFAULT 'UTC';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_brief JSONB;
 
 ALTER TABLE guest_tags ADD COLUMN IF NOT EXISTS tag_name TEXT;
 ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ DEFAULT NOW();

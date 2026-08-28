@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isSafeRelativeUploadPath } from "@/lib/sanitize";
 import { messageAudienceSchema } from "@/lib/messages/audience";
+import { eventBriefContextSchema } from "@/lib/event-brief";
 
 /** Reject javascript:/data: and require https or same-origin /uploads paths */
 export function isSafeHttpUrl(value: string): boolean {
@@ -77,6 +78,7 @@ export const eventCreateSchema = z.object({
     subject: z.string().min(1).max(200),
     message: z.string().min(1).max(5000),
   }).strict()).max(5).optional(),
+  event_brief: eventBriefContextSchema.nullable().optional(),
   ai_generation_id: z.string().uuid().optional(),
   ai_edit_count: z.number().int().min(0).max(100).optional(),
   event_date: z.string().optional(),

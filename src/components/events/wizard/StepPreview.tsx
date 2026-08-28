@@ -25,6 +25,7 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
     invitation_headline: formData.invitation_headline,
     invitation_body: formData.invitation_body,
     rsvp_deadline: formData.rsvp_deadline,
+    event_brief: formData.event_brief,
   });
 
   const buttonBorderRadius =

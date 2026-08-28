@@ -120,4 +120,6 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 
 ## Known evidence gap
 
-The current candidate changes authenticated event creation and guest import. Its unit contracts and production build pass, but the changed wizard still requires authorized mobile/tablet/desktop visual QA and a disposable authenticated lifecycle after deployment.
+The current candidate changes authenticated event creation, guest import, and the AI-assisted event brief. The brief now persists intended audience, accessibility review, and communication intent; schedule, location, and capacity remain canonical event fields and override generated copy. Every publication boundary blocks an incomplete brief, while private drafts remain saveable. AI draft contract `1.1` requires missing capacity to be disclosed instead of inferred.
+
+Candidate evidence on 2026-08-28: 191/191 local contract tests, TypeScript, ESLint with zero warnings, the Next.js production build, and the high-severity runtime dependency audit passed. The launch decision remains `NO_GO` at 5/18 because the 13 provider, compliance, real-host, real-device, and human-approval gates remain pending. The changed authenticated wizard still requires authorized mobile/tablet/desktop visual QA and a disposable authenticated lifecycle after deployment; no production deployment is claimed by this checkpoint.

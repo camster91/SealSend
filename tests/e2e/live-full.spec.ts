@@ -58,7 +58,16 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await expect(page).toHaveURL(/\/settings$/);
 
     const aiDraftResponse = await page.context().request.post('/api/ai/event-draft', { data: {
-      prompt: 'A client appreciation dinner for forty people in Toronto with business casual attire.',
+      brief: {
+        summary: 'A client appreciation dinner for forty people in Toronto with business casual attire.',
+        eventDate: '2026-09-18T23:00:00.000Z',
+        locationName: 'Community Hall',
+        maxAttendees: 40,
+        audience: 'Current clients and their approved guests',
+        accessibilityStatus: 'no_known_requirements',
+        accessibilityNotes: null,
+        communicationPreference: 'email',
+      },
       timezone: 'America/Toronto',
     }});
     expect(aiDraftResponse.status()).toBe(200);

@@ -55,7 +55,7 @@ test('production migration backfills and constrains the send logging contract', 
 test('feature table schemas match the SQL contracts used by application routes', async () => {
   const schema = await read('src/lib/db/schema.sql');
 
-  assertColumns(schema, 'events', ['location_lat', 'location_lng', 'payment_id']);
+  assertColumns(schema, 'events', ['location_lat', 'location_lng', 'payment_id', 'event_brief']);
   assertColumns(schema, 'guests', ['tags']);
   assert.match(tableDefinition(schema, 'guests'), /invite_status TEXT DEFAULT 'not_sent'/);
   assertColumns(schema, 'guest_tags', ['tag_name']);
@@ -200,8 +200,34 @@ test('manual event creation exposes every required publication decision', async 
   assert.match(details, /register\(['"]invitation_body['"]/);
   assert.match(wizard, /invitation_headline:\s*formData\.invitation_headline/);
   assert.match(wizard, /invitation_body:\s*formData\.invitation_body/);
+  assert.match(details, /register\(['"]audience['"]/);
+  assert.match(details, /register\(['"]accessibility_status['"]/);
+  assert.match(details, /register\(['"]communication_preference['"]/);
+  assert.match(wizard, /event_brief:\s*formData\.event_brief/);
   assert.equal((details.match(/id=["']title-counter["']/g) ?? []).length, 1);
   assert.equal((details.match(/id=["']description-counter["']/g) ?? []).length, 1);
+});
+
+test('structured event brief survives generation, storage, editing, and publication checks', async () => {
+  const migration = await read('apply-security-indexes.sql');
+  const validation = await read('src/lib/validations.ts');
+  const createRoute = await read('src/app/api/events/route.ts');
+  const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
+  const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
+  const aiRoute = await read('src/app/api/ai/event-draft/route.ts');
+  const generator = await read('src/components/events/wizard/PromptToEventGenerator.tsx');
+  const details = await read('src/components/events/wizard/StepEventDetails.tsx');
+  const preview = await read('src/components/events/wizard/StepPreview.tsx');
+
+  assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_brief JSONB/);
+  assert.match(validation, /event_brief:\s*eventBriefContextSchema/);
+  assert.match(createRoute, /event_brief/);
+  assert.match(updateRoute, /event_brief/);
+  assert.match(publishRoute, /event_brief/);
+  assert.match(aiRoute, /brief:\s*eventBriefSchema/);
+  assert.match(generator, /brief:\s*EventBrief/);
+  assert.match(details, /values:\s*data/);
+  assert.match(preview, /event_brief:\s*formData\.event_brief/);
 });
 
 test('database rate limiting serializes attempts for the same key', async () => {

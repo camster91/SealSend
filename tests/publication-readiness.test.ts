@@ -13,6 +13,7 @@ test("publication readiness identifies every missing host decision", () => {
     invitation_headline: null,
     invitation_body: " ",
     rsvp_deadline: null,
+    event_brief: null,
   });
 
   assert.equal(result.ready, false);
@@ -21,6 +22,9 @@ test("publication readiness identifies every missing host decision", () => {
     "event_date",
     "location_name",
     "max_attendees",
+    "event_brief.audience",
+    "event_brief.accessibilityStatus",
+    "event_brief.communicationPreference",
     "invitation_headline",
     "invitation_body",
   ]);
@@ -36,6 +40,12 @@ test("publication readiness rejects invalid schedule ordering", () => {
     invitation_headline: "Join our September dinner",
     invitation_body: "Please review the details and RSVP.",
     rsvp_deadline: "2026-09-19T22:00:00.000Z",
+    event_brief: {
+      audience: "Neighbourhood volunteers",
+      accessibilityStatus: "no_known_requirements",
+      accessibilityNotes: null,
+      communicationPreference: "email",
+    },
   });
 
   assert.equal(result.ready, false);
@@ -55,6 +65,12 @@ test("publication readiness accepts a complete reviewed event", () => {
     invitation_headline: "Join our September dinner",
     invitation_body: "Please review the details and RSVP.",
     rsvp_deadline: new Date("2026-09-15T22:00:00.000Z"),
+    event_brief: {
+      audience: "Neighbourhood volunteers",
+      accessibilityStatus: "requirements_known",
+      accessibilityNotes: "Step-free entrance is available.",
+      communicationPreference: "email_and_sms",
+    },
   });
 
   assert.deepEqual(result, { ready: true, blockers: [] });

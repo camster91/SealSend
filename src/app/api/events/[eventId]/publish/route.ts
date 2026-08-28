@@ -19,7 +19,7 @@ export async function POST(
     // Fetch the current event to get its status
     const event = await queryOne<PublicationCandidate & { id: string; status: string }>(
       `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
-              invitation_headline, invitation_body, rsvp_deadline
+              invitation_headline, invitation_body, rsvp_deadline, event_brief
          FROM events WHERE id = $1`,
       [eventId]
     );

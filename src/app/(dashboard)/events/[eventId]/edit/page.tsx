@@ -77,6 +77,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     invitation_headline: event.invitation_headline ?? '',
     invitation_body: event.invitation_body ?? '',
     reminder_sequence: event.reminder_sequence ?? [],
+    event_brief: event.event_brief ?? null,
     ai_generation_id: event.ai_generation_id ?? '',
     customization: {
       primaryColor: event.customization?.primaryColor ?? '#6366f1',

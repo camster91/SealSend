@@ -1,3 +1,5 @@
+import type { EventBriefContext } from "@/lib/event-brief";
+
 type DateValue = string | Date | null | undefined;
 
 export type PublicationCandidate = {
@@ -9,10 +11,11 @@ export type PublicationCandidate = {
   invitation_headline?: string | null;
   invitation_body?: string | null;
   rsvp_deadline?: DateValue;
+  event_brief?: EventBriefContext | null;
 };
 
 export type PublicationBlocker = {
-  field: keyof PublicationCandidate;
+  field: keyof PublicationCandidate | "event_brief.audience" | "event_brief.accessibilityStatus" | "event_brief.communicationPreference";
   message: string;
 };
 
@@ -49,6 +52,19 @@ export function getPublicationReadiness(candidate: PublicationCandidate): {
   }
   if (!Number.isInteger(candidate.max_attendees) || Number(candidate.max_attendees) < 1) {
     blockers.push({ field: "max_attendees", message: "Set the event capacity." });
+  }
+  if (!hasText(candidate.event_brief?.audience)) {
+    blockers.push({ field: "event_brief.audience", message: "Describe who the event is for." });
+  }
+  if (
+    !candidate.event_brief
+    || candidate.event_brief.accessibilityStatus === "not_reviewed"
+    || (candidate.event_brief.accessibilityStatus === "requirements_known" && !hasText(candidate.event_brief.accessibilityNotes))
+  ) {
+    blockers.push({ field: "event_brief.accessibilityStatus", message: "Review the event's accessibility needs." });
+  }
+  if (!candidate.event_brief || candidate.event_brief.communicationPreference === "undecided") {
+    blockers.push({ field: "event_brief.communicationPreference", message: "Choose the intended guest communication approach." });
   }
   if (!hasText(candidate.invitation_headline)) {
     blockers.push({ field: "invitation_headline", message: "Review and add the invitation headline." });

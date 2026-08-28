@@ -48,7 +48,7 @@ export async function PATCH(
     // Verify ownership
     const existing = await queryOne<PublicationCandidate & { id: string; status: string }>(
       `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
-              invitation_headline, invitation_body, rsvp_deadline
+              invitation_headline, invitation_body, rsvp_deadline, event_brief
          FROM events WHERE id = $1`,
       [eventId]
     );
@@ -88,7 +88,7 @@ export async function PATCH(
     }
 
     const ALLOWED_COLUMNS = [
-      'title', 'description', 'invitation_headline', 'invitation_body', 'reminder_sequence', 'ai_generation_id', 'event_date', 'event_end_date', 'event_timezone',
+      'title', 'description', 'invitation_headline', 'invitation_body', 'reminder_sequence', 'event_brief', 'ai_generation_id', 'event_date', 'event_end_date', 'event_timezone',
       'location_name', 'location_address', 'host_name', 'dress_code',
       'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
       'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',

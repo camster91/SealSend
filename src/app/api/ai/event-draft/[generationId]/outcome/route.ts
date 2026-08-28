@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { queryOne } from "@/lib/db/client";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { AI_EVENT_DRAFT_SCHEMA_VERSION } from "@/lib/ai/event-draft-schema";
 
 const outcomeSchema = z.object({ outcome: z.enum(["accepted", "rejected"]) }).strict();
 
@@ -18,6 +19,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ gen
     [parsed.data.outcome, generationId, auth.user.id],
   );
   if (!result) return NextResponse.json({ error: "Generation not found or already reviewed" }, { status: 404 });
-  if (parsed.data.outcome === "accepted") await recordActivationEventSafely({ name: "ai_generation_accepted", userId: auth.user.id, metadata: { aiSchemaVersion: "1.0" } });
+  if (parsed.data.outcome === "accepted") await recordActivationEventSafely({ name: "ai_generation_accepted", userId: auth.user.id, metadata: { aiSchemaVersion: AI_EVENT_DRAFT_SCHEMA_VERSION } });
   return NextResponse.json({ success: true });
 }

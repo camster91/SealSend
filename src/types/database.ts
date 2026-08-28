@@ -1,3 +1,5 @@
+import type { EventBriefContext } from "@/lib/event-brief";
+
 export type EventStatus = "draft" | "published" | "archived";
 export type EventTier = "free" | "standard" | "premium" | "silver" | "gold" | "platinum" | "diamond";
 export type RSVPFieldType =
@@ -37,6 +39,7 @@ export interface Event {
   invitation_headline: string | null;
   invitation_body: string | null;
   reminder_sequence: Array<{ timing: string; subject: string; message: string }>;
+  event_brief: EventBriefContext | null;
   ai_generation_id: string | null;
   event_date: string | null;
   event_end_date: string | null;
