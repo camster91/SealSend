@@ -1284,6 +1284,26 @@ test('host lifecycle emails are deduplicated, controlled, and disabled by defaul
   assert.match(example, /ENABLE_HOST_LIFECYCLE_EMAILS=false/);
 });
 
+test('post-event repeat prompts are bounded, deduplicated, and measurable', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
+  const lifecycle = await read('src/lib/host-lifecycle.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+
+  assert.match(schema, /host_lifecycle_notifications_notification_type_check/);
+  assert.match(schema, /post_event_repeat/);
+  assert.match(lifecycle, /notification_type: [^;]*post_event_repeat/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) <= NOW\(\) - INTERVAL '24 hours'/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) >= NOW\(\) - INTERVAL '7 days'/);
+  assert.match(route, /EXISTS \(SELECT 1 FROM rsvp_responses/);
+  assert.match(route, /repeated\.repeated_from_event_id = e\.id/);
+  assert.match(lifecycle, /Review outcomes/);
+  assert.match(lifecycle, /Repeat event/);
+  assert.match(metrics, /repeatLoop/);
+  assert.match(metrics, /post_event_repeat/);
+  assert.match(metrics, /repeated_from_event_id/);
+});
+
 test('checkout conversion telemetry is recorded only at real lifecycle boundaries', async () => {
   const eventCheckout = await read('src/app/api/checkout/route.ts');
   const annualCheckout = await read('src/app/api/subscriptions/checkout/route.ts');

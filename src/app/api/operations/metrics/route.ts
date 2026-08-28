@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows, betaSupportReviewRows] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, repeatLoop, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows, betaSupportReviewRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -35,7 +35,20 @@ export async function GET(request: NextRequest) {
     query<{ status: string; count: string }>(
       `SELECT last_delivery_status AS status, COUNT(*)::text AS count FROM monitoring_alert_deliveries
         WHERE last_attempted_at >= NOW() - INTERVAL '30 days'
-        GROUP BY last_delivery_status ORDER BY last_delivery_status`,
+       GROUP BY last_delivery_status ORDER BY last_delivery_status`,
+    ),
+    queryOne<{ prompted_hosts: string; repeated_hosts: string }>(
+      `SELECT
+         COUNT(DISTINCT notifications.user_id)::text AS prompted_hosts,
+         COUNT(DISTINCT CASE WHEN repeated.id IS NOT NULL THEN notifications.user_id END)::text AS repeated_hosts
+       FROM host_lifecycle_notifications notifications
+       LEFT JOIN events child ON child.repeated_from_event_id = notifications.event_id
+       LEFT JOIN activation_events repeated
+         ON repeated.event_name = 'event_repeated'
+        AND repeated.event_id = child.id
+        AND repeated.created_at >= notifications.sent_at
+       WHERE notifications.notification_type = 'post_event_repeat'
+         AND notifications.sent_at >= NOW() - INTERVAL '30 days'`,
     ),
     query<{ participant_id: string; segment: BetaSegment; consented_at: string }>(
       `SELECT user_id::text AS participant_id, segment, consented_at FROM beta_participants
@@ -158,7 +171,7 @@ export async function GET(request: NextRequest) {
     participantCount: participantIds.size,
   }));
   return NextResponse.json(
-    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort, betaAcceptance },
+    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, repeatLoop, betaParticipants, betaMilestones, betaCohort, betaAcceptance },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
