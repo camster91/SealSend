@@ -76,12 +76,13 @@ INSERT INTO guest_magic_tokens (
 );
 
 INSERT INTO beta_enrollment_invites (
-  token_hash, token_preview, participant_label, segment, expires_at
+  token_hash, token_preview, participant_label, segment, cohort_version, expires_at
 ) VALUES (
   repeat('b', 64),
   'bbbb',
   'host-111111111111',
   'club_association',
+  'recurring-community-v1',
   NOW() + INTERVAL '7 days'
 );
 

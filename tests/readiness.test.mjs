@@ -905,6 +905,7 @@ test('beta evidence is isolated to one approved cohort with one active host per 
   const participation = await read('src/app/api/beta/participation/route.ts');
   const metrics = await read('src/app/api/operations/metrics/route.ts');
   const report = await read('scripts/report-beta-participants.ts');
+  const featureSchemaVerification = await read('scripts/test/verify-feature-schema.sql');
   const operations = await read('docs/launch-operations.md');
 
   for (const sql of [schema, migration]) {
@@ -924,6 +925,10 @@ test('beta evidence is isolated to one approved cohort with one active host per 
   assert.match(participation, /status !== "approved"/);
   assert.match(metrics, /participants\.cohort_version = \$1/);
   assert.match(report, /participants\.cohort_version = \$1/);
+  assert.match(
+    featureSchemaVerification,
+    /INSERT INTO beta_enrollment_invites\s*\(\s*token_hash,\s*token_preview,\s*participant_label,\s*segment,\s*cohort_version,\s*expires_at\s*\)/,
+  );
   assert.match(operations, /one active host per required segment/i);
   assert.match(operations, /legacy-unassigned/i);
 });
