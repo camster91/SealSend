@@ -84,9 +84,9 @@
         {
           "id": "trust_proof",
           "maximum": 20,
-          "earned": 5,
-          "evidence": ["config/launch-evidence.json#repository_quality", "docs/paid-beta-evidence-register.md", "src/app/(marketing)/support/page.tsx", "tests/readiness.test.mjs"],
-          "missingEvidence": ["Permissioned real-host case evidence", "Provider delivery evidence", "Candidate support expectations require production deployment verification", "Qualified compliance review"]
+          "earned": 6,
+          "evidence": ["config/launch-evidence.json#repository_quality", "docs/paid-beta-evidence-register.md", "docs/retention-policy-decision.md", "src/app/(marketing)/privacy/page.tsx", "src/app/(marketing)/support/page.tsx", "tests/readiness.test.mjs", "tests/retention.test.ts"],
+          "missingEvidence": ["Permissioned real-host case evidence", "Provider delivery evidence", "Candidate trust content requires production deployment verification", "Qualified compliance review"]
         },
         {
           "id": "product_led_differentiation",
