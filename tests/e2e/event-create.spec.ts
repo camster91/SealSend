@@ -9,8 +9,12 @@ test.describe('Protected event creation', () => {
 
   test('homepage CTA leads to account creation', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: 'Build Your Event Workflow' }).click();
-    await expect(page).toHaveURL(/\/signup$/);
+    const cta = page.getByRole('link', { name: 'Build Your Event Workflow' });
+    await expect(cta).toHaveAttribute('href', '/signup');
+    await Promise.all([
+      page.waitForURL(/\/signup$/, { timeout: 15_000 }),
+      cta.click(),
+    ]);
     await expect(page.getByRole('button', { name: 'Get Started' })).toBeVisible();
   });
 });
