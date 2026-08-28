@@ -1335,6 +1335,24 @@ test('stale-draft deletion requires the current warning and its full waiting per
   assert.match(cleanup, /DELETE FROM events[\s\S]*EXISTS[\s\S]*stale_draft_warning/);
 });
 
+test('retention rehearsal proves fail-closed deletion in disposable PostgreSQL', async () => {
+  const rehearsal = await read('ops/rehearse-retention.sh');
+
+  assert.match(rehearsal, /SEALSEND_RETENTION_REHEARSAL_CONFIRM/);
+  assert.match(rehearsal, /postgres:16-alpine/);
+  assert.match(rehearsal, /docker network create/);
+  assert.match(rehearsal, /src\/lib\/db\/schema\.sql/);
+  assert.match(rehearsal, /stale_draft_warning/);
+  assert.match(rehearsal, /ENABLE_STALE_DRAFT_CLEANUP=true/);
+  assert.match(rehearsal, /"candidates":4/);
+  assert.match(rehearsal, /"warnedCandidates":1/);
+  assert.match(rehearsal, /"blockedWithoutWarning":3/);
+  assert.match(rehearsal, /"deleted":1/);
+  assert.match(rehearsal, /remaining_events.*3/);
+  assert.match(rehearsal, /trap cleanup EXIT INT TERM/);
+  assert.doesNotMatch(rehearsal, /sealsend-postgres|coolify\.resourceName|--network host/);
+});
+
 test('checkout conversion telemetry is recorded only at real lifecycle boundaries', async () => {
   const eventCheckout = await read('src/app/api/checkout/route.ts');
   const annualCheckout = await read('src/app/api/subscriptions/checkout/route.ts');
