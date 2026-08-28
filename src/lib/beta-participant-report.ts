@@ -3,6 +3,7 @@ import {
   type BetaMilestoneName,
   type BetaSegment,
 } from "./beta-participation";
+import type { BetaWillingnessToPay } from "./beta-outcome";
 
 interface BetaParticipantReportInput {
   participantLabel: string;
@@ -12,6 +13,13 @@ interface BetaParticipantReportInput {
   withdrawnAt: string | null;
   activationEvents: Array<{ name: BetaMilestoneName; createdAt: string }>;
   feedbackEntries: Array<{ createdAt: string }>;
+  outcome: null | {
+    willingnessToPay: BetaWillingnessToPay;
+    repeatIntent: number;
+    selfReportedSupportMinutes: number;
+    priceVersion: string;
+    submittedAt: string;
+  };
 }
 
 export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
@@ -34,6 +42,7 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
     active: input.withdrawnAt === null,
     progress,
     feedbackCount,
+    outcome: input.outcome,
     criticalDefects: null,
   };
 }

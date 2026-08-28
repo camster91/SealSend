@@ -10,6 +10,8 @@ test("empty beta cohorts report null rates instead of implying zero-percent perf
   assert.deepEqual(metrics.repeatUse, { numerator: 0, denominator: 0, rate: null });
   assert.equal(metrics.medianHoursToFirstPublish, null);
   assert.equal(metrics.averageFeedbackRating, null);
+  assert.deepEqual(metrics.statedWillingnessToPay, { annualPro: 0, perEvent: 0, freeOnly: 0, unsure: 0, responses: 0, denominator: 0 });
+  assert.equal(metrics.medianSelfReportedSupportMinutes, null);
 });
 
 test("cohort metrics exclude withdrawn hosts and milestones recorded before consent", () => {
@@ -32,6 +34,7 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
         { name: "event_repeated", createdAt: "2026-08-27T14:40:00.000Z" },
       ],
       feedbackRatings: [4, 5],
+      outcome: { willingnessToPay: "annual_pro", repeatIntent: 5, selfReportedSupportMinutes: 12 },
     },
     {
       participantId: "withdrawn-host",
@@ -40,6 +43,7 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
       withdrawnAt: "2026-08-27T13:00:00.000Z",
       activationEvents: [{ name: "event_published", createdAt: "2026-08-27T12:10:00.000Z" }],
       feedbackRatings: [1],
+      outcome: { willingnessToPay: "free_only", repeatIntent: 1, selfReportedSupportMinutes: 600 },
     },
   ]);
 
@@ -50,6 +54,8 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
   assert.deepEqual(metrics.repeatUse, { numerator: 1, denominator: 1, rate: 1 });
   assert.equal(metrics.medianHoursToFirstPublish, 2);
   assert.equal(metrics.averageFeedbackRating, 4.5);
+  assert.deepEqual(metrics.statedWillingnessToPay, { annualPro: 1, perEvent: 0, freeOnly: 0, unsure: 0, responses: 1, denominator: 1 });
+  assert.equal(metrics.medianSelfReportedSupportMinutes, 12);
   assert.doesNotMatch(JSON.stringify(metrics), /internal-host-a|withdrawn-host/);
 });
 
@@ -62,6 +68,7 @@ test("repeat-use rate uses repeat planners rather than the whole cohort as its d
       withdrawnAt: null,
       activationEvents: [],
       feedbackRatings: [],
+      outcome: null,
     },
     {
       participantId: "community-a",
@@ -70,6 +77,7 @@ test("repeat-use rate uses repeat planners rather than the whole cohort as its d
       withdrawnAt: null,
       activationEvents: [{ name: "event_repeated", createdAt: "2026-08-27T13:00:00.000Z" }],
       feedbackRatings: [],
+      outcome: null,
     },
   ]);
 

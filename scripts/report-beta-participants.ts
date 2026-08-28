@@ -9,6 +9,7 @@ import {
   type BetaMilestoneName,
   type BetaSegment,
 } from "../src/lib/beta-participation";
+import type { BetaWillingnessToPay } from "../src/lib/beta-outcome";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -43,9 +44,18 @@ interface FeedbackRow {
   created_at: string;
 }
 
+interface OutcomeRow {
+  participant_label: string;
+  willingness_to_pay: BetaWillingnessToPay;
+  repeat_intent: number;
+  self_reported_support_minutes: number;
+  price_version: string;
+  updated_at: string;
+}
+
 async function reportBetaParticipants() {
   try {
-    const [participants, milestones, feedbackEntries] = await Promise.all([
+    const [participants, milestones, feedbackEntries, outcomes] = await Promise.all([
       pool.query<ParticipantRow>(
         `SELECT participant_label,
                 segment,
@@ -81,6 +91,21 @@ async function reportBetaParticipants() {
           ORDER BY participants.participant_label, feedback.created_at`,
         [BETA_SEGMENTS],
       ),
+      pool.query<OutcomeRow>(
+        `SELECT participants.participant_label,
+                outcomes.willingness_to_pay,
+                outcomes.repeat_intent,
+                outcomes.self_reported_support_minutes,
+                outcomes.price_version,
+                outcomes.updated_at::text
+           FROM beta_participants participants
+           JOIN beta_outcomes outcomes
+             ON outcomes.user_id = participants.user_id
+            AND outcomes.consented_at = participants.consented_at
+          WHERE participants.segment = ANY($1::text[])
+          ORDER BY participants.participant_label`,
+        [BETA_SEGMENTS],
+      ),
     ]);
 
     if (participants.rows.length === 0) {
@@ -101,6 +126,16 @@ async function reportBetaParticipants() {
         feedbackEntries: feedbackEntries.rows
           .filter((entry) => entry.participant_label === participant.participant_label)
           .map((entry) => ({ createdAt: entry.created_at })),
+        outcome: (() => {
+          const outcome = outcomes.rows.find((entry) => entry.participant_label === participant.participant_label);
+          return outcome ? {
+            willingnessToPay: outcome.willingness_to_pay,
+            repeatIntent: outcome.repeat_intent,
+            selfReportedSupportMinutes: outcome.self_reported_support_minutes,
+            priceVersion: outcome.price_version,
+            submittedAt: outcome.updated_at,
+          } : null;
+        })(),
       });
       console.log(JSON.stringify(report));
     }

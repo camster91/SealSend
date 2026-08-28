@@ -763,10 +763,39 @@ test('operators can export a pseudonymous five-host acceptance report without pe
   assert.match(command, /buildBetaParticipantReport/);
   assert.match(command, /activation_events/);
   assert.match(command, /beta_feedback/);
+  assert.match(command, /beta_outcomes/);
   for (const prohibited of ['token_hash', 'token_preview', 'admin_users', 'feedback.message', 'guests']) {
     assert.doesNotMatch(command, new RegExp(prohibited.replace('.', '\\.')));
   }
   assert.equal(pkg.scripts['report-beta-participants'], 'npx tsx scripts/report-beta-participants.ts');
+});
+
+test('structured beta outcomes are consent-scoped, price-versioned, and evidence-limited', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/outcome/route.ts');
+  const panel = await read('src/components/dashboard/BetaOutcomeSurvey.tsx');
+  const participation = await read('src/components/dashboard/BetaParticipation.tsx');
+  const register = await read('docs/paid-beta-evidence-register.md');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_outcomes/);
+    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
+    assert.match(sql, /self_reported_support_minutes INTEGER NOT NULL CHECK \(self_reported_support_minutes BETWEEN 0 AND 600\)/);
+  }
+  assert.match(route, /requireApiHost/);
+  assert.match(route, /withdrawn_at IS NULL/);
+  assert.match(route, /segment = ANY/);
+  assert.match(route, /ON CONFLICT \(user_id, consented_at\)/);
+  assert.doesNotMatch(route, /request.*consent|request.*segment|request.*priceVersion/i);
+  assert.match(panel, /\$124\.99\/year/);
+  assert.match(panel, /\$8\.99-\$49\.99\/event/);
+  assert.match(panel, /self-reported/i);
+  assert.match(panel, /stated intent/i);
+  assert.match(participation, /BetaOutcomeSurvey/);
+  assert.match(register, /self-reported/i);
+  assert.match(register, /stated intent/i);
+  assert.match(register, /not paid conversion/i);
 });
 
 test('pending beta hosts never claim zero critical defects before human review', async () => {

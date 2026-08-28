@@ -19,6 +19,13 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
       { createdAt: "2026-08-27T11:00:00.000Z" },
       { createdAt: "2026-08-27T12:03:00.000Z" },
     ],
+    outcome: {
+      willingnessToPay: "annual_pro",
+      repeatIntent: 5,
+      selfReportedSupportMinutes: 12,
+      priceVersion: "usd-annual-124.99-event-8.99-49.99-2026-08-27",
+      submittedAt: "2026-08-27T12:04:00.000Z",
+    },
   });
 
   assert.equal(report.participantLabel, "host-abcdef123456");
@@ -28,6 +35,8 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
   assert.equal(report.progress.steps.repeatEvent, true);
   assert.equal(report.progress.steps.feedback, true);
   assert.equal(report.feedbackCount, 1);
+  assert.equal(report.outcome?.willingnessToPay, "annual_pro");
+  assert.equal(report.outcome?.selfReportedSupportMinutes, 12);
   assert.equal(report.criticalDefects, null);
   assert.equal("userId" in report, false);
   assert.equal("email" in report, false);
@@ -43,11 +52,13 @@ test("withdrawn beta host remains visible without being reported as active", () 
     withdrawnAt: "2026-08-27T13:00:00.000Z",
     activationEvents: [],
     feedbackEntries: [],
+    outcome: null,
   });
 
   assert.equal(report.active, false);
   assert.equal(report.withdrawnAt, "2026-08-27T13:00:00.000Z");
   assert.equal(report.progress.allRequiredComplete, false);
   assert.equal(report.feedbackCount, 0);
+  assert.equal(report.outcome, null);
   assert.equal(report.criticalDefects, null);
 });

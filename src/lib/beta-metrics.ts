@@ -3,6 +3,7 @@ import {
   type BetaMilestoneName,
   type BetaSegment,
 } from "@/lib/beta-participation";
+import type { BetaWillingnessToPay } from "@/lib/beta-outcome";
 
 export interface BetaCohortParticipant {
   participantId: string;
@@ -11,6 +12,11 @@ export interface BetaCohortParticipant {
   withdrawnAt: string | null;
   activationEvents: Array<{ name: BetaMilestoneName; createdAt: string }>;
   feedbackRatings: number[];
+  outcome: null | {
+    willingnessToPay: BetaWillingnessToPay;
+    repeatIntent: number;
+    selfReportedSupportMinutes: number;
+  };
 }
 
 interface RateMetric {
@@ -46,6 +52,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
       (event) => new Date(event.createdAt).getTime() >= new Date(participant.consentedAt).getTime(),
     ),
     feedbackRatings: participant.feedbackRatings.filter((rating) => rating >= 1 && rating <= 5),
+    outcome: participant.outcome,
   })).map((participant) => ({
     ...participant,
     progress: deriveBetaProgress({
@@ -77,6 +84,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
   });
   const ratings = progress.flatMap((participant) => participant.feedbackRatings);
   const denominator = active.length;
+  const outcomes = progress.flatMap((participant) => participant.outcome ? [participant.outcome] : []);
 
   return {
     cohortSize: denominator,
@@ -96,5 +104,14 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
     averageFeedbackRating: ratings.length === 0
       ? null
       : Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 100) / 100,
+    statedWillingnessToPay: {
+      annualPro: outcomes.filter((outcome) => outcome.willingnessToPay === "annual_pro").length,
+      perEvent: outcomes.filter((outcome) => outcome.willingnessToPay === "per_event").length,
+      freeOnly: outcomes.filter((outcome) => outcome.willingnessToPay === "free_only").length,
+      unsure: outcomes.filter((outcome) => outcome.willingnessToPay === "unsure").length,
+      responses: outcomes.length,
+      denominator,
+    },
+    medianSelfReportedSupportMinutes: median(outcomes.map((outcome) => outcome.selfReportedSupportMinutes)),
   };
 }

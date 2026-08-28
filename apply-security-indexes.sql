@@ -431,3 +431,17 @@ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
   ON beta_participants(segment) WHERE withdrawn_at IS NULL;
+CREATE TABLE IF NOT EXISTS beta_outcomes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES beta_participants(user_id) ON DELETE CASCADE,
+  consented_at TIMESTAMPTZ NOT NULL,
+  consent_version TEXT NOT NULL,
+  willingness_to_pay TEXT NOT NULL CHECK (willingness_to_pay IN ('annual_pro','per_event','free_only','unsure')),
+  repeat_intent INTEGER NOT NULL CHECK (repeat_intent BETWEEN 1 AND 5),
+  self_reported_support_minutes INTEGER NOT NULL CHECK (self_reported_support_minutes BETWEEN 0 AND 600),
+  price_version TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, consented_at)
+);
+CREATE INDEX IF NOT EXISTS idx_beta_outcomes_created ON beta_outcomes(created_at DESC);

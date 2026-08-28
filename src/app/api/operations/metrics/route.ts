@@ -3,12 +3,13 @@ import { query, queryOne } from "@/lib/db/client";
 import { isOperationsAuthorized } from "@/lib/operations-auth";
 import { computeBetaCohortMetrics, type BetaCohortParticipant } from "@/lib/beta-metrics";
 import { BETA_MILESTONE_NAMES, type BetaMilestoneName, type BetaSegment } from "@/lib/beta-participation";
+import type { BetaWillingnessToPay } from "@/lib/beta-outcome";
 
 export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -53,7 +54,18 @@ export async function GET(request: NextRequest) {
        JOIN beta_feedback feedback
          ON feedback.user_id = participants.user_id AND feedback.created_at >= participants.consented_at
        WHERE participants.withdrawn_at IS NULL
-       ORDER BY participants.user_id, feedback.created_at`,
+      ORDER BY participants.user_id, feedback.created_at`,
+    ),
+    query<{ participant_id: string; willingness_to_pay: BetaWillingnessToPay; repeat_intent: number; self_reported_support_minutes: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              outcomes.willingness_to_pay,
+              outcomes.repeat_intent,
+              outcomes.self_reported_support_minutes
+       FROM beta_participants participants
+       JOIN beta_outcomes outcomes
+         ON outcomes.user_id = participants.user_id AND outcomes.consented_at = participants.consented_at
+       WHERE participants.withdrawn_at IS NULL
+       ORDER BY participants.user_id`,
     ),
   ]);
   const participantMap = new Map<string, BetaCohortParticipant>(
@@ -64,6 +76,7 @@ export async function GET(request: NextRequest) {
       withdrawnAt: null,
       activationEvents: [],
       feedbackRatings: [],
+      outcome: null,
     }]),
   );
   for (const event of betaMilestoneRows) {
@@ -74,6 +87,14 @@ export async function GET(request: NextRequest) {
   }
   for (const feedback of betaFeedbackRows) {
     participantMap.get(feedback.participant_id)?.feedbackRatings.push(feedback.rating);
+  }
+  for (const outcome of betaOutcomeRows) {
+    const participant = participantMap.get(outcome.participant_id);
+    if (participant) participant.outcome = {
+      willingnessToPay: outcome.willingness_to_pay,
+      repeatIntent: outcome.repeat_intent,
+      selfReportedSupportMinutes: outcome.self_reported_support_minutes,
+    };
   }
   const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);
   const betaParticipants = [...betaParticipantRows.reduce((counts, participant) => {

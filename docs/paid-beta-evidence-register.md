@@ -63,6 +63,8 @@ The secret-gated operations report computes active-cohort event-publish, guest-i
 | Backup restore rehearsal | | Pass | Pending |
 | Willingness to pay | | Recorded for all five hosts | Pending |
 
+The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. Missing responses remain missing; they are never converted to zero or a passing result.
+
 ## Real-device accessibility evidence
 
 Automated emulation is supporting evidence only. Record the physical device, operating-system version, browser or assistive technology, tester, date, and result. Do not record participant account credentials.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BetaOutcomeSurvey } from "@/components/dashboard/BetaOutcomeSurvey";
 
 type Segment = "club_association" | "volunteer_nonprofit" | "creative_community" | "alumni_professional" | "repeat_planner";
 
@@ -122,6 +123,7 @@ export function BetaParticipation() {
               Repeat-event evidence: {data.progress.steps.repeatEvent ? "recorded" : "not yet recorded"}.
             </p>
           )}
+          <BetaOutcomeSurvey />
           <button type="button" disabled={busy} onClick={withdraw} className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
             {busy ? "Updating…" : "Withdraw beta consent"}
           </button>
