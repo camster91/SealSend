@@ -1304,6 +1304,37 @@ test('post-event repeat prompts are bounded, deduplicated, and measurable', asyn
   assert.match(metrics, /repeated_from_event_id/);
 });
 
+test('stale-draft warnings cover the complete 14-day pre-cleanup window', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
+  const lifecycle = await read('src/lib/host-lifecycle.ts');
+  const privacy = await read('src/app/(marketing)/privacy/page.tsx');
+
+  assert.match(schema, /stale_draft_warning/);
+  assert.match(lifecycle, /stale_draft_warning/);
+  assert.match(route, /STALE_DRAFT_RETENTION_DAYS/);
+  assert.match(route, /STALE_DRAFT_WARNING_DAYS/);
+  assert.match(route, /e\.updated_at <= NOW\(\) - \(\$1::int \* INTERVAL '1 day'\)/);
+  assert.match(route, /e\.updated_at > NOW\(\) - \(\$2::int \* INTERVAL '1 day'\)/);
+  assert.match(route, /EXTRACT\(EPOCH FROM e\.updated_at\)::bigint/);
+  assert.match(route, /e\.updated_at \+ \(\$2::int \* INTERVAL '1 day'\)/);
+  assert.match(privacy, /90 days after (?:its|the) last update/i);
+  assert.match(privacy, /14-day warning/i);
+  assert.match(privacy, /unreferenced upload[^.]*7 days/i);
+  assert.match(privacy, /automatic cleanup is currently disabled/i);
+});
+
+test('stale-draft deletion requires the current warning and its full waiting period', async () => {
+  const cleanup = await read('src/app/api/cron/cleanup-drafts/route.ts');
+
+  assert.match(cleanup, /resolveStaleDraftPolicy/);
+  assert.match(cleanup, /notification_type = ['"]stale_draft_warning['"]/);
+  assert.match(cleanup, /EXTRACT\(EPOCH FROM events\.updated_at\)::bigint/);
+  assert.match(cleanup, /notifications\.sent_at <= \$3/);
+  assert.match(cleanup, /blockedWithoutWarning/);
+  assert.match(cleanup, /DELETE FROM events[\s\S]*EXISTS[\s\S]*stale_draft_warning/);
+});
+
 test('checkout conversion telemetry is recorded only at real lifecycle boundaries', async () => {
   const eventCheckout = await read('src/app/api/checkout/route.ts');
   const annualCheckout = await read('src/app/api/subscriptions/checkout/route.ts');

@@ -1,6 +1,6 @@
 # SealSend retention-policy decision
 
-Status: **Proposed — owner approval pending**
+Status: **Owner approved — activation and qualified legal review pending**
 
 Reviewed: 2026-08-28
 
@@ -28,7 +28,7 @@ Authoritative references:
 
 | Data | Current behavior | Proposed approved period | Activation state |
 |---|---|---:|---|
-| Stale draft event and its event-scoped guest data | `cleanup-drafts` selects only `draft` events by `updated_at`; the configured default is 90 days and code refuses a value below 30 days | 90 days since last update | `ENABLE_STALE_DRAFT_CLEANUP=false` |
+| Stale draft event and its event-scoped guest data | `cleanup-drafts` selects only `draft` events by `updated_at`; the configured default is 90 days and code refuses a value below 30 days. Deletion additionally requires a matching warning for the draft's exact current `updated_at` version and the full configured warning interval after delivery. | 90 days since last update | `ENABLE_STALE_DRAFT_CLEANUP=false` |
 | Orphan upload asset | `cleanup-uploads` selects assets older than 7 days only when no event references the asset path | 7 days since upload | `ENABLE_ORPHAN_UPLOAD_CLEANUP=false` |
 | Active, published, and archived events | Not targeted by either cleanup job | Retained while the account exists or until the owner deletes the event/account | No automatic event-retention deletion |
 | Account deletion | Authenticated request has a 7-day cancellation window; due requests are blocked by an active paid subscription and then cascade-delete account/event data and queue upload-directory deletion | Execute after 7-day cancellation period; support workflow completes verified requests within 30 days | Separate authenticated workflow |
@@ -36,23 +36,23 @@ Authoritative references:
 
 ## Gaps that must remain visible
 
-- The public Privacy Policy currently describes account deletion but does not name the 90-day stale-draft or 7-day orphan-upload periods.
-- No 14-day stale-draft deletion warning currently exists.
+- The release candidate's public Privacy Policy names the 90-day stale-draft, 14-day warning, and 7-day orphan-upload periods, but this candidate is not deployed.
+- The release candidate includes an exact-version 14-day stale-draft warning and fail-closed deletion gate, but lifecycle email delivery and destructive cleanup remain disabled.
 - The revised policy and any statutory applicability still require qualified legal review under the separate privacy/legal gate.
 - Mailgun, Twilio, Stripe, hosting, and other processor retention must be confirmed from the configured accounts and contracts; repository code cannot prove provider deletion.
 - Destructive cleanup has not been enabled or exercised against production data.
 
 ## Approval record
 
-Owner: Pending
+Owner: Cameron Ashley
 
-Decision timestamp: Pending
+Decision timestamp: 2026-08-28T17:01:03.1091779-04:00
 
-Approved stale-draft period: Pending
+Approved stale-draft period: 90 days since last update
 
-Approved orphan-upload period: Pending
+Approved orphan-upload period: 7 days since upload when unreferenced
 
-Approved activation prerequisites: Pending
+Approved activation prerequisites: Public notice and 14-day stale-draft warning in the release candidate; separate production approval after candidate-count review
 
 Boundary: Approval of this document would pass only the owner retention-period decision. It would not enable cleanup, approve the full Privacy Policy, satisfy qualified legal review, or authorize production deployment.
 

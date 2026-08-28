@@ -5,8 +5,9 @@ export type HostLifecycleCandidate = {
   email: string;
   event_id: string | null;
   title: string | null;
-  notification_type: "getting_started" | "finish_draft" | "event_approaching" | "post_event_repeat";
+  notification_type: "getting_started" | "finish_draft" | "event_approaching" | "post_event_repeat" | "stale_draft_warning";
   scope_key: string;
+  action_at?: string | null;
 };
 
 export function buildHostLifecycleMessage(candidate: HostLifecycleCandidate, siteOverride?: string) {
@@ -23,6 +24,17 @@ export function buildHostLifecycleMessage(candidate: HostLifecycleCandidate, sit
     text: `Your event is still a draft. Review it at ${href}`,
     html: `<p><strong>${title}</strong> is still a draft.</p><p><a href="${href}">Review event</a></p>`,
   };
+  if (candidate.notification_type === "stale_draft_warning") {
+    const actionDate = candidate.action_at
+      ? new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(candidate.action_at))
+      : "the scheduled cleanup date";
+    const editHref = `${href}/edit`;
+    return {
+      subject: `Draft cleanup warning: ${candidate.title || "your event"}`,
+      text: `${candidate.title || "Your event"} will become eligible for cleanup on ${actionDate}. Review and save the draft at ${editHref} to keep it active.`,
+      html: `<p><strong>${title}</strong> will become eligible for cleanup on ${actionDate}.</p><p><a href="${editHref}">Review and save this draft</a> to keep it active.</p>`,
+    };
+  }
   if (candidate.notification_type === "post_event_repeat") {
     const analyticsHref = `${site}/events/${candidate.event_id}/analytics`;
     return {

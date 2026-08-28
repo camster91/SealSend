@@ -19,3 +19,21 @@ test("post-event repeat message links outcomes and the reviewed next-event workf
   assert.match(message.html, /Community &lt;Night&gt;/);
   assert.doesNotMatch(message.html, /Community <Night>/);
 });
+
+test("stale-draft warning names the eligibility date and recovery action", () => {
+  const message = buildHostLifecycleMessage({
+    user_id: "user-1",
+    email: "organizer@example.test",
+    event_id: "event-1",
+    title: "Community <Night>",
+    notification_type: "stale_draft_warning",
+    scope_key: "stale_draft_warning:event-1:123:90",
+    action_at: "2026-09-11T12:00:00.000Z",
+  } as unknown as Parameters<typeof buildHostLifecycleMessage>[0], "https://example.test");
+
+  assert.match(message.subject, /Draft cleanup warning/);
+  assert.match(message.text, /September 11, 2026/);
+  assert.match(message.text, /https:\/\/example\.test\/events\/event-1\/edit/);
+  assert.match(message.html, /Community &lt;Night&gt;/);
+  assert.match(message.html, /Review and save this draft/);
+});
