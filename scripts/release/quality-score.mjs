@@ -7,6 +7,7 @@ const rounded = (value) => Math.round(value * 10) / 10;
 
 export function evaluateQualityScorecard(scorecard, launch) {
   const errors = [];
+  /** @type {Record<string, number>} */
   const scores = {};
 
   if (scorecard?.schemaVersion !== 1) errors.push("Unsupported or missing quality scorecard schema");
