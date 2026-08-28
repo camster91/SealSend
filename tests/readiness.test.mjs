@@ -754,6 +754,32 @@ test('operators can inspect and revoke beta invitations without exposing raw cod
   assert.equal(pkg.scripts['revoke-beta-invite'], 'npx tsx scripts/revoke-beta-invite.ts');
 });
 
+test('operators can export a pseudonymous five-host acceptance report without personal data', async () => {
+  const command = await read('scripts/report-beta-participants.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  assert.match(command, /participant_label/);
+  assert.match(command, /consent_version/);
+  assert.match(command, /buildBetaParticipantReport/);
+  assert.match(command, /activation_events/);
+  assert.match(command, /beta_feedback/);
+  for (const prohibited of ['token_hash', 'token_preview', 'admin_users', 'feedback.message', 'guests']) {
+    assert.doesNotMatch(command, new RegExp(prohibited.replace('.', '\\.')));
+  }
+  assert.equal(pkg.scripts['report-beta-participants'], 'npx tsx scripts/report-beta-participants.ts');
+});
+
+test('pending beta hosts never claim zero critical defects before human review', async () => {
+  const register = await read('docs/paid-beta-evidence-register.md');
+  const pendingHostRows = register.split(/\r?\n/).filter((line) => /^\| host-0[1-5] \|/.test(line));
+
+  assert.equal(pendingHostRows.length, 5);
+  for (const row of pendingHostRows) {
+    assert.match(row, /\| Pending \|\s*$/);
+    assert.doesNotMatch(row, /\| 0 \|\s*$/);
+  }
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');

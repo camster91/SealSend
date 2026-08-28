@@ -35,13 +35,15 @@ Enrollment is invitation-controlled. For each approved host, an operator runs `n
 
 The release candidate records a versioned consent timestamp, an operator-assigned pseudonymous participant label and segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence and rejoining requires a new operator invitation. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
 
+Run `npm run report-beta-participants` with the protected production `DATABASE_URL` to produce one JSON line per current-scope participant. Each line contains only the pseudonymous label, operator-assigned segment, consent version/timestamps, active/withdrawn state, privacy-limited milestone booleans, completion counts, feedback count, and `criticalDefects: null`. The command joins internally on account IDs but never returns them, and it does not select guest data, contact details, feedback messages, invitation tokens, or token hashes. Copy only the required results into the matrix below. `criticalDefects: null` means not assessed; replace it with a reviewed count only after human severity triage.
+
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| host-01 | Club/association | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-02 | Volunteer/local non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-03 | Creative community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-04 | Alumni/small professional community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-05 | Repeat planner | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-01 | Club/association | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-02 | Volunteer/local non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-03 | Creative community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-04 | Alumni/small professional community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-05 | Repeat planner | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
 
 ## Launch measures
 

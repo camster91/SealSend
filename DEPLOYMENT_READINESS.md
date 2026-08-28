@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 146 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment and operator revocation, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 150 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -82,7 +82,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - AI-assisted message drafts with tone, length, urgency, and channel controls; no AI route can send externally.
 - Traceable aggregate RSVP intelligence that excludes guest free text from AI interpretation.
 - Thirteen editable templates, template-to-wizard population, safe artwork upload, and non-destructive crop/focus controls.
-- Operator-issued, expiring, one-time beta invitations with hashed token storage, server-assigned cohort segments, privacy-limited listing, and idempotent pre-acceptance revocation; privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
+- Operator-issued, expiring, one-time beta invitations with hashed token storage, server-assigned cohort segments, privacy-limited listing, and idempotent pre-acceptance revocation; pseudonymous per-host acceptance reporting that leaves critical-defect assessment explicitly unclaimed; privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
 - Self-service portable JSON export plus scheduled account deletion with a seven-day cooling-off period, paid-subscription protection, cancellation, and retry-safe upload cleanup.
 - Per-account upload accounting and serialized quotas: 250 MB free, 1 GB paid-event, and 5 GB annual Pro; orphan deletion remains report-only until explicitly enabled.
 - First-event onboarding, checkout lifecycle analytics, aggregate secret-gated operational metrics, and deduplicated host lifecycle messaging that remains disabled until provider verification.
@@ -115,8 +115,8 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 6. Create a one-time `repeat_planner` QA invitation with `npm run create-beta-invite -- repeat_planner`, confirm its pseudonymous status with `npm run list-beta-invites`, pass the code only as `SEALSEND_QA_BETA_INVITE_TOKEN`, and use a disposable production QA owner to exercise consent, AI fallback, templates, event create/edit/publish, guests, public RSVP/plus-one/comment, RSVP summary, audience/cost preview, message-draft feedback, calendar/CSV, beta feedback, withdrawal, and cleanup. Never record the raw invitation code in evidence. If QA cannot proceed, revoke the unused invitation with `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>`.
 7. Verify a disposable check-in-only user can check guests in but cannot access event design, exports, or billing.
 8. Run public visual/accessibility checks at 375, 768, and 1440 pixels, including long content and missing artwork.
-9. Remove all disposable QA accounts/events/feedback and verify cleanup counts.
-10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates.
+9. Run `npm run report-beta-participants`, verify the QA participant contains only pseudonymous acceptance fields and `criticalDefects: null`, then withdraw the participant and remove all disposable QA accounts/events/feedback. Verify cleanup counts.
+10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates. Do not convert `criticalDefects: null` into zero without human severity triage.
 
 ## Known informational warning
 
