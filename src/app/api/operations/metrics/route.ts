@@ -4,6 +4,8 @@ import { isOperationsAuthorized } from "@/lib/operations-auth";
 import { computeBetaCohortMetrics, type BetaCohortParticipant } from "@/lib/beta-metrics";
 import { BETA_MILESTONE_NAMES, type BetaMilestoneName, type BetaSegment } from "@/lib/beta-participation";
 import type { BetaWillingnessToPay } from "@/lib/beta-outcome";
+import { evaluateBetaAcceptance } from "@/lib/beta-acceptance-decision";
+import betaAcceptancePolicy from "../../../../../config/beta-acceptance-policy.json";
 
 export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
@@ -131,6 +133,11 @@ export async function GET(request: NextRequest) {
     };
   }
   const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);
+  const betaAcceptance = evaluateBetaAcceptance({
+    policy: betaAcceptancePolicy,
+    metrics: betaCohort,
+    cohortStartedAt: betaParticipantRows[0]?.consented_at ?? null,
+  });
   const betaParticipants = [...betaParticipantRows.reduce((counts, participant) => {
     counts.set(participant.segment, (counts.get(participant.segment) ?? 0) + 1);
     return counts;
@@ -145,7 +152,7 @@ export async function GET(request: NextRequest) {
     participantCount: participantIds.size,
   }));
   return NextResponse.json(
-    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort },
+    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort, betaAcceptance },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

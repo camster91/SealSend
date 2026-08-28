@@ -873,6 +873,29 @@ test('operators can record consent-window support effort without conflating host
   assert.equal(pkg.scripts['record-beta-support-review'], 'npx tsx scripts/record-beta-support-review.ts');
 });
 
+test('beta acceptance is evaluated only against pre-approved, pre-cohort thresholds', async () => {
+  const policy = JSON.parse(await read('config/beta-acceptance-policy.json'));
+  const evaluator = await read('src/lib/beta-acceptance-decision.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const operations = await read('docs/launch-operations.md');
+
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.status, 'pending');
+  assert.equal(policy.approvedBy, null);
+  assert.equal(policy.approvedAt, null);
+  assert.equal(policy.thresholds, null);
+  assert.match(evaluator, /approvedAt/);
+  assert.match(evaluator, /cohortStartedAt/);
+  assert.match(evaluator, /before the first host consent/i);
+  assert.match(evaluator, /minimumWillingToPayHosts/);
+  assert.match(evaluator, /maximumUnresolvedCriticalDefects/);
+  assert.match(evaluator, /medianOperatorRecordedSupportMinutes/);
+  assert.match(metrics, /evaluateBetaAcceptance/);
+  assert.match(metrics, /betaAcceptance/);
+  assert.match(operations, /must be approved before the first host consents/i);
+  assert.match(operations, /must not be changed after beta evidence exists/i);
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');
