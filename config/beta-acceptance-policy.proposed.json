@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "cohortVersion": "recurring-community-v1",
+  "status": "proposed",
+  "preparedOn": "2026-08-28",
+  "ownerDecision": "pending",
+  "evidenceBoundary": "This proposal cannot enroll hosts or satisfy a launch gate. The owner must approve these immutable thresholds before the first host consents.",
+  "thresholds": {
+    "minimumCohortSize": 5,
+    "requiredSegments": [
+      "club_association",
+      "volunteer_nonprofit",
+      "creative_community",
+      "alumni_professional",
+      "repeat_planner"
+    ],
+    "minimumWorkflowCompletionRate": 0.8,
+    "minimumFeedbackRate": 1,
+    "minimumOutcomeResponseRate": 1,
+    "minimumSupportReviewRate": 1,
+    "minimumDefectReviewRate": 1,
+    "minimumRepeatUseRate": 1,
+    "minimumAverageFeedbackRating": 4,
+    "maximumMedianHoursToFirstPublish": 24,
+    "maximumMedianOperatorSupportMinutes": 60,
+    "maximumUnresolvedCriticalDefects": 0,
+    "minimumWillingToPayHosts": 3
+  }
+}

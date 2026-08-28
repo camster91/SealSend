@@ -16,6 +16,7 @@
     "test:capacity": "node scripts/load/rsvp-capacity.mjs",
     "launch:decision": "node scripts/release/launch-decision.mjs",
     "quality:score": "node scripts/release/quality-score.mjs",
+    "beta:validate-proposal": "tsx scripts/release/validate-beta-policy-proposal.ts",
     "test:launch-gates": "node scripts/release/launch-decision.mjs --allow-no-go",
     "test:config": "npx tsx scripts/test/check-config.ts",
     "test:email": "npx tsx scripts/test/test-email.ts",

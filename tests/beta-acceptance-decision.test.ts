@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { evaluateBetaAcceptance } from "../src/lib/beta-acceptance-decision";
+import proposedPolicy from "../config/beta-acceptance-policy.proposed.json";
+import { validateBetaPolicyProposal } from "../src/lib/beta-policy-proposal";
 
 const requiredSegments = [
   "club_association",
@@ -48,6 +50,16 @@ const completeMetrics = {
   defectReviewCoverage: { numerator: 5, denominator: 5, rate: 1 },
   unresolvedCriticalDefects: 0,
 };
+
+test("proposed thresholds are machine-valid but cannot activate enrollment", () => {
+  const proposal = validateBetaPolicyProposal(proposedPolicy);
+  assert.equal(proposal.success, true);
+  if (!proposal.success) return;
+  assert.equal(proposal.data.ownerDecision, "pending");
+  assert.equal(proposal.data.thresholds.minimumCohortSize, 5);
+  assert.equal(proposal.data.thresholds.minimumWillingToPayHosts, 3);
+  assert.equal(proposal.data.thresholds.maximumUnresolvedCriticalDefects, 0);
+});
 
 test("pending beta policy cannot produce an acceptance pass", () => {
   const result = evaluateBetaAcceptance({

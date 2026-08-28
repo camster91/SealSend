@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const segments = [
+export const requiredBetaSegments = [
   "club_association",
   "volunteer_nonprofit",
   "creative_community",
@@ -10,10 +10,10 @@ const segments = [
 
 const rateThreshold = z.number().min(0).max(1);
 const cohortVersion = z.string().regex(/^[a-z0-9][a-z0-9-]{2,63}$/);
-const thresholdsSchema = z.object({
+export const betaAcceptanceThresholdsSchema = z.object({
   minimumCohortSize: z.number().int().min(5),
-  requiredSegments: z.array(z.enum(segments)).length(5).refine(
-    (values) => new Set(values).size === segments.length,
+  requiredSegments: z.array(z.enum(requiredBetaSegments)).length(5).refine(
+    (values) => new Set(values).size === requiredBetaSegments.length,
     "Every required segment must appear exactly once",
   ),
   minimumWorkflowCompletionRate: rateThreshold,
@@ -29,7 +29,7 @@ const thresholdsSchema = z.object({
   minimumWillingToPayHosts: z.number().int().min(1).max(5),
 }).strict();
 
-const policySchema = z.discriminatedUnion("status", [
+export const betaAcceptancePolicySchema = z.discriminatedUnion("status", [
   z.object({
     schemaVersion: z.literal(1),
     cohortVersion,
@@ -44,7 +44,7 @@ const policySchema = z.discriminatedUnion("status", [
     status: z.literal("approved"),
     approvedBy: z.string().trim().min(2).max(100),
     approvedAt: z.string().datetime(),
-    thresholds: thresholdsSchema,
+    thresholds: betaAcceptanceThresholdsSchema,
   }).strict(),
 ]);
 
@@ -95,7 +95,7 @@ export function evaluateBetaAcceptance(input: {
   metrics: BetaAcceptanceMetrics;
   cohortStartedAt: string | null;
 }) {
-  const parsed = policySchema.safeParse(input.policy);
+  const parsed = betaAcceptancePolicySchema.safeParse(input.policy);
   if (!parsed.success) {
     return {
       decision: "INVALID_POLICY" as const,
