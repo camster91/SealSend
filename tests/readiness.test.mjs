@@ -1339,6 +1339,7 @@ test('retention rehearsal proves fail-closed deletion in disposable PostgreSQL',
   const rehearsal = await read('ops/rehearse-retention.sh');
 
   assert.match(rehearsal, /SEALSEND_RETENTION_REHEARSAL_CONFIRM/);
+  assert.match(rehearsal, /date -u \+%Y%m%d%H%M%S/);
   assert.match(rehearsal, /postgres:16-alpine/);
   assert.match(rehearsal, /docker network create/);
   assert.match(rehearsal, /src\/lib\/db\/schema\.sql/);

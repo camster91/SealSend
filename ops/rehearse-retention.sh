@@ -15,7 +15,7 @@ case "$commit_label" in
   *[!A-Za-z0-9._-]*) echo "Commit label contains unsupported characters" >&2; exit 64 ;;
 esac
 
-suffix="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+suffix="$(date -u +%Y%m%d%H%M%S)-$$"
 prefix="sealsend-retention-ci-$suffix"
 image="$prefix:$commit_label"
 network="$prefix-network"
