@@ -251,8 +251,15 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect(summaryData.attendingHeadcount).toBe(2);
     expect(summaryData.sourceResponseIds).toHaveLength(1);
 
+    const announcementSubject = 'Temporary QA announcement';
+    const announcementMessage = 'This approved QA announcement is scheduled beyond the test and removed during cleanup.';
+    const announcementAudience = { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false };
+    const announcementScheduledAt = new Date(Date.now() + 86400000).toISOString();
     const audience = await page.context().request.post(`/api/events/${eventId}/announcements/audience`, { data: {
-      audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
+      subject: announcementSubject,
+      message: announcementMessage,
+      sendAt: announcementScheduledAt,
+      audience: announcementAudience,
       channels: ['email'],
     }});
     expect(audience.status()).toBe(200);
@@ -261,6 +268,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect(audienceData.emailCount).toBe(3);
     expect(audienceData.smsCount).toBe(0);
     expect(audienceData.recipients).toHaveLength(3);
+    expect(audienceData.approvalProof).toBeTruthy();
 
     const messageDraft = await page.context().request.post(`/api/events/${eventId}/announcements/draft`, { data: {
       intent: 'Remind guests to review the event page before arriving.',
@@ -278,12 +286,13 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect(messageFeedback.status()).toBe(200);
 
     const scheduledAnnouncement = await page.context().request.post(`/api/events/${eventId}/announcements`, { data: {
-      subject: 'Temporary QA announcement',
-      message: 'This approved QA announcement is scheduled beyond the test and removed during cleanup.',
-      audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
+      subject: announcementSubject,
+      message: announcementMessage,
+      audience: announcementAudience,
       channels: ['email'],
-      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+      scheduledAt: announcementScheduledAt,
       approved: true,
+      approvalProof: audienceData.approvalProof,
     }});
     expect(scheduledAnnouncement.status()).toBe(201);
 
