@@ -4,7 +4,7 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
 import { getDb } from "@/lib/db/client";
 import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
-import { parseRepeatEventRequest } from "@/lib/repeat-event";
+import { buildRepeatedEventBrief, parseRepeatEventRequest } from "@/lib/repeat-event";
 import { getUserTier } from "@/lib/subscription";
 import { generateSlug } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ type SourceEvent = {
   design_url: string | null;
   design_type: string;
   customization: unknown;
+  event_brief: unknown;
 };
 
 type SourceGuest = { id: string; name: string; email: string | null; phone: string | null; tags: unknown };
@@ -79,7 +80,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       `SELECT description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
               location_name, location_address, location_lat, location_lng, host_name, dress_code,
               registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
-              design_url, design_type, customization
+              design_url, design_type, customization, event_brief
        FROM events WHERE id = $1`,
       [eventId],
     );
@@ -88,6 +89,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+    const repeatedEventBrief = buildRepeatedEventBrief(original.event_brief);
 
     const limits = getEffectiveEventLimits(accountPlan, "free");
     const insertedEvent = await client.query<{ id: string; title: string }>(
@@ -97,10 +99,10 @@ export async function POST(request: Request, { params }: RouteParams) {
          location_lat, location_lng, host_name, dress_code, rsvp_deadline, registry_links,
          max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type,
          customization, status, tier, max_responses, auto_reminders, reminder_sent_at, payment_id,
-         ai_generation_id
+         event_brief, ai_generation_id
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, NULL
+         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL
        ) RETURNING id, title`,
       [
         auth.user.id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
@@ -110,6 +112,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         original.host_name, original.dress_code, repeatRequest.rsvpDeadline, original.registry_links,
         original.max_attendees, original.allow_plus_ones, original.max_guests_per_rsvp,
         original.design_url, original.design_type, original.customization, limits.responses,
+        repeatedEventBrief ? JSON.stringify(repeatedEventBrief) : null,
       ],
     );
     const newEvent = insertedEvent.rows[0];

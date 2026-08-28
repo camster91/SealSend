@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { eventBriefContextSchema, type EventBriefContext } from "@/lib/event-brief";
 
 const nullableInstant = z.string().datetime({ offset: true }).nullable().optional();
 
@@ -38,5 +39,17 @@ export function parseRepeatEventRequest(input: unknown, referenceInstant = new D
     eventEndDate: parsed.eventEndDate ?? null,
     rsvpDeadline: parsed.rsvpDeadline ?? null,
     includeGuests: parsed.includeGuests,
+  };
+}
+
+export function buildRepeatedEventBrief(input: unknown): EventBriefContext | null {
+  const source = eventBriefContextSchema.safeParse(input);
+  if (!source.success || source.data.audience.length < 3) return null;
+
+  return {
+    audience: source.data.audience,
+    accessibilityStatus: "not_reviewed",
+    accessibilityNotes: null,
+    communicationPreference: "undecided",
   };
 }

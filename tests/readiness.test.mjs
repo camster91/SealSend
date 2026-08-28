@@ -419,6 +419,8 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(route, /COMMIT/);
   assert.match(route, /ROLLBACK/);
   assert.match(route, /includeGuests/);
+  assert.match(route, /buildRepeatedEventBrief/);
+  assert.match(route, /event_brief/);
   assert.match(route, /guest_tags/);
   assert.match(route, /guest_tag_assignments/);
   assert.doesNotMatch(route, /SELECT \* FROM events/);
@@ -428,6 +430,8 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(control, /type="datetime-local"/);
   assert.match(control, /includeGuests/);
   assert.match(control, /does not copy responses, check-ins, messages, or guest notes/i);
+  assert.match(control, /audience carries forward/i);
+  assert.match(control, /accessibility and communication decisions must be reviewed again/i);
   assert.match(control, /zonedLocalDateTimeToInstant/);
   assert.match(control, /event\.key\s*===\s*['"]Escape['"]/);
   assert.match(control, /titleInputRef\.current\?\.focus\(\)/);

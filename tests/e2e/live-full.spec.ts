@@ -89,6 +89,12 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
       invitation_headline: aiDraft.draft.invitation.headline,
       invitation_body: aiDraft.draft.invitation.body,
       reminder_sequence: aiDraft.draft.reminders,
+      event_brief: {
+        audience: aiDraft.brief.audience,
+        accessibilityStatus: aiDraft.brief.accessibilityStatus,
+        accessibilityNotes: aiDraft.brief.accessibilityNotes,
+        communicationPreference: aiDraft.brief.communicationPreference,
+      },
       ai_generation_id: aiDraft.generationId,
       status: 'draft',
     }});
@@ -268,6 +274,16 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
     repeatedEventId = page.url().split('/').pop() || '';
     expect(repeatedEventId).toBeTruthy();
+
+    const repeatedEventResponse = await page.context().request.get(`/api/events/${repeatedEventId}`);
+    expect(repeatedEventResponse.status()).toBe(200);
+    const repeatedEvent = await repeatedEventResponse.json();
+    expect(repeatedEvent.event_brief).toEqual({
+      audience: 'Current clients and their approved guests',
+      accessibilityStatus: 'not_reviewed',
+      accessibilityNotes: null,
+      communicationPreference: 'undecided',
+    });
 
     const repeatedGuests = await page.context().request.get(`/api/events/${repeatedEventId}/guests`);
     expect(repeatedGuests.status()).toBe(200);

@@ -152,7 +152,7 @@ export function CloneEventButton({
               </label>
 
               <div className="rounded-lg bg-brand-50 p-3 text-sm text-brand-900">
-                SealSend copies the invitation design, RSVP questions, and sign-up board structure. It does not copy responses, check-ins, messages, or guest notes.
+                SealSend copies the invitation design, RSVP questions, sign-up board structure, and intended audience. The audience carries forward, but accessibility and communication decisions must be reviewed again. It does not copy responses, check-ins, messages, or guest notes.
               </div>
 
               {cloneError && <p role="alert" className="text-sm text-red-700">{cloneError}</p>}
