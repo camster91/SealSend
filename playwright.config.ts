@@ -7,6 +7,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3100',
+    ignoreHTTPSErrors: process.env.SEALSEND_E2E_IGNORE_HTTPS_ERRORS === 'true',
     trace: 'on-first-retry',
   },
   projects: [

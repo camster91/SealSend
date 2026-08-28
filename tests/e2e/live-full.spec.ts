@@ -1,14 +1,20 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { Pool } from 'pg';
+
+import { hashAuthCode } from '../../src/lib/auth/code-hash';
 
 const qaEmail = process.env.SEALSEND_QA_EMAIL;
 const qaPassword = process.env.SEALSEND_QA_PASSWORD;
 const qaBetaInviteToken = process.env.SEALSEND_QA_BETA_INVITE_TOKEN;
+const allowPendingBetaPolicy = process.env.SEALSEND_QA_ALLOW_PENDING_BETA_POLICY === 'true';
+const qaDatabaseUrl = process.env.SEALSEND_QA_DATABASE_URL;
+const qaGuestCode = process.env.SEALSEND_QA_GUEST_CODE;
 const output = path.resolve('qa-screenshots', 'live-full');
 
-test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
-  test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required');
+test('authenticated host and guest lifecycle', async ({ browser, page }, testInfo) => {
+  test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Disposable QA credentials and a one-time beta invitation are required');
   test.skip(testInfo.project.name !== 'chromium', 'Run the stateful production lifecycle once.');
   await mkdir(output, { recursive: true });
   const pageErrors: string[] = [];
@@ -31,18 +37,24 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await page.getByLabel('Password').fill(qaPassword!);
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
-    await page.context().setExtraHTTPHeaders({ Origin: 'https://sealsend.app' });
+    const origin = new URL(page.url()).origin;
+    await page.context().setExtraHTTPHeaders({ Origin: origin });
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
     const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {
       inviteToken: qaBetaInviteToken, consent: true,
     }});
-    expect(betaEnrollment.status()).toBe(201);
-    const initialBeta = await betaEnrollment.json();
-    expect(initialBeta.participant.active).toBe(true);
-    expect(initialBeta.progress.completedRequired).toBe(1);
-    betaJoined = true;
+    if (allowPendingBetaPolicy) {
+      expect(betaEnrollment.status()).toBe(409);
+      expect((await betaEnrollment.json()).error).toBe('Beta enrollment is not open until the cohort policy is approved.');
+    } else {
+      expect(betaEnrollment.status()).toBe(201);
+      const initialBeta = await betaEnrollment.json();
+      expect(initialBeta.participant.active).toBe(true);
+      expect(initialBeta.progress.completedRequired).toBe(1);
+      betaJoined = true;
+    }
 
     await page.goto('/dashboard?plan=pro_annual');
     await expect(page.getByText('Continue with SealSend Pro')).toHaveCount(0);
@@ -151,11 +163,51 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
 
     const magic = await page.context().request.post(`/api/guests/${guest.id}/magic-link`);
     expect(magic.status()).toBe(200);
-    expect((await magic.json()).magicLink).toMatch(/^https:\/\/sealsend\.app\/guest\/update\//);
+    const magicUrl = new URL((await magic.json()).magicLink);
+    expect(magicUrl.origin).toBe(origin);
+    expect(magicUrl.pathname).toMatch(/^\/guest\/update\/[A-Za-z0-9_-]{43}$/);
 
     const publish = await page.context().request.post(`/api/events/${eventId}/publish`);
     expect(publish.status()).toBe(200);
     expect((await publish.json()).status).toBe('published');
+
+    if (qaDatabaseUrl && qaGuestCode) {
+      expect(process.env.SEALSEND_E2E_FIXTURE_CONFIRM).toBe('isolated');
+      expect(new URL(qaDatabaseUrl).pathname).toBe('/sealsend_e2e');
+      const pool = new Pool({ connectionString: qaDatabaseUrl, max: 1 });
+      try {
+        await pool.query(
+          `INSERT INTO auth_codes (email, code_hash, role, event_id, expires_at)
+           VALUES ($1, $2, 'guest', $3, NOW() + INTERVAL '15 minutes')`,
+          ['qa-guest-one@example.com', hashAuthCode({
+            code: qaGuestCode,
+            recipient: 'qa-guest-one@example.com',
+            role: 'guest',
+            eventId,
+          }), eventId],
+        );
+      } finally {
+        await pool.end();
+      }
+
+      const guestContext = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
+      try {
+        await guestContext.setExtraHTTPHeaders({ Origin: origin });
+        const guestLogin = await guestContext.request.post('/api/auth/verify-code', { data: {
+          method: 'email', email: 'qa-guest-one@example.com', code: qaGuestCode, eventId,
+        }});
+        expect(guestLogin.status()).toBe(200);
+        expect((await guestLogin.json()).user.role).toBe('guest');
+        expect((await guestContext.request.get(`/api/events/${eventId}`)).status()).toBe(403);
+        expect((await guestContext.request.get('/api/events')).status()).toBe(403);
+        expect((await guestContext.request.get('/api/account/export')).status()).toBe(403);
+        expect((await guestContext.request.post('/api/subscriptions/checkout', { data: { plan: 'pro_annual' } })).status()).toBe(403);
+        expect((await guestContext.request.get(`/api/events/${eventId}/guests`)).status()).toBe(403);
+        expect((await guestContext.request.post('/api/auth/logout')).status()).toBe(200);
+      } finally {
+        await guestContext.close();
+      }
+    }
 
     const calendar = await page.context().request.get(`/api/calendar/${slug}`);
     expect(calendar.status()).toBe(200);
@@ -306,12 +358,14 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(repeatedSignupData[0].title).toBe('Bring dessert');
     expect(repeatedSignupData[0].claims).toHaveLength(0);
 
-    const betaEvidence = await page.context().request.get('/api/beta/participation');
-    expect(betaEvidence.status()).toBe(200);
-    const betaEvidenceData = await betaEvidence.json();
-    expect(betaEvidenceData.progress.completedRequired).toBe(9);
-    expect(betaEvidenceData.progress.steps.controlledInvite).toBe(false);
-    expect(betaEvidenceData.progress.steps.repeatEvent).toBe(true);
+    if (betaJoined) {
+      const betaEvidence = await page.context().request.get('/api/beta/participation');
+      expect(betaEvidence.status()).toBe(200);
+      const betaEvidenceData = await betaEvidence.json();
+      expect(betaEvidenceData.progress.completedRequired).toBe(9);
+      expect(betaEvidenceData.progress.steps.controlledInvite).toBe(false);
+      expect(betaEvidenceData.progress.steps.repeatEvent).toBe(true);
+    }
 
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);

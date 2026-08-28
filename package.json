@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/readiness.test.mjs tests/rate-limit.test.ts tests/storage.test.ts tests/datetime.test.ts tests/event-validation.test.ts tests/publication-readiness.test.ts tests/event-brief.test.ts tests/guest-import.test.ts tests/upload-path.test.ts tests/magic-token.test.ts tests/auth-code.test.ts tests/entitlements.test.ts tests/billing.test.ts tests/provider-readiness.test.ts tests/launch-decision.test.ts tests/ai-event-draft.test.ts tests/ai-fallback.test.ts tests/activation-events.test.ts tests/onboarding-checklist.test.ts tests/beta-participation.test.ts tests/beta-outcome.test.ts tests/beta-defect-review.test.ts tests/beta-support-review.test.ts tests/beta-acceptance-decision.test.ts tests/beta-invite-operations.test.ts tests/beta-participant-report.test.ts tests/beta-metrics.test.ts tests/calendar.test.ts tests/event-access.test.ts tests/message-audience.test.ts tests/message-cost-estimate.test.ts tests/communications-safety.test.ts tests/communication-suppressions.test.ts tests/repeat-event.test.ts tests/rsvp-summary.test.ts tests/server-monitoring.test.ts tests/event-templates.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:prepare-authenticated": "tsx scripts/test/prepare-authenticated-e2e.ts",
     "test:load": "node scripts/load/public-readiness.mjs",
     "test:capacity": "node scripts/load/rsvp-capacity.mjs",
     "launch:decision": "node scripts/release/launch-decision.mjs",

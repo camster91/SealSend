@@ -182,12 +182,25 @@ test('browser CI serves the same standalone artifact shape as production', async
 test('public browser QA remains runnable without authenticated QA credentials', async () => {
   const browserSpec = await read('tests/e2e/live-full.spec.ts');
   const authenticatedTest = browserSpec.indexOf("test('authenticated host and guest lifecycle'");
-  const credentialGuard = browserSpec.indexOf(
-    "test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required')",
-  );
+  const nextPublicTest = browserSpec.indexOf("test('public navigation and responsive layouts'", authenticatedTest);
+  const authenticatedBody = browserSpec.slice(authenticatedTest, nextPublicTest);
 
   assert.ok(authenticatedTest >= 0, 'authenticated lifecycle test must exist');
-  assert.ok(credentialGuard > authenticatedTest, 'credential guard must be scoped inside the authenticated lifecycle test');
+  assert.ok(nextPublicTest > authenticatedTest, 'public lifecycle test must remain independently addressable');
+  assert.match(
+    authenticatedBody,
+    /test\.skip\(!qaEmail \|\| !qaPassword \|\| !qaBetaInviteToken/,
+    'credential guard must be scoped inside the authenticated lifecycle test',
+  );
+});
+
+test('authenticated browser fixture can reset only the named isolated database', async () => {
+  const fixture = await read('scripts/test/prepare-authenticated-e2e.ts');
+
+  assert.match(fixture, /SEALSEND_E2E_FIXTURE_CONFIRM !== ["']isolated["']/);
+  assert.match(fixture, /new URL\(databaseUrl\)\.pathname !== ["']\/sealsend_e2e["']/);
+  assert.match(fixture, /DROP SCHEMA public CASCADE; CREATE SCHEMA public/);
+  assert.doesNotMatch(fixture, /console\.log\([^\n]*(?:password|inviteToken|email)/i);
 });
 
 test('every publication boundary enforces the shared guest-ready contract', async () => {
