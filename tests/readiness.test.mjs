@@ -1332,6 +1332,19 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /status: 500/);
 });
 
+test('paid-mode analytics uses server-derived event-owner entitlements', async () => {
+  const page = await read('src/app/(dashboard)/events/[eventId]/analytics/page.tsx');
+  const route = await read('src/app/api/events/[eventId]/features/route.ts').catch(() => '');
+
+  assert.match(page, /\/api\/events\/\$\{eventId\}\/features/);
+  assert.doesNotMatch(page, /currentTier=["']free["']/);
+  assert.match(page, /requiredTier=["']business["']/);
+  assert.match(page, /currentTier=\{hasAnalyticsAccess \? ["']business["'] : ["']free["']\}/);
+  assert.match(route, /requireEventPermission\(eventId, ["']export_responses["']\)/);
+  assert.match(route, /getUserTier\(event\.user_id\)/);
+  assert.match(route, /canUseFeature\(accountPlan, event\.tier as EventTier, ["']analytics["']\)/);
+});
+
 test('direct provider test sends obey the controlled-recipient allowlist', async () => {
   const smsTest = await read('scripts/test/test-sms.ts');
   const guardIndex = smsTest.indexOf('assertApprovedRecipient(formattedPhone)');
