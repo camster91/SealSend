@@ -1,8 +1,28 @@
 {
   "schemaVersion": 1,
   "cohortVersion": "recurring-community-v1",
-  "status": "pending",
-  "approvedBy": null,
-  "approvedAt": null,
-  "thresholds": null
+  "status": "approved",
+  "approvedBy": "Cameron Ashley",
+  "approvedAt": "2026-08-28T20:06:43.844Z",
+  "thresholds": {
+    "minimumCohortSize": 5,
+    "requiredSegments": [
+      "club_association",
+      "volunteer_nonprofit",
+      "creative_community",
+      "alumni_professional",
+      "repeat_planner"
+    ],
+    "minimumWorkflowCompletionRate": 0.8,
+    "minimumFeedbackRate": 1,
+    "minimumOutcomeResponseRate": 1,
+    "minimumSupportReviewRate": 1,
+    "minimumDefectReviewRate": 1,
+    "minimumRepeatUseRate": 1,
+    "minimumAverageFeedbackRating": 4,
+    "maximumMedianHoursToFirstPublish": 24,
+    "maximumMedianOperatorSupportMinutes": 60,
+    "maximumUnresolvedCriticalDefects": 0,
+    "minimumWillingToPayHosts": 3
+  }
 }

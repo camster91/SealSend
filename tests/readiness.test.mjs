@@ -1096,10 +1096,10 @@ test('beta acceptance is evaluated only against pre-approved, pre-cohort thresho
 
   assert.equal(policy.schemaVersion, 1);
   assert.match(policy.cohortVersion, /^[a-z0-9][a-z0-9-]{2,63}$/);
-  assert.equal(policy.status, 'pending');
-  assert.equal(policy.approvedBy, null);
-  assert.equal(policy.approvedAt, null);
-  assert.equal(policy.thresholds, null);
+  assert.equal(policy.status, 'approved');
+  assert.equal(policy.approvedBy, 'Cameron Ashley');
+  assert.match(policy.approvedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.equal(policy.thresholds.minimumCohortSize, 5);
   assert.match(evaluator, /approvedAt/);
   assert.match(evaluator, /cohortStartedAt/);
   assert.match(evaluator, /before the first host consent/i);
@@ -1330,6 +1330,22 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /timingSafeEqual/);
   assert.match(twilio, /INSERT INTO webhook_receipts/);
   assert.match(twilio, /status: 500/);
+});
+
+test('Twilio incoming opt-out events synchronize the local SMS suppression state', async () => {
+  const twilio = await read('src/app/api/webhooks/twilio/route.ts');
+  const inbound = await read('src/lib/twilio-inbound-opt-out.ts');
+
+  assert.match(twilio, /processTwilioOptOutEvent/);
+  assert.match(twilio, /data\.OptOutType/);
+  assert.match(twilio, /data\.From/);
+  assert.match(twilio, /BEGIN[\s\S]*processTwilioOptOutEvent[\s\S]*COMMIT/);
+  assert.match(twilio, /<Response><\/Response>/);
+  assert.match(inbound, /STOP[\s\S]*recordCommunicationSuppression/);
+  assert.match(inbound, /START[\s\S]*removeCommunicationSuppressionsForRecipient/);
+  assert.match(inbound, /HELP/);
+  assert.match(inbound, /INSERT INTO webhook_receipts/);
+  assert.match(inbound, /JOIN events/);
 });
 
 test('complaints, unsubscribes, bounces, and invalid phones block future guest communications', async () => {

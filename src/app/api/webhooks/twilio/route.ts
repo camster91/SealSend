@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/client';
+import { processTwilioOptOutEvent } from '@/lib/twilio-inbound-opt-out';
 
 /**
- * Twilio webhook handler for SMS status callbacks
- * Handles: queued, sending, sent, failed, delivered, undelivered
+ * Twilio webhook handler for SMS status callbacks and incoming opt-out events.
+ * Handles: queued, sending, sent, failed, delivered, undelivered, STOP, START, HELP.
  *
  * Configure in Twilio Console > Phone Numbers > Manage > Active Numbers
  * Set "Messaging" > "Webhook" for status callbacks:
@@ -52,10 +53,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
+    if (data.OptOutType && data.MessageSid && data.From) {
+      const client = await getDb().connect();
+      try {
+        await client.query('BEGIN');
+        const result = await processTwilioOptOutEvent(client, {
+          messageSid: data.MessageSid,
+          from: data.From,
+          optOutType: data.OptOutType,
+        });
+        await client.query('COMMIT');
+
+        if (result.duplicate) {
+          return NextResponse.json({ received: true, duplicate: true });
+        }
+
+        // Advanced Opt-Out has already sent Twilio's configured reply. Return empty TwiML.
+        return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
     // Map Twilio status to our status
     const status = mapTwilioStatus(data.MessageStatus);
 
-    if (status && data.MessageSid && data.To) {
+    if (status && data.MessageSid && data.MessageStatus && data.To) {
       const processed = await updateSmsStatus(data.MessageSid, data.MessageStatus, status, {
         to: data.To,
         from: data.From,
@@ -74,7 +103,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function mapTwilioStatus(twilioStatus: string): 'sent' | 'delivered' | 'failed' | 'bounced' | null {
+function mapTwilioStatus(twilioStatus?: string): 'sent' | 'delivered' | 'failed' | 'bounced' | null {
+  if (!twilioStatus) return null;
   const statusMap: Record<string, 'sent' | 'delivered' | 'failed' | 'bounced'> = {
     'sent': 'sent',
     'delivered': 'delivered',
@@ -220,10 +250,11 @@ async function updateSmsStatus(
 // Type definitions
 interface TwilioWebhookData {
   MessageSid: string;
-  MessageStatus: string;
-  To: string;
+  MessageStatus?: string;
+  To?: string;
   From: string;
+  OptOutType?: string;
   ErrorCode?: string;
-  ApiVersion: string;
-  AccountSid: string;
+  ApiVersion?: string;
+  AccountSid?: string;
 }
