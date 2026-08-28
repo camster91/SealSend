@@ -561,6 +561,7 @@ test('organizer use cases and comparison stay inside the shipped product scope',
       assert.match(navigationSource, new RegExp(`/use-cases/${slug}`));
     }
   }
+  assert.match(sitemap, /`\$\{SITE_URL\}\/use-cases`/);
 
   assert.match(indexPage, /USE_CASES/);
   assert.doesNotMatch(indexPage, /const useCases =/);
