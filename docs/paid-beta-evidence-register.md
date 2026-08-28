@@ -31,6 +31,8 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 | OpenAI | Invalid output/timeout | Deterministic fallback with no external action | Pending | | |
 | Monitoring | Synthetic error | Alert received with sanitized route metadata only | Pending | | |
 
+The current provider-cost proposal is `docs/provider-cost-envelope.md`: USD 0.002 per email, USD 0.020 per billed SMS segment, a second review above USD 10 projected per event, and a monthly pause/reconciliation threshold above USD 50. These values remain **pending owner approval** and must be rechecked against actual provider billing before the `provider_cost_approval` gate can pass.
+
 ## Five-host acceptance
 
 Each participant must consent to beta observation. Recruit within the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner.

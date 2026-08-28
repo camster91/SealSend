@@ -168,8 +168,9 @@ export const announcementSchema = z.object({
   message: z.string().min(1, "Message is required").max(5000),
   audience: messageAudienceSchema,
   channels: z.array(z.enum(["email", "sms"])).min(1).max(2),
-  scheduledAt: z.string().datetime({ offset: true }),
+  scheduledAt: z.union([z.literal("now"), z.string().datetime({ offset: true })]),
   approved: z.literal(true),
+  approvalProof: z.string().min(1).max(256),
 }).strict();
 
 export const eventMemberInviteSchema = z.object({

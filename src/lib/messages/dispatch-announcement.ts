@@ -85,7 +85,7 @@ export async function dispatchAnnouncement(announcementId: string) {
           continue;
         }
         assertApprovedRecipient(phone.formatted);
-        const body = buildAnnouncementSms({ guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, rsvpUrl });
+        const body = buildAnnouncementSms({ guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, message: announcement.message, rsvpUrl });
         providerMessageId = (await getTwilioClient().messages.create({ body, to: phone.formatted, ...getTwilioSendOptions() })).sid;
       }
       await query("UPDATE announcement_deliveries SET status = 'accepted', provider_message_id = $2, error = NULL, updated_at = NOW() WHERE id = $1", [delivery.id, providerMessageId]);

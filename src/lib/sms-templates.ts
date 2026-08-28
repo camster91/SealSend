@@ -1,8 +1,8 @@
 import { formatDateTime } from "@/lib/utils";
 
 /** Strip characters that could be used for SMS injection (e.g. GSM concatenation exploits) */
-function sanitize(text: string): string {
-  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, 300);
+function sanitize(text: string, maximumLength = 300): string {
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").slice(0, maximumLength);
 }
 
 interface InviteSmsParams {
@@ -67,6 +67,7 @@ interface AnnouncementSmsParams {
   guestName: string;
   eventTitle: string;
   subject: string;
+  message: string;
   rsvpUrl: string;
 }
 
@@ -74,7 +75,8 @@ export function buildAnnouncementSms(params: AnnouncementSmsParams): string {
   const guestName = sanitize(params.guestName);
   const eventTitle = sanitize(params.eventTitle);
   const subject = sanitize(params.subject);
+  const message = sanitize(params.message, 5000);
   const { rsvpUrl } = params;
 
-  return `Hi ${guestName}, update for ${eventTitle}: ${subject}\n\nDetails: ${rsvpUrl}\n\n- Sent via Seal and Send`;
+  return `Hi ${guestName}, update for ${eventTitle}: ${subject}\n\n${message}\n\nDetails: ${rsvpUrl}\n\n- Sent via Seal and Send`;
 }

@@ -1125,12 +1125,27 @@ test('beta evidence is isolated to one approved cohort with one active host per 
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');
+  const dispatch = await read('src/lib/messages/dispatch-announcement.ts');
+  const approvalProof = await read('src/lib/messages/approval-proof.ts');
+  const announcementRoute = await read('src/app/api/events/[eventId]/announcements/route.ts');
   const modal = await read('src/components/dashboard/SendAnnouncementModal.tsx');
   assert.match(audience, /recipients:/);
   assert.match(audience, /estimatedCostMicros/);
+  assert.match(audience, /countSmsSegments/);
+  assert.match(audience, /smsSegmentCount/);
+  assert.match(audience, /subject: parsed\.data\.subject/);
+  assert.match(audience, /message: parsed\.data\.message/);
+  assert.match(dispatch, /message: announcement\.message/);
+  assert.match(approvalProof, /createHmac/);
+  assert.match(approvalProof, /timingSafeEqual/);
+  assert.match(announcementRoute, /verifyAnnouncementApprovalProof/);
+  assert.match(announcementRoute, /approval expired/);
   for (const control of ['tone', 'length', 'urgency', 'channel']) assert.match(draft, new RegExp(control));
   assert.match(modal, /Review resolved recipients/);
   assert.match(modal, /Estimated provider charge/);
+  assert.match(modal, /billed SMS segment/);
+  assert.match(modal, /subject: subject\.trim\(\), message: message\.trim\(\)/);
+  assert.match(modal, /approvalProof: preview\?\.approvalProof/);
   assert.match(modal, /approve this external send/);
   assert.doesNotMatch(draft, /dispatchAnnouncement|sendEmail|\.messages\.create/);
 });

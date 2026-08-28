@@ -8,6 +8,7 @@ import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { getEventAccess, roleCan } from "@/lib/auth/event-access";
 import { dispatchAnnouncement } from "@/lib/messages/dispatch-announcement";
+import { verifyAnnouncementApprovalProof } from "@/lib/messages/approval-proof";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -36,6 +37,18 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!rateLimitOk) return NextResponse.json({ error: "Too many requests. Please wait before scheduling another message." }, { status: 429 });
   const parsed = announcementSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Review and explicitly approve the complete message, audience, channels, and schedule.", details: parsed.error.flatten() }, { status: 400 });
+  const approvedInput = {
+    eventId,
+    userId: auth.user.id,
+    subject: parsed.data.subject,
+    message: parsed.data.message,
+    audience: parsed.data.audience,
+    channels: parsed.data.channels,
+    sendAt: parsed.data.scheduledAt === "now" ? null : parsed.data.scheduledAt,
+  };
+  if (!verifyAnnouncementApprovalProof(approvedInput, parsed.data.approvalProof)) {
+    return NextResponse.json({ error: "The reviewed message changed or the approval expired. Preview it again before sending." }, { status: 409 });
+  }
   const event = await queryOne<{ id: string; user_id: string; status: string; tier: string }>(
     "SELECT id, user_id, status, tier FROM events WHERE id = $1", [eventId],
   );
@@ -43,7 +56,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (event.status !== "published") return NextResponse.json({ error: "Event must be published before messaging guests" }, { status: 400 });
   const accountPlan = await getUserTier(event.user_id);
   if (!canUseFeature(accountPlan, event.tier as EventTier, "announcements")) return NextResponse.json({ error: "Announcements require an eligible plan" }, { status: 403 });
-  const scheduledAt = new Date(parsed.data.scheduledAt);
+  const scheduledAt = parsed.data.scheduledAt === "now" ? new Date() : new Date(parsed.data.scheduledAt);
   if (scheduledAt.getTime() < Date.now() - 60_000) return NextResponse.json({ error: "Scheduled time cannot be in the past" }, { status: 400 });
   const announcement = await queryOne<{ id: string }>(
     `INSERT INTO event_announcements
