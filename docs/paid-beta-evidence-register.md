@@ -124,6 +124,7 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 | Current-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T213741Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Rollback-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T195857Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Retention fail-closed rehearsal | Commit `817b721`; fresh PostgreSQL 16 schema and production image shape; 4 stale candidates, 1 exact warning older than 14 days, 3 blocked, exactly 1 deleted; 6 lifecycle candidates; temporary containers, network, image, and checkout removed; production health remained 200 | Pass | Codex QA | 2026-08-28 |
+| Current-candidate authenticated browser | Commit `aa3d03c` (application tree identical to parent `edbbcef`); isolated PostgreSQL 16, internal HTTPS for `sealsend.app`, and Chromium; authenticated host/guest lifecycle plus public navigation 2/2 passed, including signed announcement review; temporary containers, network, candidate image, and checkout removed; production health remained 200 | Pass | Codex QA | 2026-08-28 |
 | Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
 
 ## Go/no-go record
