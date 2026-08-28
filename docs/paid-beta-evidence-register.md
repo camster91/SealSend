@@ -109,7 +109,7 @@ Internal implementation review does not replace qualified legal or accounting ad
 | Email/SMS compliance | | CASL/TCPA and intended markets | Consent, identification, unsubscribe and records decision | Pending | |
 | Accessibility risk | | Intended markets | Remediation/statement decision | Pending | |
 
-The repository-controlled retention-period decision is documented in `docs/retention-policy-decision.md`. It remains owner-pending, keeps destructive cleanup disabled, and does not replace the qualified privacy/deletion review tracked above.
+The repository-controlled retention-period decision is documented in `docs/retention-policy-decision.md`. Cameron Ashley approved the 90-day stale-draft and 7-day orphan-upload periods on 2026-08-28. Destructive cleanup remains disabled, and this owner decision does not replace the qualified privacy/deletion review tracked above.
 
 ## Load and recovery evidence
 
@@ -123,6 +123,7 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 | RSVP capacity concurrency | 10 simultaneous attempts for 3 seats: 3 accepted, 7 capacity-rejected, persisted 3 responses/3 attendees; fixture removed | Pass | Codex QA | 2026-08-08 |
 | Current-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T213741Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Rollback-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T195857Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
+| Retention fail-closed rehearsal | Commit `817b721`; fresh PostgreSQL 16 schema and production image shape; 4 stale candidates, 1 exact warning older than 14 days, 3 blocked, exactly 1 deleted; 6 lifecycle candidates; temporary containers, network, image, and checkout removed; production health remained 200 | Pass | Codex QA | 2026-08-28 |
 | Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
 
 ## Go/no-go record

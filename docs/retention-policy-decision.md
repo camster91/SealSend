@@ -38,6 +38,7 @@ Authoritative references:
 
 - The release candidate's public Privacy Policy names the 90-day stale-draft, 14-day warning, and 7-day orphan-upload periods, but this candidate is not deployed.
 - The release candidate includes an exact-version 14-day stale-draft warning and fail-closed deletion gate, but lifecycle email delivery and destructive cleanup remain disabled.
+- Commit `817b721` passed an isolated VPS rehearsal against a fresh PostgreSQL 16 schema and the production image shape: of four stale candidates, only the one with an exact current-version warning sent more than 14 days earlier was deleted; the other three remained. All temporary Docker resources and the checkout were removed, and production health remained 200.
 - The revised policy and any statutory applicability still require qualified legal review under the separate privacy/legal gate.
 - Mailgun, Twilio, Stripe, hosting, and other processor retention must be confirmed from the configured accounts and contracts; repository code cannot prove provider deletion.
 - Destructive cleanup has not been enabled or exercised against production data.
