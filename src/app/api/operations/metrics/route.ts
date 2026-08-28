@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows, betaSupportReviewRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -75,6 +75,15 @@ export async function GET(request: NextRequest) {
          JOIN beta_defect_reviews reviews
            ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
         WHERE participants.withdrawn_at IS NULL
+      ORDER BY participants.user_id`,
+    ),
+    query<{ participant_id: string; operator_recorded_support_minutes: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              reviews.operator_recorded_support_minutes
+         FROM beta_participants participants
+         JOIN beta_support_reviews reviews
+           ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
+        WHERE participants.withdrawn_at IS NULL
         ORDER BY participants.user_id`,
     ),
   ]);
@@ -88,6 +97,7 @@ export async function GET(request: NextRequest) {
       feedbackRatings: [],
       outcome: null,
       defectReview: null,
+      supportReview: null,
     }]),
   );
   for (const event of betaMilestoneRows) {
@@ -112,6 +122,12 @@ export async function GET(request: NextRequest) {
     if (participant) participant.defectReview = {
       unresolvedSeverity1: review.unresolved_severity_1,
       unresolvedSeverity2: review.unresolved_severity_2,
+    };
+  }
+  for (const review of betaSupportReviewRows) {
+    const participant = participantMap.get(review.participant_id);
+    if (participant) participant.supportReview = {
+      operatorRecordedSupportMinutes: review.operator_recorded_support_minutes,
     };
   }
   const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);

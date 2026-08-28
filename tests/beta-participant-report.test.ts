@@ -32,6 +32,11 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
       reviewVersion: "beta-severity-review-v1",
       reviewedAt: "2026-08-27T12:05:00.000Z",
     },
+    supportReview: {
+      operatorRecordedSupportMinutes: 35,
+      reviewVersion: "beta-operator-support-review-v1",
+      reviewedAt: "2026-08-27T12:06:00.000Z",
+    },
   });
 
   assert.equal(report.participantLabel, "host-abcdef123456");
@@ -50,6 +55,12 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
     reviewVersion: "beta-severity-review-v1",
     reviewedAt: "2026-08-27T12:05:00.000Z",
   });
+  assert.equal(report.outcome?.selfReportedSupportMinutes, 12);
+  assert.deepEqual(report.operatorSupportReview, {
+    operatorRecordedSupportMinutes: 35,
+    reviewVersion: "beta-operator-support-review-v1",
+    reviewedAt: "2026-08-27T12:06:00.000Z",
+  });
   assert.equal("userId" in report, false);
   assert.equal("email" in report, false);
   assert.equal("feedbackMessages" in report, false);
@@ -66,6 +77,7 @@ test("withdrawn beta host remains visible without being reported as active", () 
     feedbackEntries: [],
     outcome: null,
     defectReview: null,
+    supportReview: null,
   });
 
   assert.equal(report.active, false);
@@ -75,4 +87,5 @@ test("withdrawn beta host remains visible without being reported as active", () 
   assert.equal(report.outcome, null);
   assert.equal(report.criticalDefects, null);
   assert.equal(report.criticalDefectReview, null);
+  assert.equal(report.operatorSupportReview, null);
 });

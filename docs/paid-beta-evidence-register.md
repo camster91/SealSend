@@ -39,6 +39,8 @@ Run `npm run report-beta-participants` with the protected production `DATABASE_U
 
 After a named human has triaged the host's current consent window, record the unresolved counts with `npm run record-beta-defect-review -- <host-label> "<reviewer name>" <severity-1-count> <severity-2-count> CONFIRM-HUMAN-SEVERITY-TRIAGE`. The command stores no free-text defect, guest, or response content and does not print the reviewer name. Re-run it after triage changes; it updates the same consent-window review. Keep detailed defect reproduction and resolution evidence in the access-controlled engineering system under its pseudonymous host label.
 
+After a named operator has reconciled the support effort delivered during the host's current consent window, record the total with `npm run record-beta-support-review -- <host-label> "<reviewer name>" <support-minutes> CONFIRM-OPERATOR-SUPPORT-REVIEW`. This operator-recorded value is separate from the host's self-reported survey answer. The command stores no support notes, message content, guest data, or reviewer name in its output; rerunning it updates the same consent-window review.
+
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | host-01 | Club/association | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
@@ -51,7 +53,7 @@ After a named human has triaged the host's current consent window, record the un
 
 Record the measurement window and denominator for every rate.
 
-The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, and average feedback rating without returning participant identifiers.
+The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, average feedback rating, operator support-review coverage, and the median operator-recorded support time only after every active host has a review, without returning participant identifiers.
 
 | Measure | Result | Acceptance threshold | Decision |
 |---|---:|---:|---|
@@ -65,7 +67,7 @@ The secret-gated operations report computes active-cohort event-publish, guest-i
 | Backup restore rehearsal | | Pass | Pending |
 | Willingness to pay | | Recorded for all five hosts | Pending |
 
-The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. Missing responses remain missing; they are never converted to zero or a passing result.
+The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The survey support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. The separate named operator review is the source for operator-recorded support effort. Missing responses or reviews remain missing; they are never converted to zero or a passing result.
 
 ## Real-device accessibility evidence
 

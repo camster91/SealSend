@@ -660,6 +660,20 @@ CREATE TABLE IF NOT EXISTS beta_defect_reviews (
   FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_beta_defect_reviews_reviewed ON beta_defect_reviews(reviewed_at DESC);
+CREATE TABLE IF NOT EXISTS beta_support_reviews (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  consented_at TIMESTAMPTZ NOT NULL,
+  reviewer_name TEXT NOT NULL CHECK (char_length(reviewer_name) BETWEEN 2 AND 100),
+  review_version TEXT NOT NULL,
+  operator_recorded_support_minutes INTEGER NOT NULL CHECK (operator_recorded_support_minutes BETWEEN 0 AND 600),
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, consented_at),
+  FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_beta_support_reviews_reviewed ON beta_support_reviews(reviewed_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user
   ON activation_events(event_name, user_id)
   WHERE user_id IS NOT NULL AND event_name IN ('account_created', 'event_draft_started', 'account_exported');

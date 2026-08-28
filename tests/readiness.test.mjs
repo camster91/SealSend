@@ -842,6 +842,37 @@ test('operators can record explicit consent-window severity review without guest
   assert.equal(pkg.scripts['record-beta-defect-review'], 'npx tsx scripts/record-beta-defect-review.ts');
 });
 
+test('operators can record consent-window support effort without conflating host self-report', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const command = await read('scripts/record-beta-support-review.ts');
+  const report = await read('scripts/report-beta-participants.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const register = await read('docs/paid-beta-evidence-register.md');
+  const pkg = JSON.parse(await read('package.json'));
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_support_reviews/);
+    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
+    assert.match(sql, /operator_recorded_support_minutes INTEGER NOT NULL CHECK \(operator_recorded_support_minutes BETWEEN 0 AND 600\)/);
+    assert.doesNotMatch(sql, /support_(?:message|notes|description)/);
+    assert.match(sql, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
+  }
+  assert.match(command, /parseBetaSupportReview/);
+  assert.match(command, /FOR UPDATE/);
+  assert.match(command, /segment = ANY/);
+  assert.match(command, /ON CONFLICT \(user_id, consented_at\)/);
+  assert.match(command, /reviewer_name/);
+  assert.doesNotMatch(command, /SELECT \*/);
+  assert.match(report, /beta_support_reviews/);
+  assert.doesNotMatch(report, /SELECT[\s\S]*reviewer_name/);
+  assert.match(metrics, /beta_support_reviews/);
+  assert.doesNotMatch(metrics, /reviewer_name/);
+  assert.match(register, /operator-recorded/i);
+  assert.match(register, /self-reported/i);
+  assert.equal(pkg.scripts['record-beta-support-review'], 'npx tsx scripts/record-beta-support-review.ts');
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');

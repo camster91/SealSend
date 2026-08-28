@@ -21,6 +21,9 @@ export interface BetaCohortParticipant {
     unresolvedSeverity1: number;
     unresolvedSeverity2: number;
   };
+  supportReview: null | {
+    operatorRecordedSupportMinutes: number;
+  };
 }
 
 interface RateMetric {
@@ -58,6 +61,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
     feedbackRatings: participant.feedbackRatings.filter((rating) => rating >= 1 && rating <= 5),
     outcome: participant.outcome,
     defectReview: participant.defectReview,
+    supportReview: participant.supportReview,
   })).map((participant) => ({
     ...participant,
     progress: deriveBetaProgress({
@@ -91,6 +95,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
   const denominator = active.length;
   const outcomes = progress.flatMap((participant) => participant.outcome ? [participant.outcome] : []);
   const defectReviews = progress.flatMap((participant) => participant.defectReview ? [participant.defectReview] : []);
+  const supportReviews = progress.flatMap((participant) => participant.supportReview ? [participant.supportReview] : []);
 
   return {
     cohortSize: denominator,
@@ -119,6 +124,10 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
       denominator,
     },
     medianSelfReportedSupportMinutes: median(outcomes.map((outcome) => outcome.selfReportedSupportMinutes)),
+    supportReviewCoverage: rate(supportReviews.length, denominator),
+    medianOperatorRecordedSupportMinutes: denominator > 0 && supportReviews.length === denominator
+      ? median(supportReviews.map((review) => review.operatorRecordedSupportMinutes))
+      : null,
     defectReviewCoverage: rate(defectReviews.length, denominator),
     unresolvedCriticalDefects: denominator > 0 && defectReviews.length === denominator
       ? defectReviews.reduce(

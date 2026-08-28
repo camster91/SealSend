@@ -61,9 +61,16 @@ interface DefectReviewRow {
   reviewed_at: string;
 }
 
+interface SupportReviewRow {
+  participant_label: string;
+  operator_recorded_support_minutes: number;
+  review_version: string;
+  reviewed_at: string;
+}
+
 async function reportBetaParticipants() {
   try {
-    const [participants, milestones, feedbackEntries, outcomes, defectReviews] = await Promise.all([
+    const [participants, milestones, feedbackEntries, outcomes, defectReviews, supportReviews] = await Promise.all([
       pool.query<ParticipantRow>(
         `SELECT participant_label,
                 segment,
@@ -128,6 +135,19 @@ async function reportBetaParticipants() {
           ORDER BY participants.participant_label`,
         [BETA_SEGMENTS],
       ),
+      pool.query<SupportReviewRow>(
+        `SELECT participants.participant_label,
+                reviews.operator_recorded_support_minutes,
+                reviews.review_version,
+                reviews.reviewed_at::text
+           FROM beta_participants participants
+           JOIN beta_support_reviews reviews
+             ON reviews.user_id = participants.user_id
+            AND reviews.consented_at = participants.consented_at
+          WHERE participants.segment = ANY($1::text[])
+          ORDER BY participants.participant_label`,
+        [BETA_SEGMENTS],
+      ),
     ]);
 
     if (participants.rows.length === 0) {
@@ -163,6 +183,14 @@ async function reportBetaParticipants() {
           return review ? {
             unresolvedSeverity1: review.unresolved_severity_1,
             unresolvedSeverity2: review.unresolved_severity_2,
+            reviewVersion: review.review_version,
+            reviewedAt: review.reviewed_at,
+          } : null;
+        })(),
+        supportReview: (() => {
+          const review = supportReviews.rows.find((entry) => entry.participant_label === participant.participant_label);
+          return review ? {
+            operatorRecordedSupportMinutes: review.operator_recorded_support_minutes,
             reviewVersion: review.review_version,
             reviewedAt: review.reviewed_at,
           } : null;

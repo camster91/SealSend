@@ -26,6 +26,11 @@ interface BetaParticipantReportInput {
     reviewVersion: string;
     reviewedAt: string;
   };
+  supportReview: null | {
+    operatorRecordedSupportMinutes: number;
+    reviewVersion: string;
+    reviewedAt: string;
+  };
 }
 
 export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
@@ -53,5 +58,6 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
       ? input.defectReview.unresolvedSeverity1 + input.defectReview.unresolvedSeverity2
       : null,
     criticalDefectReview: input.defectReview,
+    operatorSupportReview: input.supportReview,
   };
 }
