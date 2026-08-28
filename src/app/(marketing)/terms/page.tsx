@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Terms of Service - SealSend",
   description: "Terms of Service for SealSend digital invitation platform.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

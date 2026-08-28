@@ -518,6 +518,19 @@ test('root discovery metadata matches the recurring-organizer controlled beta', 
   assert.match(icon, /<svg/);
 });
 
+test('every sitemap marketing page declares a canonical URL', async () => {
+  const pages = [
+    ['src/app/(marketing)/page.tsx', '/'],
+    ['src/app/(marketing)/pricing/page.tsx', '/pricing'],
+    ['src/app/(marketing)/terms/page.tsx', '/terms'],
+    ['src/app/(marketing)/privacy/page.tsx', '/privacy'],
+  ];
+  for (const [file, route] of pages) {
+    const source = await read(file);
+    assert.match(source, new RegExp(`canonical:\\s*["']${route.replace('/', '\\/')}["']`), `${route} must declare its canonical URL`);
+  }
+});
+
 test('the optional service worker never caches authenticated or API responses', async () => {
   const worker = await read('public/sw.js');
   assert.doesNotMatch(worker, /PRECACHE_URLS\s*=\s*\[[^\]]*['"]\/dashboard['"]/);
