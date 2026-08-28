@@ -10,6 +10,8 @@ Date: 2026-08-28
 
 Payments and external communications must remain explicitly test-only until their provider gates pass. A green local build is not evidence of a completed charge or delivered message.
 
+The machine-checked quality baseline is product capability **81/100**, competitive position **66/100**, and paid-launch readiness **5/18 (27.8%)**. Run `npm run quality:score` for the current evidence-bounded result; the scorecard refuses earned points without linked evidence and requires missing proof for every partial category.
+
 ## Current production
 
 - Public origin: `https://sealsend.app`
@@ -28,7 +30,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 183 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, guest-ready publication enforcement, partial CSV import and duplicate-contact handling, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 204 unit/readiness tests passed, including the evidence-bounded quality scorecard, provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, guest-ready publication enforcement, partial CSV import and duplicate-contact handling, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
