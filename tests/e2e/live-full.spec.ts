@@ -22,7 +22,6 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   });
 
   let eventId = '';
-  let replacementEventId = '';
   let repeatedEventId = '';
   let slug = '';
   let betaJoined = false;
@@ -76,7 +75,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const acceptDraft = await page.context().request.post(`/api/ai/event-draft/${aiDraft.generationId}/outcome`, { data: { outcome: 'accepted' } });
     expect(acceptDraft.status()).toBe(200);
 
-    const create = await page.context().request.post('/api/events', { data: {
+    const createData = {
       title: 'SealSend Production QA Event',
       description: 'Temporary automated browser QA event.',
       event_date: new Date(Date.now() + 7 * 86400000).toISOString(),
@@ -97,7 +96,16 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
       },
       ai_generation_id: aiDraft.generationId,
       status: 'draft',
-    }});
+    };
+    const createResponses = await Promise.all([
+      page.context().request.post('/api/events', { data: createData }),
+      page.context().request.post('/api/events', { data: {
+        ...createData,
+        title: 'SealSend Concurrent QA Event',
+      }}),
+    ]);
+    expect(createResponses.map(response => response.status()).sort()).toEqual([201, 403]);
+    const create = createResponses.find(response => response.status() === 201)!;
     expect(create.status()).toBe(201);
     const event = await create.json();
     eventId = event.id;
@@ -112,17 +120,6 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
 
     const secondEvent = await page.context().request.post('/api/events', { data: { title: 'Should Be Blocked' } });
     expect(secondEvent.status()).toBe(403);
-
-    const archive = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
-    expect(archive.status()).toBe(200);
-    const replacement = await page.context().request.post('/api/events', { data: { title: 'Temporary Replacement Event' } });
-    expect(replacement.status()).toBe(201);
-    const replacementEvent = await replacement.json();
-    replacementEventId = replacementEvent.id;
-    expect((await page.context().request.delete(`/api/events/${replacementEventId}`)).status()).toBe(200);
-    replacementEventId = '';
-    const restore = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'draft' } });
-    expect(restore.status()).toBe(200);
 
     const guestCreate = await page.context().request.post(`/api/events/${eventId}/guests`, { data: {
       name: 'QA Guest One', email: 'qa-guest-one@example.com', notes: 'Temporary QA record',
@@ -321,7 +318,6 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(failedRequests).toEqual([]);
   } finally {
     if (repeatedEventId) await page.context().request.delete(`/api/events/${repeatedEventId}`);
-    if (replacementEventId) await page.context().request.delete(`/api/events/${replacementEventId}`);
     if (eventId) await page.context().request.delete(`/api/events/${eventId}`);
     if (betaJoined) await page.context().request.fetch('/api/beta/participation', { method: 'DELETE' });
     await page.context().request.post('/api/auth/logout');

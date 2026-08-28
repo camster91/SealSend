@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db/client';
+import type { PoolClient } from 'pg';
+import { getDb, query } from '@/lib/db/client';
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
@@ -30,24 +31,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  let client: PoolClient | null = null;
   try {
     const auth = await requireApiHost();
     if (auth.error) return auth.error;
     const user = auth.user;
-
-    const [accountPlan, eventCount] = await Promise.all([
-      getUserTier(user.id),
-      queryOne<{ count: string }>(
-        "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
-        [user.id],
-      ),
-    ]);
-    if (!canCreateEvent(accountPlan, Number(eventCount?.count ?? 0))) {
-      return NextResponse.json(
-        { error: 'This plan supports one active event. Archive the current event before creating another.' },
-        { status: 403 }
-      );
-    }
 
     const body = await request.json();
     const parsed = eventCreateSchema.safeParse(body);
@@ -70,9 +58,32 @@ export async function POST(request: NextRequest) {
     }
 
     const { title, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const accountPlan = await getUserTier(user.id);
+    client = await getDb().connect();
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [user.id]);
+
+    const eventCountResult = await client.query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
+      [user.id],
+    );
+    if (!canCreateEvent(accountPlan, Number(eventCountResult.rows[0]?.count ?? 0))) {
+      await client.query('ROLLBACK');
+      return NextResponse.json(
+        { error: 'This plan supports one active event. Archive the current event before creating another.' },
+        { status: 403 }
+      );
+    }
+
     if (ai_generation_id) {
-      const generation = await queryOne("SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'", [ai_generation_id, user.id]);
-      if (!generation) return NextResponse.json({ error: 'AI generation was not accepted by this host' }, { status: 400 });
+      const generation = await client.query(
+        "SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'",
+        [ai_generation_id, user.id],
+      );
+      if (!generation.rows[0]) {
+        await client.query('ROLLBACK');
+        return NextResponse.json({ error: 'AI generation was not accepted by this host' }, { status: 400 });
+      }
     }
 
     // Retry slug generation on collision (unique constraint)
@@ -80,8 +91,9 @@ export async function POST(request: NextRequest) {
     let insertError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       const slug = generateSlug(title);
+      await client.query('SAVEPOINT event_slug_attempt');
       try {
-        event = await queryOne(
+        const inserted = await client.query(
           `INSERT INTO events (
             user_id, title, slug, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code,
@@ -118,14 +130,15 @@ export async function POST(request: NextRequest) {
             status ?? 'draft',
           ]
         );
+        event = inserted.rows[0] ?? null;
+        await client.query('RELEASE SAVEPOINT event_slug_attempt');
         insertError = null;
         break;
       } catch (err: unknown) {
         const pgError = err as { code?: string; message?: string };
-        // If not a unique constraint violation, don't retry
+        await client.query('ROLLBACK TO SAVEPOINT event_slug_attempt');
         if (pgError.code !== '23505') {
-          insertError = pgError;
-          break;
+          throw err;
         }
         insertError = pgError;
       }
@@ -133,6 +146,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('Event insert failed:', insertError.message);
+      await client.query('ROLLBACK');
       return NextResponse.json(
         { error: 'Failed to create event' },
         { status: 500 }
@@ -163,21 +177,17 @@ export async function POST(request: NextRequest) {
         paramIdx += 9;
       });
 
-      try {
-        await query(
-          `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder) VALUES ${placeholders.join(', ')}`,
-          values
-        );
-      } catch (rsvpErr: unknown) {
-        const rsvpError = rsvpErr as { message?: string };
-        console.error('Failed to insert default RSVP fields:', rsvpError.message);
-      }
+      await client.query(
+        `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder) VALUES ${placeholders.join(', ')}`,
+        values
+      );
     }
 
     if (event) {
       if (ai_generation_id && ai_edit_count !== undefined) {
-        await query('UPDATE ai_generations SET edit_count = $3 WHERE id = $1 AND user_id = $2', [ai_generation_id, user.id, ai_edit_count]);
+        await client.query('UPDATE ai_generations SET edit_count = $3 WHERE id = $1 AND user_id = $2', [ai_generation_id, user.id, ai_edit_count]);
       }
+      await client.query('COMMIT');
       await recordActivationEventSafely({
         name: 'event_draft_started',
         userId: user.id,
@@ -187,10 +197,20 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(event, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // The connection may already be outside a transaction.
+      }
+    }
+    console.error('Event creation failed:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  } finally {
+    client?.release();
   }
 }

@@ -409,6 +409,11 @@ test('controlled beta remains free and enforces one active event throughout the 
   assert.match(checkout, /controlled beta/i);
   assert.match(events, /status\s*<>\s*['"]archived['"]/i);
   assert.match(events, /one active event/i);
+  assert.match(events, /pg_advisory_xact_lock/);
+  assert.match(events, /BEGIN/);
+  assert.match(events, /COMMIT/);
+  assert.match(events, /ROLLBACK/);
+  assert.match(events, /SAVEPOINT event_slug_attempt/);
 });
 
 test('dashboard reports truthful per-event guest usage', async () => {
@@ -425,6 +430,7 @@ test('dashboard reports truthful per-event guest usage', async () => {
 test('repeat organizers get an explicit, atomic, privacy-limited next-event workflow', async () => {
   const route = await read('src/app/api/events/[eventId]/clone/route.ts');
   const control = await read('src/components/dashboard/CloneEventButton.tsx');
+  const eventRoute = await read('src/app/api/events/[eventId]/route.ts');
 
   assert.match(route, /parseRepeatEventRequest/);
   assert.match(route, /pg_advisory_xact_lock/);
@@ -444,6 +450,10 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(route, /guest_tag_assignments/);
   assert.doesNotMatch(route, /SELECT \* FROM events/);
   assert.doesNotMatch(route, /guest\.notes/);
+  assert.match(eventRoute, /targetStatus === ['"]archived['"] && auth\.access\.role !== ['"]owner['"]/);
+  assert.match(eventRoute, /Only the event owner can archive this event/);
+  assert.match(eventRoute, /eventForAccess\(event, auth\.access\.role\)/);
+  assert.match(eventRoute, /repeated_from_event_id:\s*_ownerOnlyLineage/);
 
   assert.match(control, /Repeat event/);
   assert.match(control, /type="datetime-local"/);

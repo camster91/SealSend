@@ -6,6 +6,12 @@ import { getPublicationReadiness, type PublicationCandidate } from '@/lib/public
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
+function eventForAccess(event: unknown, role: string): unknown {
+  if (role === 'owner' || !event || typeof event !== 'object') return event;
+  const { repeated_from_event_id: _ownerOnlyLineage, ...collaboratorEvent } = event as Record<string, unknown>;
+  return collaboratorEvent;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: RouteParams
@@ -27,7 +33,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(event);
+    return NextResponse.json(eventForAccess(event, auth.access.role));
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -70,6 +76,12 @@ export async function PATCH(
       );
     }
     const targetStatus = parsed.data.status ?? existing.status;
+    if (targetStatus === 'archived' && auth.access.role !== 'owner') {
+      return NextResponse.json(
+        { error: 'Only the event owner can archive this event.' },
+        { status: 403 },
+      );
+    }
     if (existing.status === 'archived' && targetStatus !== 'archived') {
       return NextResponse.json(
         { error: 'Archived events cannot be reactivated directly. Use Repeat event to create a reviewed new draft.' },
@@ -133,7 +145,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(event);
+    return NextResponse.json(eventForAccess(event, auth.access.role));
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
