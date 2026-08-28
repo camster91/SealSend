@@ -3,8 +3,32 @@
 import { useState } from "react";
 import { ChevronDown, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BETA_MODE } from "@/lib/constants";
 
-const faqs = [
+const betaFaqs = [
+  {
+    question: "What is included in the controlled beta?",
+    answer:
+      "A controlled beta account can run one active event for up to 100 guests, including the shipped invitation, RSVP, guest-management, communications, co-host, analytics, and check-in tools.",
+  },
+  {
+    question: "Will I be charged during the beta?",
+    answer:
+      "No. Paid checkout is disabled during the controlled beta, and SealSend does not ask for a payment card.",
+  },
+  {
+    question: "Are guest communications sent automatically?",
+    answer:
+      "No. The host reviews and deliberately starts external email or SMS communications. Provider delivery is verified with each approved beta host before live use.",
+  },
+  {
+    question: "Do guests need an account or app?",
+    answer:
+      "No. Guests use the published event link in a browser to review details and submit their RSVP.",
+  },
+];
+
+const paidFaqs = [
   {
     question: "What is the difference between an event upgrade and annual Pro?",
     answer:
@@ -33,6 +57,7 @@ const faqs = [
 ];
 
 export function PricingFAQ() {
+  const faqs = BETA_MODE ? betaFaqs : paidFaqs;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
@@ -46,7 +71,7 @@ export function PricingFAQ() {
             Frequently asked questions
           </h2>
           <p className="mt-4 text-neutral-600">
-            Everything you need to know about pricing and billing
+            {BETA_MODE ? "What to expect from the controlled beta" : "Everything you need to know about pricing and billing"}
           </p>
         </div>
 

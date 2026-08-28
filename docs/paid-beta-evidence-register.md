@@ -29,19 +29,29 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 
 ## Five-host acceptance
 
-Each participant must consent to beta observation. Use one participant for each segment: private celebration, wedding, community/non-profit, corporate/team, and repeat planner.
+Each participant must consent to beta observation. Recruit within the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner.
+
+Enrollment is invitation-controlled. For each approved host, an operator runs `npm run create-beta-invite -- <segment>` with the protected production `DATABASE_URL`, records the returned pseudonymous participant label, and transmits the one-time invitation code directly to that host. Codes are stored only as SHA-256 hashes, expire after seven days, assign the cohort segment on the server, and cannot be reused, self-selected, or accepted after revocation. `npm run list-beta-invites` shows at most 100 recent pseudonymous labels, segments, four-character previews, expiry dates, and derived statuses without querying or printing token hashes. If a code was misdirected or is no longer authorized, run `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>` before acceptance; the command is idempotent for an already-revoked invitation and refuses an accepted one. Do not commit or paste a raw code into this register, tickets, screenshots, or chat logs.
+
+The release candidate records a versioned consent timestamp, an operator-assigned pseudonymous participant label and segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence and rejoining requires a new operator invitation. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
+
+Run `npm run report-beta-participants` with the protected production `DATABASE_URL` to produce one JSON line per current-scope participant. Each line contains only the pseudonymous label, operator-assigned segment, consent version/timestamps, active/withdrawn state, privacy-limited milestone booleans, completion counts, feedback count, structured outcome, and severity-review counts. The command joins internally on account IDs but never returns them, and it does not select guest data, contact details, feedback messages, invitation tokens, token hashes, or reviewer names. Copy only the required results into the matrix below. `criticalDefects: null` means **not reviewed**; only a completed, named human severity review may replace it with a count, including zero.
+
+After a named human has triaged the host's current consent window, record the unresolved counts with `npm run record-beta-defect-review -- <host-label> "<reviewer name>" <severity-1-count> <severity-2-count> CONFIRM-HUMAN-SEVERITY-TRIAGE`. The command stores no free-text defect, guest, or response content and does not print the reviewer name. Re-run it after triage changes; it updates the same consent-window review. Keep detailed defect reproduction and resolution evidence in the access-controlled engineering system under its pseudonymous host label.
 
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| host-01 | Private celebration | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-02 | Wedding | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-03 | Community/non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-04 | Corporate/team | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
-| host-05 | Repeat planner | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | 0 |
+| host-01 | Club/association | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-02 | Volunteer/local non-profit | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-03 | Creative community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-04 | Alumni/small professional community | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
+| host-05 | Repeat planner | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending | Pending |
 
 ## Launch measures
 
 Record the measurement window and denominator for every rate.
+
+The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, and average feedback rating without returning participant identifiers.
 
 | Measure | Result | Acceptance threshold | Decision |
 |---|---:|---:|---|
@@ -54,6 +64,8 @@ Record the measurement window and denominator for every rate.
 | Median support time per host | | Defined before beta | Pending |
 | Backup restore rehearsal | | Pass | Pending |
 | Willingness to pay | | Recorded for all five hosts | Pending |
+
+The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. Missing responses remain missing; they are never converted to zero or a passing result.
 
 ## Real-device accessibility evidence
 
@@ -96,8 +108,8 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 |---|---|---|---|---|
 | Bounded public load | 200 requests, concurrency 10, 0 failures, p95 286 ms, max 629 ms; production remained healthy | Pass | Codex QA | 2026-08-08 |
 | RSVP capacity concurrency | 10 simultaneous attempts for 3 seats: 3 accepted, 7 capacity-rejected, persisted 3 responses/3 attendees; fixture removed | Pass | Codex QA | 2026-08-08 |
-| Current-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T012633Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
-| Rollback-image recovery | `sealsend-20260809T012633Z.dump` + `sealsend:20260809T003511Z`; 33 tables, health 200, protected API 401 | Pass | Codex QA | 2026-08-08 |
+| Current-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T213741Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
+| Rollback-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T195857Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
 
 ## Go/no-go record

@@ -1,22 +1,30 @@
 #!/usr/bin/env tsx
 /**
  * Create an admin user in the database
- * Usage: npx tsx scripts/create-admin.ts <email>
+ * Usage: SEALSEND_ADMIN_PASSWORD=... npx tsx scripts/create-admin.ts <email>
  */
 
 import { Pool } from 'pg';
+import { checkPasswordStrength, hashPassword } from '../src/lib/password';
 
 const databaseUrl = process.env.DATABASE_URL;
+const adminPassword = process.env.SEALSEND_ADMIN_PASSWORD;
+const adminName = process.env.SEALSEND_ADMIN_NAME?.trim() || 'SealSend Operator';
 
 if (!databaseUrl) {
   console.error('Error: Missing DATABASE_URL environment variable');
   process.exit(1);
 }
 
-const email = process.argv[2];
+const email = process.argv[2]?.trim().toLowerCase();
 
-if (!email) {
-  console.error('Usage: npx tsx scripts/create-admin.ts <email>');
+if (!email || !adminPassword) {
+  console.error('Usage: set DATABASE_URL and SEALSEND_ADMIN_PASSWORD, then pass the admin email');
+  process.exit(1);
+}
+
+if (!checkPasswordStrength(adminPassword).valid) {
+  console.error('Error: SEALSEND_ADMIN_PASSWORD does not meet the application password policy');
   process.exit(1);
 }
 
@@ -44,15 +52,14 @@ async function createAdmin() {
     );
 
     if (checkResult.rows.length > 0) {
-      const existing = checkResult.rows[0];
-      console.log(`Admin user already exists: ${existing.email}`);
-      process.exit(0);
+      console.log(`Admin user already exists: ${checkResult.rows[0].email}`);
+      return;
     }
 
-    // Create admin user
+    const passwordHash = await hashPassword(adminPassword);
     const insertResult = await pool.query<AdminUser>(
-      'INSERT INTO admin_users (email) VALUES ($1) RETURNING id, email, created_at',
-      [email]
+      'INSERT INTO admin_users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, created_at',
+      [email, passwordHash, adminName]
     );
 
     const data = insertResult.rows[0];

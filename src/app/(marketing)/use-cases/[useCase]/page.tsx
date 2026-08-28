@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
-import { USE_CASES, USE_CASE_SLUGS } from "@/lib/use-case-content";
+import { notFound, redirect } from "next/navigation";
+import { LEGACY_USE_CASE_REDIRECTS, USE_CASES, USE_CASE_SLUGS } from "@/lib/use-case-content";
 import { createMetadata } from "@/lib/metadata";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import UseCaseHero from "@/components/marketing/UseCaseHero";
@@ -18,7 +18,8 @@ export async function generateMetadata({
   params: Promise<{ useCase: string }>;
 }) {
   const { useCase } = await params;
-  const data = USE_CASES[useCase];
+  const canonicalUseCase = LEGACY_USE_CASE_REDIRECTS[useCase] ?? useCase;
+  const data = USE_CASES[canonicalUseCase];
   if (!data) return {};
 
   return createMetadata({
@@ -35,7 +36,9 @@ export default async function UseCasePage({
   params: Promise<{ useCase: string }>;
 }) {
   const { useCase } = await params;
-  const data = USE_CASES[useCase];
+  const canonicalUseCase = LEGACY_USE_CASE_REDIRECTS[useCase] ?? useCase;
+  if (canonicalUseCase !== useCase) redirect(`/use-cases/${canonicalUseCase}`);
+  const data = USE_CASES[canonicalUseCase];
   if (!data) notFound();
 
   const faqJsonLd = {
@@ -63,10 +66,10 @@ export default async function UseCasePage({
       <section className="bg-neutral-50 py-20">
         <div className="mx-auto max-w-6xl px-4 text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Simple, transparent pricing
+            One bounded controlled beta
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Start free. Upgrade when your event grows.
+            Run one active event with up to 100 guests. Paid checkout remains disabled while mandatory launch evidence is incomplete.
           </p>
         </div>
         <PricingCards />

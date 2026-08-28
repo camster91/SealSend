@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+const upgradeInsecureRequests = process.env.NEXT_PUBLIC_SITE_URL?.startsWith('https://')
+  ? '; upgrade-insecure-requests'
+  : '';
+
 const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: {
@@ -54,7 +58,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests",
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'${upgradeInsecureRequests}`,
           },
         ],
       },

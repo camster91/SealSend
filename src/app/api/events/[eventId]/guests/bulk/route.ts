@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { guestBulkSchema } from "@/lib/validations";
@@ -130,6 +131,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       `INSERT INTO guests (event_id, name, email, phone, notes) VALUES ${valuePlaceholders.join(', ')} RETURNING id, name, email, phone`,
       queryParams
     );
+    if (insertedGuests.length > 0) {
+      await recordActivationEventSafely({
+        name: "guest_import_completed",
+        userId: event.user_id,
+        eventId,
+      });
+    }
 
     return NextResponse.json({
       inserted: insertedGuests?.length || 0,

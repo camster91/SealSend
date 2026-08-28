@@ -5,11 +5,12 @@ import type { LucideIcon } from "lucide-react";
 // SAAS CONFIGURATION
 // ========================================
 
-/** 
- * BETA MODE - When true, all features are free and unlimited
- * Set to false when launching paid tiers
+/**
+ * BETA MODE - When true, paid checkout is hidden and accounts receive the
+ * bounded controlled-beta entitlement: one active event for up to 100 guests.
+ * Set to false only after every mandatory paid-launch gate passes.
  */
-export const BETA_MODE = false;
+export const BETA_MODE = true;
 
 /**
  * Feature flags for gradual rollout
@@ -199,6 +200,21 @@ export const PUBLIC_PRICING_PLANS = [
   { id: "pro_annual", name: "SealSend Pro", price: 124.99, period: "/year", description: "For repeat hosts and event planners", events: "Unlimited", guests: "2,500", features: ["All shipped premium features", "Unlimited events", "2,500 guests per event"], popular: true },
 ] as const;
 
+export const CONTROLLED_BETA_PRICING_PLAN = {
+  id: "controlled_beta",
+  name: "Controlled Beta",
+  price: 0,
+  period: "",
+  description: "Run one real event while we verify paid-launch evidence",
+  events: "1 active",
+  guests: "100",
+  features: [
+    "Invitation, RSVP, and guest workflow",
+    "Host-approved email and SMS communications",
+    "Guest tags, co-hosts, analytics, and check-in",
+  ],
+} as const;
+
 // ========================================
 // LEGACY EVENT TIERS (Per-Event - Deprecated)
 // ========================================
@@ -372,32 +388,28 @@ export const DEFAULT_RSVP_FIELDS = [
 
 export const USE_CASES = [
   {
-    slug: "weddings",
-    title: "Weddings",
-    description: "Create elegant wedding invitations with RSVP tracking, meal preferences, and plus-one management.",
-    image: "/use-cases/wedding.jpg",
-    features: ["Registry integration", "Meal preferences", "Plus-one tracking", "Save the dates"],
+    slug: "community-events",
+    title: "Community Events",
+    description: "Connect invitations, guest decisions, approved updates, and check-in for recurring gatherings.",
+    features: ["Guest tags", "Co-host roles", "Approved updates", "Mobile check-in"],
   },
   {
-    slug: "baby-showers",
-    title: "Baby Showers",
-    description: "Celebrate the upcoming arrival with adorable invitations and gift registry links.",
-    image: "/use-cases/baby-shower.jpg",
-    features: ["Registry links", "Gender reveal option", "Gift tracking", "Photo sharing"],
+    slug: "nonprofit-events",
+    title: "Local Nonprofits",
+    description: "Coordinate local nonprofit and volunteer events with operational RSVP details.",
+    features: ["Custom RSVP fields", "Sign-up board", "Guest export", "Co-host access"],
   },
   {
-    slug: "birthday-parties",
-    title: "Birthday Parties",
-    description: "From first birthdays to milestone celebrations, make every birthday special.",
-    image: "/use-cases/birthday.jpg",
-    features: ["Age-appropriate themes", "RSVP by date", "Gift preferences", "Photo gallery"],
+    slug: "clubs-associations",
+    title: "Clubs & Associations",
+    description: "Reuse a proven event workflow for chapters, meetings, and member gatherings.",
+    features: ["Clone events", "Guest tags", "RSVP status", "Calendar links"],
   },
   {
-    slug: "corporate-events",
-    title: "Corporate Events",
-    description: "Professional invitations for company events, conferences, and team gatherings.",
-    image: "/use-cases/corporate.jpg",
-    features: ["Branded templates", "Calendar invites", "Attendee tracking", "Polls & surveys"],
+    slug: "professional-gatherings",
+    title: "Professional Gatherings",
+    description: "Run workshops and networking events without enterprise event-software overhead.",
+    features: ["Uploaded artwork", "Custom questions", "Guest segments", "Check-in and export"],
   },
 ] as const;
 

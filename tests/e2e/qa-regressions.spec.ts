@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 test('navigation and pricing expose one accessible control per action', async ({ page }) => {
   await page.goto('/pricing');
   await expect(page.locator('a button')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Test billing setup pending' })).toBeDisabled();
+  await expect(page.locator('article').getByRole('link', { name: 'Join controlled beta' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Test billing setup pending' })).toHaveCount(0);
 
   const mobileToggle = page.getByRole('button', { name: 'Toggle mobile navigation menu' });
   if (await mobileToggle.isVisible()) {
@@ -14,7 +15,7 @@ test('navigation and pricing expose one accessible control per action', async ({
     await expect(page.locator('#mobile-navigation')).toBeVisible();
   }
 
-  const faq = page.getByRole('button', { name: /difference between an event upgrade/i });
+  const faq = page.getByRole('button', { name: /what is included in the controlled beta/i });
   await expect(faq).toHaveAttribute('aria-expanded', 'false');
   await faq.click();
   await expect(faq).toHaveAttribute('aria-expanded', 'true');
@@ -38,4 +39,23 @@ test('disabled placeholder features route to working product areas', async ({ pa
     // redirects after authentication are covered by source readiness checks.
     expect(destination).toMatch(/^\//);
   }
+});
+
+test('organizer use cases are reachable and legacy links redirect', async ({ page }) => {
+  await page.goto('/use-cases');
+  for (const route of [
+    '/use-cases/community-events',
+    '/use-cases/nonprofit-events',
+    '/use-cases/clubs-associations',
+    '/use-cases/professional-gatherings',
+  ]) {
+    await expect(page.locator('main').locator(`a[href="${route}"]`)).toHaveCount(1);
+    const response = await page.goto(route);
+    expect(response?.status()).toBeLessThan(400);
+    await expect(page.getByText(/^Run one active event with up to 100 guests\./i)).toBeVisible();
+    await page.goBack();
+  }
+
+  await page.goto('/use-cases/weddings');
+  await expect(page).toHaveURL(/\/use-cases\/professional-gatherings$/);
 });

@@ -28,12 +28,12 @@ export default function CTASection() {
 
           <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             {BETA_MODE
-              ? "Ready to create something beautiful?"
+              ? "Ready to run one complete event workflow?"
               : "Ready to turn your event idea into an operating plan?"}
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
             {BETA_MODE
-              ? "Join our beta and create stunning invitations for free. Help us shape the future of digital invitations."
+              ? "Use the controlled beta for one active event with up to 100 guests. Review communications before they are sent and help us verify the workflow with real hosting evidence."
               : "Build the invitation, RSVP questions, guest workflow, and communication drafts together. Review every AI suggestion before anything is saved or sent."}
           </p>
 
@@ -41,7 +41,7 @@ export default function CTASection() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
-              <span>Free to start</span>
+              <span>One active beta event</span>
             </div>
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
@@ -59,20 +59,20 @@ export default function CTASection() {
               href="/signup"
               className="group inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-primary-600 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:bg-primary-50 hover:shadow-xl"
             >
-              Get Started Free
+              Join Controlled Beta
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
               href="/pricing"
               className="inline-flex items-center gap-2 rounded-xl border-2 border-white/30 px-8 py-4 text-lg font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/10"
             >
-              View Pricing
+              See Beta Details
             </Link>
           </div>
 
           <div className="mt-12">
             <p className="mt-4 text-sm text-white/80">
-              Start free. No credit card required.
+              Free during the controlled beta. No credit card required.
             </p>
           </div>
         </motion.div>

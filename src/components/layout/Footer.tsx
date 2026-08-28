@@ -4,16 +4,16 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-5">
+        <div className="grid gap-8 lg:grid-cols-5">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="lg:col-span-2">
             <span className="text-xl font-bold">
               <span className="text-foreground">Seal</span>
               <span className="text-brand-600">Send</span>
             </span>
             <p className="mt-3 text-sm text-muted-foreground">
-              Create beautiful digital invitations, collect RSVPs, and manage
-              your event guests all in one place.
+              Turn an event brief into an approved invitation, actionable guest
+              list, host-controlled updates, and event-day check-in.
             </p>
           </div>
 
@@ -48,34 +48,34 @@ export function Footer() {
             <ul className="mt-3 space-y-2">
               <li>
                 <Link
-                  href="/use-cases/weddings"
+                  href="/use-cases/community-events"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Weddings
+                  Community Events
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/use-cases/baby-showers"
+                  href="/use-cases/nonprofit-events"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Baby Showers
+                  Local Nonprofits
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/use-cases/birthday-parties"
+                  href="/use-cases/clubs-associations"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Birthday Parties
+                  Clubs &amp; Associations
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/use-cases/corporate-events"
+                  href="/use-cases/professional-gatherings"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Corporate Events
+                  Professional Gatherings
                 </Link>
               </li>
             </ul>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { getEventAccess, roleCan } from "@/lib/auth/event-access";
 import { getDb, query } from "@/lib/db/client";
@@ -37,6 +38,11 @@ export async function PATCH(request: Request, { params }: Params) {
   const client = await getDb().connect();
   try {
     await client.query("BEGIN");
+    const ownerResult = await client.query<{ user_id: string }>(
+      "SELECT user_id FROM events WHERE id = $1",
+      [eventId],
+    );
+    const ownerId = ownerResult.rows[0]?.user_id;
     const identifierClause = parsed.data.guestId ? "id = $1" : "invite_token = $1";
     const identifier = parsed.data.guestId ?? parsed.data.inviteToken;
     const result = await client.query(
@@ -54,6 +60,13 @@ export async function PATCH(request: Request, { params }: Params) {
       [eventId, auth.user.id, parsed.data.checkedIn ? "guest_checked_in" : "guest_checked_out", JSON.stringify({ guestId: guest.id })],
     );
     await client.query("COMMIT");
+    if (parsed.data.checkedIn && ownerId) {
+      await recordActivationEventSafely({
+        name: "first_guest_checked_in",
+        userId: ownerId,
+        eventId,
+      });
+    }
     return NextResponse.json(guest);
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); }

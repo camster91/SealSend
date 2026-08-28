@@ -29,6 +29,7 @@ test('check-in-only staff can check in guests and nothing more', async ({ page }
 
   expect((await page.context().request.patch(`/api/events/${eventId}`, { data: { title: 'Forbidden edit' } })).status()).toBe(404);
   expect((await page.context().request.get(`/api/events/${eventId}/responses?format=csv`)).status()).toBe(404);
+  expect((await page.context().request.get(`/api/events/${eventId}/guests?format=check-in-csv`)).status()).toBe(404);
   expect((await page.context().request.get(`/api/events/${eventId}/members`)).status()).toBe(404);
   expect((await page.context().request.post(`/api/events/${eventId}/announcements/audience`, {
     data: { audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false }, channels: ['email'] },
@@ -38,14 +39,17 @@ test('check-in-only staff can check in guests and nothing more', async ({ page }
   await page.goto(`/events/${eventId}/check-in`);
   await expect(page.getByRole('heading', { name: 'Guest check-in' })).toBeVisible();
   await expect(page.getByRole('button', { name: /QA Check-in Guest/ })).toContainText('Checked in');
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-  await page.keyboard.press('Tab');
-  await expect(page.locator(':focus')).toBeVisible();
 
   const checkOut = await page.context().request.patch(`/api/events/${eventId}/check-in`, {
     data: { guestId, checkedIn: false },
   });
   expect(checkOut.status()).toBe(200);
   expect((await checkOut.json()).checked_in_at).toBeNull();
+  await page.getByRole('button', { name: 'Refresh guest list' }).click();
+  await expect(page.getByRole('button', { name: /QA Check-in Guest/ })).toContainText('Check in');
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toBeVisible();
 });

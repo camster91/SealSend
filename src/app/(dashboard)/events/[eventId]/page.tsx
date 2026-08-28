@@ -220,7 +220,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             {/* Publish / delete / clone */}
             <div className="space-y-2">
               {canEdit && <PublishButton eventId={eventId} isPublished={isPublished} />}
-              {access.role === 'owner' && <CloneEventButton eventId={eventId} eventTitle={event.title as string} />}
+              {access.role === 'owner' && <CloneEventButton eventId={eventId} eventTitle={event.title as string} eventTimezone={event.event_timezone} />}
               {access.role === 'owner' && <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />}
             </div>
           </div>

@@ -38,7 +38,7 @@
 
 ## Five-host beta acceptance
 
-Recruit one host from each segment: private celebration, wedding, community/non-profit, corporate/team, and repeat planner. Each host must complete account access, event creation, customization, publishing, guest import, a controlled invitation, RSVP, announcement/reminder review, calendar addition, check-in, export, and feedback. Record only consented operational observations—no guest content. A paid launch decision requires provider delivery evidence, funnel completion, unresolved severity, support effort, and willingness-to-pay results.
+Recruit five hosts from the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner. Each host must complete account access, event creation, customization, publishing, guest import, a controlled invitation, RSVP, announcement/reminder review, calendar addition, check-in, export, and feedback. Record only consented operational observations—no guest content. A paid launch decision requires provider delivery evidence, funnel completion, unresolved severity, support effort, and willingness-to-pay results.
 
 ## Provider readiness and lifecycle evidence
 

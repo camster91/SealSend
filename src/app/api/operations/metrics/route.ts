@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
 import { isOperationsAuthorized } from "@/lib/operations-auth";
+import { computeBetaCohortMetrics, type BetaCohortParticipant } from "@/lib/beta-metrics";
+import { BETA_MILESTONE_NAMES, type BetaMilestoneName, type BetaSegment } from "@/lib/beta-participation";
+import type { BetaWillingnessToPay } from "@/lib/beta-outcome";
 
 export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -32,6 +35,101 @@ export async function GET(request: NextRequest) {
         WHERE last_attempted_at >= NOW() - INTERVAL '30 days'
         GROUP BY last_delivery_status ORDER BY last_delivery_status`,
     ),
+    query<{ participant_id: string; segment: BetaSegment; consented_at: string }>(
+      `SELECT user_id::text AS participant_id, segment, consented_at FROM beta_participants
+       WHERE withdrawn_at IS NULL ORDER BY consented_at ASC`,
+    ),
+    query<{ participant_id: string; event_name: BetaMilestoneName; created_at: string }>(
+      `SELECT participants.user_id::text AS participant_id, events.event_name, events.created_at
+       FROM beta_participants participants
+       JOIN activation_events events
+         ON events.user_id = participants.user_id AND events.created_at >= participants.consented_at
+       WHERE participants.withdrawn_at IS NULL AND events.event_name = ANY($1::text[])
+       ORDER BY participants.user_id, events.created_at`,
+      [BETA_MILESTONE_NAMES],
+    ),
+    query<{ participant_id: string; rating: number }>(
+      `SELECT participants.user_id::text AS participant_id, feedback.rating
+       FROM beta_participants participants
+       JOIN beta_feedback feedback
+         ON feedback.user_id = participants.user_id AND feedback.created_at >= participants.consented_at
+       WHERE participants.withdrawn_at IS NULL
+      ORDER BY participants.user_id, feedback.created_at`,
+    ),
+    query<{ participant_id: string; willingness_to_pay: BetaWillingnessToPay; repeat_intent: number; self_reported_support_minutes: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              outcomes.willingness_to_pay,
+              outcomes.repeat_intent,
+              outcomes.self_reported_support_minutes
+       FROM beta_participants participants
+       JOIN beta_outcomes outcomes
+         ON outcomes.user_id = participants.user_id AND outcomes.consented_at = participants.consented_at
+       WHERE participants.withdrawn_at IS NULL
+      ORDER BY participants.user_id`,
+    ),
+    query<{ participant_id: string; unresolved_severity_1: number; unresolved_severity_2: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              reviews.unresolved_severity_1,
+              reviews.unresolved_severity_2
+         FROM beta_participants participants
+         JOIN beta_defect_reviews reviews
+           ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
+        WHERE participants.withdrawn_at IS NULL
+        ORDER BY participants.user_id`,
+    ),
   ]);
-  return NextResponse.json({ generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts }, { headers: { "Cache-Control": "no-store" } });
+  const participantMap = new Map<string, BetaCohortParticipant>(
+    betaParticipantRows.map((participant) => [participant.participant_id, {
+      participantId: participant.participant_id,
+      segment: participant.segment,
+      consentedAt: participant.consented_at,
+      withdrawnAt: null,
+      activationEvents: [],
+      feedbackRatings: [],
+      outcome: null,
+      defectReview: null,
+    }]),
+  );
+  for (const event of betaMilestoneRows) {
+    participantMap.get(event.participant_id)?.activationEvents.push({
+      name: event.event_name,
+      createdAt: event.created_at,
+    });
+  }
+  for (const feedback of betaFeedbackRows) {
+    participantMap.get(feedback.participant_id)?.feedbackRatings.push(feedback.rating);
+  }
+  for (const outcome of betaOutcomeRows) {
+    const participant = participantMap.get(outcome.participant_id);
+    if (participant) participant.outcome = {
+      willingnessToPay: outcome.willingness_to_pay,
+      repeatIntent: outcome.repeat_intent,
+      selfReportedSupportMinutes: outcome.self_reported_support_minutes,
+    };
+  }
+  for (const review of betaDefectReviewRows) {
+    const participant = participantMap.get(review.participant_id);
+    if (participant) participant.defectReview = {
+      unresolvedSeverity1: review.unresolved_severity_1,
+      unresolvedSeverity2: review.unresolved_severity_2,
+    };
+  }
+  const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);
+  const betaParticipants = [...betaParticipantRows.reduce((counts, participant) => {
+    counts.set(participant.segment, (counts.get(participant.segment) ?? 0) + 1);
+    return counts;
+  }, new Map<BetaSegment, number>())].map(([segment, count]) => ({ segment, count }));
+  const milestoneParticipants = new Map<BetaMilestoneName, Set<string>>();
+  for (const event of betaMilestoneRows) {
+    if (!milestoneParticipants.has(event.event_name)) milestoneParticipants.set(event.event_name, new Set());
+    milestoneParticipants.get(event.event_name)?.add(event.participant_id);
+  }
+  const betaMilestones = [...milestoneParticipants].map(([eventName, participantIds]) => ({
+    eventName,
+    participantCount: participantIds.size,
+  }));
+  return NextResponse.json(
+    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

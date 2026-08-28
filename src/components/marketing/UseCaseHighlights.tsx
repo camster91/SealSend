@@ -1,30 +1,30 @@
 import Link from "next/link";
-import { Heart, Baby, Cake, Briefcase, ArrowRight } from "lucide-react";
+import { Users, Heart, BadgeCheck, Briefcase, ArrowRight } from "lucide-react";
 
 const useCases = [
   {
+    icon: Users,
+    title: "Community Events",
+    description: "Guest operations for recurring community gatherings.",
+    href: "/use-cases/community-events",
+  },
+  {
     icon: Heart,
-    title: "Weddings",
-    description: "Elegant digital wedding invitations with RSVP tracking.",
-    href: "/use-cases/weddings",
+    title: "Local Nonprofits",
+    description: "Custom RSVP and volunteer coordination for local teams.",
+    href: "/use-cases/nonprofit-events",
   },
   {
-    icon: Baby,
-    title: "Baby Showers",
-    description: "Adorable invites to celebrate the newest arrival.",
-    href: "/use-cases/baby-showers",
-  },
-  {
-    icon: Cake,
-    title: "Birthday Parties",
-    description: "Fun, vibrant invitations for every age and theme.",
-    href: "/use-cases/birthday-parties",
+    icon: BadgeCheck,
+    title: "Clubs & Associations",
+    description: "Repeatable event workflows for chapters and members.",
+    href: "/use-cases/clubs-associations",
   },
   {
     icon: Briefcase,
-    title: "Corporate Events",
-    description: "Professional invitations for conferences, galas, and more.",
-    href: "/use-cases/corporate-events",
+    title: "Professional Gatherings",
+    description: "Controlled guest workflows without enterprise overhead.",
+    href: "/use-cases/professional-gatherings",
   },
 ];
 
@@ -34,10 +34,10 @@ export default function UseCaseHighlights() {
       <div className="mx-auto max-w-5xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Perfect for Every Occasion
+            Designed for recurring organizers
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            From intimate gatherings to large celebrations, Seal and Send has you covered.
+            Keep invitations, guest decisions, approved updates, and check-in connected.
           </p>
         </div>
 

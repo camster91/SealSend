@@ -1,4 +1,4 @@
-export type AccountPlan = "free" | "pro_annual";
+export type AccountPlan = "free" | "beta" | "pro_annual";
 
 export type EventTier =
   | "free"
@@ -55,6 +55,10 @@ function isAnnualPro(accountPlan: AccountPlan): boolean {
   return accountPlan === "pro_annual";
 }
 
+function isControlledBeta(accountPlan: AccountPlan): boolean {
+  return accountPlan === "beta";
+}
+
 export function canCreateEvent(accountPlan: AccountPlan, existingEventCount: number): boolean {
   return isAnnualPro(accountPlan) || existingEventCount < 1;
 }
@@ -67,6 +71,10 @@ export function getEffectiveEventLimits(
     return { guests: 2_500, responses: 2_500 };
   }
 
+  if (isControlledBeta(accountPlan)) {
+    return { guests: 100, responses: 100 };
+  }
+
   return EVENT_LIMITS[eventTier] ?? EVENT_LIMITS.free;
 }
 
@@ -75,7 +83,7 @@ export function canUseFeature(
   eventTier: EventTier,
   feature: EventFeature,
 ): boolean {
-  return isAnnualPro(accountPlan) || EVENT_FEATURES[feature].includes(eventTier);
+  return isAnnualPro(accountPlan) || isControlledBeta(accountPlan) || EVENT_FEATURES[feature].includes(eventTier);
 }
 
 export function getTeamMemberLimit(
@@ -83,5 +91,6 @@ export function getTeamMemberLimit(
   eventTier: EventTier,
 ): number {
   if (isAnnualPro(accountPlan)) return 10;
+  if (isControlledBeta(accountPlan)) return 3;
   return EVENT_TEAM_LIMITS[eventTier] ?? 1;
 }

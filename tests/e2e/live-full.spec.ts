@@ -4,9 +4,10 @@ import { expect, test } from '@playwright/test';
 
 const qaEmail = process.env.SEALSEND_QA_EMAIL;
 const qaPassword = process.env.SEALSEND_QA_PASSWORD;
+const qaBetaInviteToken = process.env.SEALSEND_QA_BETA_INVITE_TOKEN;
 const output = path.resolve('qa-screenshots', 'live-full');
 
-test.skip(!qaEmail || !qaPassword, 'Temporary production QA credentials are required');
+test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required');
 
 test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Run the stateful production lifecycle once.');
@@ -21,7 +22,10 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   });
 
   let eventId = '';
+  let replacementEventId = '';
+  let repeatedEventId = '';
   let slug = '';
+  let betaJoined = false;
   try {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Password' }).click();
@@ -33,8 +37,17 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
+    const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {
+      inviteToken: qaBetaInviteToken, consent: true,
+    }});
+    expect(betaEnrollment.status()).toBe(201);
+    const initialBeta = await betaEnrollment.json();
+    expect(initialBeta.participant.active).toBe(true);
+    expect(initialBeta.progress.completedRequired).toBe(1);
+    betaJoined = true;
+
     await page.goto('/dashboard?plan=pro_annual');
-    await expect(page.getByText('Continue with SealSend Pro')).toBeVisible();
+    await expect(page.getByText('Continue with SealSend Pro')).toHaveCount(0);
     await page.goto('/templates');
     await expect(page.getByRole('heading', { name: 'Event templates' })).toBeVisible();
     await page.getByRole('link', { name: 'Use this template' }).first().click();
@@ -84,6 +97,17 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const secondEvent = await page.context().request.post('/api/events', { data: { title: 'Should Be Blocked' } });
     expect(secondEvent.status()).toBe(403);
 
+    const archive = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
+    expect(archive.status()).toBe(200);
+    const replacement = await page.context().request.post('/api/events', { data: { title: 'Temporary Replacement Event' } });
+    expect(replacement.status()).toBe(201);
+    const replacementEvent = await replacement.json();
+    replacementEventId = replacementEvent.id;
+    expect((await page.context().request.delete(`/api/events/${replacementEventId}`)).status()).toBe(200);
+    replacementEventId = '';
+    const restore = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'draft' } });
+    expect(restore.status()).toBe(200);
+
     const guestCreate = await page.context().request.post(`/api/events/${eventId}/guests`, { data: {
       name: 'QA Guest One', email: 'qa-guest-one@example.com', notes: 'Temporary QA record',
     }});
@@ -97,8 +121,21 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(bulk.status()).toBe(201);
     expect((await bulk.json()).inserted).toBe(2);
 
-    expect((await page.context().request.post(`/api/events/${eventId}/tags`, { data: { tag_name: 'VIP' } })).status()).toBe(403);
-    expect((await page.context().request.post(`/api/events/${eventId}/signups`, { data: { title: 'Bring dessert', slots: 2 } })).status()).toBe(403);
+    const checkInFallback = await page.context().request.get(`/api/events/${eventId}/guests?format=check-in-csv`);
+    expect(checkInFallback.status()).toBe(200);
+    expect(checkInFallback.headers()['content-type']).toContain('text/csv');
+    expect(checkInFallback.headers()['cache-control']).toContain('no-store');
+    expect(checkInFallback.headers()['content-disposition']).toContain('check-in-fallback');
+    const fallbackCsv = await checkInFallback.text();
+    expect(fallbackCsv).toContain('QA Guest One');
+    expect(fallbackCsv).not.toContain('qa-guest-one@example.com');
+
+    const tagCreate = await page.context().request.post(`/api/events/${eventId}/tags`, { data: { tag_name: 'VIP' } });
+    expect(tagCreate.status()).toBe(201);
+    expect((await tagCreate.json()).tag_name).toBe('VIP');
+    const signupCreate = await page.context().request.post(`/api/events/${eventId}/signups`, { data: { title: 'Bring dessert', slots: 2 } });
+    expect(signupCreate.status()).toBe(201);
+    expect((await signupCreate.json()).title).toBe('Bring dessert');
 
     const magic = await page.context().request.post(`/api/guests/${guest.id}/magic-link`);
     expect(magic.status()).toBe(200);
@@ -107,6 +144,15 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const publish = await page.context().request.post(`/api/events/${eventId}/publish`);
     expect(publish.status()).toBe(200);
     expect((await publish.json()).status).toBe('published');
+
+    const calendar = await page.context().request.get(`/api/calendar/${slug}`);
+    expect(calendar.status()).toBe(200);
+    expect(calendar.headers()['content-type']).toContain('text/calendar');
+
+    const checkIn = await page.context().request.patch(`/api/events/${eventId}/check-in`, { data: {
+      guestId: guest.id, checkedIn: true,
+    }});
+    expect(checkIn.status()).toBe(200);
 
     await page.goto(`/events/${eventId}`);
     await expect(page.getByText('SealSend Production QA Event').first()).toBeVisible();
@@ -167,6 +213,16 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     );
     expect(messageFeedback.status()).toBe(200);
 
+    const scheduledAnnouncement = await page.context().request.post(`/api/events/${eventId}/announcements`, { data: {
+      subject: 'Temporary QA announcement',
+      message: 'This approved QA announcement is scheduled beyond the test and removed during cleanup.',
+      audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
+      channels: ['email'],
+      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+      approved: true,
+    }});
+    expect(scheduledAnnouncement.status()).toBe(201);
+
     const feedback = await page.context().request.post('/api/feedback', { data: {
       category: 'setup', rating: 5, message: 'Temporary automated production QA feedback.', mayContact: false,
     }});
@@ -176,18 +232,68 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     expect(csv.status()).toBe(200);
     expect(csv.headers()['content-type']).toContain('text/csv');
 
+    const accountExport = await page.context().request.get('/api/account/export');
+    expect(accountExport.status()).toBe(200);
+
     await page.goto(`/events/${eventId}/responses`);
     await expect(page.getByText('QA Respondent').first()).toBeVisible();
     await page.screenshot({ path: path.join(output, '04-responses-desktop.png'), fullPage: true });
 
     const checkout = await page.context().request.post('/api/subscriptions/checkout', { data: { plan: 'pro_annual' } });
     expect(checkout.status()).toBe(503);
-    expect((await checkout.json()).error).toContain('not configured');
+    expect((await checkout.json()).error).toContain('controlled beta');
+
+    const archiveForRepeat = await page.context().request.patch(`/api/events/${eventId}`, { data: { status: 'archived' } });
+    expect(archiveForRepeat.status()).toBe(200);
+    await page.goto(`/events/${eventId}`);
+    await page.getByRole('button', { name: 'Repeat event' }).click();
+    const repeatDialog = page.getByRole('dialog', { name: 'Repeat event' });
+    await expect(repeatDialog).toBeVisible();
+    await repeatDialog.getByLabel('New event title').fill('SealSend Production QA Repeat');
+    const repeatStart = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
+    await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
+    await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
+    await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
+    await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);
+    await expect(page).toHaveURL(/\/events\/[0-9a-f-]+$/);
+    repeatedEventId = page.url().split('/').pop() || '';
+    expect(repeatedEventId).toBeTruthy();
+
+    const repeatedGuests = await page.context().request.get(`/api/events/${repeatedEventId}/guests`);
+    expect(repeatedGuests.status()).toBe(200);
+    const repeatedGuestData = await repeatedGuests.json();
+    expect(repeatedGuestData).toHaveLength(3);
+    expect(repeatedGuestData.find((entry: { name: string }) => entry.name === 'QA Guest One')?.notes).toBeNull();
+    expect(repeatedGuestData.every((entry: { invite_status: string; reminder_sent_at: string | null }) =>
+      entry.invite_status === 'not_sent' && entry.reminder_sent_at === null)).toBe(true);
+
+    const repeatedResponses = await page.context().request.get(`/api/events/${repeatedEventId}/responses`);
+    expect(repeatedResponses.status()).toBe(200);
+    expect(await repeatedResponses.json()).toHaveLength(0);
+    const repeatedTags = await page.context().request.get(`/api/events/${repeatedEventId}/tags`);
+    expect(repeatedTags.status()).toBe(200);
+    expect((await repeatedTags.json()).map((entry: { tag_name: string }) => entry.tag_name)).toContain('VIP');
+    const repeatedSignups = await page.context().request.get(`/api/events/${repeatedEventId}/signups`);
+    expect(repeatedSignups.status()).toBe(200);
+    const repeatedSignupData = await repeatedSignups.json();
+    expect(repeatedSignupData).toHaveLength(1);
+    expect(repeatedSignupData[0].title).toBe('Bring dessert');
+    expect(repeatedSignupData[0].claims).toHaveLength(0);
+
+    const betaEvidence = await page.context().request.get('/api/beta/participation');
+    expect(betaEvidence.status()).toBe(200);
+    const betaEvidenceData = await betaEvidence.json();
+    expect(betaEvidenceData.progress.completedRequired).toBe(9);
+    expect(betaEvidenceData.progress.steps.controlledInvite).toBe(false);
+    expect(betaEvidenceData.progress.steps.repeatEvent).toBe(true);
 
     expect(pageErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   } finally {
+    if (repeatedEventId) await page.context().request.delete(`/api/events/${repeatedEventId}`);
+    if (replacementEventId) await page.context().request.delete(`/api/events/${replacementEventId}`);
     if (eventId) await page.context().request.delete(`/api/events/${eventId}`);
+    if (betaJoined) await page.context().request.fetch('/api/beta/participation', { method: 'DELETE' });
     await page.context().request.post('/api/auth/logout');
   }
 });

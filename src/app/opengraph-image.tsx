@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Seal and Send — Beautiful Digital Invitations & RSVP Management";
+export const alt = "SealSend controlled beta for recurring event organizers";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,7 +41,7 @@ export default function Image() {
             lineHeight: 1.4,
           }}
         >
-          Beautiful Digital Invitations & RSVP Management
+          An Approved Guest Workflow from Brief to Check-in
         </div>
         <div
           style={{
@@ -52,9 +52,9 @@ export default function Image() {
             opacity: 0.8,
           }}
         >
-          <span>10,000+ Events</span>
-          <span>200,000+ Guests</span>
-          <span>Free to Start</span>
+          <span>Controlled Beta</span>
+          <span>One Event · Up to 100 Guests</span>
+          <span>No Payment Card</span>
         </div>
       </div>
     ),

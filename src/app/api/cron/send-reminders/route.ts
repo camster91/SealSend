@@ -8,6 +8,7 @@ import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import { BETA_MODE } from "@/lib/constants";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
+import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -29,6 +30,7 @@ interface GuestWithResponse {
   name: string;
   email: string | null;
   phone: string | null;
+  phone_invalid_at: string | null;
   invite_token: string | null;
   reminder_sent_at: string | null;
   rsvp_status: string | null;
@@ -125,8 +127,8 @@ export async function GET(request: NextRequest) {
       // 1. Haven't received a reminder yet (reminder_sent_at is null)
       // 2. Have either email or phone
       // Join with rsvp_responses to check status
-      const guests = await query<GuestWithResponse>(
-        `SELECT g.id, g.name, g.email, g.phone, g.invite_token, g.reminder_sent_at,
+      const rawGuests = await query<GuestWithResponse>(
+        `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token, g.reminder_sent_at,
                 r.status as rsvp_status
          FROM guests g
          LEFT JOIN rsvp_responses r ON r.guest_id = g.id
@@ -135,6 +137,18 @@ export async function GET(request: NextRequest) {
            AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
         [event.id]
       );
+      const suppressions = await getCommunicationSuppressions(event.user_id);
+      const guests = rawGuests.map((guest) => {
+        const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
+          ? guest.email
+          : null;
+        let phone = smsEnabled && (BETA_MODE || event.tier !== "free") && !guest.phone_invalid_at ? guest.phone : null;
+        if (phone) {
+          const validation = validateAndFormatPhone(phone);
+          if (validation.valid && validation.formatted && isCommunicationSuppressed(suppressions, "sms", validation.formatted)) phone = null;
+        }
+        return { ...guest, email, phone };
+      }).filter((guest) => guest.email || guest.phone);
 
       if (!guests || guests.length === 0) {
         console.log(`[CRON] No guests to notify for event ${event.id}`);
@@ -274,6 +288,7 @@ export async function GET(request: NextRequest) {
                   });
                 }
               } else {
+                await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);
                 const errorMsg = phoneValidation.error || "Invalid phone number";
                 console.error(`[CRON] Invalid phone for guest ${guest.id}:`, errorMsg);
                 await logSendFailure(event.id, "sms", guest.phone, errorMsg, {

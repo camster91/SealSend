@@ -35,6 +35,7 @@ export async function PATCH(
     }
 
     const setClauses = fields.map(([key], i) => `${key} = $${i + 1}`);
+    if (parsed.data.phone !== undefined) setClauses.push('phone_invalid_at = NULL');
     const values = fields.map(([, v]) => v);
     const paramOffset = fields.length;
 

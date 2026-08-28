@@ -3,11 +3,19 @@ import { requireApiHost } from '@/lib/auth/api-auth';
 import { getStripe } from "@/lib/stripe";
 import { buildAnnualProCheckoutParams, isAnnualProCheckoutAvailable } from "@/lib/billing";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { BETA_MODE } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiHost();
   if (auth.error) return auth.error;
   const user = auth.user;
+
+  if (BETA_MODE) {
+    return NextResponse.json(
+      { error: "Paid checkout is disabled during the controlled beta" },
+      { status: 503 }
+    );
+  }
 
   if (!isAnnualProCheckoutAvailable()) {
     return NextResponse.json(

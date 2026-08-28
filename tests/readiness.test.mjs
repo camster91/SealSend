@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -124,7 +124,7 @@ test('package exposes unit, typecheck, and e2e test commands', async () => {
   assert.equal(typeof pkg.scripts['test:e2e'], 'string');
 });
 
-test('browser QA permanently covers Chromium, Firefox, and desktop/mobile WebKit', async () => {
+test('browser QA covers five engines and the hero is hydration-safe with reduced motion', async () => {
   const config = await read('playwright.config.ts');
   assert.match(config, /Desktop Chrome/);
   assert.match(config, /Pixel 7/);
@@ -132,8 +132,9 @@ test('browser QA permanently covers Chromium, Firefox, and desktop/mobile WebKit
   assert.match(config, /Desktop Safari/);
   assert.match(config, /iPhone 15/);
   const hero = await read('src/components/marketing/Hero.tsx');
-  assert.match(hero, /useReducedMotion/);
-  assert.match(hero, /initial=\{shouldReduceMotion \? false/);
+  assert.match(hero, /initial=\{false\}/);
+  assert.doesNotMatch(hero, /useReducedMotion/);
+  assert.doesNotMatch(hero, /repeat:\s*Infinity/);
 });
 
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
@@ -141,6 +142,7 @@ test('Next.js uses the repository as its build root and the current proxy conven
   const proxy = await read('src/proxy.ts');
 
   assert.match(config, /turbopack:\s*\{[\s\S]*?root:\s*process\.cwd\(\)/);
+  assert.match(config, /NEXT_PUBLIC_SITE_URL\?\.startsWith\('https:\/\/'\)/);
   assert.match(proxy, /export async function proxy\(/);
 });
 
@@ -213,12 +215,169 @@ test('public marketing does not ship invented social proof', async () => {
   const hero = await read('src/components/marketing/Hero.tsx');
   const pricingCta = await read('src/components/pricing/PricingCTA.tsx');
   const cta = await read('src/components/marketing/CTASection.tsx');
+  const openGraphImage = await read('src/app/opengraph-image.tsx');
+  const marketingDirectory = new URL('../src/components/marketing/', import.meta.url);
+  const marketingComponents = await Promise.all(
+    (await readdir(marketingDirectory))
+      .filter((file) => file.endsWith('.tsx'))
+      .map((file) => read(`src/components/marketing/${file}`)),
+  );
 
   assert.doesNotMatch(marketingPage, /<Testimonials\s*\/>/);
   assert.doesNotMatch(useCasePage, /<UseCaseTestimonial\b/);
   for (const source of [hero, pricingCta, cta]) {
     assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%/i);
   }
+  for (const source of marketingComponents) {
+    assert.doesNotMatch(source, /10,000\+|200,000\+|500K\+|4\.9\/5|99% satisfaction/i);
+    assert.doesNotMatch(source, /Sarah Mitchell|David Chen|Emily Rodriguez/);
+  }
+  assert.doesNotMatch(openGraphImage, /10,000\+|200,000\+|500K\+|4\.9\/5|99%/i);
+  assert.match(openGraphImage, /Controlled Beta/);
+  assert.match(openGraphImage, /One Event · Up to 100 Guests/);
+});
+
+test('public offer is a bounded controlled beta for recurring community organizers', async () => {
+  const constants = await read('src/lib/constants.ts');
+  const hero = await read('src/components/marketing/Hero.tsx');
+  const howItWorks = await read('src/components/marketing/HowItWorks.tsx');
+  const pricingCards = await read('src/components/pricing/PricingCards.tsx');
+  const pricingFaq = await read('src/components/pricing/PricingFAQ.tsx');
+
+  assert.match(constants, /export const BETA_MODE = true/);
+  assert.match(constants, /CONTROLLED_BETA_PRICING_PLAN[\s\S]*guests:\s*"100"/);
+  assert.match(hero, /recurring community organizers/i);
+  assert.match(hero, /approved guest workflow/i);
+  for (const stage of [
+    'Start from the event brief',
+    'Review the invitation and RSVP',
+    'Act on the guest list',
+    'Run event day',
+  ]) {
+    assert.match(howItWorks, new RegExp(stage, 'i'));
+  }
+  assert.match(pricingCards, /BETA_MODE\s*\?\s*\[CONTROLLED_BETA_PRICING_PLAN\]/);
+  assert.match(pricingFaq, /one active event for up to 100 guests/i);
+  assert.match(pricingFaq, /paid checkout is disabled/i);
+});
+
+test('controlled beta remains free and enforces one active event throughout the authenticated app', async () => {
+  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
+  const checkout = await read('src/app/api/subscriptions/checkout/route.ts');
+  const events = await read('src/app/api/events/route.ts');
+
+  assert.match(dashboard, /BETA_MODE/);
+  assert.match(dashboard, /!BETA_MODE\s*&&\s*plan/);
+  assert.match(dashboard, /accountPlan\s*===\s*['"]beta['"]\s*\?\s*100/);
+  assert.match(checkout, /if\s*\(BETA_MODE\)/);
+  assert.match(checkout, /controlled beta/i);
+  assert.match(events, /status\s*<>\s*['"]archived['"]/i);
+  assert.match(events, /one active event/i);
+});
+
+test('dashboard reports truthful per-event guest usage', async () => {
+  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
+  const usage = await read('src/components/dashboard/UsageStats.tsx');
+
+  assert.match(dashboard, /MAX\(event_guest_count\)/);
+  assert.match(dashboard, /events\.status\s*<>\s*['"]archived['"]/i);
+  assert.match(dashboard, /guestsUsed=\{Number\(guestUsage\?\.largest_event_guest_count\s*\?\?\s*0\)\}/);
+  assert.doesNotMatch(dashboard, /guestsUsed=\{0\}/);
+  assert.match(usage, /Guests in largest event/);
+});
+
+test('repeat organizers get an explicit, atomic, privacy-limited next-event workflow', async () => {
+  const route = await read('src/app/api/events/[eventId]/clone/route.ts');
+  const control = await read('src/components/dashboard/CloneEventButton.tsx');
+
+  assert.match(route, /parseRepeatEventRequest/);
+  assert.match(route, /pg_advisory_xact_lock/);
+  assert.match(route, /status\s*<>\s*['"]archived['"]/i);
+  assert.match(route, /canCreateEvent/);
+  assert.match(route, /BEGIN/);
+  assert.match(route, /COMMIT/);
+  assert.match(route, /ROLLBACK/);
+  assert.match(route, /includeGuests/);
+  assert.match(route, /guest_tags/);
+  assert.match(route, /guest_tag_assignments/);
+  assert.doesNotMatch(route, /SELECT \* FROM events/);
+  assert.doesNotMatch(route, /guest\.notes/);
+
+  assert.match(control, /Repeat event/);
+  assert.match(control, /type="datetime-local"/);
+  assert.match(control, /includeGuests/);
+  assert.match(control, /does not copy responses, check-ins, messages, or guest notes/i);
+  assert.match(control, /zonedLocalDateTimeToInstant/);
+  assert.match(control, /event\.key\s*===\s*['"]Escape['"]/);
+  assert.match(control, /titleInputRef\.current\?\.focus\(\)/);
+});
+
+test('root discovery metadata matches the recurring-organizer controlled beta', async () => {
+  const layout = await read('src/app/layout.tsx');
+  const manifest = await read('public/manifest.json');
+  const icon = await read('public/icons/icon.svg');
+
+  for (const source of [layout, manifest]) {
+    assert.match(source, /recurring (community )?organizers/i);
+    assert.match(source, /approved guest workflow/i);
+    assert.doesNotMatch(source, /wedding invitations|party invitations|beautiful digital invitations/i);
+  }
+  assert.match(layout, /manifest:\s*["']\/manifest\.json["']/);
+  assert.doesNotMatch(layout, /\/og-image\.jpg/);
+  assert.match(layout, /\/opengraph-image/);
+  assert.match(manifest, /\/icons\/icon\.svg/);
+  assert.match(icon, /<svg/);
+});
+
+test('the optional service worker never caches authenticated or API responses', async () => {
+  const worker = await read('public/sw.js');
+  assert.doesNotMatch(worker, /PRECACHE_URLS\s*=\s*\[[^\]]*['"]\/dashboard['"]/);
+  assert.match(worker, /pathname\.startsWith\(['"]\/api\/['"]\)/);
+  assert.match(worker, /pathname\.startsWith\(['"]\/dashboard['"]\)/);
+  assert.match(worker, /cache-control/i);
+  assert.match(worker, /no-store/i);
+});
+
+test('organizer use cases and comparison stay inside the shipped product scope', async () => {
+  const content = await read('src/lib/use-case-content.ts');
+  const indexPage = await read('src/app/(marketing)/use-cases/page.tsx');
+  const detailPage = await read('src/app/(marketing)/use-cases/[useCase]/page.tsx');
+  const navbar = await read('src/components/layout/Navbar.tsx');
+  const footer = await read('src/components/layout/Footer.tsx');
+  const sitemap = await read('src/app/sitemap.ts');
+  const home = await read('src/app/(marketing)/page.tsx');
+  const organizerFit = await read('src/components/marketing/OrganizerFit.tsx');
+
+  for (const slug of [
+    'community-events',
+    'nonprofit-events',
+    'clubs-associations',
+    'professional-gatherings',
+  ]) {
+    assert.match(content, new RegExp(`slug: ["']${slug}["']`));
+    for (const navigationSource of [navbar, footer, sitemap]) {
+      assert.match(navigationSource, new RegExp(`/use-cases/${slug}`));
+    }
+  }
+
+  assert.match(indexPage, /USE_CASES/);
+  assert.doesNotMatch(indexPage, /const useCases =/);
+  assert.match(detailPage, /one active event with up to 100 guests/i);
+  assert.match(content, /LEGACY_USE_CASE_REDIRECTS/);
+  assert.match(detailPage, /redirect\(`\/use-cases\/\$\{canonicalUseCase\}`\)/);
+  assert.doesNotMatch(content, /testimonial\s*:|Twyla Tyler|Monica W|Ashley Corbett|Brian Stuart/);
+  assert.doesNotMatch(content, /music\s*(?:&|and)\s*video|photo sharing|gift tracking|1,200 replies/i);
+
+  assert.match(home, /<OrganizerFit\s*\/>/);
+  for (const alternative of [
+    'Spreadsheets and group chats',
+    'Invitation-first tools',
+    'Enterprise event platforms',
+  ]) {
+    assert.match(organizerFit, new RegExp(alternative, 'i'));
+  }
+  assert.match(organizerFit, /product-scope comparison/i);
+  assert.match(organizerFit, /not a claim about every competitor/i);
 });
 
 test('activation analytics has a privacy-limited fresh schema and upgrade path', async () => {
@@ -282,6 +441,7 @@ test('load and recovery gates are bounded, read-only, and isolated from producti
   assert.match(capacity, /attempts > 25/);
   assert.match(recovery, /sealsend-rehearsal-/);
   assert.match(recovery, /postgres:16-alpine/);
+  assert.match(recovery, /PostgreSQL init process complete; ready for start up/);
   assert.match(recovery, /pg_restore --exit-on-error/);
   assert.match(recovery, /PAYMENTS_TEST_ONLY=true/);
   assert.match(recovery, /COMMUNICATIONS_TEST_ONLY=true/);
@@ -367,6 +527,44 @@ test('mobile check-in is permission-gated, auditable, and reversible', async () 
   assert.match(page, /aria-label=.*Search guests/);
 });
 
+test('event-day check-in refreshes safely for reconnects and multiple staff', async () => {
+  const page = await read('src/app/(dashboard)/events/[eventId]/check-in/page.tsx');
+  const live = await read('tests/e2e/live-check-in-role.spec.ts');
+
+  assert.match(page, /Refresh guest list/);
+  assert.match(page, /visibilitychange/);
+  assert.match(page, /window\.addEventListener\(["']online["'][\s\S]*load/);
+  assert.match(page, /setInterval\([\s\S]*15_000/);
+  assert.match(page, /document\.visibilityState\s*===\s*["']visible["']/);
+  assert.match(page, /aria-busy=\{refreshing\}/);
+  assert.match(page, /Last confirmed/);
+  assert.match(page, /Print loaded guest list/);
+  assert.match(page, /window\.print\(\)/);
+  assert.match(page, /hidden print:table/);
+  assert.match(page, /manual check-in[\s\S]*reconcile after reconnecting/i);
+  assert.match(live, /getByRole\(["']button["'],\s*\{\s*name:\s*["']Refresh guest list["']/);
+  assert.match(live, /toContainText\(["']Check in["']\)/);
+});
+
+test('event owners can download a privacy-limited check-in fallback', async () => {
+  const route = await read('src/app/api/events/[eventId]/guests/route.ts');
+  const page = await read('src/app/(dashboard)/events/[eventId]/guests/page.tsx');
+  const live = await read('tests/e2e/live-full.spec.ts');
+
+  assert.match(route, /format\s*===\s*["']check-in-csv["']/);
+  assert.match(route, /format\s*===\s*["']check-in-csv["']\s*\?\s*["']export_responses["']\s*:\s*["']view_guest_contacts["']/);
+  assert.match(route, /SELECT name, rsvp_status, invite_status, checked_in_at/);
+  assert.doesNotMatch(route, /SELECT name, rsvp_status, invite_status, checked_in_at[^;]*email/i);
+  assert.match(route, /guest_check_in_fallback_exported/);
+  assert.match(route, /Content-Disposition[\s\S]*check-in-fallback/);
+  assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
+  assert.match(route, /\^\[=\+\\-@\\t\\r\]/);
+  assert.match(page, /Download check-in fallback/);
+  assert.match(page, /format=check-in-csv/);
+  assert.match(live, /format=check-in-csv/);
+  assert.match(live, /not\.toContain\(['"]qa-guest-one@example\.com['"]\)/);
+});
+
 test('scheduled announcements are approved, cancellable, and idempotently dispatched', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
@@ -427,6 +625,221 @@ test('beta operations include privacy-safe error capture and authenticated feedb
   assert.match(instrumentation, /onRequestError/);
   assert.match(feedback, /requireApiHost/);
   assert.match(feedback, /rateLimit/);
+});
+
+test('controlled beta evidence requires explicit consent, supports withdrawal, and records real milestones', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/participation/route.ts');
+  const panel = await read('src/components/dashboard/BetaParticipation.tsx');
+  const settings = await read('src/app/(dashboard)/settings/page.tsx');
+  const activation = await read('src/lib/analytics/activation-events.ts');
+  const repeat = await read('src/app/api/events/[eventId]/clone/route.ts');
+  const guestImport = await read('src/app/api/events/[eventId]/guests/bulk/route.ts');
+  const announcement = await read('src/app/api/events/[eventId]/announcements/route.ts');
+  const calendar = await read('src/app/api/calendar/[slug]/route.ts');
+  const checkIn = await read('src/app/api/events/[eventId]/check-in/route.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const live = await read('tests/e2e/live-full.spec.ts');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_participants/);
+    assert.match(sql, /consent_version TEXT NOT NULL/);
+    assert.match(sql, /consented_at TIMESTAMPTZ NOT NULL/);
+    assert.match(sql, /withdrawn_at TIMESTAMPTZ/);
+    for (const segment of ['club_association', 'volunteer_nonprofit', 'creative_community', 'alumni_professional', 'repeat_planner']) {
+      assert.match(sql, new RegExp(`['"]${segment}['"]`));
+    }
+    for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
+      assert.match(sql, new RegExp(`['"]${milestone}['"]`));
+    }
+  }
+  assert.match(migration, /DROP CONSTRAINT IF EXISTS beta_participants_segment_check/);
+  assert.match(migration, /withdrawn_at = COALESCE\(withdrawn_at, NOW\(\)\)/);
+  assert.match(route, /requireApiHost/);
+  assert.match(route, /parseBetaEnrollment/);
+  assert.match(route, /deriveBetaProgress/);
+  assert.match(route, /withdrawn_at = NOW\(\)/);
+  assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
+  assert.doesNotMatch(route, /SELECT \*/);
+  assert.match(panel, /Join controlled beta/);
+  assert.match(panel, /workflow milestones/);
+  assert.match(panel, /does not record guest names, contact details, message bodies, or response content/);
+  assert.match(panel, /Withdraw beta consent/);
+  assert.match(settings, /BetaParticipation/);
+  for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
+    assert.match(activation, new RegExp(`["']${milestone}["']`));
+  }
+  assert.match(repeat, /name:\s*["']event_repeated["']/);
+  assert.match(guestImport, /name:\s*["']guest_import_completed["']/);
+  assert.match(announcement, /name:\s*["']announcement_approved["']/);
+  assert.match(calendar, /name:\s*["']calendar_exported["']/);
+  assert.match(checkIn, /name:\s*["']first_guest_checked_in["']/);
+  assert.match(metrics, /betaParticipants/);
+  assert.match(metrics, /computeBetaCohortMetrics/);
+  assert.match(metrics, /betaCohort/);
+  assert.match(metrics, /withdrawn_at IS NULL/);
+  assert.doesNotMatch(metrics, /participant_label|respondent_name|respondent_email|message\s+FROM|recipient/);
+  assert.match(live, /api\/beta\/participation/);
+  assert.match(live, /completedRequired\)\.toBe\(9\)/);
+  assert.match(live, /method:\s*['"]DELETE['"]/);
+});
+
+test('controlled beta enrollment accepts only operator invitations', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/participation/route.ts');
+  const panel = await read('src/components/dashboard/BetaParticipation.tsx');
+  const command = await read('scripts/create-beta-invite.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_enrollment_invites/);
+    for (const column of ['token_hash', 'token_preview', 'participant_label', 'segment', 'expires_at', 'accepted_by', 'accepted_at', 'revoked_at']) {
+      assert.match(sql, new RegExp(`${column}\\s`));
+    }
+  }
+  assert.match(route, /hashMagicToken\(enrollment\.inviteToken\)/);
+  assert.match(route, /BEGIN/);
+  assert.match(route, /FOR UPDATE/);
+  assert.match(route, /accepted_at IS NULL/);
+  assert.match(route, /revoked_at IS NULL/);
+  assert.match(route, /expires_at > NOW\(\)/);
+  assert.match(route, /Enter a valid invitation code and explicitly consent/);
+  assert.match(route, /accepted_by = \$2[\s\S]*accepted_at = NOW\(\)/);
+  assert.match(route, /COMMIT/);
+  assert.match(route, /ROLLBACK/);
+  assert.doesNotMatch(route, /randomBytes/);
+  assert.doesNotMatch(route, /enrollment\.segment/);
+  assert.match(panel, /Invitation code/);
+  assert.match(panel, /inviteToken/);
+  assert.doesNotMatch(panel, /beta-segment/);
+  assert.match(command, /generateMagicToken/);
+  assert.match(command, /hashMagicToken/);
+  assert.match(command, /previewMagicToken/);
+  assert.match(command, /BETA_SEGMENTS/);
+  assert.match(command, /INTERVAL '7 days'/);
+  assert.equal(pkg.scripts['create-beta-invite'], 'npx tsx scripts/create-beta-invite.ts');
+});
+
+test('accepted beta invitations survive account deletion without retaining the account id', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    const invites = tableDefinition(sql, 'beta_enrollment_invites');
+    assert.match(invites, /accepted_by UUID REFERENCES admin_users\(id\) ON DELETE SET NULL/);
+    assert.doesNotMatch(invites, /accepted_at IS NULL OR accepted_by IS NOT NULL/);
+  }
+});
+
+test('operators can inspect and revoke beta invitations without exposing raw codes', async () => {
+  const listCommand = await read('scripts/list-beta-invites.ts');
+  const revokeCommand = await read('scripts/revoke-beta-invite.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  assert.match(listCommand, /participant_label/);
+  assert.match(listCommand, /token_preview/);
+  assert.match(listCommand, /classifyBetaInvite/);
+  assert.doesNotMatch(listCommand, /token_hash/);
+  assert.doesNotMatch(listCommand, /Invitation code/);
+
+  assert.match(revokeCommand, /parseBetaInviteLabel/);
+  assert.match(revokeCommand, /accepted_at IS NULL/);
+  assert.match(revokeCommand, /revoked_at IS NULL/);
+  assert.match(revokeCommand, /SET revoked_at = NOW\(\)/);
+  assert.doesNotMatch(revokeCommand, /token_hash/);
+
+  assert.equal(pkg.scripts['list-beta-invites'], 'npx tsx scripts/list-beta-invites.ts');
+  assert.equal(pkg.scripts['revoke-beta-invite'], 'npx tsx scripts/revoke-beta-invite.ts');
+});
+
+test('operators can export a pseudonymous five-host acceptance report without personal data', async () => {
+  const command = await read('scripts/report-beta-participants.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  assert.match(command, /participant_label/);
+  assert.match(command, /consent_version/);
+  assert.match(command, /buildBetaParticipantReport/);
+  assert.match(command, /activation_events/);
+  assert.match(command, /beta_feedback/);
+  assert.match(command, /beta_outcomes/);
+  for (const prohibited of ['token_hash', 'token_preview', 'admin_users', 'feedback.message', 'guests']) {
+    assert.doesNotMatch(command, new RegExp(prohibited.replace('.', '\\.')));
+  }
+  assert.equal(pkg.scripts['report-beta-participants'], 'npx tsx scripts/report-beta-participants.ts');
+});
+
+test('structured beta outcomes are consent-scoped, price-versioned, and evidence-limited', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/outcome/route.ts');
+  const panel = await read('src/components/dashboard/BetaOutcomeSurvey.tsx');
+  const participation = await read('src/components/dashboard/BetaParticipation.tsx');
+  const register = await read('docs/paid-beta-evidence-register.md');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_outcomes/);
+    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
+    assert.match(sql, /self_reported_support_minutes INTEGER NOT NULL CHECK \(self_reported_support_minutes BETWEEN 0 AND 600\)/);
+  }
+  assert.match(route, /requireApiHost/);
+  assert.match(route, /withdrawn_at IS NULL/);
+  assert.match(route, /segment = ANY/);
+  assert.match(route, /ON CONFLICT \(user_id, consented_at\)/);
+  assert.doesNotMatch(route, /request.*consent|request.*segment|request.*priceVersion/i);
+  assert.match(panel, /\$124\.99\/year/);
+  assert.match(panel, /\$8\.99-\$49\.99\/event/);
+  assert.match(panel, /self-reported/i);
+  assert.match(panel, /stated intent/i);
+  assert.match(participation, /BetaOutcomeSurvey/);
+  assert.match(register, /self-reported/i);
+  assert.match(register, /stated intent/i);
+  assert.match(register, /not paid conversion/i);
+});
+
+test('pending beta hosts never claim zero critical defects before human review', async () => {
+  const register = await read('docs/paid-beta-evidence-register.md');
+  const pendingHostRows = register.split(/\r?\n/).filter((line) => /^\| host-0[1-5] \|/.test(line));
+
+  assert.equal(pendingHostRows.length, 5);
+  for (const row of pendingHostRows) {
+    assert.match(row, /\| Pending \|\s*$/);
+    assert.doesNotMatch(row, /\| 0 \|\s*$/);
+  }
+});
+
+test('operators can record explicit consent-window severity review without guest or defect text', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const command = await read('scripts/record-beta-defect-review.ts');
+  const report = await read('scripts/report-beta-participants.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const register = await read('docs/paid-beta-evidence-register.md');
+  const pkg = JSON.parse(await read('package.json'));
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_defect_reviews/);
+    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
+    assert.match(sql, /unresolved_severity_1 INTEGER NOT NULL CHECK \(unresolved_severity_1 BETWEEN 0 AND 100\)/);
+    assert.match(sql, /unresolved_severity_2 INTEGER NOT NULL CHECK \(unresolved_severity_2 BETWEEN 0 AND 100\)/);
+    assert.doesNotMatch(sql, /defect_(?:message|notes|description)/);
+    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent/);
+    assert.match(sql, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
+  }
+  assert.match(command, /parseBetaDefectReview/);
+  assert.match(command, /FOR UPDATE/);
+  assert.match(command, /segment = ANY/);
+  assert.match(command, /ON CONFLICT \(user_id, consented_at\)/);
+  assert.match(command, /reviewer_name/);
+  assert.doesNotMatch(command, /SELECT \*/);
+  assert.match(report, /beta_defect_reviews/);
+  assert.doesNotMatch(report, /reviewer_name/);
+  assert.match(metrics, /beta_defect_reviews/);
+  assert.doesNotMatch(metrics, /reviewer_name/);
+  assert.match(register, /not reviewed/i);
+  assert.match(register, /named human/i);
+  assert.equal(pkg.scripts['record-beta-defect-review'], 'npx tsx scripts/record-beta-defect-review.ts');
 });
 
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
@@ -598,6 +1011,36 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /status: 500/);
 });
 
+test('complaints, unsubscribes, bounces, and invalid phones block future guest communications', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');
+  const invitations = await read('src/app/api/events/[eventId]/send-invites/route.ts');
+  const reminders = await read('src/app/api/events/[eventId]/send-reminders/route.ts');
+  const scheduledReminders = await read('src/app/api/cron/send-reminders/route.ts');
+  const announcements = await read('src/lib/messages/dispatch-announcement.ts');
+  const guestUpdate = await read('src/app/api/events/[eventId]/guests/[guestId]/route.ts');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /communication_suppressions/);
+    assert.match(sql, /recipient_hash/);
+    assert.match(sql, /(?:UNIQUE|PRIMARY KEY)\s*\(user_id, channel, recipient_hash\)/);
+  }
+  assert.match(mailgun, /recordCommunicationSuppression/);
+  assert.match(mailgun, /unsubscribed[\s\S]*complained[\s\S]*bounced/);
+  for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
+    assert.match(sender, /getCommunicationSuppressions/);
+    assert.match(sender, /isCommunicationSuppressed/);
+  }
+  assert.match(invitations, /phone_invalid_at/);
+  assert.match(reminders, /phone_invalid_at/);
+  assert.match(scheduledReminders, /phone_invalid_at/);
+  for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
+    assert.match(sender, /SET phone_invalid_at = NOW\(\)/);
+  }
+  assert.match(guestUpdate, /phone_invalid_at = NULL/);
+});
+
 test('operations readiness is secret-gated and never returns credential values', async () => {
   const route = await read('src/app/api/operations/readiness/route.ts');
   const readiness = await read('src/lib/provider-readiness.ts');
@@ -626,4 +1069,13 @@ test('authentication codes are hashed and scoped to one login context', async ()
   assert.match(verify, /code_hash = \$2/);
   assert.match(verify, /event_id IS NOT DISTINCT FROM \$4/);
   assert.match(password, /DUMMY_PASSWORD_HASH/);
+});
+
+test('operator-created admin accounts require a hashed password and never print credentials', async () => {
+  const script = await read('scripts/create-admin.ts');
+  assert.match(script, /SEALSEND_ADMIN_PASSWORD/);
+  assert.match(script, /hashPassword/);
+  assert.match(script, /INSERT INTO admin_users \(email, password, name\)/);
+  assert.doesNotMatch(script, /console\.log\([^\n]*password/i);
+  assert.doesNotMatch(script, /INSERT INTO admin_users \(email\) VALUES/);
 });

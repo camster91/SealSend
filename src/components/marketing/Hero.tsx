@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Play, Star, Users, Zap } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { BETA_MODE } from "@/lib/constants";
 
 const fadeInUp = {
@@ -20,7 +20,6 @@ const staggerContainer = {
 };
 
 export default function Hero() {
-  const shouldReduceMotion = useReducedMotion();
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-primary-50 via-white to-white">
       {/* Background decoration */}
@@ -32,7 +31,7 @@ export default function Hero() {
       <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         <motion.div
           className="grid gap-12 lg:grid-cols-2 lg:gap-8"
-          initial={shouldReduceMotion ? false : "initial"}
+          initial={false}
           animate="animate"
           variants={staggerContainer}
         >
@@ -45,7 +44,7 @@ export default function Hero() {
                 className="group inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-sm font-medium text-primary-700 shadow-sm transition-all hover:border-primary-300 hover:shadow-md"
               >
                 <Zap className="h-4 w-4 text-accent-500" />
-                <span>{BETA_MODE ? "Now in Beta — All features free!" : "Start free — upgrade when you need more"}</span>
+                <span>{BETA_MODE ? "Controlled beta — one active event, up to 100 guests" : "Start free — upgrade when you need more"}</span>
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
@@ -55,8 +54,8 @@ export default function Hero() {
               variants={fadeInUp}
               className="mt-6 font-display text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl"
             >
-              Turn an event idea into a{" "}
-              <span className="text-gradient">guest-ready workflow</span> in minutes
+              Turn an event brief into an{" "}
+              <span className="text-gradient">approved guest workflow</span>
             </motion.h1>
 
             {/* Subheading */}
@@ -64,7 +63,7 @@ export default function Hero() {
               variants={fadeInUp}
               className="mt-6 text-lg text-neutral-600 sm:text-xl"
             >
-              For independent planners, community organizers, and small teams: create an editable AI-assisted invitation, RSVP flow, guest list, and ready-to-review communications in one place.
+              For recurring community organizers and independent planners: build the invitation, RSVP, actionable guest list, host-approved updates, and check-in in one place.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -76,7 +75,7 @@ export default function Hero() {
                 href="/signup"
                 className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-xl"
               >
-                Build Your Event Draft
+                Build Your Event Workflow
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
@@ -90,7 +89,7 @@ export default function Hero() {
 
             <motion.div variants={fadeInUp} className="mt-10">
               <p className="text-sm font-medium text-neutral-600">
-                No app download for guests. Start free with no credit card.
+                No app download for guests. The controlled beta needs no credit card.
               </p>
             </motion.div>
           </div>
@@ -127,31 +126,27 @@ export default function Hero() {
               {/* Floating elements */}
               <motion.div
                 className="absolute -left-8 top-1/4 rounded-xl bg-white p-4 shadow-xl"
-                animate={shouldReduceMotion ? { y: 0 } : { y: [0, -10, 0] }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-100">
                     <Users className="h-5 w-5 text-success-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-neutral-500">RSVP Received</p>
-                    <p className="font-semibold text-neutral-900">Sarah + 2</p>
+                    <p className="text-xs text-neutral-500">Example workflow</p>
+                    <p className="font-semibold text-neutral-900">New RSVP received</p>
                   </div>
                 </div>
               </motion.div>
 
               <motion.div
                 className="absolute -right-4 bottom-1/4 rounded-xl bg-white p-4 shadow-xl"
-                animate={shouldReduceMotion ? { y: 0 } : { y: [0, 10, 0] }}
-                transition={shouldReduceMotion ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-100">
                     <Star className="h-4 w-4 text-accent-600" />
                   </div>
                   <p className="text-sm font-medium text-neutral-900">
-                    42 guests attending!
+                    Guest list updated
                   </p>
                 </div>
               </motion.div>

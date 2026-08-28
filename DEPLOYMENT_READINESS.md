@@ -1,6 +1,6 @@
 # SealSend deployment readiness
 
-Date: 2026-08-08
+Date: 2026-08-27
 
 ## Release decision
 
@@ -16,19 +16,19 @@ Payments and external communications must remain explicitly test-only until thei
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
-- Current verified image: `sealsend:20260811T013748Z`
-- Current verified application commit: `2d406a1819a986da536b89785605ccc18d02e621`
-- Current release source: `/opt/sealsend/releases/20260811T013748Z`
-- Immediate rollback image/source: `sealsend:20260809T220256Z` and `/opt/sealsend/releases/20260809T220256Z`
+- Current verified image: `sealsend:20260827T213741Z`
+- Current verified application commit: `10e05912a062919a0da71999c43340317b57970a`
+- Current release source: `/opt/sealsend/releases/20260827T213741Z`
+- Immediate rollback image/source: `sealsend:20260827T195857Z` and `/opt/sealsend/releases/20260827T195857Z`
 - Earlier rollback source: `/opt/sealsend/releases/20260808T130600Z`
-- Verified pre-release database backup: `/opt/sealsend/backups/automated/sealsend-20260811T013748Z.dump`
+- Verified pre-release database backup: `/opt/sealsend/backups/20260827T194856Z/sealsend-predeploy.dump`
 - Pre-change Coolify configuration backup: `/opt/sealsend/backups/20260808T134336Z/coolify.env`
 
 The application and PostgreSQL containers are healthy and `/api/health` returns HTTP 200. HTTP redirects to HTTPS, the expected CSP/HSTS/content-type/referrer headers are present, protected cron returns 401, and the synthetic monitoring route returns 404 without its secret. The health cron and verified database backup are installed.
 
 ## Locally verified release candidate
 
-- 111 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 150 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -40,6 +40,12 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - `git diff --check` passed.
 
 ## Production QA evidence
+
+- On 2026-08-27, exact application revision `10e05912a062919a0da71999c43340317b57970a` was deployed as `sealsend:20260827T213741Z`; the container was running and healthy, public home and health returned 200, and payments and communications remained test-only.
+- The deployed authenticated host/guest/check-in/repeat-event lifecycle and public responsive suite passed 2/2. The repeat-event assertions verified explicit contact reuse, guest-note exclusion, reset occurrence state, tag remapping, and empty signup claims.
+- The disposable QA account and event records were removed. One orphaned repeat-event fixture caused by an earlier test-navigation race was deleted by exact UUID; subsequent checks found zero matching QA events, beta participation, beta feedback, admin accounts, and event announcements.
+- The `20260827T194856Z` pre-deploy backup restored 34 public tables with current image `sealsend:20260827T213741Z` and immediate rollback image `sealsend:20260827T195857Z`; both rehearsals returned health 200 and unauthenticated events 401 on isolated Docker networks.
+- The recovery rehearsal initially exposed a PostgreSQL initialization race: `pg_isready` could accept the image's temporary initialization server immediately before shutdown. The runner now waits for the official image's initialization-complete marker before checking readiness; a regression assertion covers that ordering.
 
 - A disposable production owner completed the authenticated lifecycle on Chromium; public navigation/responsive checks passed on desktop and Pixel 7 emulation.
 - Verified AI event fallback and acceptance, template-to-wizard routing, event creation/publishing, default RSVP fields and JSON options, guests/bulk guests, magic links, public RSVP plus-one, comments, response dashboard, CSV, and plan enforcement.
@@ -76,7 +82,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - AI-assisted message drafts with tone, length, urgency, and channel controls; no AI route can send externally.
 - Traceable aggregate RSVP intelligence that excludes guest free text from AI interpretation.
 - Thirteen editable templates, template-to-wizard population, safe artwork upload, and non-destructive crop/focus controls.
-- Privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
+- Operator-issued, expiring, one-time beta invitations with hashed token storage, server-assigned cohort segments, privacy-limited listing, and idempotent pre-acceptance revocation; pseudonymous per-host acceptance reporting that leaves critical-defect assessment explicitly unclaimed; privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
 - Self-service portable JSON export plus scheduled account deletion with a seven-day cooling-off period, paid-subscription protection, cancellation, and retry-safe upload cleanup.
 - Per-account upload accounting and serialized quotas: 250 MB free, 1 GB paid-event, and 5 GB annual Pro; orphan deletion remains report-only until explicitly enabled.
 - First-event onboarding, checkout lifecycle analytics, aggregate secret-gated operational metrics, and deduplicated host lifecycle messaging that remains disabled until provider verification.
@@ -106,11 +112,11 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 3. Create and verify a new PostgreSQL backup, retain the prior image/release, and record an explicit rollback target.
 4. Build a uniquely tagged image and apply `apply-security-indexes.sql` with `ON_ERROR_STOP` before switching the app.
 5. Verify explicit test-only environment flags, container health, logs, HTTP-to-HTTPS, TLS, CSP/security headers, sensitive-path protection, robots, sitemap, and `/api/health`.
-6. Use a disposable production QA owner to exercise AI fallback, templates, event create/edit/publish, guests, public RSVP/plus-one/comment, RSVP summary, audience/cost preview, message-draft feedback, calendar/CSV, beta feedback, and cleanup.
+6. Create a one-time `repeat_planner` QA invitation with `npm run create-beta-invite -- repeat_planner`, confirm its pseudonymous status with `npm run list-beta-invites`, pass the code only as `SEALSEND_QA_BETA_INVITE_TOKEN`, and use a disposable production QA owner to exercise consent, AI fallback, templates, event create/edit/publish, guests, public RSVP/plus-one/comment, RSVP summary, audience/cost preview, message-draft feedback, calendar/CSV, beta feedback, withdrawal, and cleanup. Never record the raw invitation code in evidence. If QA cannot proceed, revoke the unused invitation with `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>`.
 7. Verify a disposable check-in-only user can check guests in but cannot access event design, exports, or billing.
 8. Run public visual/accessibility checks at 375, 768, and 1440 pixels, including long content and missing artwork.
-9. Remove all disposable QA accounts/events/feedback and verify cleanup counts.
-10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates.
+9. Run `npm run report-beta-participants`, verify the QA participant contains only pseudonymous acceptance fields and `criticalDefects: null`, then withdraw the participant and remove all disposable QA accounts/events/feedback. Verify cleanup counts.
+10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates. Do not convert `criticalDefects: null` into zero without human severity triage.
 
 ## Known informational warning
 

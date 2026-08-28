@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import { recordCommunicationSuppression, type CommunicationSuppressionReason } from "@/lib/communication-suppressions";
 
 type Payload = {
   signature?: { timestamp?: string; token?: string; signature?: string };
@@ -38,17 +39,63 @@ export async function POST(request: Request) {
       "INSERT INTO webhook_receipts (provider, event_id) VALUES ('mailgun', $1) ON CONFLICT DO NOTHING RETURNING event_id", [eventId],
     );
     if (!receipt.rows[0]) { await client.query("ROLLBACK"); return NextResponse.json({ received: true, duplicate: true }); }
-    await client.query(
-      `UPDATE announcement_deliveries SET status = $1, error = $2, updated_at = NOW()
-       WHERE TRIM(BOTH '<>' FROM provider_message_id) = TRIM(BOTH '<>' FROM $3)`,
+    const updatedDeliveries = await client.query<{
+      recipient: string;
+      owner_user_id: string;
+      source_event_id: string;
+    }>(
+      `WITH updated AS (
+         UPDATE announcement_deliveries SET
+           status = CASE WHEN status IN ('bounced', 'opted_out') THEN status ELSE $1 END,
+           error = $2,
+           updated_at = NOW()
+         WHERE TRIM(BOTH '<>' FROM provider_message_id) = TRIM(BOTH '<>' FROM $3)
+         RETURNING recipient, announcement_id
+       )
+       SELECT updated.recipient, events.user_id AS owner_user_id, events.id AS source_event_id
+       FROM updated
+       JOIN event_announcements ON event_announcements.id = updated.announcement_id
+       JOIN events ON events.id = event_announcements.event_id`,
       [status, event?.["delivery-status"]?.message?.slice(0, 1000) ?? null, messageId],
     );
     const sendLogStatus = status === "accepted" ? "sent" : status === "opted_out" ? "bounced" : status;
-    await client.query(
-      `UPDATE send_logs SET status = $1, error_message = $2, updated_at = NOW()
-       WHERE TRIM(BOTH '<>' FROM provider_message_id) = TRIM(BOTH '<>' FROM $3)`,
+    const updatedSendLogs = await client.query<{
+      recipient: string;
+      owner_user_id: string;
+      source_event_id: string;
+    }>(
+      `WITH updated AS (
+         UPDATE send_logs SET
+           status = CASE WHEN status = 'bounced' THEN status ELSE $1 END,
+           error_message = $2,
+           updated_at = NOW()
+         WHERE TRIM(BOTH '<>' FROM provider_message_id) = TRIM(BOTH '<>' FROM $3)
+         RETURNING recipient, event_id
+       )
+       SELECT updated.recipient, events.user_id AS owner_user_id, events.id AS source_event_id
+       FROM updated JOIN events ON events.id = updated.event_id`,
       [sendLogStatus, event?.["delivery-status"]?.message?.slice(0, 1000) ?? null, messageId],
     );
+    if (status === "opted_out" || status === "bounced") {
+      const reason: CommunicationSuppressionReason = event.event === "unsubscribed"
+        ? "unsubscribed"
+        : event.event === "complained" ? "complained" : "bounced";
+      const targets = [...updatedDeliveries.rows, ...updatedSendLogs.rows];
+      const recorded = new Set<string>();
+      for (const delivery of targets) {
+        const key = `${delivery.owner_user_id}:${delivery.recipient.trim().toLowerCase()}`;
+        if (recorded.has(key)) continue;
+        recorded.add(key);
+        await recordCommunicationSuppression(client, {
+          userId: delivery.owner_user_id,
+          channel: "email",
+          recipient: delivery.recipient,
+          reason,
+          provider: "mailgun",
+          sourceEventId: delivery.source_event_id,
+        });
+      }
+    }
     await client.query("COMMIT");
     return NextResponse.json({ received: true });
   } catch (error) { await client.query("ROLLBACK"); throw error; }

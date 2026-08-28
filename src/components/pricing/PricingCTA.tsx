@@ -10,12 +10,12 @@ export function PricingCTA() {
       <div className="mx-auto max-w-4xl text-center">
         <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
           {BETA_MODE
-            ? "Ready to create your first invitation?"
+            ? "Ready to run one real event?"
             : "Ready to get started?"}
         </h2>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
           {BETA_MODE
-            ? "Try every SealSend feature during the beta at no cost."
+            ? "Use the complete shipped workflow for one active event with up to 100 guests, at no cost during the controlled beta."
             : "Create beautiful invitations and manage your event in one place."}
         </p>
 
@@ -23,7 +23,7 @@ export function PricingCTA() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
-            <span>Free to start</span>
+            <span>One active beta event</span>
           </div>
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -41,7 +41,7 @@ export function PricingCTA() {
             href="/signup"
             className="group inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-primary-600 shadow-lg transition-all hover:bg-primary-50 hover:shadow-xl"
           >
-            Get Started Free
+            Join Controlled Beta
             <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
           </Link>
           <Link
@@ -55,7 +55,7 @@ export function PricingCTA() {
         {/* Social proof */}
         <div className="mt-12">
           <p className="mt-4 text-sm text-white/80">
-            Start free. No credit card required.
+            Free during the controlled beta. No credit card required.
           </p>
         </div>
       </div>

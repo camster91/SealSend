@@ -32,6 +32,13 @@ docker run -d --name "$database" --network "$network" --network-alias database \
   -e POSTGRES_PASSWORD="$password" -e POSTGRES_DB=sealsend postgres:16-alpine >/dev/null
 
 attempt=0
+until docker logs "$database" 2>&1 | grep -Fq "PostgreSQL init process complete; ready for start up"; do
+  attempt=$((attempt + 1))
+  [ "$attempt" -lt 60 ] || { docker logs "$database" >&2; echo "Isolated PostgreSQL initialization did not complete" >&2; exit 1; }
+  sleep 1
+done
+
+attempt=0
 until docker exec "$database" pg_isready -U postgres -d sealsend >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   [ "$attempt" -lt 30 ] || { echo "Isolated PostgreSQL did not become ready" >&2; exit 1; }

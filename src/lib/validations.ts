@@ -114,7 +114,11 @@ export const eventCreateSchema = z.object({
   auto_reminders: z.boolean().optional(),
 });
 
-export const eventUpdateSchema = eventCreateSchema.partial();
+export const eventUpdateSchema = eventCreateSchema.extend({
+  event_timezone: z.string().min(1).max(100),
+  design_type: z.enum(["image", "pdf", "upload", "video"]),
+  status: z.enum(["draft", "published", "archived"]),
+}).partial();
 
 export const rsvpFieldSchema = z.object({
   field_name: z.string().min(1),

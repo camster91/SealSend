@@ -27,8 +27,59 @@ export async function GET(
 ) {
   try {
     const { eventId } = await params;
-    const auth = await requireEventPermission(eventId, 'view_guest_contacts');
+    const url = new URL(request.url);
+    const format = url.searchParams.get("format");
+    const auth = await requireEventPermission(
+      eventId,
+      format === "check-in-csv" ? "export_responses" : "view_guest_contacts",
+    );
     if (auth.error) return auth.error;
+
+    if (format === "check-in-csv") {
+      const guests = await query<{
+        name: string;
+        rsvp_status: string;
+        invite_status: string;
+        checked_in_at: string | null;
+      }>(
+        `SELECT name, rsvp_status, invite_status, checked_in_at
+         FROM guests
+         WHERE event_id = $1
+         ORDER BY name ASC
+         LIMIT 10000`,
+        [eventId],
+      );
+      const escapeCell = (value: string) => {
+        let safe = value.replace(/"/g, '""');
+        if (/^[=+\-@\t\r]/.test(safe)) safe = `'${safe}`;
+        return `"${safe}"`;
+      };
+      const rows = guests.map((guest) => [
+        guest.name,
+        guest.rsvp_status,
+        guest.invite_status,
+        guest.checked_in_at ? "Checked in" : "Not checked in",
+      ].map(escapeCell).join(","));
+      const csv = [
+        "Name,RSVP Status,Invitation Status,Check-in Status",
+        ...rows,
+      ].join("\n");
+
+      await query(
+        `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
+         VALUES ($1, $2, 'guest_check_in_fallback_exported', $3::jsonb)`,
+        [eventId, auth.user.id, JSON.stringify({ count: guests.length, format: "check-in-csv" })],
+      );
+
+      return new NextResponse(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="check-in-fallback-${eventId}.csv"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
 
     const { limit, offset } = parsePagination(request);
 

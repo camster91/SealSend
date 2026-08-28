@@ -10,6 +10,7 @@ import { getUserTier } from '@/lib/subscription';
 import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist';
 import { queryOne } from '@/lib/db/client';
+import { BETA_MODE } from '@/lib/constants';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -34,18 +35,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
   
   const allEvents = Array.from(new Map([...myEvents, ...collaboratingEvents, ...invitedEvents].map((event) => [event.id, event])).values());
-  const firstOwnedEvent = myEvents[0];
-  const onboarding = firstOwnedEvent ? await queryOne<{ guest_count: string; sent_count: string }>(
-    `SELECT COUNT(*)::text AS guest_count,
-            COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
-       FROM guests WHERE event_id = $1`,
-    [firstOwnedEvent.id],
-  ) : null;
+  const activeOwnedEvents = myEvents.filter((event) => event.status !== 'archived');
+  const firstOwnedEvent = activeOwnedEvents[0];
+  const [onboarding, guestUsage] = await Promise.all([
+    firstOwnedEvent ? queryOne<{ guest_count: string; sent_count: string }>(
+      `SELECT COUNT(*)::text AS guest_count,
+              COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
+         FROM guests WHERE event_id = $1`,
+      [firstOwnedEvent.id],
+    ) : null,
+    queryOne<{ largest_event_guest_count: string }>(
+      `SELECT COALESCE(MAX(event_guest_count), 0)::text AS largest_event_guest_count
+         FROM (
+           SELECT COUNT(guests.id) AS event_guest_count
+             FROM events
+             LEFT JOIN guests ON guests.event_id = events.id
+            WHERE events.user_id = $1 AND events.status <> 'archived'
+            GROUP BY events.id
+         ) active_event_usage`,
+      [user.id],
+    ),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {plan && (
+        {!BETA_MODE && plan && (
           <div className="mb-6 rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900">
             <p className="font-semibold">Continue with {plan === 'pro_annual' ? 'SealSend Pro' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`}</p>
             <p className="mt-1 text-sm">
@@ -90,11 +105,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         {/* Usage Stats */}
         <div className="mb-8">
           <UsageStats
-            tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : 'free'}
-            eventsUsed={myEvents.length}
+            tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : accountPlan === 'beta' ? 'Controlled Beta' : 'free'}
+            eventsUsed={activeOwnedEvents.length}
             eventsLimit={accountPlan === 'pro_annual' ? -1 : 1}
-            guestsUsed={0}
-            guestsLimit={accountPlan === 'pro_annual' ? 2500 : 15}
+            guestsUsed={Number(guestUsage?.largest_event_guest_count ?? 0)}
+            guestsLimit={accountPlan === 'beta' ? 100 : accountPlan === 'pro_annual' ? 2500 : 15}
           />
         </div>
 
@@ -217,7 +232,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </div>
                   </Link>
                   <div className="px-4 py-4 sm:px-2">
-                    <EventActionsMenu eventId={event.id} eventTitle={event.title} />
+                    <EventActionsMenu eventId={event.id} eventTitle={event.title} eventTimezone={event.event_timezone} />
                   </div>
                 </li>
               ))}

@@ -36,11 +36,14 @@ export async function POST(request: NextRequest) {
 
     const [accountPlan, eventCount] = await Promise.all([
       getUserTier(user.id),
-      queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1', [user.id]),
+      queryOne<{ count: string }>(
+        "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
+        [user.id],
+      ),
     ]);
     if (!canCreateEvent(accountPlan, Number(eventCount?.count ?? 0))) {
       return NextResponse.json(
-        { error: 'Free accounts can create one event. Upgrade to annual Pro for unlimited events.' },
+        { error: 'This plan supports one active event. Archive the current event before creating another.' },
         { status: 403 }
       );
     }
