@@ -19,7 +19,7 @@ export default defineConfig({
   webServer: process.env.NEXT_PUBLIC_SITE_URL
     ? undefined
     : {
-        command: 'npm run build && npm run start -- --hostname 127.0.0.1 --port 3100',
+        command: 'npm run build && npm run start:e2e',
         url: 'http://127.0.0.1:3100',
         reuseExistingServer: !process.env.CI,
         timeout: 180000,

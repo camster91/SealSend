@@ -153,10 +153,25 @@ test('recurring-organizer marketing describes the explicit next-event workflow',
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
   const config = await read('next.config.ts');
   const proxy = await read('src/proxy.ts');
+  const openGraphImage = await read('src/app/opengraph-image.tsx');
 
   assert.match(config, /turbopack:\s*\{[\s\S]*?root:\s*process\.cwd\(\)/);
   assert.match(config, /NEXT_PUBLIC_SITE_URL\?\.startsWith\('https:\/\/'\)/);
   assert.match(proxy, /export async function proxy\(/);
+  assert.doesNotMatch(openGraphImage, /runtime\s*=\s*["']edge["']/);
+});
+
+test('browser CI serves the same standalone artifact shape as production', async () => {
+  const config = await read('playwright.config.ts');
+  const pkg = JSON.parse(await read('package.json'));
+  const server = await read('scripts/test/start-playwright-server.mjs');
+
+  assert.match(config, /npm run build && npm run start:e2e/);
+  assert.equal(pkg.scripts['start:e2e'], 'node scripts/test/start-playwright-server.mjs');
+  assert.match(server, /\.next[\\/]standalone[\\/]server\.js/);
+  assert.match(server, /\.next[\\/]static/);
+  assert.match(server, /standalone[\\/]\.next[\\/]static/);
+  assert.match(server, /standalone[\\/]public/);
 });
 
 test('database rate limiting serializes attempts for the same key', async () => {
