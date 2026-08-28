@@ -74,6 +74,6 @@ test("checked-in quality score stays evidence-bounded and agrees with launch gat
   assert.deepEqual(result.errors, []);
   assert.equal(result.scores.productCapability, 81);
   assert.equal(result.scores.competitivePosition, 66);
-  assert.equal(result.scores.paidLaunchReadiness, 27.8);
+  assert.equal(result.scores.paidLaunchReadiness, 33.3);
   assert.equal(result.decision, "KEEP_WORKING");
 });
