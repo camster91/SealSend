@@ -809,6 +809,39 @@ test('pending beta hosts never claim zero critical defects before human review',
   }
 });
 
+test('operators can record explicit consent-window severity review without guest or defect text', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const command = await read('scripts/record-beta-defect-review.ts');
+  const report = await read('scripts/report-beta-participants.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+  const register = await read('docs/paid-beta-evidence-register.md');
+  const pkg = JSON.parse(await read('package.json'));
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_defect_reviews/);
+    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
+    assert.match(sql, /unresolved_severity_1 INTEGER NOT NULL CHECK \(unresolved_severity_1 BETWEEN 0 AND 100\)/);
+    assert.match(sql, /unresolved_severity_2 INTEGER NOT NULL CHECK \(unresolved_severity_2 BETWEEN 0 AND 100\)/);
+    assert.doesNotMatch(sql, /defect_(?:message|notes|description)/);
+    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent/);
+    assert.match(sql, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
+  }
+  assert.match(command, /parseBetaDefectReview/);
+  assert.match(command, /FOR UPDATE/);
+  assert.match(command, /segment = ANY/);
+  assert.match(command, /ON CONFLICT \(user_id, consented_at\)/);
+  assert.match(command, /reviewer_name/);
+  assert.doesNotMatch(command, /SELECT \*/);
+  assert.match(report, /beta_defect_reviews/);
+  assert.doesNotMatch(report, /reviewer_name/);
+  assert.match(metrics, /beta_defect_reviews/);
+  assert.doesNotMatch(metrics, /reviewer_name/);
+  assert.match(register, /not reviewed/i);
+  assert.match(register, /named human/i);
+  assert.equal(pkg.scripts['record-beta-defect-review'], 'npx tsx scripts/record-beta-defect-review.ts');
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');

@@ -53,9 +53,17 @@ interface OutcomeRow {
   updated_at: string;
 }
 
+interface DefectReviewRow {
+  participant_label: string;
+  unresolved_severity_1: number;
+  unresolved_severity_2: number;
+  review_version: string;
+  reviewed_at: string;
+}
+
 async function reportBetaParticipants() {
   try {
-    const [participants, milestones, feedbackEntries, outcomes] = await Promise.all([
+    const [participants, milestones, feedbackEntries, outcomes, defectReviews] = await Promise.all([
       pool.query<ParticipantRow>(
         `SELECT participant_label,
                 segment,
@@ -106,6 +114,20 @@ async function reportBetaParticipants() {
           ORDER BY participants.participant_label`,
         [BETA_SEGMENTS],
       ),
+      pool.query<DefectReviewRow>(
+        `SELECT participants.participant_label,
+                reviews.unresolved_severity_1,
+                reviews.unresolved_severity_2,
+                reviews.review_version,
+                reviews.reviewed_at::text
+           FROM beta_participants participants
+           JOIN beta_defect_reviews reviews
+             ON reviews.user_id = participants.user_id
+            AND reviews.consented_at = participants.consented_at
+          WHERE participants.segment = ANY($1::text[])
+          ORDER BY participants.participant_label`,
+        [BETA_SEGMENTS],
+      ),
     ]);
 
     if (participants.rows.length === 0) {
@@ -134,6 +156,15 @@ async function reportBetaParticipants() {
             selfReportedSupportMinutes: outcome.self_reported_support_minutes,
             priceVersion: outcome.price_version,
             submittedAt: outcome.updated_at,
+          } : null;
+        })(),
+        defectReview: (() => {
+          const review = defectReviews.rows.find((entry) => entry.participant_label === participant.participant_label);
+          return review ? {
+            unresolvedSeverity1: review.unresolved_severity_1,
+            unresolvedSeverity2: review.unresolved_severity_2,
+            reviewVersion: review.review_version,
+            reviewedAt: review.reviewed_at,
           } : null;
         })(),
       });

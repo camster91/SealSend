@@ -431,9 +431,11 @@ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
   ON beta_participants(segment) WHERE withdrawn_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent
+  ON beta_participants(user_id, consented_at);
 CREATE TABLE IF NOT EXISTS beta_outcomes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES beta_participants(user_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   consented_at TIMESTAMPTZ NOT NULL,
   consent_version TEXT NOT NULL,
   willingness_to_pay TEXT NOT NULL CHECK (willingness_to_pay IN ('annual_pro','per_event','free_only','unsure')),
@@ -442,6 +444,22 @@ CREATE TABLE IF NOT EXISTS beta_outcomes (
   price_version TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, consented_at)
+  UNIQUE (user_id, consented_at),
+  FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_beta_outcomes_created ON beta_outcomes(created_at DESC);
+CREATE TABLE IF NOT EXISTS beta_defect_reviews (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  consented_at TIMESTAMPTZ NOT NULL,
+  reviewer_name TEXT NOT NULL CHECK (char_length(reviewer_name) BETWEEN 2 AND 100),
+  review_version TEXT NOT NULL,
+  unresolved_severity_1 INTEGER NOT NULL CHECK (unresolved_severity_1 BETWEEN 0 AND 100),
+  unresolved_severity_2 INTEGER NOT NULL CHECK (unresolved_severity_2 BETWEEN 0 AND 100),
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, consented_at),
+  FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_beta_defect_reviews_reviewed ON beta_defect_reviews(reviewed_at DESC);

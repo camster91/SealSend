@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -65,7 +65,17 @@ export async function GET(request: NextRequest) {
        JOIN beta_outcomes outcomes
          ON outcomes.user_id = participants.user_id AND outcomes.consented_at = participants.consented_at
        WHERE participants.withdrawn_at IS NULL
-       ORDER BY participants.user_id`,
+      ORDER BY participants.user_id`,
+    ),
+    query<{ participant_id: string; unresolved_severity_1: number; unresolved_severity_2: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              reviews.unresolved_severity_1,
+              reviews.unresolved_severity_2
+         FROM beta_participants participants
+         JOIN beta_defect_reviews reviews
+           ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
+        WHERE participants.withdrawn_at IS NULL
+        ORDER BY participants.user_id`,
     ),
   ]);
   const participantMap = new Map<string, BetaCohortParticipant>(
@@ -77,6 +87,7 @@ export async function GET(request: NextRequest) {
       activationEvents: [],
       feedbackRatings: [],
       outcome: null,
+      defectReview: null,
     }]),
   );
   for (const event of betaMilestoneRows) {
@@ -94,6 +105,13 @@ export async function GET(request: NextRequest) {
       willingnessToPay: outcome.willingness_to_pay,
       repeatIntent: outcome.repeat_intent,
       selfReportedSupportMinutes: outcome.self_reported_support_minutes,
+    };
+  }
+  for (const review of betaDefectReviewRows) {
+    const participant = participantMap.get(review.participant_id);
+    if (participant) participant.defectReview = {
+      unresolvedSeverity1: review.unresolved_severity_1,
+      unresolvedSeverity2: review.unresolved_severity_2,
     };
   }
   const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);

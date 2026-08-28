@@ -17,6 +17,10 @@ export interface BetaCohortParticipant {
     repeatIntent: number;
     selfReportedSupportMinutes: number;
   };
+  defectReview: null | {
+    unresolvedSeverity1: number;
+    unresolvedSeverity2: number;
+  };
 }
 
 interface RateMetric {
@@ -53,6 +57,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
     ),
     feedbackRatings: participant.feedbackRatings.filter((rating) => rating >= 1 && rating <= 5),
     outcome: participant.outcome,
+    defectReview: participant.defectReview,
   })).map((participant) => ({
     ...participant,
     progress: deriveBetaProgress({
@@ -85,6 +90,7 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
   const ratings = progress.flatMap((participant) => participant.feedbackRatings);
   const denominator = active.length;
   const outcomes = progress.flatMap((participant) => participant.outcome ? [participant.outcome] : []);
+  const defectReviews = progress.flatMap((participant) => participant.defectReview ? [participant.defectReview] : []);
 
   return {
     cohortSize: denominator,
@@ -113,5 +119,12 @@ export function computeBetaCohortMetrics(participants: BetaCohortParticipant[]) 
       denominator,
     },
     medianSelfReportedSupportMinutes: median(outcomes.map((outcome) => outcome.selfReportedSupportMinutes)),
+    defectReviewCoverage: rate(defectReviews.length, denominator),
+    unresolvedCriticalDefects: denominator > 0 && defectReviews.length === denominator
+      ? defectReviews.reduce(
+        (total, review) => total + review.unresolvedSeverity1 + review.unresolvedSeverity2,
+        0,
+      )
+      : null,
   };
 }

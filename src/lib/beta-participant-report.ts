@@ -20,6 +20,12 @@ interface BetaParticipantReportInput {
     priceVersion: string;
     submittedAt: string;
   };
+  defectReview: null | {
+    unresolvedSeverity1: number;
+    unresolvedSeverity2: number;
+    reviewVersion: string;
+    reviewedAt: string;
+  };
 }
 
 export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
@@ -43,6 +49,9 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
     progress,
     feedbackCount,
     outcome: input.outcome,
-    criticalDefects: null,
+    criticalDefects: input.defectReview
+      ? input.defectReview.unresolvedSeverity1 + input.defectReview.unresolvedSeverity2
+      : null,
+    criticalDefectReview: input.defectReview,
   };
 }
