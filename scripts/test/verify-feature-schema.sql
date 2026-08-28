@@ -17,6 +17,17 @@ INSERT INTO events (
   'published'
 );
 
+INSERT INTO events (
+  id, user_id, title, slug, status, repeated_from_event_id
+) VALUES (
+  '00000000-0000-4000-8000-000000000006',
+  '00000000-0000-4000-8000-000000000001',
+  'Repeated Schema Contract Event',
+  'repeated-schema-contract-event',
+  'draft',
+  '00000000-0000-4000-8000-000000000002'
+);
+
 INSERT INTO guests (id, event_id, name, email, tags, reminder_sent_at)
 VALUES (
   '00000000-0000-4000-8000-000000000003',
@@ -101,5 +112,8 @@ INSERT INTO send_logs (
 SELECT * FROM rsvp_responses
 WHERE event_id = '00000000-0000-4000-8000-000000000002'
 ORDER BY submitted_at DESC;
+
+SELECT repeated_from_event_id FROM events
+WHERE id = '00000000-0000-4000-8000-000000000006';
 
 ROLLBACK;

@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS events (
   reminder_sequence JSONB NOT NULL DEFAULT '[]',
   event_brief JSONB,
   ai_generation_id UUID,
+  repeated_from_event_id UUID REFERENCES events(id) ON DELETE SET NULL,
   event_date TIMESTAMPTZ,
   event_end_date TIMESTAMPTZ,
   event_timezone TEXT NOT NULL DEFAULT 'UTC',
@@ -97,6 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
 CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug);
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_status_date ON events(status, event_date);
+CREATE INDEX IF NOT EXISTS idx_events_repeated_from ON events(repeated_from_event_id) WHERE repeated_from_event_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS ai_generations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

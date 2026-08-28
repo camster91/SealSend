@@ -37,10 +37,12 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
   // Optimized: Consolidating three database queries into one using scalar subqueries.
   // This reduces database round-trips from 3 to 1, significantly improving TTFB.
-  const event = await queryOne<Event & { response_count: number; guest_count: number }>(
+  const event = await queryOne<Event & { response_count: number; guest_count: number; repeated_from_title: string | null }>(
     `SELECT *,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id) AS response_count,
-      (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count
+      (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count,
+      (SELECT source.title FROM events source
+        WHERE source.id = events.repeated_from_event_id AND source.user_id = events.user_id) AS repeated_from_title
      FROM events
      WHERE id = $1`,
     [eventId]
@@ -244,6 +246,17 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <h2 className="text-sm font-semibold text-gray-900">Event Details</h2>
               </div>
               <div className="divide-y divide-gray-50 p-1">
+                {access.role === 'owner' && event.repeated_from_event_id && event.repeated_from_title && (
+                  <div className="flex items-start gap-3 rounded-xl px-5 py-3 transition-colors hover:bg-gray-50/50">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500" aria-hidden="true">↩</div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Previous event</p>
+                      <Link href={`/events/${event.repeated_from_event_id}`} className="mt-0.5 block truncate text-sm font-medium text-brand-700 hover:underline">
+                        {event.repeated_from_title}
+                      </Link>
+                    </div>
+                  </div>
+                )}
                 <DetailRow icon="calendar" label="Date" value={formatDate(event.event_date as string | null)} />
                 {event.event_end_date && (
                   <DetailRow icon="calendar-end" label="End Date" value={formatDate(event.event_end_date as string | null)} />

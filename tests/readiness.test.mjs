@@ -54,8 +54,13 @@ test('production migration backfills and constrains the send logging contract', 
 
 test('feature table schemas match the SQL contracts used by application routes', async () => {
   const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const verification = await read('scripts/test/verify-feature-schema.sql');
 
-  assertColumns(schema, 'events', ['location_lat', 'location_lng', 'payment_id', 'event_brief']);
+  assertColumns(schema, 'events', ['location_lat', 'location_lng', 'payment_id', 'event_brief', 'repeated_from_event_id']);
+  assert.match(tableDefinition(schema, 'events'), /repeated_from_event_id\s+UUID\s+REFERENCES events\(id\) ON DELETE SET NULL/);
+  assert.match(migration, /ALTER TABLE events ADD COLUMN IF NOT EXISTS repeated_from_event_id UUID REFERENCES events\(id\) ON DELETE SET NULL/);
+  assert.match(verification, /repeated_from_event_id/);
   assertColumns(schema, 'guests', ['tags']);
   assert.match(tableDefinition(schema, 'guests'), /invite_status TEXT DEFAULT 'not_sent'/);
   assertColumns(schema, 'guest_tags', ['tag_name']);
@@ -434,6 +439,7 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(route, /includeGuests/);
   assert.match(route, /buildRepeatedEventBrief/);
   assert.match(route, /event_brief/);
+  assert.match(route, /repeated_from_event_id/);
   assert.match(route, /guest_tags/);
   assert.match(route, /guest_tag_assignments/);
   assert.doesNotMatch(route, /SELECT \* FROM events/);
@@ -457,6 +463,8 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(eventPage, /const isArchived\s*=\s*event\.status\s*===\s*['"]archived['"]/);
   assert.match(eventPage, /!isArchived\s*&&\s*canEdit/);
   assert.match(eventPage, /Archived/);
+  assert.match(eventPage, /repeated_from_title/);
+  assert.match(eventPage, /Previous event/);
 });
 
 test('root discovery metadata matches the recurring-organizer controlled beta', async () => {

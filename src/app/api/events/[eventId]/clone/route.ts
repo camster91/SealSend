@@ -114,10 +114,10 @@ export async function POST(request: Request, { params }: RouteParams) {
          location_lat, location_lng, host_name, dress_code, rsvp_deadline, registry_links,
          max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type,
          customization, status, tier, max_responses, auto_reminders, reminder_sent_at, payment_id,
-         event_brief, ai_generation_id
+         event_brief, ai_generation_id, repeated_from_event_id
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL
+         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL, $27
        ) RETURNING id, title`,
       [
         auth.user.id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
@@ -128,6 +128,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         original.max_attendees, original.allow_plus_ones, original.max_guests_per_rsvp,
         original.design_url, original.design_type, original.customization, limits.responses,
         repeatedEventBrief ? JSON.stringify(repeatedEventBrief) : null,
+        eventId,
       ],
     );
     const newEvent = insertedEvent.rows[0];

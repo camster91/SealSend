@@ -19,6 +19,8 @@ CREATE INDEX IF NOT EXISTS idx_auth_codes_phone_context ON auth_codes(phone, rol
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_id TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS repeated_from_event_id UUID REFERENCES events(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_events_repeated_from ON events(repeated_from_event_id) WHERE repeated_from_event_id IS NOT NULL;
 
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone_invalid_at TIMESTAMPTZ;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;

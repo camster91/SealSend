@@ -277,6 +277,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     const repeatedEventResponse = await page.context().request.get(`/api/events/${repeatedEventId}`);
     expect(repeatedEventResponse.status()).toBe(200);
     const repeatedEvent = await repeatedEventResponse.json();
+    expect(repeatedEvent.repeated_from_event_id).toBe(eventId);
     expect(repeatedEvent.event_brief).toEqual({
       audience: 'Current clients and their approved guests',
       accessibilityStatus: 'not_reviewed',

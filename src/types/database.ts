@@ -41,6 +41,7 @@ export interface Event {
   reminder_sequence: Array<{ timing: string; subject: string; message: string }>;
   event_brief: EventBriefContext | null;
   ai_generation_id: string | null;
+  repeated_from_event_id: string | null;
   event_date: string | null;
   event_end_date: string | null;
   event_timezone: string;
