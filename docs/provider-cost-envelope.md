@@ -1,8 +1,10 @@
 # SealSend provider cost envelope
 
-Status: **Proposed — owner approval pending**  
-Reviewed: 2026-08-28  
-Scope: North American controlled beta and the planned USD 124.99 annual subscription. This document does not activate billing or communications and does not pass the provider-cost gate by itself.
+Status: **Approved for controlled cost estimates and alert thresholds**
+
+Reviewed: 2026-08-28
+
+Scope: North American controlled beta and the planned USD 124.99 annual subscription. This approval does not activate billing or authorize unrestricted communications.
 
 ## Current first-party price evidence
 
@@ -46,8 +48,14 @@ Recommended approval thresholds:
 
 ## Approval record
 
-Owner: Pending  
-Decision date: Pending  
-Approved preview rates: Pending  
-Approved per-event threshold: Pending  
-Approved monthly threshold: Pending
+Owner: Cameron Ashley
+
+Decision timestamp: 2026-08-28T20:34:03.394Z
+
+Approved preview rates: USD 0.002 per email; USD 0.020 per SMS segment
+
+Approved per-event threshold: Second operator review above USD 10 projected provider cost
+
+Approved monthly threshold: Pause new external sends and reconcile above USD 50 total email/SMS provider cost
+
+Boundary: No billing activation, provider credential change, unrestricted communication, merge, or deployment is authorized by this approval.
