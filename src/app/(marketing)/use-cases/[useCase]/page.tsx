@@ -12,6 +12,8 @@ export function generateStaticParams() {
   return USE_CASE_SLUGS.map((slug) => ({ useCase: slug }));
 }
 
+export const dynamicParams = false;
+
 export async function generateMetadata({
   params,
 }: {
@@ -20,7 +22,7 @@ export async function generateMetadata({
   const { useCase } = await params;
   const canonicalUseCase = LEGACY_USE_CASE_REDIRECTS[useCase] ?? useCase;
   const data = USE_CASES[canonicalUseCase];
-  if (!data) return {};
+  if (!data) notFound();
 
   return createMetadata({
     title: data.metaTitle,
