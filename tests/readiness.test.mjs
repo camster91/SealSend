@@ -685,6 +685,54 @@ test('controlled beta evidence requires explicit consent, supports withdrawal, a
   assert.match(live, /method:\s*['"]DELETE['"]/);
 });
 
+test('controlled beta enrollment accepts only operator invitations', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/beta/participation/route.ts');
+  const panel = await read('src/components/dashboard/BetaParticipation.tsx');
+  const command = await read('scripts/create-beta-invite.ts');
+  const pkg = JSON.parse(await read('package.json'));
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_enrollment_invites/);
+    for (const column of ['token_hash', 'token_preview', 'participant_label', 'segment', 'expires_at', 'accepted_by', 'accepted_at', 'revoked_at']) {
+      assert.match(sql, new RegExp(`${column}\\s`));
+    }
+  }
+  assert.match(route, /hashMagicToken\(enrollment\.inviteToken\)/);
+  assert.match(route, /BEGIN/);
+  assert.match(route, /FOR UPDATE/);
+  assert.match(route, /accepted_at IS NULL/);
+  assert.match(route, /revoked_at IS NULL/);
+  assert.match(route, /expires_at > NOW\(\)/);
+  assert.match(route, /Enter a valid invitation code and explicitly consent/);
+  assert.match(route, /accepted_by = \$2[\s\S]*accepted_at = NOW\(\)/);
+  assert.match(route, /COMMIT/);
+  assert.match(route, /ROLLBACK/);
+  assert.doesNotMatch(route, /randomBytes/);
+  assert.doesNotMatch(route, /enrollment\.segment/);
+  assert.match(panel, /Invitation code/);
+  assert.match(panel, /inviteToken/);
+  assert.doesNotMatch(panel, /beta-segment/);
+  assert.match(command, /generateMagicToken/);
+  assert.match(command, /hashMagicToken/);
+  assert.match(command, /previewMagicToken/);
+  assert.match(command, /BETA_SEGMENTS/);
+  assert.match(command, /INTERVAL '7 days'/);
+  assert.equal(pkg.scripts['create-beta-invite'], 'npx tsx scripts/create-beta-invite.ts');
+});
+
+test('accepted beta invitations survive account deletion without retaining the account id', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    const invites = tableDefinition(sql, 'beta_enrollment_invites');
+    assert.match(invites, /accepted_by UUID REFERENCES admin_users\(id\) ON DELETE SET NULL/);
+    assert.doesNotMatch(invites, /accepted_at IS NULL OR accepted_by IS NOT NULL/);
+  }
+});
+
 test('communication review exposes resolved recipients, cost status, controls, and a separate approval gate', async () => {
   const audience = await read('src/app/api/events/[eventId]/announcements/audience/route.ts');
   const draft = await read('src/app/api/events/[eventId]/announcements/draft/route.ts');

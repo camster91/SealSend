@@ -20,7 +20,8 @@
     "test:integration": "npx tsx scripts/test/test-integration.ts",
     "test:rate-limit": "tsx scripts/test/test-rate-limit-concurrency.ts",
     "test:all": "npx tsx scripts/test/test-all.ts",
-    "create-admin": "npx tsx scripts/create-admin.ts"
+    "create-admin": "npx tsx scripts/create-admin.ts",
+    "create-beta-invite": "npx tsx scripts/create-beta-invite.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.8.0",

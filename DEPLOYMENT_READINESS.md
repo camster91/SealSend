@@ -28,7 +28,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 138 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 142 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -82,7 +82,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - AI-assisted message drafts with tone, length, urgency, and channel controls; no AI route can send externally.
 - Traceable aggregate RSVP intelligence that excludes guest free text from AI interpretation.
 - Thirteen editable templates, template-to-wizard population, safe artwork upload, and non-destructive crop/focus controls.
-- Privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
+- Operator-issued, expiring, one-time beta invitations with hashed token storage and server-assigned cohort segments; privacy-limited activation analytics, sanitized server-error monitoring, authenticated beta feedback, health checks, backups, and rollback artifacts.
 - Self-service portable JSON export plus scheduled account deletion with a seven-day cooling-off period, paid-subscription protection, cancellation, and retry-safe upload cleanup.
 - Per-account upload accounting and serialized quotas: 250 MB free, 1 GB paid-event, and 5 GB annual Pro; orphan deletion remains report-only until explicitly enabled.
 - First-event onboarding, checkout lifecycle analytics, aggregate secret-gated operational metrics, and deduplicated host lifecycle messaging that remains disabled until provider verification.
@@ -112,7 +112,7 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 3. Create and verify a new PostgreSQL backup, retain the prior image/release, and record an explicit rollback target.
 4. Build a uniquely tagged image and apply `apply-security-indexes.sql` with `ON_ERROR_STOP` before switching the app.
 5. Verify explicit test-only environment flags, container health, logs, HTTP-to-HTTPS, TLS, CSP/security headers, sensitive-path protection, robots, sitemap, and `/api/health`.
-6. Use a disposable production QA owner to exercise AI fallback, templates, event create/edit/publish, guests, public RSVP/plus-one/comment, RSVP summary, audience/cost preview, message-draft feedback, calendar/CSV, beta feedback, and cleanup.
+6. Create a one-time `repeat_planner` QA invitation with `npm run create-beta-invite -- repeat_planner`, pass it only as `SEALSEND_QA_BETA_INVITE_TOKEN`, and use a disposable production QA owner to exercise consent, AI fallback, templates, event create/edit/publish, guests, public RSVP/plus-one/comment, RSVP summary, audience/cost preview, message-draft feedback, calendar/CSV, beta feedback, withdrawal, and cleanup. Never record the raw invitation code in evidence.
 7. Verify a disposable check-in-only user can check guests in but cannot access event design, exports, or billing.
 8. Run public visual/accessibility checks at 375, 768, and 1440 pixels, including long content and missing artwork.
 9. Remove all disposable QA accounts/events/feedback and verify cleanup counts.

@@ -21,14 +21,6 @@ interface ParticipationResponse {
   };
 }
 
-const SEGMENTS: Array<{ value: Segment; label: string }> = [
-  { value: "club_association", label: "Club or association" },
-  { value: "volunteer_nonprofit", label: "Volunteer group or local non-profit" },
-  { value: "creative_community", label: "Creative community" },
-  { value: "alumni_professional", label: "Alumni or small professional community" },
-  { value: "repeat_planner", label: "Repeat planner" },
-];
-
 const STEPS = [
   ["account", "Account and beta consent"],
   ["eventAndDesign", "Publish an event and review its design"],
@@ -44,7 +36,7 @@ const STEPS = [
 
 export function BetaParticipation() {
   const [data, setData] = useState<ParticipationResponse | null>(null);
-  const [segment, setSegment] = useState<Segment>("club_association");
+  const [inviteToken, setInviteToken] = useState("");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -54,7 +46,6 @@ export function BetaParticipation() {
     if (!response.ok) throw new Error("Beta participation could not be loaded.");
     const next = await response.json() as ParticipationResponse;
     setData(next);
-    if (next.participant?.segment) setSegment(next.participant.segment);
   };
 
   useEffect(() => {
@@ -68,12 +59,13 @@ export function BetaParticipation() {
       const response = await fetch("/api/beta/participation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segment, consent }),
+        body: JSON.stringify({ inviteToken: inviteToken.trim(), consent }),
       });
       const next = await response.json();
       if (!response.ok) throw new Error(next.error || "Beta consent could not be recorded.");
       setData(next);
       setConsent(false);
+      setInviteToken("");
       setNotice({ tone: "success", text: "Your controlled-beta consent was recorded." });
     } catch (error) {
       setNotice({ tone: "error", text: error instanceof Error ? error.message : "Beta consent could not be recorded." });
@@ -138,16 +130,15 @@ export function BetaParticipation() {
         <div className="mt-5 space-y-4">
           {data?.participant?.withdrawnAt && <p className="text-sm text-gray-700">Your previous consent is withdrawn. Rejoining starts a new evidence window.</p>}
           <div>
-            <label htmlFor="beta-segment" className="block text-sm font-medium text-gray-900">Your primary event type</label>
-            <select id="beta-segment" value={segment} onChange={(event) => setSegment(event.target.value as Segment)} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
-              {SEGMENTS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            <label htmlFor="beta-invitation-code" className="block text-sm font-medium text-gray-900">Invitation code</label>
+            <input id="beta-invitation-code" value={inviteToken} onChange={(event) => setInviteToken(event.target.value)} autoComplete="off" spellCheck={false} maxLength={43} className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 font-mono text-sm" />
+            <p className="mt-1 text-xs text-gray-600">Your operator-issued code assigns the approved cohort segment and can be used once.</p>
           </div>
           <label className="flex items-start gap-3 text-sm text-gray-700">
             <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />
             <span>I consent to SealSend using privacy-limited workflow milestones and my submitted feedback to evaluate this controlled beta. I can withdraw this consent here at any time.</span>
           </label>
-          <button type="button" disabled={busy || !consent} onClick={join} className="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+          <button type="button" disabled={busy || !consent || inviteToken.trim().length !== 43} onClick={join} className="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
             {busy ? "Joining…" : "Join controlled beta"}
           </button>
         </div>

@@ -75,6 +75,16 @@ INSERT INTO guest_magic_tokens (
   '00000000-0000-4000-8000-000000000001'
 );
 
+INSERT INTO beta_enrollment_invites (
+  token_hash, token_preview, participant_label, segment, expires_at
+) VALUES (
+  repeat('b', 64),
+  'bbbb',
+  'host-111111111111',
+  'club_association',
+  NOW() + INTERVAL '7 days'
+);
+
 INSERT INTO send_logs (
   guest_id, event_id, send_type, status, recipient, provider_message_id, metadata
 ) VALUES (

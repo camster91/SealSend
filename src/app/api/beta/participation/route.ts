@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   BETA_MILESTONE_NAMES,
@@ -9,7 +8,8 @@ import {
   type BetaSegment,
 } from "@/lib/beta-participation";
 import { requireApiHost } from "@/lib/auth/api-auth";
-import { query, queryOne } from "@/lib/db/client";
+import { getDb, query, queryOne } from "@/lib/db/client";
+import { hashMagicToken } from "@/lib/magic-token";
 
 interface ParticipantRow {
   participant_label: string;
@@ -79,23 +79,58 @@ export async function POST(request: Request) {
   try {
     enrollment = parseBetaEnrollment(await request.json());
   } catch {
-    return noStore({ error: "Choose a beta segment and explicitly consent to observation." }, { status: 400 });
+    return noStore({ error: "Enter a valid invitation code and explicitly consent to observation." }, { status: 400 });
   }
 
-  const participantLabel = `host-${randomBytes(6).toString("hex")}`;
-  await queryOne(
-    `INSERT INTO beta_participants
-       (user_id, participant_label, segment, consent_version, consented_at, withdrawn_at, updated_at)
-     VALUES ($1, $2, $3, $4, NOW(), NULL, NOW())
-     ON CONFLICT (user_id) DO UPDATE SET
-       segment = EXCLUDED.segment,
-       consent_version = EXCLUDED.consent_version,
-       consented_at = NOW(),
-       withdrawn_at = NULL,
-       updated_at = NOW()
-     RETURNING participant_label`,
-    [auth.user.id, participantLabel, enrollment.segment, enrollment.consentVersion],
-  );
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    const inviteResult = await client.query<{
+      id: string;
+      participant_label: string;
+      segment: BetaSegment;
+    }>(
+      `SELECT id, participant_label, segment
+         FROM beta_enrollment_invites
+        WHERE token_hash = $1
+          AND accepted_at IS NULL
+          AND revoked_at IS NULL
+          AND expires_at > NOW()
+        FOR UPDATE`,
+      [hashMagicToken(enrollment.inviteToken)],
+    );
+    const invite = inviteResult.rows[0];
+    if (!invite) {
+      await client.query("ROLLBACK");
+      return noStore({ error: "Invitation code is invalid, expired, revoked, or already used." }, { status: 404 });
+    }
+
+    await client.query(
+      `INSERT INTO beta_participants
+         (user_id, participant_label, segment, consent_version, consented_at, withdrawn_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NULL, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         participant_label = EXCLUDED.participant_label,
+         segment = EXCLUDED.segment,
+         consent_version = EXCLUDED.consent_version,
+         consented_at = NOW(),
+         withdrawn_at = NULL,
+         updated_at = NOW()`,
+      [auth.user.id, invite.participant_label, invite.segment, enrollment.consentVersion],
+    );
+    await client.query(
+      `UPDATE beta_enrollment_invites
+          SET accepted_by = $2, accepted_at = NOW()
+        WHERE id = $1 AND accepted_at IS NULL`,
+      [invite.id, auth.user.id],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
   return noStore(await getParticipation(auth.user.id), { status: 201 });
 }
 

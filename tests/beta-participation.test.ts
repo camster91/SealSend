@@ -9,7 +9,7 @@ import {
   parseBetaEnrollment,
 } from "../src/lib/beta-participation";
 
-test("beta enrollment requires explicit current-version consent and a supported segment", () => {
+test("beta enrollment accepts only a valid invitation token", () => {
   assert.deepEqual(BETA_SEGMENTS, [
     "club_association",
     "volunteer_nonprofit",
@@ -17,14 +17,19 @@ test("beta enrollment requires explicit current-version consent and a supported 
     "alumni_professional",
     "repeat_planner",
   ]);
+  const inviteToken = "a".repeat(43);
   assert.deepEqual(
-    parseBetaEnrollment({ segment: "club_association", consent: true }),
-    { segment: "club_association", consentVersion: BETA_CONSENT_VERSION },
+    parseBetaEnrollment({ inviteToken, consent: true }),
+    { inviteToken, consentVersion: BETA_CONSENT_VERSION },
   );
-  assert.throws(() => parseBetaEnrollment({ segment: "club_association", consent: false }));
-  assert.throws(() => parseBetaEnrollment({ segment: "consumer_party", consent: true }));
-  assert.throws(() => parseBetaEnrollment({ segment: "wedding", consent: true }));
-  assert.throws(() => parseBetaEnrollment({ segment: "wedding", consent: true, email: "not-allowed@example.com" }));
+  assert.throws(() => parseBetaEnrollment({ inviteToken: "short", consent: true }));
+  assert.throws(() => parseBetaEnrollment({ inviteToken, segment: "club_association", consent: true }));
+});
+
+test("beta enrollment requires explicit consent", () => {
+  const inviteToken = "a".repeat(43);
+  assert.throws(() => parseBetaEnrollment({ inviteToken, consent: false }));
+  assert.throws(() => parseBetaEnrollment({ inviteToken }));
 });
 
 test("withdrawn participation is excluded from active beta evidence", () => {

@@ -4,9 +4,10 @@ import { expect, test } from '@playwright/test';
 
 const qaEmail = process.env.SEALSEND_QA_EMAIL;
 const qaPassword = process.env.SEALSEND_QA_PASSWORD;
+const qaBetaInviteToken = process.env.SEALSEND_QA_BETA_INVITE_TOKEN;
 const output = path.resolve('qa-screenshots', 'live-full');
 
-test.skip(!qaEmail || !qaPassword, 'Temporary production QA credentials are required');
+test.skip(!qaEmail || !qaPassword || !qaBetaInviteToken, 'Temporary production QA credentials and a one-time beta invitation are required');
 
 test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Run the stateful production lifecycle once.');
@@ -37,7 +38,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
     const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {
-      segment: 'repeat_planner', consent: true,
+      inviteToken: qaBetaInviteToken, consent: true,
     }});
     expect(betaEnrollment.status()).toBe(201);
     const initialBeta = await betaEnrollment.json();

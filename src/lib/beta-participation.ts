@@ -13,17 +13,17 @@ export const BETA_SEGMENTS = [
 export type BetaSegment = (typeof BETA_SEGMENTS)[number];
 
 const betaEnrollmentSchema = z.object({
-  segment: z.enum(BETA_SEGMENTS),
+  inviteToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   consent: z.literal(true),
 }).strict();
 
 export function parseBetaEnrollment(input: unknown): {
-  segment: BetaSegment;
+  inviteToken: string;
   consentVersion: string;
 } {
   const enrollment = betaEnrollmentSchema.parse(input);
   return {
-    segment: enrollment.segment,
+    inviteToken: enrollment.inviteToken,
     consentVersion: BETA_CONSENT_VERSION,
   };
 }

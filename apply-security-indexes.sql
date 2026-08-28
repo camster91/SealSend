@@ -392,6 +392,21 @@ CREATE TABLE IF NOT EXISTS beta_feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_beta_feedback_created ON beta_feedback(created_at DESC);
+CREATE TABLE IF NOT EXISTS beta_enrollment_invites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  token_hash TEXT UNIQUE NOT NULL CHECK (token_hash ~ '^[a-f0-9]{64}$'),
+  token_preview TEXT NOT NULL CHECK (char_length(token_preview) = 4),
+  participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
+  segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  accepted_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (accepted_at IS NULL OR revoked_at IS NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_beta_enrollment_invites_available
+  ON beta_enrollment_invites(expires_at) WHERE accepted_at IS NULL AND revoked_at IS NULL;
 CREATE TABLE IF NOT EXISTS beta_participants (
   user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
