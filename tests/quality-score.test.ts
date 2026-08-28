@@ -77,3 +77,17 @@ test("checked-in quality score stays evidence-bounded and agrees with launch gat
   assert.equal(result.scores.paidLaunchReadiness, 38.9);
   assert.equal(result.decision, "KEEP_WORKING");
 });
+
+test("launch status documents match the authoritative checked-in score", async () => {
+  const checkedInScorecard = JSON.parse(await readFile("config/quality-scorecard.json", "utf8"));
+  const launchEvidence = JSON.parse(await readFile("config/launch-evidence.json", "utf8"));
+  const passed = launchEvidence.gates.filter((gate: { status: string }) => gate.status === "pass").length;
+  const required = launchEvidence.gates.length;
+  const result = evaluateQualityScorecard(checkedInScorecard, { passed, required });
+  const expected = `product capability **${result.scores.productCapability}/100**, competitive position **${result.scores.competitivePosition}/100**, and paid-launch readiness **${passed}/${required} (${result.scores.paidLaunchReadiness}%)**`;
+
+  for (const path of ["DEPLOYMENT_READINESS.md", "docs/paid-beta-evidence-register.md"]) {
+    const document = await readFile(path, "utf8");
+    assert.match(document, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `${path} must state the authoritative score`);
+  }
+});

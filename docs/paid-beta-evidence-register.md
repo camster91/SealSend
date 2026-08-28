@@ -4,7 +4,7 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 
 ## Evidence-backed score baseline
 
-`npm run quality:score` evaluates `config/quality-scorecard.json` together with the mandatory launch-gate manifest. The 2026-08-28 baseline is product capability **81/100**, competitive position **66/100**, and paid-launch readiness **5/18 (27.8%)**. Synthetic QA and automated checks can strengthen product evidence, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence. Do not raise a category unless its linked evidence exists; every partial category must keep its missing proof explicit.
+`npm run quality:score` evaluates `config/quality-scorecard.json` together with the mandatory launch-gate manifest. The 2026-08-28 baseline is product capability **82/100**, competitive position **69/100**, and paid-launch readiness **7/18 (38.9%)**. Synthetic QA and automated checks can strengthen product evidence, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence. Do not raise a category unless its linked evidence exists; every partial category must keep its missing proof explicit.
 
 ## Provider lifecycle evidence
 
