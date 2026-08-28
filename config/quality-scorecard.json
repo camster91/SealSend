@@ -30,9 +30,9 @@
         {
           "id": "communications_control_delivery",
           "maximum": 15,
-          "earned": 11,
-          "evidence": ["tests/communications-safety.test.ts", "tests/communication-suppressions.test.ts", "tests/message-cost-estimate.test.ts"],
-          "missingEvidence": ["Mailgun signed delivery lifecycle", "Twilio signed delivery and STOP lifecycle", "Approved provider costs"]
+          "earned": 12,
+          "evidence": ["tests/communications-safety.test.ts", "tests/communication-suppressions.test.ts", "tests/message-cost-estimate.test.ts", "docs/provider-cost-envelope.md"],
+          "missingEvidence": ["Mailgun signed delivery lifecycle", "Twilio signed delivery and STOP lifecycle"]
         },
         {
           "id": "team_event_day_operations",
@@ -77,9 +77,9 @@
         {
           "id": "value_pricing_logic",
           "maximum": 15,
-          "earned": 13,
-          "evidence": ["src/lib/constants.ts", "tests/entitlements.test.ts", "tests/billing.test.ts"],
-          "missingEvidence": ["Approved provider unit costs", "Five-host willingness-to-pay results", "Observed paid conversion"]
+          "earned": 14,
+          "evidence": ["src/lib/constants.ts", "tests/entitlements.test.ts", "tests/billing.test.ts", "docs/provider-cost-envelope.md"],
+          "missingEvidence": ["Five-host willingness-to-pay results", "Observed paid conversion"]
         },
         {
           "id": "trust_proof",
@@ -98,8 +98,8 @@
         {
           "id": "distribution_repeat_use_loop",
           "maximum": 10,
-          "earned": 5,
-          "evidence": ["src/app/api/events/[eventId]/clone/route.ts", "tests/beta-metrics.test.ts"],
+          "earned": 6,
+          "evidence": ["src/app/api/events/[eventId]/clone/route.ts", "src/app/api/cron/send-host-lifecycle/route.ts", "src/app/api/operations/metrics/route.ts", "tests/host-lifecycle.test.ts", "tests/beta-metrics.test.ts"],
           "missingEvidence": ["Measured repeat-host activation", "Permissioned acquisition source and referral evidence"]
         }
       ]
