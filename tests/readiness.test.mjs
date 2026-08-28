@@ -1332,6 +1332,15 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /status: 500/);
 });
 
+test('direct provider test sends obey the controlled-recipient allowlist', async () => {
+  const smsTest = await read('scripts/test/test-sms.ts');
+  const guardIndex = smsTest.indexOf('assertApprovedRecipient(formattedPhone)');
+  const sendIndex = smsTest.indexOf('client.messages.create');
+
+  assert.ok(guardIndex >= 0, 'SMS provider test must enforce the controlled-recipient allowlist');
+  assert.ok(sendIndex > guardIndex, 'SMS recipient guard must run before the first provider send');
+});
+
 test('Twilio incoming opt-out events synchronize the local SMS suppression state', async () => {
   const twilio = await read('src/app/api/webhooks/twilio/route.ts');
   const inbound = await read('src/lib/twilio-inbound-opt-out.ts');

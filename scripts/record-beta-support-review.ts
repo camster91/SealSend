@@ -14,7 +14,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-let review;
+let review: ReturnType<typeof parseBetaSupportReview>;
 try {
   review = parseBetaSupportReview({
     participantLabel: process.argv[2],

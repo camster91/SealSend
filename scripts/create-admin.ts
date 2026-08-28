@@ -28,6 +28,8 @@ if (!checkPasswordStrength(adminPassword).valid) {
   process.exit(1);
 }
 
+const verifiedAdminPassword = adminPassword;
+
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 2,
@@ -56,7 +58,7 @@ async function createAdmin() {
       return;
     }
 
-    const passwordHash = await hashPassword(adminPassword);
+    const passwordHash = await hashPassword(verifiedAdminPassword);
     const insertResult = await pool.query<AdminUser>(
       'INSERT INTO admin_users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, created_at',
       [email, passwordHash, adminName]

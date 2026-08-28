@@ -27,6 +27,10 @@ if (!/^[A-Za-z0-9_-]{43}$/.test(inviteToken)) {
   throw new Error("SEALSEND_QA_BETA_INVITE_TOKEN must be a 43-character base64url token");
 }
 
+const qaEmail = email;
+const qaPassword = password;
+const qaInviteToken = inviteToken;
+
 async function main() {
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -43,14 +47,14 @@ async function main() {
       `INSERT INTO admin_users (email, password, name)
        VALUES ($1, $2, $3)
        ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, name = EXCLUDED.name`,
-      [email.toLowerCase(), await hashPassword(password), "Isolated QA Host"],
+      [qaEmail.toLowerCase(), await hashPassword(qaPassword), "Isolated QA Host"],
     );
     await pool.query(
       `INSERT INTO beta_enrollment_invites
          (token_hash, token_preview, participant_label, segment, cohort_version, expires_at)
        VALUES ($1, $2, 'host-e2e000000001', 'repeat_planner', $3, NOW() + INTERVAL '1 day')
        ON CONFLICT (token_hash) DO NOTHING`,
-      [hashMagicToken(inviteToken), previewMagicToken(inviteToken), betaAcceptancePolicy.cohortVersion],
+      [hashMagicToken(qaInviteToken), previewMagicToken(qaInviteToken), betaAcceptancePolicy.cohortVersion],
     );
     console.log("Prepared isolated SealSend authenticated browser fixture.");
   } finally {
