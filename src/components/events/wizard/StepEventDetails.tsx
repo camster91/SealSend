@@ -10,6 +10,8 @@ import { X } from 'lucide-react';
 interface EventDetailsFormValues {
   title: string;
   description: string;
+  invitation_headline: string;
+  invitation_body: string;
   event_date: string;
   event_end_date: string;
   location_name: string;
@@ -19,6 +21,10 @@ interface EventDetailsFormValues {
   rsvp_deadline: string;
   max_attendees: string;
   max_guests_per_rsvp: string;
+  audience: string;
+  accessibility_status: 'not_reviewed' | 'no_known_requirements' | 'requirements_known';
+  accessibility_notes: string;
+  communication_preference: 'undecided' | 'email' | 'sms' | 'email_and_sms' | 'none';
 }
 
 interface StepEventDetailsProps {
@@ -64,17 +70,17 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
     control,
     formState: { errors },
   } = useForm<EventDetailsFormValues>({
-    defaultValues: data,
+    values: data,
     mode: 'onChange',
   });
 
   const watchedValues = useWatch({ control });
 
   useEffect(() => {
-    const fields: (keyof EventDetailsFormValues)[] = [
-      'title', 'description', 'event_date', 'event_end_date',
+    const fields = [
+      'title', 'description', 'invitation_headline', 'invitation_body', 'event_date', 'event_end_date',
       'location_name', 'location_address', 'host_name', 'dress_code', 'rsvp_deadline',
-    ];
+    ] as const;
 
     fields.forEach((field) => {
       if (watchedValues[field] !== data[field]) {
@@ -89,6 +95,18 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
     if (watchedValues.max_guests_per_rsvp !== data.max_guests_per_rsvp) {
       const val = watchedValues.max_guests_per_rsvp;
       onUpdate('max_guests_per_rsvp', val ? parseInt(val, 10) || 10 : 10);
+    }
+    const briefChanged = watchedValues.audience !== data.audience
+      || watchedValues.accessibility_status !== data.accessibility_status
+      || watchedValues.accessibility_notes !== data.accessibility_notes
+      || watchedValues.communication_preference !== data.communication_preference;
+    if (briefChanged) {
+      onUpdate('event_brief', {
+        audience: watchedValues.audience ?? '',
+        accessibilityStatus: watchedValues.accessibility_status ?? 'not_reviewed',
+        accessibilityNotes: watchedValues.accessibility_notes?.trim() || null,
+        communicationPreference: watchedValues.communication_preference ?? 'undecided',
+      });
     }
   }, [watchedValues, data, onUpdate]);
 
@@ -132,14 +150,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             aria-describedby="title-counter"
           />
-          <div className="mt-1 flex justify-between items-start">
-            <div>
-              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
-            </div>
-            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
-              {(watchedValues.title || '').length}/200
-            </p>
-          </div>
+          {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
         </div>
 
         <div>
@@ -164,14 +175,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             aria-describedby="description-counter"
           />
-          <div className="mt-1 flex justify-between items-start">
-            <div>
-              {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
-            </div>
-            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
-              {(watchedValues.description || '').length}/2000
-            </p>
-          </div>
+          {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
         </div>
 
         <div>
@@ -184,6 +188,76 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
+      </section>
+
+      <hr className="border-gray-200" />
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Invitation Copy</h3>
+          <p className="mt-1 text-sm text-gray-600">Review the message guests will see. You can leave it incomplete while saving a private draft.</p>
+        </div>
+        <div>
+          <label htmlFor="invitation_headline" className="mb-1 block text-sm font-medium text-gray-700">Invitation headline</label>
+          <input
+            id="invitation_headline"
+            type="text"
+            {...register('invitation_headline', { maxLength: { value: 200, message: 'Invitation headline must be less than 200 characters' } })}
+            placeholder="You’re invited to our September gathering"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          />
+          {errors.invitation_headline && <p className="mt-1 text-sm text-red-600">{errors.invitation_headline.message}</p>}
+        </div>
+        <div>
+          <label htmlFor="invitation_body" className="mb-1 block text-sm font-medium text-gray-700">Invitation message</label>
+          <textarea
+            id="invitation_body"
+            rows={4}
+            {...register('invitation_body', { maxLength: { value: 2000, message: 'Invitation message must be less than 2000 characters' } })}
+            placeholder="Share the purpose of the event and what guests should know before they RSVP."
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          />
+          {errors.invitation_body && <p className="mt-1 text-sm text-red-600">{errors.invitation_body.message}</p>}
+        </div>
+      </section>
+
+      <hr className="border-gray-200" />
+
+      <section className="space-y-4" aria-labelledby="event-brief-heading">
+        <div>
+          <h3 id="event-brief-heading" className="text-sm font-semibold uppercase tracking-wide text-gray-400">Guest Operations Brief</h3>
+          <p className="mt-1 text-sm text-gray-600">Record who this event serves and the decisions your organizing team must review before publishing.</p>
+        </div>
+        <div>
+          <label htmlFor="audience" className="mb-1 block text-sm font-medium text-gray-700">Intended audience</label>
+          <textarea id="audience" rows={2} {...register('audience', { maxLength: 500 })} placeholder="Neighbourhood volunteers and their invited household members" className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="accessibility_status" className="mb-1 block text-sm font-medium text-gray-700">Accessibility review</label>
+            <select id="accessibility_status" {...register('accessibility_status')} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-base">
+              <option value="not_reviewed">Not reviewed yet</option>
+              <option value="no_known_requirements">No known requirements</option>
+              <option value="requirements_known">Requirements identified</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="communication_preference" className="mb-1 block text-sm font-medium text-gray-700">Guest communication plan</label>
+            <select id="communication_preference" {...register('communication_preference')} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-base">
+              <option value="undecided">Not decided yet</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="email_and_sms">Email and SMS</option>
+              <option value="none">No messages planned</option>
+            </select>
+          </div>
+        </div>
+        {watchedValues.accessibility_status === 'requirements_known' && (
+          <div>
+            <label htmlFor="accessibility_notes" className="mb-1 block text-sm font-medium text-gray-700">Accessibility requirements</label>
+            <textarea id="accessibility_notes" rows={3} {...register('accessibility_notes', { maxLength: 1000 })} placeholder="Document confirmed access needs and accommodations without adding sensitive guest details." className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
+          </div>
+        )}
       </section>
 
       <hr className="border-gray-200" />

@@ -12,6 +12,8 @@ test("empty beta cohorts report null rates instead of implying zero-percent perf
   assert.equal(metrics.averageFeedbackRating, null);
   assert.deepEqual(metrics.statedWillingnessToPay, { annualPro: 0, perEvent: 0, freeOnly: 0, unsure: 0, responses: 0, denominator: 0 });
   assert.equal(metrics.medianSelfReportedSupportMinutes, null);
+  assert.deepEqual(metrics.supportReviewCoverage, { numerator: 0, denominator: 0, rate: null });
+  assert.equal(metrics.medianOperatorRecordedSupportMinutes, null);
   assert.deepEqual(metrics.defectReviewCoverage, { numerator: 0, denominator: 0, rate: null });
   assert.equal(metrics.unresolvedCriticalDefects, null);
 });
@@ -38,6 +40,7 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
       feedbackRatings: [4, 5],
       outcome: { willingnessToPay: "annual_pro", repeatIntent: 5, selfReportedSupportMinutes: 12 },
       defectReview: { unresolvedSeverity1: 0, unresolvedSeverity2: 1 },
+      supportReview: { operatorRecordedSupportMinutes: 0 },
     },
     {
       participantId: "withdrawn-host",
@@ -48,6 +51,7 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
       feedbackRatings: [1],
       outcome: { willingnessToPay: "free_only", repeatIntent: 1, selfReportedSupportMinutes: 600 },
       defectReview: { unresolvedSeverity1: 9, unresolvedSeverity2: 9 },
+      supportReview: { operatorRecordedSupportMinutes: 600 },
     },
   ]);
 
@@ -60,6 +64,8 @@ test("cohort metrics exclude withdrawn hosts and milestones recorded before cons
   assert.equal(metrics.averageFeedbackRating, 4.5);
   assert.deepEqual(metrics.statedWillingnessToPay, { annualPro: 1, perEvent: 0, freeOnly: 0, unsure: 0, responses: 1, denominator: 1 });
   assert.equal(metrics.medianSelfReportedSupportMinutes, 12);
+  assert.deepEqual(metrics.supportReviewCoverage, { numerator: 1, denominator: 1, rate: 1 });
+  assert.equal(metrics.medianOperatorRecordedSupportMinutes, 0);
   assert.deepEqual(metrics.defectReviewCoverage, { numerator: 1, denominator: 1, rate: 1 });
   assert.equal(metrics.unresolvedCriticalDefects, 1);
   assert.doesNotMatch(JSON.stringify(metrics), /internal-host-a|withdrawn-host/);
@@ -76,6 +82,7 @@ test("repeat-use rate uses repeat planners rather than the whole cohort as its d
       feedbackRatings: [],
       outcome: null,
       defectReview: null,
+      supportReview: null,
     },
     {
       participantId: "community-a",
@@ -86,12 +93,15 @@ test("repeat-use rate uses repeat planners rather than the whole cohort as its d
       feedbackRatings: [],
       outcome: null,
       defectReview: null,
+      supportReview: null,
     },
   ]);
 
   assert.deepEqual(metrics.repeatUse, { numerator: 0, denominator: 1, rate: 0 });
   assert.deepEqual(metrics.defectReviewCoverage, { numerator: 0, denominator: 2, rate: 0 });
   assert.equal(metrics.unresolvedCriticalDefects, null);
+  assert.deepEqual(metrics.supportReviewCoverage, { numerator: 0, denominator: 2, rate: 0 });
+  assert.equal(metrics.medianOperatorRecordedSupportMinutes, null);
 });
 
 test("critical defect aggregate stays null until every active host has human review", () => {
@@ -105,6 +115,7 @@ test("critical defect aggregate stays null until every active host has human rev
       feedbackRatings: [],
       outcome: null,
       defectReview: { unresolvedSeverity1: 0, unresolvedSeverity2: 0 },
+      supportReview: { operatorRecordedSupportMinutes: 20 },
     },
     {
       participantId: "not-reviewed",
@@ -115,9 +126,12 @@ test("critical defect aggregate stays null until every active host has human rev
       feedbackRatings: [],
       outcome: null,
       defectReview: null,
+      supportReview: null,
     },
   ]);
 
   assert.deepEqual(metrics.defectReviewCoverage, { numerator: 1, denominator: 2, rate: 0.5 });
   assert.equal(metrics.unresolvedCriticalDefects, null);
+  assert.deepEqual(metrics.supportReviewCoverage, { numerator: 1, denominator: 2, rate: 0.5 });
+  assert.equal(metrics.medianOperatorRecordedSupportMinutes, null);
 });

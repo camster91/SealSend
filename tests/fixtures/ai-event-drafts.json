@@ -4,7 +4,7 @@
     "category": "wedding",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Ava and Noor's Wedding", "description": "Join us for our wedding celebration.", "eventDate": "2026-09-19T20:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": "Harbour Hall", "locationAddress": null, "hostName": "Ava and Noor", "dressCode": "Formal", "rsvpDeadline": "2026-08-30T03:59:00.000Z", "maxAttendees": 120, "allowPlusOnes": true, "maxGuestsPerRsvp": 2 },
       "rsvpFields": [{ "key": "dietary_requirements", "label": "Dietary requirements", "type": "text", "required": false, "options": [] }],
       "invitation": { "headline": "We are getting married", "body": "Celebrate with Ava and Noor.", "tone": "formal" },
@@ -19,7 +19,7 @@
     "category": "business",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Client Appreciation Dinner", "description": "An evening to thank our clients.", "eventDate": "2026-09-18T23:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": null, "locationAddress": null, "hostName": null, "dressCode": "Business casual", "rsvpDeadline": null, "maxAttendees": 40, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [],
       "invitation": { "headline": "An evening of appreciation", "body": "Please join us for dinner.", "tone": "professional" },
@@ -34,13 +34,13 @@
     "category": "community",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Neighbourhood Cleanup", "description": "Help clean our local park.", "eventDate": "2026-05-02T14:00:00.000Z", "eventEndDate": "2026-05-02T17:00:00.000Z", "eventTimezone": "America/Toronto", "locationName": "East Park entrance", "locationAddress": null, "hostName": "Community Association", "dressCode": null, "rsvpDeadline": null, "maxAttendees": null, "allowPlusOnes": true, "maxGuestsPerRsvp": 5 },
       "rsvpFields": [{ "key": "supplies", "label": "Which supplies can you bring?", "type": "multiselect", "required": false, "options": ["Gloves", "Garbage bags", "Litter picker"] }],
       "invitation": { "headline": "Help clean our park", "body": "Neighbours of all ages are welcome.", "tone": "warm" },
       "reminders": [],
       "theme": { "style": "community", "primaryColor": "#166534", "backgroundColor": "#F0FDF4", "imageDirection": "Friendly park illustration with no embedded text." },
-      "missingInformation": [],
+      "missingInformation": ["event.maxAttendees"],
       "assumptions": []
     }
   },
@@ -49,7 +49,7 @@
     "category": "birthday",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Maya's 30th Birthday", "description": "Dinner, music, and cake.", "eventDate": "2026-11-08T00:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": "Maya's home", "locationAddress": null, "hostName": "Maya", "dressCode": null, "rsvpDeadline": null, "maxAttendees": 25, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [],
       "invitation": { "headline": "Maya turns 30", "body": "Come celebrate with dinner, music, and cake.", "tone": "playful" },
@@ -64,7 +64,7 @@
     "category": "ambiguous-date",
     "expectedValid": false,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "September Dinner", "description": "A dinner in September.", "eventDate": "September 18", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": null, "locationAddress": null, "hostName": null, "dressCode": null, "rsvpDeadline": null, "maxAttendees": null, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [],
       "invitation": { "headline": "Dinner together", "body": "Please join us.", "tone": "warm" },
@@ -79,7 +79,7 @@
     "category": "international-contact",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Global Alumni Meetup", "description": "An international alumni gathering.", "eventDate": "2026-10-10T16:00:00.000Z", "eventEndDate": null, "eventTimezone": "Europe/London", "locationName": "Alumni Centre", "locationAddress": null, "hostName": "Alumni Network", "dressCode": null, "rsvpDeadline": null, "maxAttendees": 80, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [{ "key": "mobile_number", "label": "Mobile number including country code", "type": "phone", "required": false, "options": [] }],
       "invitation": { "headline": "Alumni together again", "body": "Join alumni from around the world.", "tone": "professional" },
@@ -94,7 +94,7 @@
     "category": "dst-boundary",
     "expectedValid": true,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Autumn Breakfast", "description": "Breakfast after the clocks change.", "eventDate": "2026-11-01T14:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": "Community Hall", "locationAddress": null, "hostName": null, "dressCode": null, "rsvpDeadline": null, "maxAttendees": 50, "allowPlusOnes": true, "maxGuestsPerRsvp": 2 },
       "rsvpFields": [],
       "invitation": { "headline": "Autumn breakfast", "body": "Join us after the seasonal clock change.", "tone": "casual" },
@@ -109,7 +109,7 @@
     "category": "malformed-output",
     "expectedValid": false,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Workshop", "description": "A practical workshop.", "eventDate": "2026-06-01T14:00:00.000Z", "eventEndDate": null, "eventTimezone": "UTC", "locationName": "Studio", "locationAddress": null, "hostName": null, "dressCode": null, "rsvpDeadline": null, "maxAttendees": 20, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [{ "key": "experience", "label": "Experience", "type": "select", "required": true, "options": ["Beginner"] }],
       "invitation": { "headline": "Learn together", "body": "Join our practical workshop.", "tone": "casual" },
@@ -124,7 +124,7 @@
     "category": "missing-disclosure",
     "expectedValid": false,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Book Club", "description": "Monthly discussion.", "eventDate": "2026-07-10T23:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": null, "locationAddress": null, "hostName": null, "dressCode": null, "rsvpDeadline": null, "maxAttendees": 12, "allowPlusOnes": false, "maxGuestsPerRsvp": 1 },
       "rsvpFields": [],
       "invitation": { "headline": "July book club", "body": "Join our monthly discussion.", "tone": "casual" },
@@ -139,7 +139,7 @@
     "category": "unsafe-extra-field",
     "expectedValid": false,
     "output": {
-      "schemaVersion": "1.0",
+      "schemaVersion": "1.1",
       "event": { "title": "Networking Night", "description": "Meet local founders.", "eventDate": "2026-08-14T22:00:00.000Z", "eventEndDate": null, "eventTimezone": "America/Toronto", "locationName": "Innovation Hub", "locationAddress": null, "hostName": null, "dressCode": null, "rsvpDeadline": null, "maxAttendees": 100, "allowPlusOnes": false, "maxGuestsPerRsvp": 1, "ticketPrice": 75 },
       "rsvpFields": [],
       "invitation": { "headline": "Meet local founders", "body": "Build new connections.", "tone": "professional" },

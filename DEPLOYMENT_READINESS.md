@@ -1,6 +1,6 @@
 # SealSend deployment readiness
 
-Date: 2026-08-27
+Date: 2026-08-28
 
 ## Release decision
 
@@ -9,6 +9,8 @@ Date: 2026-08-27
 - **Public paid launch:** not cleared. It additionally requires five real hosts to complete workflows, professional legal/accounting review, and observed conversion/cost evidence.
 
 Payments and external communications must remain explicitly test-only until their provider gates pass. A green local build is not evidence of a completed charge or delivered message.
+
+The machine-checked quality baseline is product capability **81/100**, competitive position **66/100**, and paid-launch readiness **5/18 (27.8%)**. Run `npm run quality:score` for the current evidence-bounded result; the scorecard refuses earned points without linked evidence and requires missing proof for every partial category.
 
 ## Current production
 
@@ -28,7 +30,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Locally verified release candidate
 
-- 150 unit/readiness tests passed, including provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, selected-channel cost preview, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
+- 212 unit/readiness tests passed, including the evidence-bounded quality scorecard, factual support expectations, fail-closed machine validation of proposed beta thresholds, canonical sitemap metadata, signed review proofs, billed-segment SMS cost preview, approved announcement-content delivery, provider readiness, fail-closed launch evidence, invitation-controlled beta enrollment, operator revocation, pseudonymous per-host acceptance reporting, evidence-integrity checks for unreviewed defects, privacy-safe repeat events, denominator-safe beta metrics, guest-ready publication enforcement, partial CSV import and duplicate-contact handling, cross-browser coverage, replay-safe callbacks, alert delivery backoff, Stripe lifecycle mapping, account deletion/export, upload quotas, timezone/DST handling, atomic RSVP-field, checkout authorization, accessible checkout and host-management failures, and operational cron safeguards.
 - TypeScript typecheck passed.
 - ESLint passed with zero warnings.
 - Next.js 16 production build passed.
@@ -41,6 +43,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 ## Production QA evidence
 
+- A 2026-08-28 read-only public audit passed 40/50 checks across Chromium, mobile Chromium, Firefox, desktop WebKit, and mobile WebKit. All accessibility, horizontal-overflow, keyboard-navigation, pricing, and protected-route checks passed. The ten failures were the same two known deployment gaps repeated across five engines: the older production image returns HTTP 200 for the legacy weddings route instead of redirecting, and returns HTTP 200 for an unknown use-case slug instead of a real 404. The candidate passes both routing regressions 5/5 locally; this is deployment-gap evidence, not a production pass. HTTPS redirect, HSTS, CSP, nosniff, referrer policy, health no-store, protected operations, cron authentication, all nine sitemap URLs, and the TLS certificate were also verified read-only. The candidate additionally declares canonical links for every sitemap marketing page.
 - On 2026-08-27, exact application revision `10e05912a062919a0da71999c43340317b57970a` was deployed as `sealsend:20260827T213741Z`; the container was running and healthy, public home and health returned 200, and payments and communications remained test-only.
 - The deployed authenticated host/guest/check-in/repeat-event lifecycle and public responsive suite passed 2/2. The repeat-event assertions verified explicit contact reuse, guest-note exclusion, reset occurrence state, tag remapping, and empty signup claims.
 - The disposable QA account and event records were removed. One orphaned repeat-event fixture caused by an earlier test-navigation race was deleted by exact UUID; subsequent checks found zero matching QA events, beta participation, beta feedback, admin accounts, and event announcements.
@@ -95,7 +98,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 - Use a Stripe **test-mode** secret, recurring annual Pro price, and webhook secret before payment QA. Verify success, cancellation, failure, delayed payment, renewal/update, cancellation, and webhook replay.
 - Verify Mailgun/Twilio credentials and allowlists before sending only to approved recipients. Confirm queued, accepted, delivered, failed, bounced, and opted-out states where supported.
 - Configure `ERROR_ALERT_WEBHOOK_URL`, then call the secret-protected monitoring test route and verify receipt. The health cron alone does not prove alert delivery.
-- Set channel-specific `EMAIL_ESTIMATED_COST_MICROS` and `SMS_ESTIMATED_COST_MICROS` from current provider pricing before relying on the approval estimate.
+- Review and approve `docs/provider-cost-envelope.md`, then set channel-specific `EMAIL_ESTIMATED_COST_MICROS` per email and `SMS_ESTIMATED_COST_MICROS` per billed SMS segment before relying on the approval estimate.
 - Approve a retention policy before enabling draft cleanup. Reminder/announcement cron jobs remain gated until controlled delivery verification.
 - Keep `ENABLE_STALE_DRAFT_CLEANUP=false`, `ENABLE_ORPHAN_UPLOAD_CLEANUP=false`, and `ENABLE_HOST_LIFECYCLE_EMAILS=false` until retention/provider gates are approved and verified.
 - Keep the configured `OPERATIONS_SECRET` private, rotate it after any suspected exposure, and retrieve aggregate operational metrics only from an approved operator context.
@@ -118,6 +121,8 @@ On 2026-08-08, a generated 64-character `OPERATIONS_SECRET` was installed in the
 9. Run `npm run report-beta-participants`, verify the QA participant contains only pseudonymous acceptance fields and `criticalDefects: null`, then withdraw the participant and remove all disposable QA accounts/events/feedback. Verify cleanup counts.
 10. Update this file with the deployed commit/image, backup, rollback target, exact QA results, and remaining external gates. Do not convert `criticalDefects: null` into zero without human severity triage.
 
-## Known informational warning
+## Known evidence gap
 
-Next.js 16 reports that the Edge Runtime used by the framework proxy convention is deprecated. The production build succeeds; track the supported migration path in a later framework upgrade.
+The current candidate changes authenticated event creation, guest import, and the AI-assisted event brief. The brief now persists intended audience, accessibility review, and communication intent; schedule, location, and capacity remain canonical event fields and override generated copy. Every publication boundary blocks an incomplete brief, while private drafts remain saveable. AI draft contract `1.1` requires missing capacity to be disclosed instead of inferred.
+
+Candidate evidence on 2026-08-28: 212/212 local contract tests, TypeScript, ESLint with zero warnings, the Next.js production build, and the high-severity runtime dependency audit passed. Isolated PostgreSQL 16 and HTTPS Chromium exercised the complete host lifecycle, guest authentication, role denials, repeat-event transition, and cleanup using synthetic data. Announcement preview now resolves the final subject, message, recipients, channels, schedule, and per-recipient SMS body before counting GSM-7 or Unicode billed segments; a short-lived signed proof prevents changed or expired content from being sent, and dispatch uses that approved message body instead of dropping it from SMS. Every sitemap marketing page now declares a canonical URL, and the candidate passes the legacy redirect and true-404 regressions that the older production image currently fails. The proposed five-host thresholds now have a separate machine-valid artifact whose validator reports `activationStatus: NOT_APPROVED`; the active policy and enrollment remain pending. The candidate also includes factual public support expectations with a two-business-day initial-response target, priority categories, safe-data instructions, and an explicit no-24/7 boundary; this is not counted as published trust evidence until deployed and verified. The provider cost envelope remains an owner proposal, not an approved rate or delivered-message claim. The launch decision remains `NO_GO` at 5/18 because the 13 provider, compliance, real-host, real-device, and human-approval gates remain pending. No production deployment is claimed by this checkpoint.

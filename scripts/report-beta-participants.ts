@@ -10,6 +10,7 @@ import {
   type BetaSegment,
 } from "../src/lib/beta-participation";
 import type { BetaWillingnessToPay } from "../src/lib/beta-outcome";
+import betaAcceptancePolicy from "../config/beta-acceptance-policy.json";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -27,6 +28,7 @@ const pool = new Pool({
 
 interface ParticipantRow {
   participant_label: string;
+  cohort_version: string;
   segment: BetaSegment;
   consent_version: string;
   consented_at: string;
@@ -61,19 +63,28 @@ interface DefectReviewRow {
   reviewed_at: string;
 }
 
+interface SupportReviewRow {
+  participant_label: string;
+  operator_recorded_support_minutes: number;
+  review_version: string;
+  reviewed_at: string;
+}
+
 async function reportBetaParticipants() {
   try {
-    const [participants, milestones, feedbackEntries, outcomes, defectReviews] = await Promise.all([
+    const [participants, milestones, feedbackEntries, outcomes, defectReviews, supportReviews] = await Promise.all([
       pool.query<ParticipantRow>(
         `SELECT participant_label,
+                cohort_version,
                 segment,
                 consent_version,
                 consented_at::text,
                 withdrawn_at::text
            FROM beta_participants
-          WHERE segment = ANY($1::text[])
+          WHERE cohort_version = $1
+            AND segment = ANY($2::text[])
           ORDER BY consented_at ASC, participant_label ASC`,
-        [BETA_SEGMENTS],
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS],
       ),
       pool.query<MilestoneRow>(
         `SELECT participants.participant_label,
@@ -83,10 +94,11 @@ async function reportBetaParticipants() {
            JOIN activation_events milestones
              ON milestones.user_id = participants.user_id
             AND milestones.created_at >= participants.consented_at
-          WHERE participants.segment = ANY($1::text[])
-            AND milestones.event_name = ANY($2::text[])
+          WHERE participants.cohort_version = $1
+            AND participants.segment = ANY($2::text[])
+            AND milestones.event_name = ANY($3::text[])
           ORDER BY participants.participant_label, milestones.created_at`,
-        [BETA_SEGMENTS, BETA_MILESTONE_NAMES],
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS, BETA_MILESTONE_NAMES],
       ),
       pool.query<FeedbackRow>(
         `SELECT participants.participant_label,
@@ -95,9 +107,10 @@ async function reportBetaParticipants() {
            JOIN beta_feedback feedback
              ON feedback.user_id = participants.user_id
             AND feedback.created_at >= participants.consented_at
-          WHERE participants.segment = ANY($1::text[])
+          WHERE participants.cohort_version = $1
+            AND participants.segment = ANY($2::text[])
           ORDER BY participants.participant_label, feedback.created_at`,
-        [BETA_SEGMENTS],
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS],
       ),
       pool.query<OutcomeRow>(
         `SELECT participants.participant_label,
@@ -110,9 +123,10 @@ async function reportBetaParticipants() {
            JOIN beta_outcomes outcomes
              ON outcomes.user_id = participants.user_id
             AND outcomes.consented_at = participants.consented_at
-          WHERE participants.segment = ANY($1::text[])
+          WHERE participants.cohort_version = $1
+            AND participants.segment = ANY($2::text[])
           ORDER BY participants.participant_label`,
-        [BETA_SEGMENTS],
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS],
       ),
       pool.query<DefectReviewRow>(
         `SELECT participants.participant_label,
@@ -124,9 +138,24 @@ async function reportBetaParticipants() {
            JOIN beta_defect_reviews reviews
              ON reviews.user_id = participants.user_id
             AND reviews.consented_at = participants.consented_at
-          WHERE participants.segment = ANY($1::text[])
+          WHERE participants.cohort_version = $1
+            AND participants.segment = ANY($2::text[])
           ORDER BY participants.participant_label`,
-        [BETA_SEGMENTS],
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS],
+      ),
+      pool.query<SupportReviewRow>(
+        `SELECT participants.participant_label,
+                reviews.operator_recorded_support_minutes,
+                reviews.review_version,
+                reviews.reviewed_at::text
+           FROM beta_participants participants
+           JOIN beta_support_reviews reviews
+             ON reviews.user_id = participants.user_id
+            AND reviews.consented_at = participants.consented_at
+          WHERE participants.cohort_version = $1
+            AND participants.segment = ANY($2::text[])
+          ORDER BY participants.participant_label`,
+        [betaAcceptancePolicy.cohortVersion, BETA_SEGMENTS],
       ),
     ]);
 
@@ -138,6 +167,7 @@ async function reportBetaParticipants() {
     for (const participant of participants.rows) {
       const report = buildBetaParticipantReport({
         participantLabel: participant.participant_label,
+        cohortVersion: participant.cohort_version,
         segment: participant.segment,
         consentVersion: participant.consent_version,
         consentedAt: participant.consented_at,
@@ -163,6 +193,14 @@ async function reportBetaParticipants() {
           return review ? {
             unresolvedSeverity1: review.unresolved_severity_1,
             unresolvedSeverity2: review.unresolved_severity_2,
+            reviewVersion: review.review_version,
+            reviewedAt: review.reviewed_at,
+          } : null;
+        })(),
+        supportReview: (() => {
+          const review = supportReviews.rows.find((entry) => entry.participant_label === participant.participant_label);
+          return review ? {
+            operatorRecordedSupportMinutes: review.operator_recorded_support_minutes,
             reviewVersion: review.review_version,
             reviewedAt: review.reviewed_at,
           } : null;

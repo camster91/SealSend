@@ -8,6 +8,8 @@ interface CloneEventButtonProps {
   eventId: string;
   eventTitle: string;
   eventTimezone?: string;
+  eventStatus: 'draft' | 'published' | 'archived';
+  canKeepCurrentActive?: boolean;
   variant?: 'button' | 'menu-item';
 }
 
@@ -15,6 +17,8 @@ export function CloneEventButton({
   eventId,
   eventTitle,
   eventTimezone = 'UTC',
+  eventStatus,
+  canKeepCurrentActive = false,
   variant = 'button',
 }: CloneEventButtonProps) {
   const router = useRouter();
@@ -29,6 +33,8 @@ export function CloneEventButton({
   const [eventEndDate, setEventEndDate] = useState('');
   const [rsvpDeadline, setRsvpDeadline] = useState('');
   const [includeGuests, setIncludeGuests] = useState(false);
+  const mustArchiveSource = eventStatus !== 'archived' && !canKeepCurrentActive;
+  const [archiveSource, setArchiveSource] = useState(mustArchiveSource);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -62,6 +68,7 @@ export function CloneEventButton({
         eventEndDate: eventEndDate ? zonedLocalDateTimeToInstant(eventEndDate, eventTimezone) : null,
         rsvpDeadline: rsvpDeadline ? zonedLocalDateTimeToInstant(rsvpDeadline, eventTimezone) : null,
         includeGuests,
+        archiveSource,
       };
       const res = await fetch(`/api/events/${eventId}/clone`, {
         method: 'POST',
@@ -78,7 +85,7 @@ export function CloneEventButton({
       setIsOpen(false);
       setShowSuccess(true);
       setTimeout(() => {
-        router.push(`/events/${data.event.id}`);
+        router.push(`/events/${data.event.id}/edit`);
         router.refresh();
       }, 900);
     } catch (error) {
@@ -151,8 +158,28 @@ export function CloneEventButton({
                 </span>
               </label>
 
+              {eventStatus !== 'archived' && (
+                <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <input
+                    type="checkbox"
+                    checked={archiveSource}
+                    disabled={mustArchiveSource}
+                    onChange={(event) => setArchiveSource(event.target.checked)}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-amber-950">Archive the current event</span>
+                    <span className="block text-xs text-amber-800">
+                      {mustArchiveSource
+                        ? "Required by the controlled beta's one-active-event limit. The finished event remains available in your history."
+                        : 'Optional. The finished event remains available in your history.'}
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <div className="rounded-lg bg-brand-50 p-3 text-sm text-brand-900">
-                SealSend copies the invitation design, RSVP questions, and sign-up board structure. It does not copy responses, check-ins, messages, or guest notes.
+                SealSend copies the invitation design, RSVP questions, sign-up board structure, and intended audience. The audience carries forward, but accessibility and communication decisions must be reviewed again. It does not copy responses, check-ins, messages, or guest notes.
               </div>
 
               {cloneError && <p role="alert" className="text-sm text-red-700">{cloneError}</p>}

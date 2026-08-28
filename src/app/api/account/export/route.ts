@@ -17,7 +17,7 @@ export async function GET() {
   const events = await query<Record<string, unknown>>(
     `SELECT id, title, slug, description, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code, rsvp_deadline,
-            status, tier, created_at, updated_at
+            status, tier, repeated_from_event_id, created_at, updated_at
        FROM events WHERE user_id = $1 ORDER BY created_at`,
     [userId],
   );

@@ -56,6 +56,17 @@ test('organizer use cases are reachable and legacy links redirect', async ({ pag
     await page.goBack();
   }
 
-  await page.goto('/use-cases/weddings');
-  await expect(page).toHaveURL(/\/use-cases\/professional-gatherings$/);
+  const legacyResponse = await page.request.get('/use-cases/weddings', { maxRedirects: 0 });
+  expect([307, 308]).toContain(legacyResponse.status());
+  const redirectLocation = legacyResponse.headers().location;
+  expect(redirectLocation).toBeTruthy();
+  expect(new URL(redirectLocation, page.url()).pathname).toBe('/use-cases/professional-gatherings');
+});
+
+test('unknown use-case slugs return the helpful 404 with a real 404 status', async ({ page }) => {
+  const response = await page.goto('/use-cases/not-a-real-use-case');
+
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
 });

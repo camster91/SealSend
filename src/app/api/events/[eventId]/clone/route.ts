@@ -4,13 +4,14 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
 import { getDb } from "@/lib/db/client";
 import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
-import { parseRepeatEventRequest } from "@/lib/repeat-event";
+import { buildRepeatedEventBrief, parseRepeatEventRequest } from "@/lib/repeat-event";
 import { getUserTier } from "@/lib/subscription";
 import { generateSlug } from "@/lib/utils";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 type SourceEvent = {
+  status: "draft" | "published" | "archived";
   description: string | null;
   invitation_headline: string | null;
   invitation_body: string | null;
@@ -29,6 +30,7 @@ type SourceEvent = {
   design_url: string | null;
   design_type: string;
   customization: unknown;
+  event_brief: unknown;
 };
 
 type SourceGuest = { id: string; name: string; email: string | null; phone: string | null; tags: unknown };
@@ -63,6 +65,29 @@ export async function POST(request: Request, { params }: RouteParams) {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [auth.user.id]);
 
+    const originalResult = await client.query<SourceEvent>(
+      `SELECT status, description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
+              location_name, location_address, location_lat, location_lng, host_name, dress_code,
+              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
+              design_url, design_type, customization, event_brief
+       FROM events WHERE id = $1 AND user_id = $2`,
+      [eventId, auth.user.id],
+    );
+    const original = originalResult.rows[0];
+    if (!original) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    let sourceArchived = false;
+    if (repeatRequest.archiveSource && original.status !== "archived") {
+      await client.query(
+        "UPDATE events SET status = 'archived' WHERE id = $1 AND user_id = $2",
+        [eventId, auth.user.id],
+      );
+      sourceArchived = true;
+    }
+
     const activeResult = await client.query<{ count: string }>(
       "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
       [auth.user.id],
@@ -70,24 +95,16 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!canCreateEvent(accountPlan, Number(activeResult.rows[0]?.count ?? 0))) {
       await client.query("ROLLBACK");
       return NextResponse.json(
-        { error: "This plan supports one active event. Archive the current event before repeating it." },
-        { status: 403 },
+        {
+          error: original.status === "archived"
+            ? "This plan already has another active event. Archive it before repeating this event."
+            : "This plan supports one active event. Approve archiving the current event to create the next draft.",
+          requiresArchive: original.status !== "archived",
+        },
+        { status: 409 },
       );
     }
-
-    const originalResult = await client.query<SourceEvent>(
-      `SELECT description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
-              location_name, location_address, location_lat, location_lng, host_name, dress_code,
-              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
-              design_url, design_type, customization
-       FROM events WHERE id = $1`,
-      [eventId],
-    );
-    const original = originalResult.rows[0];
-    if (!original) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
+    const repeatedEventBrief = buildRepeatedEventBrief(original.event_brief);
 
     const limits = getEffectiveEventLimits(accountPlan, "free");
     const insertedEvent = await client.query<{ id: string; title: string }>(
@@ -97,10 +114,10 @@ export async function POST(request: Request, { params }: RouteParams) {
          location_lat, location_lng, host_name, dress_code, rsvp_deadline, registry_links,
          max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type,
          customization, status, tier, max_responses, auto_reminders, reminder_sent_at, payment_id,
-         ai_generation_id
+         event_brief, ai_generation_id, repeated_from_event_id
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, NULL
+         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL, $27
        ) RETURNING id, title`,
       [
         auth.user.id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
@@ -110,6 +127,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         original.host_name, original.dress_code, repeatRequest.rsvpDeadline, original.registry_links,
         original.max_attendees, original.allow_plus_ones, original.max_guests_per_rsvp,
         original.design_url, original.design_type, original.customization, limits.responses,
+        repeatedEventBrief ? JSON.stringify(repeatedEventBrief) : null,
+        eventId,
       ],
     );
     const newEvent = insertedEvent.rows[0];
@@ -195,7 +214,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       userId: auth.user.id,
       eventId: newEvent.id,
     });
-    return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount }, { status: 201 });
+    return NextResponse.json({ success: true, event: newEvent, copiedGuests: copiedGuestCount, sourceArchived }, { status: 201 });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Repeat event failed:", error);

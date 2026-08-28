@@ -7,6 +7,7 @@ import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import type { CountryCode } from "libphonenumber-js";
+import { deduplicateGuestImport } from "@/lib/guest-import";
 
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
@@ -153,9 +154,26 @@ export async function POST(
       phone = validation.formatted;
     }
 
+    const existingContacts = await query<{ email: string | null; phone: string | null }>(
+      'SELECT email, phone FROM guests WHERE event_id = $1',
+      [eventId],
+    );
+    const prepared = deduplicateGuestImport([{
+      name: parsed.data.name.trim(),
+      email: parsed.data.email?.trim().toLowerCase() || null,
+      phone,
+      notes: parsed.data.notes?.trim() || null,
+    }], existingContacts);
+    if (prepared.duplicates.length > 0) {
+      return NextResponse.json(
+        { error: prepared.duplicates[0].reason },
+        { status: 409 },
+      );
+    }
+
     const guest = await queryOne(
       'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
-      [eventId, parsed.data.name, parsed.data.email || null, phone, parsed.data.notes || null]
+      [eventId, prepared.accepted[0].name, prepared.accepted[0].email, prepared.accepted[0].phone, prepared.accepted[0].notes]
     );
 
     await recordActivationEventSafely({

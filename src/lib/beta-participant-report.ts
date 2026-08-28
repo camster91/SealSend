@@ -7,6 +7,7 @@ import type { BetaWillingnessToPay } from "./beta-outcome";
 
 interface BetaParticipantReportInput {
   participantLabel: string;
+  cohortVersion: string;
   segment: BetaSegment;
   consentVersion: string;
   consentedAt: string;
@@ -26,6 +27,11 @@ interface BetaParticipantReportInput {
     reviewVersion: string;
     reviewedAt: string;
   };
+  supportReview: null | {
+    operatorRecordedSupportMinutes: number;
+    reviewVersion: string;
+    reviewedAt: string;
+  };
 }
 
 export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
@@ -41,6 +47,7 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
 
   return {
     participantLabel: input.participantLabel,
+    cohortVersion: input.cohortVersion,
     segment: input.segment,
     consentVersion: input.consentVersion,
     consentedAt: input.consentedAt,
@@ -53,5 +60,6 @@ export function buildBetaParticipantReport(input: BetaParticipantReportInput) {
       ? input.defectReview.unresolvedSeverity1 + input.defectReview.unresolvedSeverity2
       : null,
     criticalDefectReview: input.defectReview,
+    operatorSupportReview: input.supportReview,
   };
 }

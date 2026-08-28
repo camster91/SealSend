@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy Policy - SealSend",
   description: "Privacy Policy for SealSend digital invitation platform.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

@@ -95,10 +95,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         <OnboardingChecklist
-          eventId={firstOwnedEvent?.id}
-          hasEvent={Boolean(firstOwnedEvent)}
+          event={firstOwnedEvent ? {
+            id: firstOwnedEvent.id,
+            eventDate: firstOwnedEvent.event_date,
+            locationName: firstOwnedEvent.location_name,
+            maxAttendees: firstOwnedEvent.max_attendees,
+            invitationHeadline: firstOwnedEvent.invitation_headline,
+            invitationBody: firstOwnedEvent.invitation_body,
+            status: firstOwnedEvent.status,
+          } : null}
           hasGuest={Number(onboarding?.guest_count ?? 0) > 0}
-          isPublished={firstOwnedEvent?.status === 'published'}
           hasInvitation={Number(onboarding?.sent_count ?? 0) > 0}
         />
 
@@ -232,7 +238,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </div>
                   </Link>
                   <div className="px-4 py-4 sm:px-2">
-                    <EventActionsMenu eventId={event.id} eventTitle={event.title} eventTimezone={event.event_timezone} />
+                    <EventActionsMenu
+                      eventId={event.id}
+                      eventTitle={event.title}
+                      eventTimezone={event.event_timezone}
+                      eventStatus={event.status}
+                      canKeepCurrentActive={accountPlan === 'pro_annual'}
+                    />
                   </div>
                 </li>
               ))}

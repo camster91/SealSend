@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseRepeatEventRequest } from "../src/lib/repeat-event";
+import { buildRepeatedEventBrief, parseRepeatEventRequest } from "../src/lib/repeat-event";
 
 const reference = new Date("2026-08-27T12:00:00.000Z");
 
@@ -35,6 +35,7 @@ test("repeat-event input is strict, trims the title, and defaults to no guest co
   }, reference);
   assert.equal(parsed.title, "September gathering");
   assert.equal(parsed.includeGuests, false);
+  assert.equal(parsed.archiveSource, false);
   assert.equal(parsed.eventEndDate, null);
   assert.equal(parsed.rsvpDeadline, null);
 
@@ -43,4 +44,31 @@ test("repeat-event input is strict, trims the title, and defaults to no guest co
     eventDate: "2026-09-10T22:00:00.000Z",
     copyResponses: true,
   }, reference));
+});
+
+test("repeat-event input records explicit source archival", () => {
+  const parsed = parseRepeatEventRequest({
+    title: "September gathering",
+    eventDate: "2026-09-10T22:00:00.000Z",
+    archiveSource: true,
+  }, reference);
+
+  assert.equal(parsed.archiveSource, true);
+});
+
+test("repeat-event brief reuses only the audience and resets occurrence decisions", () => {
+  assert.deepEqual(buildRepeatedEventBrief({
+    audience: "Neighbourhood volunteers and their households",
+    accessibilityStatus: "requirements_known",
+    accessibilityNotes: "The prior venue had a step-free entrance.",
+    communicationPreference: "email_and_sms",
+  }), {
+    audience: "Neighbourhood volunteers and their households",
+    accessibilityStatus: "not_reviewed",
+    accessibilityNotes: null,
+    communicationPreference: "undecided",
+  });
+
+  assert.equal(buildRepeatedEventBrief(null), null);
+  assert.equal(buildRepeatedEventBrief({ audience: "" }), null);
 });

@@ -4,12 +4,14 @@ import { isOperationsAuthorized } from "@/lib/operations-auth";
 import { computeBetaCohortMetrics, type BetaCohortParticipant } from "@/lib/beta-metrics";
 import { BETA_MILESTONE_NAMES, type BetaMilestoneName, type BetaSegment } from "@/lib/beta-participation";
 import type { BetaWillingnessToPay } from "@/lib/beta-outcome";
+import { evaluateBetaAcceptance } from "@/lib/beta-acceptance-decision";
+import betaAcceptancePolicy from "../../../../../config/beta-acceptance-policy.json";
 
 export async function GET(request: NextRequest) {
   if (!isOperationsAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows] = await Promise.all([
+  const [totals, funnel, deliveries, alerts, betaParticipantRows, betaMilestoneRows, betaFeedbackRows, betaOutcomeRows, betaDefectReviewRows, betaSupportReviewRows] = await Promise.all([
     queryOne<Record<string, string>>(
       `SELECT
         (SELECT COUNT(*) FROM admin_users)::text AS accounts,
@@ -37,24 +39,27 @@ export async function GET(request: NextRequest) {
     ),
     query<{ participant_id: string; segment: BetaSegment; consented_at: string }>(
       `SELECT user_id::text AS participant_id, segment, consented_at FROM beta_participants
-       WHERE withdrawn_at IS NULL ORDER BY consented_at ASC`,
+       WHERE cohort_version = $1 AND withdrawn_at IS NULL ORDER BY consented_at ASC`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; event_name: BetaMilestoneName; created_at: string }>(
       `SELECT participants.user_id::text AS participant_id, events.event_name, events.created_at
        FROM beta_participants participants
        JOIN activation_events events
          ON events.user_id = participants.user_id AND events.created_at >= participants.consented_at
-       WHERE participants.withdrawn_at IS NULL AND events.event_name = ANY($1::text[])
+       WHERE participants.cohort_version = $1
+         AND participants.withdrawn_at IS NULL AND events.event_name = ANY($2::text[])
        ORDER BY participants.user_id, events.created_at`,
-      [BETA_MILESTONE_NAMES],
+      [betaAcceptancePolicy.cohortVersion, BETA_MILESTONE_NAMES],
     ),
     query<{ participant_id: string; rating: number }>(
       `SELECT participants.user_id::text AS participant_id, feedback.rating
        FROM beta_participants participants
        JOIN beta_feedback feedback
          ON feedback.user_id = participants.user_id AND feedback.created_at >= participants.consented_at
-       WHERE participants.withdrawn_at IS NULL
+       WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
       ORDER BY participants.user_id, feedback.created_at`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; willingness_to_pay: BetaWillingnessToPay; repeat_intent: number; self_reported_support_minutes: number }>(
       `SELECT participants.user_id::text AS participant_id,
@@ -64,8 +69,9 @@ export async function GET(request: NextRequest) {
        FROM beta_participants participants
        JOIN beta_outcomes outcomes
          ON outcomes.user_id = participants.user_id AND outcomes.consented_at = participants.consented_at
-       WHERE participants.withdrawn_at IS NULL
+       WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
       ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
     query<{ participant_id: string; unresolved_severity_1: number; unresolved_severity_2: number }>(
       `SELECT participants.user_id::text AS participant_id,
@@ -74,8 +80,19 @@ export async function GET(request: NextRequest) {
          FROM beta_participants participants
          JOIN beta_defect_reviews reviews
            ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
-        WHERE participants.withdrawn_at IS NULL
+        WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
+      ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
+    ),
+    query<{ participant_id: string; operator_recorded_support_minutes: number }>(
+      `SELECT participants.user_id::text AS participant_id,
+              reviews.operator_recorded_support_minutes
+         FROM beta_participants participants
+         JOIN beta_support_reviews reviews
+           ON reviews.user_id = participants.user_id AND reviews.consented_at = participants.consented_at
+        WHERE participants.cohort_version = $1 AND participants.withdrawn_at IS NULL
         ORDER BY participants.user_id`,
+      [betaAcceptancePolicy.cohortVersion],
     ),
   ]);
   const participantMap = new Map<string, BetaCohortParticipant>(
@@ -88,6 +105,7 @@ export async function GET(request: NextRequest) {
       feedbackRatings: [],
       outcome: null,
       defectReview: null,
+      supportReview: null,
     }]),
   );
   for (const event of betaMilestoneRows) {
@@ -114,7 +132,18 @@ export async function GET(request: NextRequest) {
       unresolvedSeverity2: review.unresolved_severity_2,
     };
   }
+  for (const review of betaSupportReviewRows) {
+    const participant = participantMap.get(review.participant_id);
+    if (participant) participant.supportReview = {
+      operatorRecordedSupportMinutes: review.operator_recorded_support_minutes,
+    };
+  }
   const betaCohort = computeBetaCohortMetrics([...participantMap.values()]);
+  const betaAcceptance = evaluateBetaAcceptance({
+    policy: betaAcceptancePolicy,
+    metrics: betaCohort,
+    cohortStartedAt: betaParticipantRows[0]?.consented_at ?? null,
+  });
   const betaParticipants = [...betaParticipantRows.reduce((counts, participant) => {
     counts.set(participant.segment, (counts.get(participant.segment) ?? 0) + 1);
     return counts;
@@ -129,7 +158,7 @@ export async function GET(request: NextRequest) {
     participantCount: participantIds.size,
   }));
   return NextResponse.json(
-    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort },
+    { generatedAt: new Date().toISOString(), periodDays: 30, totals, funnel, deliveries, alerts, betaParticipants, betaMilestones, betaCohort, betaAcceptance },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

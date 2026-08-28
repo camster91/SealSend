@@ -9,8 +9,12 @@ import {
   parseAiEventDraft,
 } from "../src/lib/ai/event-draft-schema";
 
+test("capacity disclosure ships as event draft contract 1.1", () => {
+  assert.equal(AI_EVENT_DRAFT_SCHEMA_VERSION, "1.1");
+});
+
 const validDraft = {
-  schemaVersion: "1.0",
+  schemaVersion: "1.1",
   event: {
     title: "Client Appreciation Dinner",
     description: "An evening to thank our clients.",
@@ -87,6 +91,16 @@ test("rejects a missing location that is not disclosed to the host", () => {
   assert.throws(
     () => parseAiEventDraft({ ...validDraft, missingInformation: ["event.eventDate"] }),
     /event\.locationName/,
+  );
+});
+
+test("rejects a missing capacity that is not disclosed to the host", () => {
+  assert.throws(
+    () => parseAiEventDraft({
+      ...validDraft,
+      event: { ...validDraft.event, maxAttendees: null },
+    }),
+    /event\.maxAttendees/,
   );
 });
 

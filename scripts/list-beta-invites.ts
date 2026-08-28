@@ -3,6 +3,7 @@
 import { Pool } from "pg";
 
 import { classifyBetaInvite } from "../src/lib/beta-invite-operations";
+import betaAcceptancePolicy from "../config/beta-acceptance-policy.json";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -21,6 +22,7 @@ const pool = new Pool({
 interface InviteRow {
   participant_label: string;
   segment: string;
+  cohort_version: string;
   token_preview: string;
   expires_at: string;
   accepted_at: string | null;
@@ -33,14 +35,17 @@ async function listBetaInvites() {
     const result = await pool.query<InviteRow>(
       `SELECT participant_label,
               segment,
+              cohort_version,
               token_preview,
               expires_at::text,
               accepted_at::text,
               revoked_at::text,
               created_at::text
          FROM beta_enrollment_invites
+        WHERE cohort_version = $1
         ORDER BY created_at DESC
         LIMIT 100`,
+      [betaAcceptancePolicy.cohortVersion],
     );
     if (result.rows.length === 0) {
       console.log("No beta invitations found.");
@@ -55,6 +60,7 @@ async function listBetaInvites() {
       console.log([
         row.participant_label,
         row.segment,
+        `cohort=${row.cohort_version}`,
         `preview=...${row.token_preview}`,
         `status=${status}`,
         `expires=${row.expires_at}`,

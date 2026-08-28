@@ -17,6 +17,17 @@ INSERT INTO events (
   'published'
 );
 
+INSERT INTO events (
+  id, user_id, title, slug, status, repeated_from_event_id
+) VALUES (
+  '00000000-0000-4000-8000-000000000006',
+  '00000000-0000-4000-8000-000000000001',
+  'Repeated Schema Contract Event',
+  'repeated-schema-contract-event',
+  'draft',
+  '00000000-0000-4000-8000-000000000002'
+);
+
 INSERT INTO guests (id, event_id, name, email, tags, reminder_sent_at)
 VALUES (
   '00000000-0000-4000-8000-000000000003',
@@ -76,12 +87,13 @@ INSERT INTO guest_magic_tokens (
 );
 
 INSERT INTO beta_enrollment_invites (
-  token_hash, token_preview, participant_label, segment, expires_at
+  token_hash, token_preview, participant_label, segment, cohort_version, expires_at
 ) VALUES (
   repeat('b', 64),
   'bbbb',
   'host-111111111111',
   'club_association',
+  'recurring-community-v1',
   NOW() + INTERVAL '7 days'
 );
 
@@ -100,5 +112,8 @@ INSERT INTO send_logs (
 SELECT * FROM rsvp_responses
 WHERE event_id = '00000000-0000-4000-8000-000000000002'
 ORDER BY submitted_at DESC;
+
+SELECT repeated_from_event_id FROM events
+WHERE id = '00000000-0000-4000-8000-000000000006';
 
 ROLLBACK;

@@ -15,6 +15,7 @@ import { canUseFeature, type EventTier } from '@/lib/entitlements';
 import { getUserTier } from '@/lib/subscription';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 import { EventTeamPanel } from '@/components/dashboard/EventTeamPanel';
+import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -36,10 +37,12 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
   // Optimized: Consolidating three database queries into one using scalar subqueries.
   // This reduces database round-trips from 3 to 1, significantly improving TTFB.
-  const event = await queryOne<Event & { response_count: number; guest_count: number }>(
+  const event = await queryOne<Event & { response_count: number; guest_count: number; repeated_from_title: string | null }>(
     `SELECT *,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id) AS response_count,
-      (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count
+      (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count,
+      (SELECT source.title FROM events source
+        WHERE source.id = events.repeated_from_event_id AND source.user_id = events.user_id) AS repeated_from_title
      FROM events
      WHERE id = $1`,
     [eventId]
@@ -53,6 +56,13 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const guestCount = event.guest_count ?? 0;
 
   const isPublished = event.status === 'published';
+  const isArchived = event.status === 'archived';
+  const statusLabel = isPublished ? 'Published' : isArchived ? 'Archived' : 'Draft';
+  const statusClass = isPublished
+    ? 'bg-green-500/90 text-white'
+    : isArchived
+      ? 'bg-slate-700/90 text-white'
+      : 'bg-amber-500/90 text-white';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const publicUrl = `${siteUrl}/e/${event.slug}`;
   const accountPlan = await getUserTier(event.user_id as string);
@@ -104,13 +114,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <div className="flex items-end justify-between">
                   <div>
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm ${
-                        isPublished
-                          ? 'bg-green-500/90 text-white'
-                          : 'bg-amber-500/90 text-white'
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm ${statusClass}`}
                     >
-                      {isPublished ? 'Published' : 'Draft'}
+                      {statusLabel}
                     </span>
                     <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
                   </div>
@@ -120,13 +126,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           ) : (
             <div className="relative bg-gradient-to-r from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                  isPublished
-                    ? 'bg-green-500/90 text-white'
-                    : 'bg-white/20 text-white'
-                }`}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
               >
-                {isPublished ? 'Published' : 'Draft'}
+                {statusLabel}
               </span>
               <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
               {event.description && (
@@ -150,12 +152,12 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             }`}>
               {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
             </span>
-            {access.role === 'owner' && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
+            {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
           </div>
 
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-4 sm:flex sm:gap-2">
-            {canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
+            {!isArchived && canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
             {canExport && <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />}
             {canManageGuests && <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount} />}
             {canManageGuests && <ActionLink href={`/events/${eventId}/signups`} icon="signups" label="Sign-ups" />}
@@ -210,7 +212,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             )}
 
             {/* Auto Reminders */}
-            {roleCan(access.role, 'send_messages') && <AutoRemindersToggle
+            {!isArchived && roleCan(access.role, 'send_messages') && <AutoRemindersToggle
               eventId={eventId}
               initialEnabled={!!event.auto_reminders}
               eventDate={event.event_date as string | null}
@@ -219,8 +221,20 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
             {/* Publish / delete / clone */}
             <div className="space-y-2">
-              {canEdit && <PublishButton eventId={eventId} isPublished={isPublished} />}
-              {access.role === 'owner' && <CloneEventButton eventId={eventId} eventTitle={event.title as string} eventTimezone={event.event_timezone} />}
+              {isArchived && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-900">Archived event history</p>
+                  <p className="mt-1">This event cannot be republished directly. Use Repeat event to create a reviewed new draft.</p>
+                </div>
+              )}
+              {!isArchived && canEdit && <PublishEventButton eventId={eventId} isPublished={isPublished} />}
+              {access.role === 'owner' && <CloneEventButton
+                eventId={eventId}
+                eventTitle={event.title as string}
+                eventTimezone={event.event_timezone}
+                eventStatus={event.status}
+                canKeepCurrentActive={accountPlan === 'pro_annual'}
+              />}
               {access.role === 'owner' && <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />}
             </div>
           </div>
@@ -232,6 +246,17 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <h2 className="text-sm font-semibold text-gray-900">Event Details</h2>
               </div>
               <div className="divide-y divide-gray-50 p-1">
+                {access.role === 'owner' && event.repeated_from_event_id && event.repeated_from_title && (
+                  <div className="flex items-start gap-3 rounded-xl px-5 py-3 transition-colors hover:bg-gray-50/50">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500" aria-hidden="true">↩</div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Previous event</p>
+                      <Link href={`/events/${event.repeated_from_event_id}`} className="mt-0.5 block truncate text-sm font-medium text-brand-700 hover:underline">
+                        {event.repeated_from_title}
+                      </Link>
+                    </div>
+                  </div>
+                )}
                 <DetailRow icon="calendar" label="Date" value={formatDate(event.event_date as string | null)} />
                 {event.event_end_date && (
                   <DetailRow icon="calendar-end" label="End Date" value={formatDate(event.event_end_date as string | null)} />
@@ -364,57 +389,5 @@ function DetailRow({ icon, label, value, subtitle, mono }: { icon: string; label
         {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
       </div>
     </div>
-  );
-}
-
-function PublishButton({ eventId, isPublished }: { eventId: string; isPublished: boolean }) {
-  return (
-    <form
-      action={async () => {
-        'use server';
-        const { getCurrentUser } = await import('@/lib/auth/session');
-        const { query: dbQuery } = await import('@/lib/db/client');
-        const { getEventAccess, roleCan } = await import('@/lib/auth/event-access');
-
-        const user = await getCurrentUser();
-        if (!user) return;
-        const access = await getEventAccess(user.id, eventId);
-        if (!access || !roleCan(access.role, 'edit_event')) return;
-
-        const newStatus = isPublished ? 'draft' : 'published';
-        await dbQuery(
-          'UPDATE events SET status = $1 WHERE id = $2',
-          [newStatus, eventId]
-        );
-
-        const { revalidatePath } = await import('next/cache');
-        revalidatePath(`/events/${eventId}`);
-      }}
-    >
-      <button
-        type="submit"
-        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-all active:scale-[0.98] ${
-          isPublished
-            ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-            : 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-500/20 hover:shadow-lg'
-        }`}
-      >
-        {isPublished ? (
-          <>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-            </svg>
-            Unpublish
-          </>
-        ) : (
-          <>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-            </svg>
-            Publish Event
-          </>
-        )}
-      </button>
-    </form>
   );
 }

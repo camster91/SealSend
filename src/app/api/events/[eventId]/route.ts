@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
+import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
+
+function eventForAccess(event: unknown, role: string): unknown {
+  if (role === 'owner' || !event || typeof event !== 'object') return event;
+  const { repeated_from_event_id: _ownerOnlyLineage, ...collaboratorEvent } = event as Record<string, unknown>;
+  return collaboratorEvent;
+}
 
 export async function GET(
   _request: NextRequest,
@@ -26,7 +33,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(event);
+    return NextResponse.json(eventForAccess(event, auth.access.role));
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -45,8 +52,10 @@ export async function PATCH(
     if (auth.error) return auth.error;
 
     // Verify ownership
-    const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1',
+    const existing = await queryOne<PublicationCandidate & { id: string; status: string }>(
+      `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
+              invitation_headline, invitation_body, rsvp_deadline, event_brief
+         FROM events WHERE id = $1`,
       [eventId]
     );
 
@@ -66,6 +75,28 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    const targetStatus = parsed.data.status ?? existing.status;
+    if (targetStatus === 'archived' && auth.access.role !== 'owner') {
+      return NextResponse.json(
+        { error: 'Only the event owner can archive this event.' },
+        { status: 403 },
+      );
+    }
+    if (existing.status === 'archived' && targetStatus !== 'archived') {
+      return NextResponse.json(
+        { error: 'Archived events cannot be reactivated directly. Use Repeat event to create a reviewed new draft.' },
+        { status: 409 },
+      );
+    }
+    if (targetStatus === 'published') {
+      const readiness = getPublicationReadiness({ ...existing, ...parsed.data });
+      if (!readiness.ready) {
+        return NextResponse.json(
+          { error: 'Event is not ready to publish', blockers: readiness.blockers },
+          { status: 400 },
+        );
+      }
+    }
     if (parsed.data.ai_generation_id) {
       const generation = await queryOne(
         "SELECT id FROM ai_generations WHERE id = $1 AND user_id = $2 AND outcome = 'accepted'",
@@ -75,7 +106,7 @@ export async function PATCH(
     }
 
     const ALLOWED_COLUMNS = [
-      'title', 'description', 'invitation_headline', 'invitation_body', 'reminder_sequence', 'ai_generation_id', 'event_date', 'event_end_date', 'event_timezone',
+      'title', 'description', 'invitation_headline', 'invitation_body', 'reminder_sequence', 'event_brief', 'ai_generation_id', 'event_date', 'event_end_date', 'event_timezone',
       'location_name', 'location_address', 'host_name', 'dress_code',
       'rsvp_deadline', 'registry_links', 'max_attendees', 'allow_plus_ones',
       'max_guests_per_rsvp', 'design_url', 'design_type', 'customization',
@@ -114,7 +145,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(event);
+    return NextResponse.json(eventForAccess(event, auth.access.role));
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },

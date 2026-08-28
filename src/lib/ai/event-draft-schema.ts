@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const AI_EVENT_DRAFT_SCHEMA_VERSION = "1.0" as const;
+export const AI_EVENT_DRAFT_SCHEMA_VERSION = "1.1" as const;
 
 function isIanaTimezone(value: string): boolean {
   try {
@@ -88,6 +88,7 @@ export const aiEventDraftSchema = z.object({
   const requiredDisclosures: Array<[unknown, string]> = [
     [draft.event.eventDate, "event.eventDate"],
     [draft.event.locationName, "event.locationName"],
+    [draft.event.maxAttendees, "event.maxAttendees"],
   ];
 
   for (const [value, path] of requiredDisclosures) {

@@ -6,6 +6,7 @@ import { buildBetaParticipantReport } from "../src/lib/beta-participant-report";
 test("per-host beta report includes only pseudonymous acceptance evidence after consent", () => {
   const report = buildBetaParticipantReport({
     participantLabel: "host-abcdef123456",
+    cohortVersion: "recurring-community-v1",
     segment: "repeat_planner",
     consentVersion: "beta-observation-recurring-community-2026-08-27",
     consentedAt: "2026-08-27T12:00:00.000Z",
@@ -32,9 +33,15 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
       reviewVersion: "beta-severity-review-v1",
       reviewedAt: "2026-08-27T12:05:00.000Z",
     },
+    supportReview: {
+      operatorRecordedSupportMinutes: 35,
+      reviewVersion: "beta-operator-support-review-v1",
+      reviewedAt: "2026-08-27T12:06:00.000Z",
+    },
   });
 
   assert.equal(report.participantLabel, "host-abcdef123456");
+  assert.equal(report.cohortVersion, "recurring-community-v1");
   assert.equal(report.segment, "repeat_planner");
   assert.equal(report.active, true);
   assert.equal(report.progress.steps.eventAndDesign, true);
@@ -50,6 +57,12 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
     reviewVersion: "beta-severity-review-v1",
     reviewedAt: "2026-08-27T12:05:00.000Z",
   });
+  assert.equal(report.outcome?.selfReportedSupportMinutes, 12);
+  assert.deepEqual(report.operatorSupportReview, {
+    operatorRecordedSupportMinutes: 35,
+    reviewVersion: "beta-operator-support-review-v1",
+    reviewedAt: "2026-08-27T12:06:00.000Z",
+  });
   assert.equal("userId" in report, false);
   assert.equal("email" in report, false);
   assert.equal("feedbackMessages" in report, false);
@@ -58,6 +71,7 @@ test("per-host beta report includes only pseudonymous acceptance evidence after 
 test("withdrawn beta host remains visible without being reported as active", () => {
   const report = buildBetaParticipantReport({
     participantLabel: "host-fedcba654321",
+    cohortVersion: "recurring-community-v1",
     segment: "creative_community",
     consentVersion: "beta-observation-recurring-community-2026-08-27",
     consentedAt: "2026-08-27T12:00:00.000Z",
@@ -66,6 +80,7 @@ test("withdrawn beta host remains visible without being reported as active", () 
     feedbackEntries: [],
     outcome: null,
     defectReview: null,
+    supportReview: null,
   });
 
   assert.equal(report.active, false);
@@ -75,4 +90,5 @@ test("withdrawn beta host remains visible without being reported as active", () 
   assert.equal(report.outcome, null);
   assert.equal(report.criticalDefects, null);
   assert.equal(report.criticalDefectReview, null);
+  assert.equal(report.operatorSupportReview, null);
 });

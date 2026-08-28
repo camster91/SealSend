@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { WizardFormData } from './WizardContainer';
 import { zonedLocalDateTimeToInstant } from '@/lib/datetime';
+import { getPublicationReadiness } from '@/lib/publication-readiness';
 
 interface StepPreviewProps {
   formData: WizardFormData;
@@ -15,6 +16,17 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
 
   const { customization } = formData;
   const enabledFields = formData.rsvp_fields.filter((f) => f.is_enabled);
+  const publicationReadiness = getPublicationReadiness({
+    title: formData.title,
+    event_date: formData.event_date,
+    event_end_date: formData.event_end_date,
+    location_name: formData.location_name,
+    max_attendees: formData.max_attendees,
+    invitation_headline: formData.invitation_headline,
+    invitation_body: formData.invitation_body,
+    rsvp_deadline: formData.rsvp_deadline,
+    event_brief: formData.event_brief,
+  });
 
   const buttonBorderRadius =
     customization.buttonStyle === 'pill'
@@ -193,6 +205,15 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
 
       {/* ── Actions ───────────────────────────────────────────────── */}
       <div className="space-y-4">
+        {!publicationReadiness.ready && (
+          <div id="publication-requirements" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Complete before publishing</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {publicationReadiness.blockers.map((blocker) => <li key={blocker.field}>{blocker.message}</li>)}
+            </ul>
+            <p className="mt-2 text-xs">You can still save this event as a private draft.</p>
+          </div>
+        )}
         {/* Publish toggle */}
         <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4">
           <div>
@@ -207,8 +228,10 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
             type="button"
             role="switch"
             aria-checked={publishOnCreate}
+            aria-describedby={!publicationReadiness.ready ? "publication-requirements" : undefined}
+            disabled={!publicationReadiness.ready}
             onClick={() => setPublishOnCreate(!publishOnCreate)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               publishOnCreate ? 'bg-brand-600' : 'bg-gray-300'
             }`}
           >
@@ -224,7 +247,7 @@ export default function StepPreview({ formData, onSubmit, isSubmitting }: StepPr
         <button
           type="button"
           onClick={() => onSubmit(publishOnCreate)}
-          disabled={isSubmitting || !formData.title.trim()}
+          disabled={isSubmitting || !formData.title.trim() || (publishOnCreate && !publicationReadiness.ready)}
           className="w-full rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? (

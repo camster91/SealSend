@@ -130,12 +130,12 @@ export default function FeaturesGrid() {
           transition={{ duration: 0.5, delay: 0.3 }}
         >
           <p className="text-neutral-400">
-            And much more...{" "}
+            Ready to run one complete event?{" "}
             <a
               href="/signup"
               className="font-medium text-primary-400 hover:text-primary-300"
             >
-              Try it free →
+              Join controlled beta →
             </a>
           </p>
         </motion.div>

@@ -9,6 +9,7 @@ import { BETA_MODE } from '@/lib/constants';
 export const metadata: Metadata = {
   title: "Pricing - SealSend",
   description: "Run one complete event for up to 100 guests in SealSend's controlled beta.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default function PricingPage() {

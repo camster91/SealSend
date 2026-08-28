@@ -13,6 +13,7 @@ import StepPreview from './StepPreview';
 import { PromptToEventGenerator } from './PromptToEventGenerator';
 import type { AiEventDraft } from '@/lib/ai/event-draft-schema';
 import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from '@/lib/datetime';
+import { getEventBriefContext, type EventBrief, type EventBriefContext } from '@/lib/event-brief';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ export interface WizardFormData {
   invitation_headline: string;
   invitation_body: string;
   reminder_sequence: Array<{ timing: string; subject: string; message: string }>;
+  event_brief: EventBriefContext | null;
   ai_generation_id: string;
   customization: EventCustomization;
   rsvp_fields: RSVPField[];
@@ -128,6 +130,7 @@ function getInitialState(initialData?: Partial<WizardFormData>): WizardFormData 
     invitation_headline: '',
     invitation_body: '',
     reminder_sequence: [],
+    event_brief: null,
     ai_generation_id: '',
     customization: {
       primaryColor: '#6366f1',
@@ -254,7 +257,7 @@ export default function WizardContainer({
     dispatch({ type: 'SET_GUESTS', guests });
   }, []);
 
-  const applyAiDraft = useCallback((draft: AiEventDraft, generationId: string) => {
+  const applyAiDraft = useCallback((draft: AiEventDraft, generationId: string, brief: EventBrief) => {
     const timeZone = draft.event.eventTimezone;
     const appliedData: Partial<WizardFormData> = {
       title: draft.event.title,
@@ -274,6 +277,7 @@ export default function WizardContainer({
       invitation_body: draft.invitation.body,
       reminder_sequence: draft.reminders,
       ai_generation_id: generationId,
+      event_brief: getEventBriefContext(brief),
       customization: { ...formData.customization, primaryColor: draft.theme.primaryColor, backgroundColor: draft.theme.backgroundColor },
       rsvp_fields: draft.rsvpFields.map((field) => ({
         field_name: field.key,
@@ -323,6 +327,7 @@ export default function WizardContainer({
         invitation_headline: formData.invitation_headline || undefined,
         invitation_body: formData.invitation_body || undefined,
         reminder_sequence: formData.reminder_sequence,
+        event_brief: formData.event_brief,
         ai_generation_id: formData.ai_generation_id || undefined,
         ai_edit_count: aiBaseline ? Object.entries(aiBaseline).filter(([key, value]) => JSON.stringify(formData[key as keyof WizardFormData]) !== JSON.stringify(value)).length : undefined,
         status: publishOnCreate ? 'published' : 'draft',
@@ -418,6 +423,8 @@ export default function WizardContainer({
             data={{
               title: formData.title,
               description: formData.description,
+              invitation_headline: formData.invitation_headline,
+              invitation_body: formData.invitation_body,
               event_date: formData.event_date,
               event_end_date: formData.event_end_date,
               location_name: formData.location_name,
@@ -427,6 +434,10 @@ export default function WizardContainer({
               rsvp_deadline: formData.rsvp_deadline,
               max_attendees: formData.max_attendees?.toString() ?? '',
               max_guests_per_rsvp: formData.max_guests_per_rsvp?.toString() ?? '10',
+              audience: formData.event_brief?.audience ?? '',
+              accessibility_status: formData.event_brief?.accessibilityStatus ?? 'not_reviewed',
+              accessibility_notes: formData.event_brief?.accessibilityNotes ?? '',
+              communication_preference: formData.event_brief?.communicationPreference ?? 'undecided',
             }}
             registryLinks={formData.registry_links}
             allowPlusOnes={formData.allow_plus_ones}

@@ -5,6 +5,7 @@ import { Pool } from "pg";
 
 import { BETA_SEGMENTS, type BetaSegment } from "../src/lib/beta-participation";
 import { generateMagicToken, hashMagicToken, previewMagicToken } from "../src/lib/magic-token";
+import betaAcceptancePolicy from "../config/beta-acceptance-policy.json";
 
 const databaseUrl = process.env.DATABASE_URL;
 const requestedSegment = process.argv[2];
@@ -16,6 +17,11 @@ if (!databaseUrl) {
 
 if (!BETA_SEGMENTS.includes(requestedSegment as BetaSegment)) {
   console.error(`Usage: npm run create-beta-invite -- <${BETA_SEGMENTS.join("|")}>`);
+  process.exit(1);
+}
+
+if (betaAcceptancePolicy.status !== "approved") {
+  console.error("Error: Beta enrollment is closed until the cohort policy is approved before any host consents.");
   process.exit(1);
 }
 
@@ -33,13 +39,14 @@ async function createBetaInvite() {
   try {
     const result = await pool.query<{ expires_at: string }>(
       `INSERT INTO beta_enrollment_invites
-         (token_hash, token_preview, participant_label, segment, expires_at)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '7 days')
+         (token_hash, token_preview, participant_label, segment, cohort_version, expires_at)
+       VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '7 days')
        RETURNING expires_at`,
-      [hashMagicToken(token), previewMagicToken(token), participantLabel, segment],
+      [hashMagicToken(token), previewMagicToken(token), participantLabel, segment, betaAcceptancePolicy.cohortVersion],
     );
     console.log(`Participant: ${participantLabel}`);
     console.log(`Segment: ${segment}`);
+    console.log(`Cohort: ${betaAcceptancePolicy.cohortVersion}`);
     console.log(`Expires: ${result.rows[0].expires_at}`);
     console.log(`Invitation code (shown once): ${token}`);
   } catch (error) {

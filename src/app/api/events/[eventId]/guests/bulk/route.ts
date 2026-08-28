@@ -6,6 +6,7 @@ import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
+import { deduplicateGuestImport, type NormalizedGuestImport } from "@/lib/guest-import";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -38,33 +39,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       [eventId]
     );
 
-    const existingEmails = new Set((existingGuests || [])
-      .map(g => g.email?.toLowerCase())
-      .filter(Boolean));
-
-    const existingPhones = new Set((existingGuests || [])
-      .map(g => g.phone)
-      .filter(Boolean));
-
-    const duplicates: Array<{ name: string; reason: string }> = [];
     const validationErrors: Array<{ index: number; message: string }> = [];
 
-    const guests = parsed.data
+    const normalizedGuests = parsed.data
       .map((g, index) => {
-        // Check for duplicates in existing guests
-        if (g.email && existingEmails.has(g.email.toLowerCase())) {
-          duplicates.push({ name: g.name, reason: `Email ${g.email} already exists` });
-          return null;
-        }
-
-        if (g.phone) {
-          const phoneValidation = validateAndFormatPhone(g.phone);
-          if (phoneValidation.valid && phoneValidation.formatted && existingPhones.has(phoneValidation.formatted)) {
-            duplicates.push({ name: g.name, reason: `Phone ${g.phone} already exists` });
-            return null;
-          }
-        }
-
         // Validate phone number format
         let formattedPhone = g.phone || null;
         if (g.phone) {
@@ -82,14 +60,17 @@ export async function POST(request: Request, { params }: RouteParams) {
         }
 
         return {
-          event_id: eventId,
           name: g.name.trim(),
           email: g.email?.toLowerCase().trim() || null,
           phone: formattedPhone,
           notes: g.notes?.trim() || null,
         };
-      })
-      .filter(Boolean) as Array<{
+      }) satisfies NormalizedGuestImport[];
+    const { accepted, duplicates } = deduplicateGuestImport(normalizedGuests, existingGuests);
+    const guests = accepted.map((guest) => ({
+      ...guest,
+      event_id: eventId,
+    })) as Array<{
         event_id: string;
         name: string;
         email: string | null;

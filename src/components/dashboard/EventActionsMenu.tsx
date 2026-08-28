@@ -7,9 +7,11 @@ interface EventActionsMenuProps {
   eventId: string;
   eventTitle: string;
   eventTimezone?: string;
+  eventStatus: 'draft' | 'published' | 'archived';
+  canKeepCurrentActive?: boolean;
 }
 
-export function EventActionsMenu({ eventId, eventTitle, eventTimezone }: EventActionsMenuProps) {
+export function EventActionsMenu({ eventId, eventTitle, eventTimezone, eventStatus, canKeepCurrentActive }: EventActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,8 @@ export function EventActionsMenu({ eventId, eventTitle, eventTimezone }: EventAc
               eventId={eventId} 
               eventTitle={eventTitle} 
               eventTimezone={eventTimezone}
+              eventStatus={eventStatus}
+              canKeepCurrentActive={canKeepCurrentActive}
               variant="menu-item"
             />
           </div>

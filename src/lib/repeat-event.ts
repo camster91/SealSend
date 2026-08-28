@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { eventBriefContextSchema, type EventBriefContext } from "@/lib/event-brief";
 
 const nullableInstant = z.string().datetime({ offset: true }).nullable().optional();
 
@@ -8,6 +9,7 @@ export const repeatEventRequestSchema = z.object({
   eventEndDate: nullableInstant,
   rsvpDeadline: nullableInstant,
   includeGuests: z.boolean().optional().default(false),
+  archiveSource: z.boolean().optional().default(false),
 }).strict();
 
 export type RepeatEventRequest = {
@@ -16,6 +18,7 @@ export type RepeatEventRequest = {
   eventEndDate: string | null;
   rsvpDeadline: string | null;
   includeGuests: boolean;
+  archiveSource: boolean;
 };
 
 export function parseRepeatEventRequest(input: unknown, referenceInstant = new Date()): RepeatEventRequest {
@@ -38,5 +41,18 @@ export function parseRepeatEventRequest(input: unknown, referenceInstant = new D
     eventEndDate: parsed.eventEndDate ?? null,
     rsvpDeadline: parsed.rsvpDeadline ?? null,
     includeGuests: parsed.includeGuests,
+    archiveSource: parsed.archiveSource,
+  };
+}
+
+export function buildRepeatedEventBrief(input: unknown): EventBriefContext | null {
+  const source = eventBriefContextSchema.safeParse(input);
+  if (!source.success || source.data.audience.length < 3) return null;
+
+  return {
+    audience: source.data.audience,
+    accessibilityStatus: "not_reviewed",
+    accessibilityNotes: null,
+    communicationPreference: "undecided",
   };
 }

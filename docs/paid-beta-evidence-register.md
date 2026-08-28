@@ -2,6 +2,10 @@
 
 Use this register for release decisions. Store no passwords, tokens, payment-card data, message bodies, guest-list exports, or unnecessary personal information. Participant labels must be pseudonymous (for example `host-01`). Link only to access-controlled provider records.
 
+## Evidence-backed score baseline
+
+`npm run quality:score` evaluates `config/quality-scorecard.json` together with the mandatory launch-gate manifest. The 2026-08-28 baseline is product capability **81/100**, competitive position **66/100**, and paid-launch readiness **5/18 (27.8%)**. Synthetic QA and automated checks can strengthen product evidence, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence. Do not raise a category unless its linked evidence exists; every partial category must keep its missing proof explicit.
+
 ## Provider lifecycle evidence
 
 | Provider | Scenario | Required evidence | Status | Verified by | Date |
@@ -27,17 +31,21 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 | OpenAI | Invalid output/timeout | Deterministic fallback with no external action | Pending | | |
 | Monitoring | Synthetic error | Alert received with sanitized route metadata only | Pending | | |
 
+The current provider-cost proposal is `docs/provider-cost-envelope.md`: USD 0.002 per email, USD 0.020 per billed SMS segment, a second review above USD 10 projected per event, and a monthly pause/reconciliation threshold above USD 50. These values remain **pending owner approval** and must be rechecked against actual provider billing before the `provider_cost_approval` gate can pass.
+
 ## Five-host acceptance
 
 Each participant must consent to beta observation. Recruit within the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner.
 
-Enrollment is invitation-controlled. For each approved host, an operator runs `npm run create-beta-invite -- <segment>` with the protected production `DATABASE_URL`, records the returned pseudonymous participant label, and transmits the one-time invitation code directly to that host. Codes are stored only as SHA-256 hashes, expire after seven days, assign the cohort segment on the server, and cannot be reused, self-selected, or accepted after revocation. `npm run list-beta-invites` shows at most 100 recent pseudonymous labels, segments, four-character previews, expiry dates, and derived statuses without querying or printing token hashes. If a code was misdirected or is no longer authorized, run `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>` before acceptance; the command is idempotent for an already-revoked invitation and refuses an accepted one. Do not commit or paste a raw code into this register, tickets, screenshots, or chat logs.
+Enrollment is invitation-controlled and remains closed until the named cohort policy is approved. For each approved host, an operator runs `npm run create-beta-invite -- <segment>` with the protected production `DATABASE_URL`, records the returned pseudonymous participant label and cohort version, and transmits the one-time invitation code directly to that host. Codes are stored only as SHA-256 hashes, expire after seven days, assign the cohort version and segment on the server, and cannot be reused, self-selected, or accepted after revocation. Database constraints allow only one open invitation and one active host per required segment in the named cohort. `npm run list-beta-invites` shows at most 100 recent current-cohort pseudonymous labels, segments, four-character previews, expiry dates, and derived statuses without querying or printing token hashes. If a code was misdirected or is no longer authorized, run `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>` before acceptance; the command is idempotent for an already-revoked invitation and refuses an accepted one. Do not commit or paste a raw code into this register, tickets, screenshots, or chat logs.
 
 The release candidate records a versioned consent timestamp, an operator-assigned pseudonymous participant label and segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence and rejoining requires a new operator invitation. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
 
 Run `npm run report-beta-participants` with the protected production `DATABASE_URL` to produce one JSON line per current-scope participant. Each line contains only the pseudonymous label, operator-assigned segment, consent version/timestamps, active/withdrawn state, privacy-limited milestone booleans, completion counts, feedback count, structured outcome, and severity-review counts. The command joins internally on account IDs but never returns them, and it does not select guest data, contact details, feedback messages, invitation tokens, token hashes, or reviewer names. Copy only the required results into the matrix below. `criticalDefects: null` means **not reviewed**; only a completed, named human severity review may replace it with a count, including zero.
 
 After a named human has triaged the host's current consent window, record the unresolved counts with `npm run record-beta-defect-review -- <host-label> "<reviewer name>" <severity-1-count> <severity-2-count> CONFIRM-HUMAN-SEVERITY-TRIAGE`. The command stores no free-text defect, guest, or response content and does not print the reviewer name. Re-run it after triage changes; it updates the same consent-window review. Keep detailed defect reproduction and resolution evidence in the access-controlled engineering system under its pseudonymous host label.
+
+After a named operator has reconciled the support effort delivered during the host's current consent window, record the total with `npm run record-beta-support-review -- <host-label> "<reviewer name>" <support-minutes> CONFIRM-OPERATOR-SUPPORT-REVIEW`. This operator-recorded value is separate from the host's self-reported survey answer. The command stores no support notes, message content, guest data, or reviewer name in its output; rerunning it updates the same consent-window review.
 
 | Host label | Segment | Account | Event and design | Guest import | Controlled invite | RSVP | Announcement review | Calendar | Check-in | Export | Feedback | Critical defects |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -51,7 +59,7 @@ After a named human has triaged the host's current consent window, record the un
 
 Record the measurement window and denominator for every rate.
 
-The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, and average feedback rating without returning participant identifiers.
+The secret-gated operations report computes active-cohort event-publish, guest-import, controlled-invite, RSVP, announcement-review, calendar, check-in, export, feedback, workflow-completion, and repeat-planner repeat-use rates. Every rate retains its numerator and denominator; a zero denominator is reported as `null`, never as 0% or a pass. It also reports represented segments, median hours from consent to first publish, average feedback rating, operator support-review coverage, and the median operator-recorded support time only after every active host has a review, without returning participant identifiers.
 
 | Measure | Result | Acceptance threshold | Decision |
 |---|---:|---:|---|
@@ -65,7 +73,7 @@ The secret-gated operations report computes active-cohort event-publish, guest-i
 | Backup restore rehearsal | | Pass | Pending |
 | Willingness to pay | | Recorded for all five hosts | Pending |
 
-The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. Missing responses remain missing; they are never converted to zero or a passing result.
+The outcome survey records each active host's **stated intent** against the displayed price proposition. It is **not paid conversion**, checkout, or revenue evidence. The survey support-minutes field is **self-reported** by the host and must not be described as operator-observed support time. The separate named operator review is the source for operator-recorded support effort. Missing responses or reviews remain missing; they are never converted to zero or a passing result.
 
 ## Real-device accessibility evidence
 

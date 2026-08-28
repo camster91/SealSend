@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-28",
+  "evidenceBoundary": "Synthetic and automated proof can support product execution, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence.",
+  "dimensions": {
+    "productCapability": {
+      "target": 90,
+      "categories": [
+        {
+          "id": "first_event_activation",
+          "maximum": 15,
+          "earned": 10,
+          "evidence": ["tests/onboarding-checklist.test.ts", "tests/publication-readiness.test.ts", "tests/e2e/live-full.spec.ts"],
+          "missingEvidence": ["Five consented hosts completing activation", "Measured median guest-ready time and abandonment reasons"]
+        },
+        {
+          "id": "invitation_event_page_quality",
+          "maximum": 15,
+          "earned": 12,
+          "evidence": ["tests/event-templates.test.ts", "tests/e2e/visual.spec.ts", "tests/e2e/accessibility.spec.ts"],
+          "missingEvidence": ["Permissioned host and guest ratings", "Physical mobile-device review"]
+        },
+        {
+          "id": "rsvp_guest_operations",
+          "maximum": 20,
+          "earned": 18,
+          "evidence": ["tests/event-validation.test.ts", "tests/guest-import.test.ts", "tests/e2e/live-full.spec.ts", "config/launch-evidence.json#repository_quality"],
+          "missingEvidence": ["Real-event organizer and guest completion evidence"]
+        },
+        {
+          "id": "communications_control_delivery",
+          "maximum": 15,
+          "earned": 11,
+          "evidence": ["tests/communications-safety.test.ts", "tests/communication-suppressions.test.ts", "tests/message-cost-estimate.test.ts"],
+          "missingEvidence": ["Mailgun signed delivery lifecycle", "Twilio signed delivery and STOP lifecycle", "Approved provider costs"]
+        },
+        {
+          "id": "team_event_day_operations",
+          "maximum": 12,
+          "earned": 9,
+          "evidence": ["tests/event-access.test.ts", "tests/readiness.test.mjs", "tests/e2e/live-full.spec.ts"],
+          "missingEvidence": ["Physical iOS and Android check-in", "VoiceOver, TalkBack, and NVDA event-day evidence"]
+        },
+        {
+          "id": "analytics_post_event_value",
+          "maximum": 8,
+          "earned": 7,
+          "evidence": ["tests/activation-events.test.ts", "tests/beta-metrics.test.ts", "tests/rsvp-summary.test.ts"],
+          "missingEvidence": ["Completed consented-cohort outcome and repeat-use report"]
+        },
+        {
+          "id": "reliability_security_accessibility",
+          "maximum": 15,
+          "earned": 14,
+          "evidence": ["config/launch-evidence.json#repository_quality", "config/launch-evidence.json#load_capacity", "config/launch-evidence.json#backup_restore", "config/launch-evidence.json#rollback_image_restore"],
+          "missingEvidence": ["Received operational alert", "Physical-device accessibility evidence"]
+        }
+      ]
+    },
+    "competitivePosition": {
+      "target": 85,
+      "categories": [
+        {
+          "id": "ideal_customer_clarity",
+          "maximum": 15,
+          "earned": 13,
+          "evidence": ["src/lib/use-case-content.ts", "src/components/marketing/OrganizerFit.tsx", "tests/readiness.test.mjs"],
+          "missingEvidence": ["Permissioned target-organizer comprehension interviews"]
+        },
+        {
+          "id": "distinct_outcome_message",
+          "maximum": 20,
+          "earned": 14,
+          "evidence": ["src/components/marketing/Hero.tsx", "src/lib/constants.ts", "tests/repeat-event.test.ts"],
+          "missingEvidence": ["Five-host validation of the brief-to-approved-workflow promise", "Permissioned outcome quotations or case evidence"]
+        },
+        {
+          "id": "value_pricing_logic",
+          "maximum": 15,
+          "earned": 13,
+          "evidence": ["src/lib/constants.ts", "tests/entitlements.test.ts", "tests/billing.test.ts"],
+          "missingEvidence": ["Approved provider unit costs", "Five-host willingness-to-pay results", "Observed paid conversion"]
+        },
+        {
+          "id": "trust_proof",
+          "maximum": 20,
+          "earned": 5,
+          "evidence": ["config/launch-evidence.json#repository_quality", "docs/paid-beta-evidence-register.md", "src/app/(marketing)/support/page.tsx", "tests/readiness.test.mjs"],
+          "missingEvidence": ["Permissioned real-host case evidence", "Provider delivery evidence", "Candidate support expectations require production deployment verification", "Qualified compliance review"]
+        },
+        {
+          "id": "product_led_differentiation",
+          "maximum": 20,
+          "earned": 16,
+          "evidence": ["tests/repeat-event.test.ts", "tests/event-access.test.ts", "tests/e2e/live-full.spec.ts"],
+          "missingEvidence": ["Observed organizer preference versus their prior workflow", "Real repeat-event completion"]
+        },
+        {
+          "id": "distribution_repeat_use_loop",
+          "maximum": 10,
+          "earned": 5,
+          "evidence": ["src/app/api/events/[eventId]/clone/route.ts", "tests/beta-metrics.test.ts"],
+          "missingEvidence": ["Measured repeat-host activation", "Permissioned acquisition source and referral evidence"]
+        }
+      ]
+    }
+  }
+}

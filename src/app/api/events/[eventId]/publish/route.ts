@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
+import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -16,8 +17,10 @@ export async function POST(
     const user = auth.user;
 
     // Fetch the current event to get its status
-    const event = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM events WHERE id = $1',
+    const event = await queryOne<PublicationCandidate & { id: string; status: string }>(
+      `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
+              invitation_headline, invitation_body, rsvp_deadline, event_brief
+         FROM events WHERE id = $1`,
       [eventId]
     );
 
@@ -28,8 +31,24 @@ export async function POST(
       );
     }
 
+    if (event.status === 'archived') {
+      return NextResponse.json(
+        { error: 'Archived events cannot be published directly. Use Repeat event to create a reviewed new draft.' },
+        { status: 409 },
+      );
+    }
+
     // Toggle status between draft and published
     const newStatus = event.status === 'published' ? 'draft' : 'published';
+    if (newStatus === 'published') {
+      const readiness = getPublicationReadiness(event);
+      if (!readiness.ready) {
+        return NextResponse.json(
+          { error: 'Event is not ready to publish', blockers: readiness.blockers },
+          { status: 400 },
+        );
+      }
+    }
 
     const updatedEvent = await queryOne(
       'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',

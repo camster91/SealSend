@@ -19,6 +19,8 @@ CREATE INDEX IF NOT EXISTS idx_auth_codes_phone_context ON auth_codes(phone, rol
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_id TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS repeated_from_event_id UUID REFERENCES events(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_events_repeated_from ON events(repeated_from_event_id) WHERE repeated_from_event_id IS NOT NULL;
 
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone_invalid_at TIMESTAMPTZ;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
@@ -41,6 +43,7 @@ ALTER TABLE guests ADD CONSTRAINT guests_invite_status_check
 UPDATE guests SET invite_status = 'not_sent' WHERE invite_status = 'pending';
 
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_timezone TEXT NOT NULL DEFAULT 'UTC';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_brief JSONB;
 
 ALTER TABLE guest_tags ADD COLUMN IF NOT EXISTS tag_name TEXT;
 ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ DEFAULT NOW();
@@ -398,6 +401,7 @@ CREATE TABLE IF NOT EXISTS beta_enrollment_invites (
   token_preview TEXT NOT NULL CHECK (char_length(token_preview) = 4),
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
   segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner')),
+  cohort_version TEXT NOT NULL CHECK (cohort_version ~ '^[a-z0-9][a-z0-9-]{2,63}$'),
   expires_at TIMESTAMPTZ NOT NULL,
   accepted_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   accepted_at TIMESTAMPTZ,
@@ -407,16 +411,24 @@ CREATE TABLE IF NOT EXISTS beta_enrollment_invites (
 );
 CREATE INDEX IF NOT EXISTS idx_beta_enrollment_invites_available
   ON beta_enrollment_invites(expires_at) WHERE accepted_at IS NULL AND revoked_at IS NULL;
+ALTER TABLE beta_enrollment_invites
+  ADD COLUMN IF NOT EXISTS cohort_version TEXT NOT NULL DEFAULT 'legacy-unassigned';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_invites_open_cohort_segment
+  ON beta_enrollment_invites(cohort_version, segment)
+  WHERE accepted_at IS NULL AND revoked_at IS NULL AND cohort_version <> 'legacy-unassigned';
 CREATE TABLE IF NOT EXISTS beta_participants (
   user_id UUID PRIMARY KEY REFERENCES admin_users(id) ON DELETE CASCADE,
   participant_label TEXT UNIQUE NOT NULL CHECK (participant_label ~ '^host-[a-f0-9]{12}$'),
   segment TEXT NOT NULL CHECK (segment IN ('club_association','volunteer_nonprofit','creative_community','alumni_professional','repeat_planner','legacy_out_of_scope')),
+  cohort_version TEXT NOT NULL CHECK (cohort_version ~ '^[a-z0-9][a-z0-9-]{2,63}$'),
   consent_version TEXT NOT NULL,
   consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   withdrawn_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE beta_participants
+  ADD COLUMN IF NOT EXISTS cohort_version TEXT NOT NULL DEFAULT 'legacy-unassigned';
 DO $$
 BEGIN
   ALTER TABLE beta_participants DROP CONSTRAINT IF EXISTS beta_participants_segment_check;
@@ -431,6 +443,9 @@ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS idx_beta_participants_active_segment
   ON beta_participants(segment) WHERE withdrawn_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_active_cohort_segment
+  ON beta_participants(cohort_version, segment)
+  WHERE withdrawn_at IS NULL AND cohort_version <> 'legacy-unassigned';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent
   ON beta_participants(user_id, consented_at);
 CREATE TABLE IF NOT EXISTS beta_outcomes (
@@ -463,3 +478,17 @@ CREATE TABLE IF NOT EXISTS beta_defect_reviews (
   FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_beta_defect_reviews_reviewed ON beta_defect_reviews(reviewed_at DESC);
+CREATE TABLE IF NOT EXISTS beta_support_reviews (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  consented_at TIMESTAMPTZ NOT NULL,
+  reviewer_name TEXT NOT NULL CHECK (char_length(reviewer_name) BETWEEN 2 AND 100),
+  review_version TEXT NOT NULL,
+  operator_recorded_support_minutes INTEGER NOT NULL CHECK (operator_recorded_support_minutes BETWEEN 0 AND 600),
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, consented_at),
+  FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_beta_support_reviews_reviewed ON beta_support_reviews(reviewed_at DESC);
