@@ -10,6 +10,8 @@ import { X } from 'lucide-react';
 interface EventDetailsFormValues {
   title: string;
   description: string;
+  invitation_headline: string;
+  invitation_body: string;
   event_date: string;
   event_end_date: string;
   location_name: string;
@@ -72,7 +74,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
 
   useEffect(() => {
     const fields: (keyof EventDetailsFormValues)[] = [
-      'title', 'description', 'event_date', 'event_end_date',
+      'title', 'description', 'invitation_headline', 'invitation_body', 'event_date', 'event_end_date',
       'location_name', 'location_address', 'host_name', 'dress_code', 'rsvp_deadline',
     ];
 
@@ -132,14 +134,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             aria-describedby="title-counter"
           />
-          <div className="mt-1 flex justify-between items-start">
-            <div>
-              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
-            </div>
-            <p id="title-counter" className="text-xs text-gray-500" aria-live="polite">
-              {(watchedValues.title || '').length}/200
-            </p>
-          </div>
+          {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
         </div>
 
         <div>
@@ -164,14 +159,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             aria-describedby="description-counter"
           />
-          <div className="mt-1 flex justify-between items-start">
-            <div>
-              {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
-            </div>
-            <p id="description-counter" className="text-xs text-gray-500" aria-live="polite">
-              {(watchedValues.description || '').length}/2000
-            </p>
-          </div>
+          {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
         </div>
 
         <div>
@@ -183,6 +171,37 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
             placeholder="e.g. Sarah & Tom"
             className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
+        </div>
+      </section>
+
+      <hr className="border-gray-200" />
+
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Invitation Copy</h3>
+          <p className="mt-1 text-sm text-gray-600">Review the message guests will see. You can leave it incomplete while saving a private draft.</p>
+        </div>
+        <div>
+          <label htmlFor="invitation_headline" className="mb-1 block text-sm font-medium text-gray-700">Invitation headline</label>
+          <input
+            id="invitation_headline"
+            type="text"
+            {...register('invitation_headline', { maxLength: { value: 200, message: 'Invitation headline must be less than 200 characters' } })}
+            placeholder="You’re invited to our September gathering"
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          />
+          {errors.invitation_headline && <p className="mt-1 text-sm text-red-600">{errors.invitation_headline.message}</p>}
+        </div>
+        <div>
+          <label htmlFor="invitation_body" className="mb-1 block text-sm font-medium text-gray-700">Invitation message</label>
+          <textarea
+            id="invitation_body"
+            rows={4}
+            {...register('invitation_body', { maxLength: { value: 2000, message: 'Invitation message must be less than 2000 characters' } })}
+            placeholder="Share the purpose of the event and what guests should know before they RSVP."
+            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          />
+          {errors.invitation_body && <p className="mt-1 text-sm text-red-600">{errors.invitation_body.message}</p>}
         </div>
       </section>
 

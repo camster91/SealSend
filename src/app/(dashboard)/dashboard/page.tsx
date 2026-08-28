@@ -99,6 +99,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             id: firstOwnedEvent.id,
             eventDate: firstOwnedEvent.event_date,
             locationName: firstOwnedEvent.location_name,
+            maxAttendees: firstOwnedEvent.max_attendees,
             invitationHeadline: firstOwnedEvent.invitation_headline,
             invitationBody: firstOwnedEvent.invitation_body,
             status: firstOwnedEvent.status,

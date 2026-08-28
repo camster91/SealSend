@@ -9,6 +9,7 @@ test("an event draft is not guest-ready until its schedule, location, and invita
       id: "event-1",
       eventDate: null,
       locationName: "  ",
+      maxAttendees: null,
       invitationHeadline: "Welcome",
       invitationBody: " ",
       status: "draft",
@@ -21,7 +22,7 @@ test("an event draft is not guest-ready until its schedule, location, and invita
     steps.map(({ label, complete, href }) => ({ label, complete, href })),
     [
       { label: "Create an event", complete: true, href: "/events/event-1/edit" },
-      { label: "Confirm date and location", complete: false, href: "/events/event-1/edit" },
+      { label: "Confirm schedule, location, and capacity", complete: false, href: "/events/event-1/edit" },
       { label: "Review invitation copy", complete: false, href: "/events/event-1/edit" },
       { label: "Add your first guest", complete: false, href: "/events/event-1/guests" },
       { label: "Publish the event", complete: false, href: "/events/event-1" },
@@ -36,6 +37,7 @@ test("the checklist reports the complete first-event workflow only from real sta
       id: "event-2",
       eventDate: "2026-09-18T22:00:00.000Z",
       locationName: "Community Hall",
+      maxAttendees: 60,
       invitationHeadline: "September gathering",
       invitationBody: "Please review the details and RSVP.",
       status: "published",
@@ -46,6 +48,24 @@ test("the checklist reports the complete first-event workflow only from real sta
 
   assert.equal(steps.length, 6);
   assert.equal(steps.every((step) => step.complete), true);
+});
+
+test("the schedule step remains incomplete until the host sets capacity", () => {
+  const steps = buildFirstEventChecklist({
+    event: {
+      id: "event-3",
+      eventDate: "2026-09-18T22:00:00.000Z",
+      locationName: "Community Hall",
+      maxAttendees: null,
+      invitationHeadline: "September gathering",
+      invitationBody: "Please review the details and RSVP.",
+      status: "draft",
+    },
+    hasGuest: false,
+    hasInvitation: false,
+  });
+
+  assert.equal(steps.find((step) => step.label === "Confirm schedule, location, and capacity")?.complete, false);
 });
 
 test("a new host gets actionable create-event links without fabricated progress", () => {

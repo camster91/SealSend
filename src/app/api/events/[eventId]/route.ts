@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
+import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -45,8 +46,10 @@ export async function PATCH(
     if (auth.error) return auth.error;
 
     // Verify ownership
-    const existing = await queryOne(
-      'SELECT id FROM events WHERE id = $1',
+    const existing = await queryOne<PublicationCandidate & { id: string; status: string }>(
+      `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
+              invitation_headline, invitation_body, rsvp_deadline
+         FROM events WHERE id = $1`,
       [eventId]
     );
 
@@ -65,6 +68,16 @@ export async function PATCH(
         { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 }
       );
+    }
+    const targetStatus = parsed.data.status ?? existing.status;
+    if (targetStatus === 'published') {
+      const readiness = getPublicationReadiness({ ...existing, ...parsed.data });
+      if (!readiness.ready) {
+        return NextResponse.json(
+          { error: 'Event is not ready to publish', blockers: readiness.blockers },
+          { status: 400 },
+        );
+      }
     }
     if (parsed.data.ai_generation_id) {
       const generation = await queryOne(

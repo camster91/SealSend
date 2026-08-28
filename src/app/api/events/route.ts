@@ -7,6 +7,7 @@ import { DEFAULT_RSVP_FIELDS } from '@/lib/constants';
 import { canCreateEvent } from '@/lib/entitlements';
 import { getUserTier } from '@/lib/subscription';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
+import { getPublicationReadiness } from '@/lib/publication-readiness';
 
 export async function GET() {
   try {
@@ -56,6 +57,16 @@ export async function POST(request: NextRequest) {
         { error: 'Validation failed', details: parsed.error.flatten() },
         { status: 400 }
       );
+    }
+
+    if (parsed.data.status === 'published') {
+      const readiness = getPublicationReadiness(parsed.data);
+      if (!readiness.ready) {
+        return NextResponse.json(
+          { error: 'Event is not ready to publish', blockers: readiness.blockers },
+          { status: 400 },
+        );
+      }
     }
 
     const { title, description, invitation_headline, invitation_body, reminder_sequence, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;

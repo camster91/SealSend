@@ -174,6 +174,36 @@ test('browser CI serves the same standalone artifact shape as production', async
   assert.match(server, /standalone[\\/]public/);
 });
 
+test('every publication boundary enforces the shared guest-ready contract', async () => {
+  const createRoute = await read('src/app/api/events/route.ts');
+  const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
+  const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
+  const preview = await read('src/components/events/wizard/StepPreview.tsx');
+
+  for (const source of [createRoute, updateRoute, publishRoute, preview]) {
+    assert.match(source, /getPublicationReadiness/);
+  }
+  assert.match(createRoute, /status\s*===\s*['"]published['"]/);
+  assert.match(updateRoute, /targetStatus\s*=\s*parsed\.data\.status\s*\?\?\s*existing\.status/);
+  assert.match(updateRoute, /targetStatus\s*===\s*['"]published['"]/);
+  assert.match(publishRoute, /readiness\.ready/);
+  assert.match(preview, /Complete before publishing/);
+});
+
+test('manual event creation exposes every required publication decision', async () => {
+  const details = await read('src/components/events/wizard/StepEventDetails.tsx');
+  const wizard = await read('src/components/events/wizard/WizardContainer.tsx');
+
+  assert.match(details, /id=["']invitation_headline["']/);
+  assert.match(details, /register\(['"]invitation_headline['"]/);
+  assert.match(details, /id=["']invitation_body["']/);
+  assert.match(details, /register\(['"]invitation_body['"]/);
+  assert.match(wizard, /invitation_headline:\s*formData\.invitation_headline/);
+  assert.match(wizard, /invitation_body:\s*formData\.invitation_body/);
+  assert.equal((details.match(/id=["']title-counter["']/g) ?? []).length, 1);
+  assert.equal((details.match(/id=["']description-counter["']/g) ?? []).length, 1);
+});
+
 test('database rate limiting serializes attempts for the same key', async () => {
   const source = await read('src/lib/rate-limit.ts');
 

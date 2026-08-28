@@ -418,6 +418,8 @@ export default function WizardContainer({
             data={{
               title: formData.title,
               description: formData.description,
+              invitation_headline: formData.invitation_headline,
+              invitation_body: formData.invitation_body,
               event_date: formData.event_date,
               event_end_date: formData.event_end_date,
               location_name: formData.location_name,

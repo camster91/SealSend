@@ -76,6 +76,7 @@ test('authenticated host and guest lifecycle', async ({ page }, testInfo) => {
       host_name: 'SealSend QA',
       allow_plus_ones: true,
       max_guests_per_rsvp: 3,
+      max_attendees: 40,
       invitation_headline: aiDraft.draft.invitation.headline,
       invitation_body: aiDraft.draft.invitation.body,
       reminder_sequence: aiDraft.draft.reminders,

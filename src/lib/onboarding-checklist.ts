@@ -2,6 +2,7 @@ export type FirstEventChecklistEvent = {
   id: string;
   eventDate: string | null;
   locationName: string | null;
+  maxAttendees: number | null;
   invitationHeadline: string | null;
   invitationBody: string | null;
   status: "draft" | "published" | "archived";
@@ -36,8 +37,13 @@ export function buildFirstEventChecklist({
   return [
     { label: "Create an event", complete: hasEvent, href: editHref },
     {
-      label: "Confirm date and location",
-      complete: Boolean(event?.eventDate && hasText(event.locationName)),
+      label: "Confirm schedule, location, and capacity",
+      complete: Boolean(
+        event?.eventDate
+        && hasText(event.locationName)
+        && Number.isInteger(event.maxAttendees)
+        && Number(event.maxAttendees) > 0,
+      ),
       href: editHref,
     },
     {
