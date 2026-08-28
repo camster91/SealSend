@@ -139,9 +139,12 @@ test('browser QA covers five engines and the hero is hydration-safe with reduced
 
 test('recurring-organizer marketing describes the explicit next-event workflow', async () => {
   const useCases = await read('src/lib/use-case-content.ts');
+  const constants = await read('src/lib/constants.ts');
 
   assert.doesNotMatch(useCases, /\bclone(?:d|s)?\b/i);
+  assert.doesNotMatch(constants, /\bclone(?:d|s)?\b/i);
   assert.match(useCases, /Next-event setup/);
+  assert.match(constants, /Next-event setup/);
   assert.match(useCases, /choose a new schedule/i);
   assert.match(useCases, /guest contact details/i);
   assert.match(useCases, /explicitly decide/i);

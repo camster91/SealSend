@@ -403,7 +403,7 @@ export const USE_CASES = [
     slug: "clubs-associations",
     title: "Clubs & Associations",
     description: "Reuse a proven event workflow for chapters, meetings, and member gatherings.",
-    features: ["Clone events", "Guest tags", "RSVP status", "Calendar links"],
+    features: ["Next-event setup", "Guest tags", "RSVP status", "Calendar links"],
   },
   {
     slug: "professional-gatherings",
