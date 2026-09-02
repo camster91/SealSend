@@ -29,7 +29,7 @@ Test Mailgun email integration and all email templates.
 npx tsx scripts/test/test-email.ts your-email@example.com
 ```
 
-This will send 5 test emails:
+This will run five checks and send four test emails:
 1. Simple test email
 2. Invitation email template
 3. Reminder email template

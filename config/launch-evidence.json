@@ -4,26 +4,140 @@
   "decisionScope": "paid-beta-to-staged-public-launch",
   "lastReviewed": "2026-08-28",
   "gates": [
-    { "id": "production_safety", "kind": "automated", "status": "pass", "evidence": ["DEPLOYMENT_READINESS.md: PAYMENTS_TEST_ONLY and COMMUNICATIONS_TEST_ONLY verified true; destructive automation flags false"] },
-    { "id": "repository_quality", "kind": "automated", "status": "pass", "verifiedSourceDigest": "5522e72ccaef3594b729447a31a6d60897f34678e087e86aa60d8bd601589113", "evidence": ["Tracked source digest 5522e72ccaef3594b729447a31a6d60897f34678e087e86aa60d8bd601589113: 212 application checks, evidence-bounded quality scoring, typecheck, zero-warning lint, production build, zero runtime dependency vulnerabilities, and three Chromium accessibility/overflow checks for the expanded public route set passed. The candidate includes factual support expectations with a two-business-day initial-response target, priority categories, safe-data instructions, and an explicit no-24/7 boundary; this is not claimed as published trust evidence until deployment verification. The proposed five-host thresholds are machine-valid in a separate artifact whose command reports activationStatus NOT_APPROVED; the active policy remains pending and enrollment remains closed. Announcement review binds the exact event, organizer, content, audience, channels, and schedule to a short-lived signed proof; SMS dispatch includes the reviewed body and preview cost counts GSM-7 and Unicode billed segments. Every sitemap marketing page declares a canonical URL, and the organizer use-case index is included in discovery; the candidate passes the legacy redirect and true-404 regressions that the older production image currently fails. 5/5 public browser projects, 25/25 public accessibility and keyboard checks, and 2/2 responsive visual checks passed on 2026-08-28. An isolated PostgreSQL 16 and HTTPS Chromium run exercised the complete authenticated host lifecycle, repeat-event workflow, guest code authentication, and guest-to-host authorization denials against candidate image digest sha256:71039c5285939e2fc1660264fb15618449b1dd82f812b11256d9bb1ca7c70ff1. The pending beta policy correctly blocked enrollment with HTTP 409; this run used synthetic data and is not claimed as real-host beta evidence."] },
-    { "id": "load_capacity", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 200-request public load and 10-way RSVP capacity concurrency"] },
-    { "id": "backup_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: 20260827T194856Z pre-deploy backup restored 34 public tables with current image sealsend:20260827T213741Z; health 200 and unauthenticated events 401"] },
-    { "id": "rollback_image_restore", "kind": "automated", "status": "pass", "evidence": ["docs/paid-beta-evidence-register.md: the same 20260827T194856Z backup restored 34 public tables with immediate rollback image sealsend:20260827T195857Z; health 200 and unauthenticated events 401"] },
-    { "id": "stripe_test_lifecycle", "kind": "external", "status": "pending", "blocker": "Stripe app requires reauthentication and no test-mode annual price is configured" },
-    { "id": "mailgun_delivery_lifecycle", "kind": "external", "status": "pending", "blocker": "Current Mailgun credentials return HTTP 401 and webhook signing key is absent" },
-    { "id": "twilio_delivery_lifecycle", "kind": "external", "status": "pending", "blocker": "Current Twilio credentials return HTTP 401 and callback authentication is incomplete" },
-    { "id": "operational_alerting", "kind": "external", "status": "pending", "blocker": "No ERROR_ALERT_WEBHOOK_URL has received a sanitized synthetic alert" },
-    { "id": "provider_cost_approval", "kind": "human", "status": "pending", "blocker": "Email and SMS unit costs and alert thresholds require owner approval" },
-    { "id": "retention_policy_approval", "kind": "human", "status": "pending", "blocker": "Draft and orphan-upload retention periods require legal/owner approval" },
-    { "id": "five_host_beta", "kind": "human", "status": "pending", "blocker": "The release candidate now records explicit consent and privacy-limited acceptance milestones, but five consented hosts have not completed the controlled-beta matrix" },
-    { "id": "real_device_accessibility", "kind": "human", "status": "pending", "blocker": "Physical iOS, Android, macOS VoiceOver and Windows NVDA evidence is not recorded" },
-    { "id": "privacy_terms_legal", "kind": "human", "status": "pending", "blocker": "Qualified legal approval is not recorded" },
-    { "id": "refund_cancellation_legal", "kind": "human", "status": "pending", "blocker": "Qualified review of refund, cancellation and entitlement treatment is not recorded" },
-    { "id": "tax_accounting", "kind": "human", "status": "pending", "blocker": "Qualified sales-tax registration, collection and remittance decision is not recorded" },
-    { "id": "email_sms_compliance", "kind": "human", "status": "pending", "blocker": "Qualified CASL/TCPA consent and unsubscribe review is not recorded" },
-    { "id": "launch_metrics", "kind": "human", "status": "pending", "blocker": "Privacy-limited cohort rates now preserve explicit numerators, denominators and zero-evidence nulls, but approved thresholds and completed activation, conversion, delivery, support and willingness-to-pay evidence are still absent" }
+    {
+      "id": "production_safety",
+      "kind": "automated",
+      "status": "pass",
+      "evidence": [
+        "DEPLOYMENT_READINESS.md: PAYMENTS_TEST_ONLY and COMMUNICATIONS_TEST_ONLY verified true; destructive automation flags false"
+      ]
+    },
+    {
+      "id": "repository_quality",
+      "kind": "automated",
+      "status": "pass",
+      "verifiedSourceDigest": "2ed687f2e5d6cd2961b5ea3ff0956a3b36fc4d27ee175cc21c5bc30e952d6f2d",
+      "evidence": [
+        "Tracked source digest 2ed687f2e5d6cd2961b5ea3ff0956a3b36fc4d27ee175cc21c5bc30e952d6f2d: 228 application checks passed, including a regression that requires both launch-status documents to match the authoritative evidence-bounded score and gate count. The prior 227-check candidate evidence remains recorded below as historical exact-revision proof.",
+        "Tracked source digest c58ef86b7f463efb06ed00371486116eff940530554a8f7c9aea19ea42bfeb07: 227 application checks, application and operations-script typechecks, evidence-bounded quality scoring, zero-warning lint, and production build passed. Paid-mode analytics now derives the event owner's account and event entitlements on the server: Gold events and annual Pro are allowed while free and Silver remain gated, removing the prior hardcoded paid-user lockout without exposing response data to unauthorized collaborators. A disabled-by-default post-event lifecycle candidate now prompts owners of meaningful completed events to review outcomes and use the explicit next-event workflow; it is bounded to events ending 24 hours to 7 days earlier, excludes already-repeated events, deduplicates by source event, escapes event titles, and exposes privacy-limited prompted-host and repeated-host counts. The owner-approved retention decision names 90-day stale-draft and 7-day orphan-upload periods. The release candidate's public notice names those periods and its 14-day warning; stale-draft deletion requires a warning tied to the draft's exact current version and the full waiting period after delivery. Lifecycle emails and both cleanup jobs remain disabled, qualified legal review remains pending, and no production activation is authorized. Commit 817b721 passed an isolated VPS rehearsal against a fresh PostgreSQL 16 schema and the production image shape: four stale candidates produced one exact warned candidate, three fail-closed blocks, and exactly one deletion; the warning-window query returned the expected lifecycle candidate. All temporary containers, network, image, and checkout were removed, and production health remained 200. Script typechecking now covers provider and beta-operations tooling that the application compiler previously excluded; undefined Mailgun response references, incomplete SMS announcement input, captured environment narrowing, and beta review result types were corrected. Direct Twilio acceptance sends now enforce the same controlled-recipient allowlist as application communications. The recurring-community-v1 beta thresholds are recorded in the active policy with Cameron Ashley and an approval timestamp before any host consent; this repository approval does not deploy the policy, enroll hosts, or satisfy the five-host gate. Signed Twilio Advanced Opt-Out events now process STOP, START, and HELP transactionally and replay-safely: STOP records organizer-scoped hashed suppressions, START removes all local suppressions for the recipient hash, and HELP does not alter suppression state. Live Twilio provider lifecycle evidence remains pending. The candidate includes factual support expectations with a two-business-day initial-response target, priority categories, safe-data instructions, and an explicit no-24/7 boundary; this is not claimed as published trust evidence until deployment verification. Announcement review binds the exact event, organizer, content, audience, channels, and schedule to a short-lived signed proof; SMS dispatch includes the reviewed body and preview cost counts GSM-7 and Unicode billed segments. Every sitemap marketing page declares a canonical URL, and the organizer use-case index is included in discovery; the candidate passes the legacy redirect and true-404 regressions that the older production image currently fails. Earlier candidate evidence includes zero runtime dependency vulnerabilities, 5/5 public browser projects, 25/25 public accessibility and keyboard checks, and 2/2 responsive visual checks on 2026-08-28. Commit aa3d03c, whose application tree matches parent edbbcef, passed the existing isolated PostgreSQL 16 and internal-HTTPS Chromium suite 2/2 against candidate image digest sha256:8c6198da64a37ad5d1f1714ac2f42961e52ffba19932cfec142995a00becebd5. It exercised the authenticated host lifecycle, approved beta enrollment, AI fallback, one-event enforcement, guest operations, guest-code authorization denials, RSVP and summary, signed announcement review, exports, controlled-beta checkout refusal, repeat-event behavior, and public navigation. All temporary containers, network, candidate image, and checkout were removed, and production health remained 200. The earlier pending policy correctly blocked enrollment with HTTP 409; that synthetic result does not apply to the now-approved policy and is not real-host beta evidence."
+      ]
+    },
+    {
+      "id": "load_capacity",
+      "kind": "automated",
+      "status": "pass",
+      "evidence": [
+        "docs/paid-beta-evidence-register.md: 200-request public load and 10-way RSVP capacity concurrency"
+      ]
+    },
+    {
+      "id": "backup_restore",
+      "kind": "automated",
+      "status": "pass",
+      "evidence": [
+        "docs/paid-beta-evidence-register.md: 20260827T194856Z pre-deploy backup restored 34 public tables with current image sealsend:20260827T213741Z; health 200 and unauthenticated events 401"
+      ]
+    },
+    {
+      "id": "rollback_image_restore",
+      "kind": "automated",
+      "status": "pass",
+      "evidence": [
+        "docs/paid-beta-evidence-register.md: the same 20260827T194856Z backup restored 34 public tables with immediate rollback image sealsend:20260827T195857Z; health 200 and unauthenticated events 401"
+      ]
+    },
+    {
+      "id": "stripe_test_lifecycle",
+      "kind": "external",
+      "status": "pending",
+      "blocker": "Stripe app requires reauthentication and no test-mode annual price is configured"
+    },
+    {
+      "id": "mailgun_delivery_lifecycle",
+      "kind": "external",
+      "status": "pending",
+      "blocker": "Current Mailgun credentials return HTTP 401 and webhook signing key is absent"
+    },
+    {
+      "id": "twilio_delivery_lifecycle",
+      "kind": "external",
+      "status": "pending",
+      "blocker": "Current Twilio credentials return HTTP 401 and callback authentication is incomplete"
+    },
+    {
+      "id": "operational_alerting",
+      "kind": "external",
+      "status": "pending",
+      "blocker": "No ERROR_ALERT_WEBHOOK_URL has received a sanitized synthetic alert"
+    },
+    {
+      "id": "provider_cost_approval",
+      "kind": "human",
+      "status": "pass",
+      "approvedBy": "Cameron Ashley",
+      "approvalDate": "2026-08-28",
+      "evidence": [
+        "docs/provider-cost-envelope.md: owner-approved USD 0.002 per email and USD 0.020 per SMS segment estimates, second review above USD 10 per event, and pause/reconciliation above USD 50 monthly; approval explicitly excludes billing activation and unrestricted communications"
+      ]
+    },
+    {
+      "id": "retention_policy_approval",
+      "kind": "human",
+      "status": "pass",
+      "approvedBy": "Cameron Ashley",
+      "approvalDate": "2026-08-28",
+      "evidence": [
+        "docs/retention-policy-decision.md: owner-approved 90-day stale-draft and 7-day orphan-upload periods with public notice and exact-version 14-day warning prerequisites; approval explicitly excludes legal approval, cleanup activation, and deployment"
+      ]
+    },
+    {
+      "id": "five_host_beta",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "The release candidate now records explicit consent and privacy-limited acceptance milestones, but five consented hosts have not completed the controlled-beta matrix"
+    },
+    {
+      "id": "real_device_accessibility",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Physical iOS, Android, macOS VoiceOver and Windows NVDA evidence is not recorded"
+    },
+    {
+      "id": "privacy_terms_legal",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Qualified legal approval is not recorded"
+    },
+    {
+      "id": "refund_cancellation_legal",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Qualified review of refund, cancellation and entitlement treatment is not recorded"
+    },
+    {
+      "id": "tax_accounting",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Qualified sales-tax registration, collection and remittance decision is not recorded"
+    },
+    {
+      "id": "email_sms_compliance",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Qualified CASL/TCPA consent and unsubscribe review is not recorded"
+    },
+    {
+      "id": "launch_metrics",
+      "kind": "human",
+      "status": "pending",
+      "blocker": "Approved thresholds are recorded and privacy-limited cohort rates preserve explicit numerators, denominators and zero-evidence nulls, but completed activation, conversion, delivery, support and willingness-to-pay evidence are still absent"
+    }
   ],
   "optional": [
-    { "id": "openai_live_generation", "status": "pending", "note": "Optional because deterministic fallback is shipped; required before marketing live AI generation" }
+    {
+      "id": "openai_live_generation",
+      "status": "pending",
+      "note": "Optional because deterministic fallback is shipped; required before marketing live AI generation"
+    }
   ]
 }

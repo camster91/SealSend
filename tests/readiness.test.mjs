@@ -1096,10 +1096,10 @@ test('beta acceptance is evaluated only against pre-approved, pre-cohort thresho
 
   assert.equal(policy.schemaVersion, 1);
   assert.match(policy.cohortVersion, /^[a-z0-9][a-z0-9-]{2,63}$/);
-  assert.equal(policy.status, 'pending');
-  assert.equal(policy.approvedBy, null);
-  assert.equal(policy.approvedAt, null);
-  assert.equal(policy.thresholds, null);
+  assert.equal(policy.status, 'approved');
+  assert.equal(policy.approvedBy, 'Cameron Ashley');
+  assert.match(policy.approvedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.equal(policy.thresholds.minimumCohortSize, 5);
   assert.match(evaluator, /approvedAt/);
   assert.match(evaluator, /cohortStartedAt/);
   assert.match(evaluator, /before the first host consent/i);
@@ -1284,6 +1284,76 @@ test('host lifecycle emails are deduplicated, controlled, and disabled by defaul
   assert.match(example, /ENABLE_HOST_LIFECYCLE_EMAILS=false/);
 });
 
+test('post-event repeat prompts are bounded, deduplicated, and measurable', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
+  const lifecycle = await read('src/lib/host-lifecycle.ts');
+  const metrics = await read('src/app/api/operations/metrics/route.ts');
+
+  assert.match(schema, /host_lifecycle_notifications_notification_type_check/);
+  assert.match(schema, /post_event_repeat/);
+  assert.match(lifecycle, /notification_type: [^;]*post_event_repeat/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) <= NOW\(\) - INTERVAL '24 hours'/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) >= NOW\(\) - INTERVAL '7 days'/);
+  assert.match(route, /EXISTS \(SELECT 1 FROM rsvp_responses/);
+  assert.match(route, /repeated\.repeated_from_event_id = e\.id/);
+  assert.match(lifecycle, /Review outcomes/);
+  assert.match(lifecycle, /Repeat event/);
+  assert.match(metrics, /repeatLoop/);
+  assert.match(metrics, /post_event_repeat/);
+  assert.match(metrics, /repeated_from_event_id/);
+});
+
+test('stale-draft warnings cover the complete 14-day pre-cleanup window', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
+  const lifecycle = await read('src/lib/host-lifecycle.ts');
+  const privacy = await read('src/app/(marketing)/privacy/page.tsx');
+
+  assert.match(schema, /stale_draft_warning/);
+  assert.match(lifecycle, /stale_draft_warning/);
+  assert.match(route, /STALE_DRAFT_RETENTION_DAYS/);
+  assert.match(route, /STALE_DRAFT_WARNING_DAYS/);
+  assert.match(route, /e\.updated_at <= NOW\(\) - \(\$1::int \* INTERVAL '1 day'\)/);
+  assert.match(route, /e\.updated_at > NOW\(\) - \(\$2::int \* INTERVAL '1 day'\)/);
+  assert.match(route, /EXTRACT\(EPOCH FROM e\.updated_at\)::bigint/);
+  assert.match(route, /e\.updated_at \+ \(\$2::int \* INTERVAL '1 day'\)/);
+  assert.match(privacy, /90 days after (?:its|the) last update/i);
+  assert.match(privacy, /14-day warning/i);
+  assert.match(privacy, /unreferenced upload[^.]*7 days/i);
+  assert.match(privacy, /automatic cleanup is currently disabled/i);
+});
+
+test('stale-draft deletion requires the current warning and its full waiting period', async () => {
+  const cleanup = await read('src/app/api/cron/cleanup-drafts/route.ts');
+
+  assert.match(cleanup, /resolveStaleDraftPolicy/);
+  assert.match(cleanup, /notification_type = ['"]stale_draft_warning['"]/);
+  assert.match(cleanup, /EXTRACT\(EPOCH FROM events\.updated_at\)::bigint/);
+  assert.match(cleanup, /notifications\.sent_at <= \$3/);
+  assert.match(cleanup, /blockedWithoutWarning/);
+  assert.match(cleanup, /DELETE FROM events[\s\S]*EXISTS[\s\S]*stale_draft_warning/);
+});
+
+test('retention rehearsal proves fail-closed deletion in disposable PostgreSQL', async () => {
+  const rehearsal = await read('ops/rehearse-retention.sh');
+
+  assert.match(rehearsal, /SEALSEND_RETENTION_REHEARSAL_CONFIRM/);
+  assert.match(rehearsal, /date -u \+%Y%m%d%H%M%S/);
+  assert.match(rehearsal, /postgres:16-alpine/);
+  assert.match(rehearsal, /docker network create/);
+  assert.match(rehearsal, /src\/lib\/db\/schema\.sql/);
+  assert.match(rehearsal, /stale_draft_warning/);
+  assert.match(rehearsal, /ENABLE_STALE_DRAFT_CLEANUP=true/);
+  assert.match(rehearsal, /"candidates":4/);
+  assert.match(rehearsal, /"warnedCandidates":1/);
+  assert.match(rehearsal, /"blockedWithoutWarning":3/);
+  assert.match(rehearsal, /"deleted":1/);
+  assert.match(rehearsal, /remaining_events.*3/);
+  assert.match(rehearsal, /trap cleanup EXIT INT TERM/);
+  assert.doesNotMatch(rehearsal, /sealsend-postgres|coolify\.resourceName|--network host/);
+});
+
 test('checkout conversion telemetry is recorded only at real lifecycle boundaries', async () => {
   const eventCheckout = await read('src/app/api/checkout/route.ts');
   const annualCheckout = await read('src/app/api/subscriptions/checkout/route.ts');
@@ -1330,6 +1400,44 @@ test('provider callbacks are authenticated, replay-safe, and retry transient fai
   assert.match(twilio, /timingSafeEqual/);
   assert.match(twilio, /INSERT INTO webhook_receipts/);
   assert.match(twilio, /status: 500/);
+});
+
+test('paid-mode analytics uses server-derived event-owner entitlements', async () => {
+  const page = await read('src/app/(dashboard)/events/[eventId]/analytics/page.tsx');
+  const route = await read('src/app/api/events/[eventId]/features/route.ts').catch(() => '');
+
+  assert.match(page, /\/api\/events\/\$\{eventId\}\/features/);
+  assert.doesNotMatch(page, /currentTier=["']free["']/);
+  assert.match(page, /requiredTier=["']business["']/);
+  assert.match(page, /currentTier=\{hasAnalyticsAccess \? ["']business["'] : ["']free["']\}/);
+  assert.match(route, /requireEventPermission\(eventId, ["']export_responses["']\)/);
+  assert.match(route, /getUserTier\(event\.user_id\)/);
+  assert.match(route, /canUseFeature\(accountPlan, event\.tier as EventTier, ["']analytics["']\)/);
+});
+
+test('direct provider test sends obey the controlled-recipient allowlist', async () => {
+  const smsTest = await read('scripts/test/test-sms.ts');
+  const guardIndex = smsTest.indexOf('assertApprovedRecipient(formattedPhone)');
+  const sendIndex = smsTest.indexOf('client.messages.create');
+
+  assert.ok(guardIndex >= 0, 'SMS provider test must enforce the controlled-recipient allowlist');
+  assert.ok(sendIndex > guardIndex, 'SMS recipient guard must run before the first provider send');
+});
+
+test('Twilio incoming opt-out events synchronize the local SMS suppression state', async () => {
+  const twilio = await read('src/app/api/webhooks/twilio/route.ts');
+  const inbound = await read('src/lib/twilio-inbound-opt-out.ts');
+
+  assert.match(twilio, /processTwilioOptOutEvent/);
+  assert.match(twilio, /data\.OptOutType/);
+  assert.match(twilio, /data\.From/);
+  assert.match(twilio, /BEGIN[\s\S]*processTwilioOptOutEvent[\s\S]*COMMIT/);
+  assert.match(twilio, /<Response><\/Response>/);
+  assert.match(inbound, /STOP[\s\S]*recordCommunicationSuppression/);
+  assert.match(inbound, /START[\s\S]*removeCommunicationSuppressionsForRecipient/);
+  assert.match(inbound, /HELP/);
+  assert.match(inbound, /INSERT INTO webhook_receipts/);
+  assert.match(inbound, /JOIN events/);
 });
 
 test('complaints, unsubscribes, bounces, and invalid phones block future guest communications', async () => {

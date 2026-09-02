@@ -527,11 +527,17 @@ CREATE TABLE IF NOT EXISTS host_lifecycle_notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
   event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-  notification_type TEXT NOT NULL CHECK (notification_type IN ('getting_started', 'finish_draft', 'event_approaching')),
+  notification_type TEXT NOT NULL CONSTRAINT host_lifecycle_notifications_notification_type_check
+    CHECK (notification_type IN ('getting_started', 'finish_draft', 'event_approaching', 'post_event_repeat', 'stale_draft_warning')),
   scope_key TEXT UNIQUE NOT NULL,
   provider_message_id TEXT,
   sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE host_lifecycle_notifications
+  DROP CONSTRAINT IF EXISTS host_lifecycle_notifications_notification_type_check;
+ALTER TABLE host_lifecycle_notifications
+  ADD CONSTRAINT host_lifecycle_notifications_notification_type_check
+  CHECK (notification_type IN ('getting_started', 'finish_draft', 'event_approaching', 'post_event_repeat', 'stale_draft_warning'));
 CREATE INDEX IF NOT EXISTS idx_host_lifecycle_user ON host_lifecycle_notifications(user_id, sent_at);
 
 -- =====================

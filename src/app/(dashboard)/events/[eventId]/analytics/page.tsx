@@ -109,11 +109,20 @@ export default function AnalyticsPage() {
   const eventId = params.eventId as string;
   const [responses, setResponses] = useState<RSVPResponse[]>([]);
   const [guestCount, setGuestCount] = useState(0);
+  const [hasAnalyticsAccess, setHasAnalyticsAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const featureResponse = await fetch(`/api/events/${eventId}/features`);
+      const features = featureResponse.ok
+        ? await featureResponse.json() as { analytics?: boolean }
+        : null;
+      const analyticsAllowed = features?.analytics === true;
+      setHasAnalyticsAccess(analyticsAllowed);
+      if (!analyticsAllowed) return;
+
       // Fetch responses (capped)
       const res = await fetch(`/api/events/${eventId}/responses?limit=500`);
       if (res.ok) {
@@ -243,8 +252,8 @@ export default function AnalyticsPage() {
 
   return (
     <FeatureGate
-      requiredTier="pro"
-      currentTier="free"
+      requiredTier="business"
+      currentTier={hasAnalyticsAccess ? "business" : "free"}
       featureName="RSVP Analytics"
       featureDescription="Get detailed insights and statistics for your event responses."
       mode="overlay"

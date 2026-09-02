@@ -4,7 +4,7 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 
 ## Evidence-backed score baseline
 
-`npm run quality:score` evaluates `config/quality-scorecard.json` together with the mandatory launch-gate manifest. The 2026-08-28 baseline is product capability **81/100**, competitive position **66/100**, and paid-launch readiness **5/18 (27.8%)**. Synthetic QA and automated checks can strengthen product evidence, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence. Do not raise a category unless its linked evidence exists; every partial category must keep its missing proof explicit.
+`npm run quality:score` evaluates `config/quality-scorecard.json` together with the mandatory launch-gate manifest. The 2026-08-28 baseline is product capability **82/100**, competitive position **69/100**, and paid-launch readiness **7/18 (38.9%)**. Synthetic QA and automated checks can strengthen product evidence, but cannot substitute for consented organizer outcomes, provider delivery, physical-device testing, qualified review, or willingness-to-pay evidence. Do not raise a category unless its linked evidence exists; every partial category must keep its missing proof explicit.
 
 ## Provider lifecycle evidence
 
@@ -27,6 +27,9 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 | Twilio | Failed and undelivered | Failure/bounce state and invalid-number marking | Pending | | |
 | Twilio | Duplicate callback | One receipt; terminal state does not regress | Pending | | |
 | Twilio | Transient processing failure | HTTP 500 followed by successful provider retry | Pending | | |
+| Twilio | Incoming STOP | Signed event creates organizer-scoped hashed SMS suppression; future send is blocked | Pending | | |
+| Twilio | Incoming START | Signed event removes the matching local suppression after provider unblock | Pending | | |
+| Twilio | Incoming HELP | Signed event is replay-safe and leaves suppression state unchanged | Pending | | |
 | OpenAI | Valid structured generation | Schema-valid editable draft, latency, token/cost record | Pending | | |
 | OpenAI | Invalid output/timeout | Deterministic fallback with no external action | Pending | | |
 | Monitoring | Synthetic error | Alert received with sanitized route metadata only | Pending | | |
@@ -37,7 +40,7 @@ The current provider-cost proposal is `docs/provider-cost-envelope.md`: USD 0.00
 
 Each participant must consent to beta observation. Recruit within the chosen recurring-community wedge: one club or association, one volunteer group or local non-profit, one creative community, one alumni or small professional community, and one repeat planner.
 
-Enrollment is invitation-controlled and remains closed until the named cohort policy is approved. For each approved host, an operator runs `npm run create-beta-invite -- <segment>` with the protected production `DATABASE_URL`, records the returned pseudonymous participant label and cohort version, and transmits the one-time invitation code directly to that host. Codes are stored only as SHA-256 hashes, expire after seven days, assign the cohort version and segment on the server, and cannot be reused, self-selected, or accepted after revocation. Database constraints allow only one open invitation and one active host per required segment in the named cohort. `npm run list-beta-invites` shows at most 100 recent current-cohort pseudonymous labels, segments, four-character previews, expiry dates, and derived statuses without querying or printing token hashes. If a code was misdirected or is no longer authorized, run `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>` before acceptance; the command is idempotent for an already-revoked invitation and refuses an accepted one. Do not commit or paste a raw code into this register, tickets, screenshots, or chat logs.
+Enrollment is invitation-controlled. The `recurring-community-v1` thresholds were approved by Cameron Ashley at `2026-08-28T20:06:43.844Z`, before any host consent was recorded; production enrollment remains closed until the approved candidate is deployed and a host is explicitly invited. For each approved host, an operator runs `npm run create-beta-invite -- <segment>` with the protected production `DATABASE_URL`, records the returned pseudonymous participant label and cohort version, and transmits the one-time invitation code directly to that host. Codes are stored only as SHA-256 hashes, expire after seven days, assign the cohort version and segment on the server, and cannot be reused, self-selected, or accepted after revocation. Database constraints allow only one open invitation and one active host per required segment in the named cohort. `npm run list-beta-invites` shows at most 100 recent current-cohort pseudonymous labels, segments, four-character previews, expiry dates, and derived statuses without querying or printing token hashes. If a code was misdirected or is no longer authorized, run `npm run revoke-beta-invite -- <host-xxxxxxxxxxxx>` before acceptance; the command is idempotent for an already-revoked invitation and refuses an accepted one. Do not commit or paste a raw code into this register, tickets, screenshots, or chat logs.
 
 The release candidate records a versioned consent timestamp, an operator-assigned pseudonymous participant label and segment, withdrawal timestamp, and privacy-limited workflow milestones. Only milestones after the current consent timestamp count. Withdrawal excludes the participant from active aggregate evidence and rejoining requires a new operator invitation. The application does not put guest names, contact details, message bodies, or RSVP content into this beta progress record. These signals support the matrix; they do not replace host feedback, critical-defect review, or owner acceptance.
 
@@ -106,6 +109,8 @@ Internal implementation review does not replace qualified legal or accounting ad
 | Email/SMS compliance | | CASL/TCPA and intended markets | Consent, identification, unsubscribe and records decision | Pending | |
 | Accessibility risk | | Intended markets | Remediation/statement decision | Pending | |
 
+The repository-controlled retention-period decision is documented in `docs/retention-policy-decision.md`. Cameron Ashley approved the 90-day stale-draft and 7-day orphan-upload periods on 2026-08-28. Destructive cleanup remains disabled, and this owner decision does not replace the qualified privacy/deletion review tracked above.
+
 ## Load and recovery evidence
 
 Run `npm run test:load` against the intended public origin. Defaults are bounded to 200 read-only requests at concurrency 10, require zero failures, and require p95 latency no greater than 1500 ms. Record the command environment, result JSON, server health, and log review.
@@ -118,6 +123,8 @@ Run `ops/rehearse-release.sh <verified-backup.dump> <immutable-image>` on the VP
 | RSVP capacity concurrency | 10 simultaneous attempts for 3 seats: 3 accepted, 7 capacity-rejected, persisted 3 responses/3 attendees; fixture removed | Pass | Codex QA | 2026-08-08 |
 | Current-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T213741Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
 | Rollback-image recovery | `20260827T194856Z/sealsend-predeploy.dump` + `sealsend:20260827T195857Z`; 34 tables, health 200, unauthenticated events 401 | Pass | Codex QA | 2026-08-27 |
+| Retention fail-closed rehearsal | Commit `817b721`; fresh PostgreSQL 16 schema and production image shape; 4 stale candidates, 1 exact warning older than 14 days, 3 blocked, exactly 1 deleted; 6 lifecycle candidates; temporary containers, network, image, and checkout removed; production health remained 200 | Pass | Codex QA | 2026-08-28 |
+| Current-candidate authenticated browser | Commit `aa3d03c` (application tree identical to parent `edbbcef`); isolated PostgreSQL 16, internal HTTPS for `sealsend.app`, and Chromium; authenticated host/guest lifecycle plus public navigation 2/2 passed, including signed announcement review; temporary containers, network, candidate image, and checkout removed; production health remained 200 | Pass | Codex QA | 2026-08-28 |
 | Live rollback procedure | Approved maintenance window and observed cutover/restore | Pending | | |
 
 ## Go/no-go record

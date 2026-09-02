@@ -14,7 +14,7 @@ test("current launch evidence fails closed with every external or human blocker 
   assert.equal(result.required, REQUIRED_GATE_IDS.length);
   assert.deepEqual(result.blockers.map((blocker) => blocker.id), [
     "stripe_test_lifecycle", "mailgun_delivery_lifecycle", "twilio_delivery_lifecycle", "operational_alerting",
-    "provider_cost_approval", "retention_policy_approval", "five_host_beta", "real_device_accessibility",
+    "five_host_beta", "real_device_accessibility",
     "privacy_terms_legal", "refund_cancellation_legal", "tax_accounting", "email_sms_compliance", "launch_metrics",
   ]);
 });

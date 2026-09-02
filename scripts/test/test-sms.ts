@@ -22,6 +22,7 @@ import twilio from 'twilio';
 import { validateAndFormatPhone } from '../../src/lib/phone-validation';
 import { buildInviteSms, buildReminderSms, buildAnnouncementSms } from '../../src/lib/sms-templates';
 import { getTwilioSendOptions, isTwilioConfigured } from '../../src/lib/twilio';
+import { assertApprovedRecipient } from '../../src/lib/communications-safety';
 
 type TestResult = {
   name: string;
@@ -83,6 +84,7 @@ async function runSmsTests(phoneNumber: string): Promise<void> {
   }
 
   const formattedPhone = validation.formatted || phoneNumber;
+  assertApprovedRecipient(formattedPhone);
 
   // Test 2: Twilio client initialization
   console.log('📱 Test 2: Twilio client initialization...');
@@ -236,6 +238,7 @@ async function runSmsTests(phoneNumber: string): Promise<void> {
       guestName: 'Test Guest',
       eventTitle: 'Test Birthday Party',
       subject: 'Venue Change',
+      message: 'The venue changed. Review the current event details before attending.',
       rsvpUrl: 'https://sealsend.app/e/test-event?t=testtoken123',
     });
 

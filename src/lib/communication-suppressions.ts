@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import type { PoolClient } from "pg";
 import { query } from "@/lib/db/client";
+
+export type CommunicationSuppressionClient = {
+  query<T>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
+};
 
 export type CommunicationChannel = "email" | "sms";
 export type CommunicationSuppressionReason = "unsubscribed" | "complained" | "bounced" | "manual";
@@ -38,7 +41,7 @@ export async function getCommunicationSuppressions(userId: string): Promise<Set<
 }
 
 export async function recordCommunicationSuppression(
-  client: Pick<PoolClient, "query">,
+  client: CommunicationSuppressionClient,
   input: {
     userId: string;
     channel: CommunicationChannel;
@@ -59,5 +62,20 @@ export async function recordCommunicationSuppression(
        source_event_id = EXCLUDED.source_event_id,
        updated_at = NOW()`,
     [input.userId, input.channel, recipientHash, input.reason, input.provider, input.sourceEventId ?? null],
+  );
+}
+
+export async function removeCommunicationSuppressionsForRecipient(
+  client: CommunicationSuppressionClient,
+  input: {
+    channel: CommunicationChannel;
+    recipient: string;
+  },
+): Promise<void> {
+  const [, recipientHash] = communicationSuppressionKey(input.channel, input.recipient).split(":");
+  await client.query(
+    `DELETE FROM communication_suppressions
+     WHERE channel = $1 AND recipient_hash = $2`,
+    [input.channel, recipientHash],
   );
 }

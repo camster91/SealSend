@@ -55,7 +55,7 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
   // Test 1: Simple test email
   console.log('📧 Test 1: Sending simple test email...');
   try {
-    await sendEmail({
+    const result = await sendEmail({
       to: recipientEmail,
       subject: 'SealSend Test - Simple Email',
       html: '<h1>Test Successful!</h1><p>Your Mailgun integration is working.</p>',
@@ -92,7 +92,7 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
       rsvpDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    await sendEmail({
+    const result = await sendEmail({
       to: recipientEmail,
       subject,
       html,
