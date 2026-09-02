@@ -9,6 +9,8 @@ import { getClientUser } from "@/lib/auth/client-auth";
 import { getAnnualProCtaMode } from "@/lib/pricing-cta";
 import { cn } from "@/lib/utils";
 
+const PRO_AVAILABILITY_CONTACT = "mailto:support@sealsend.app?subject=SealSend%20Pro%20availability";
+
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
   const plans = BETA_MODE ? [CONTROLLED_BETA_PRICING_PLAN] : PUBLIC_PRICING_PLANS;
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,16 +61,16 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
             <div><strong className="block text-neutral-900">{plan.guests}</strong><span className="text-xs text-neutral-500">guests/event</span></div>
           </div>
           <ul className="my-6 flex-1 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-neutral-700"><Check className="h-5 w-5 shrink-0 text-primary-600" />{feature}</li>)}</ul>
-          {plan.id === "pro_annual" && annualProCtaMode === "waitlist" ? (
+          {plan.id === "pro_annual" && annualProCtaMode === "contact" ? (
             <div className="space-y-2">
-              <Link
-                href="/signup?plan=pro_annual"
+              <a
+                href={PRO_AVAILABILITY_CONTACT}
                 className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-brand-600 bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                Join Pro waitlist
-              </Link>
+                Ask about Pro availability
+              </a>
               <p className="text-center text-xs leading-5 text-neutral-500">
-                Pro checkout is not open yet. Join the beta and we&apos;ll keep your Pro plan selected for launch.
+                Pro checkout is not open yet. Contact support for launch availability or use the controlled beta while paid checkout remains disabled.
               </p>
             </div>
           ) : plan.id === "pro_annual" && annualProCtaMode === "checkout" ? (
