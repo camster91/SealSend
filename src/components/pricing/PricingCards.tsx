@@ -6,6 +6,7 @@ import { Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BETA_MODE, CONTROLLED_BETA_PRICING_PLAN, PUBLIC_PRICING_PLANS } from "@/lib/constants";
 import { getClientUser } from "@/lib/auth/client-auth";
+import { getAnnualProCtaMode } from "@/lib/pricing-cta";
 import { cn } from "@/lib/utils";
 
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
@@ -13,6 +14,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const annualProCtaMode = getAnnualProCtaMode(annualCheckoutAvailable, isAuthenticated);
 
   useEffect(() => {
     const user = getClientUser();
@@ -57,7 +59,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
             <div><strong className="block text-neutral-900">{plan.guests}</strong><span className="text-xs text-neutral-500">guests/event</span></div>
           </div>
           <ul className="my-6 flex-1 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-neutral-700"><Check className="h-5 w-5 shrink-0 text-primary-600" />{feature}</li>)}</ul>
-          {plan.id === "pro_annual" && !annualCheckoutAvailable ? (
+          {plan.id === "pro_annual" && annualProCtaMode === "waitlist" ? (
             <div className="space-y-2">
               <Link
                 href="/signup?plan=pro_annual"
@@ -69,7 +71,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
                 Pro checkout is not open yet. Join the beta and we&apos;ll keep your Pro plan selected for launch.
               </p>
             </div>
-          ) : plan.id === "pro_annual" && isAuthenticated ? (
+          ) : plan.id === "pro_annual" && annualProCtaMode === "checkout" ? (
             <Button onClick={startAnnualProCheckout} disabled={loading} className="w-full">{loading ? "Opening checkout…" : "Choose annual Pro"}</Button>
           ) : (
             <Link
