@@ -58,9 +58,17 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
           </div>
           <ul className="my-6 flex-1 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-neutral-700"><Check className="h-5 w-5 shrink-0 text-primary-600" />{feature}</li>)}</ul>
           {plan.id === "pro_annual" && !annualCheckoutAvailable ? (
-            <button type="button" disabled className="h-10 w-full rounded-lg bg-neutral-200 px-4 text-sm font-medium text-neutral-600">
-              Test billing setup pending
-            </button>
+            <div className="space-y-2">
+              <Link
+                href="/signup?plan=pro_annual"
+                className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-brand-600 bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Join Pro waitlist
+              </Link>
+              <p className="text-center text-xs leading-5 text-neutral-500">
+                Pro checkout is not open yet. Join the beta and we&apos;ll keep your Pro plan selected for launch.
+              </p>
+            </div>
           ) : plan.id === "pro_annual" && isAuthenticated ? (
             <Button onClick={startAnnualProCheckout} disabled={loading} className="w-full">{loading ? "Opening checkout…" : "Choose annual Pro"}</Button>
           ) : (
