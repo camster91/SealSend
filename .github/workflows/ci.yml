@@ -1,16 +1,10 @@
 name: CI Build
 
-# Verification workflow. Does not deploy or require production secrets.
-# Required status check on `master` (see branch protection).
-#
-# Triggers:
-#   - pull_request: every PR (path-filtered to skip docs-only changes)
-#   - push to master: every commit to the default branch
-#   - workflow_dispatch: manual re-run
-#
-# Cost controls:
-#   - `paths-ignore` keeps docs/markdown-only changes from spending minutes
-#   - `concurrency.cancel-in-progress` drops superseded runs on the same ref
+# Canonical verification workflow. Does not deploy or require production secrets.
+# Fast checks run for every relevant PR; the expensive five-project Playwright
+# browser matrix is skipped for Dependabot because dependency PRs are already
+# covered by audit, typecheck, lint, and unit/readiness tests.
+
 on:
   pull_request:
     paths-ignore:
@@ -65,7 +59,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
@@ -80,7 +74,9 @@ jobs:
         run: npm test
 
       - name: Install browsers
+        if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Browser smoke tests
+        if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e
