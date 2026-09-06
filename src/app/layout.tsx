@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ThemeScript } from "@/components/providers/ThemeScript";
 
 export const metadata: Metadata = {
   title: "SealSend — Approved Guest Workflows for Organizers",
@@ -50,14 +51,25 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const themeInitScript = `(function(){try{var m=localStorage.getItem('sealsend_theme');var d=m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth">
-      <body className="font-sans min-h-screen">{children}</body>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="font-sans min-h-screen bg-background text-foreground">
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <ThemeScript />
+        {children}
+      </body>
     </html>
   );
 }

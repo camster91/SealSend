@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { AppProviders } from "@/components/providers/AppProviders";
 import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function MarketingLayout({
@@ -7,10 +8,8 @@ export default async function MarketingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Get the full user info including role
   const user = await getCurrentUser();
 
-  // Convert to the format expected by Navbar
   const navbarUser = user
     ? {
         id: user.id,
@@ -21,10 +20,12 @@ export default async function MarketingLayout({
     : null;
 
   return (
-    <>
+    <AppProviders>
       <Navbar user={navbarUser} />
-      <main>{children}</main>
+      <main id="main-content" tabIndex={-1}>
+        {children}
+      </main>
       <Footer />
-    </>
+    </AppProviders>
   );
 }

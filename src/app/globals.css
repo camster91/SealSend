@@ -73,6 +73,9 @@
   --color-muted: var(--color-neutral-500);
   --color-border: var(--color-neutral-200);
   --color-ring: var(--color-primary-500);
+  --color-accent-red: var(--color-error-500);
+  --color-accent-green: var(--color-success-600);
+  --color-accent-amber: var(--color-warning-500);
 
   /* Brand Aliases */
   --color-brand-50: var(--color-primary-50);
@@ -157,7 +160,8 @@
   --secondary: oklch(0.96 0.01 270);
   --secondary-foreground: oklch(0.3 0.02 270);
   --muted: oklch(0.96 0.01 270);
-  --muted-foreground: oklch(0.55 0.05 270);
+  /* Darker muted text for WCAG AA contrast on white */
+  --muted-foreground: oklch(0.45 0.03 270);
   --accent: oklch(0.96 0.01 270);
   --accent-foreground: oklch(0.3 0.02 270);
   --destructive: oklch(0.6 0.2 25);
@@ -184,7 +188,14 @@
   --secondary: oklch(0.3 0.03 270);
   --secondary-foreground: oklch(0.95 0.01 270);
   --muted: oklch(0.3 0.03 270);
-  --muted-foreground: oklch(0.65 0.05 270);
+  --muted-foreground: oklch(0.72 0.03 270);
+  --color-background: oklch(0.18 0.02 270);
+  --color-foreground: oklch(0.95 0.01 270);
+  --color-muted: oklch(0.72 0.03 270);
+  --color-border: oklch(0.32 0.03 270);
+  --color-neutral-50: oklch(0.2 0.02 270);
+  --color-neutral-100: oklch(0.24 0.02 270);
+  --color-neutral-200: oklch(0.32 0.03 270);
   --accent: oklch(0.3 0.03 270);
   --accent-foreground: oklch(0.95 0.01 270);
   --destructive: oklch(0.55 0.2 25);
@@ -209,6 +220,32 @@ html {
 body {
   @apply bg-background text-foreground antialiased;
   font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100%;
+  z-index: 1000;
+  border-radius: 0.75rem;
+  background: var(--color-primary-700);
+  color: white;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 1rem;
 }
 
 /* ========================================

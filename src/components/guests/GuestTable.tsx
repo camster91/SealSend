@@ -3,10 +3,16 @@
 import { useState, useMemo } from "react";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { InlineBanner } from "@/components/ui/InlineBanner";
+import { useToast } from "@/components/ui/Toast";
 import { Trash2, Edit2 } from "lucide-react";
 import type { Guest, InviteStatus } from "@/types/database";
 
-const inviteBadge: Record<InviteStatus, { label: string; variant: "secondary" | "success" | "destructive" }> = {
+const inviteBadge: Record<
+  InviteStatus,
+  { label: string; variant: "secondary" | "success" | "destructive" }
+> = {
   not_sent: { label: "Not Sent", variant: "secondary" },
   sent: { label: "Sent", variant: "success" },
   failed: { label: "Failed", variant: "destructive" },
@@ -17,29 +23,48 @@ interface GuestTableProps {
   eventId: string;
   onEdit: (guest: Guest) => void;
   onRefresh: () => void;
+  onRemoved?: (guestId: string) => void;
 }
 
-export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTableProps) {
-  const [deleting, setDeleting] = useState<string | null>(null);
+export function GuestTable({
+  guests,
+  eventId,
+  onEdit,
+  onRefresh,
+  onRemoved,
+}: GuestTableProps) {
+  const toast = useToast();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Guest | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleDelete(guestId: string) {
-    if (!confirm("Are you sure you want to remove this guest?")) return;
-    setDeleting(guestId);
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const guest = pendingDelete;
+    setBusy(true);
+    setDeletingId(guest.id);
     setError(null);
+    setPendingDelete(null);
+    onRemoved?.(guest.id);
     try {
-      const res = await fetch(`/api/events/${eventId}/guests/${guestId}`, {
+      const res = await fetch(`/api/events/${eventId}/guests/${guest.id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
-        setError("Failed to delete guest. Please try again.");
+        setError("Failed to remove guest. Please try again.");
+        toast.error("Failed to remove guest. Please try again.");
+        onRefresh();
         return;
       }
-      onRefresh();
+      toast.success(`${guest.name} removed`);
     } catch {
       setError("Network error. Check your connection and try again.");
+      toast.error("Network error. Check your connection and try again.");
+      onRefresh();
     } finally {
-      setDeleting(null);
+      setBusy(false);
+      setDeletingId(null);
     }
   }
 
@@ -66,7 +91,9 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
         header: "Invite",
         render: (item) => {
           const guest = item as Guest;
-          if (!guest.email && !guest.phone) return <span className="text-muted-foreground">\u2014</span>;
+          if (!guest.email && !guest.phone) {
+            return <span className="text-muted-foreground">\u2014</span>;
+          }
           const badge = inviteBadge[guest.invite_status] || inviteBadge.not_sent;
           return <Badge variant={badge.variant}>{badge.label}</Badge>;
         },
@@ -74,49 +101,64 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
       {
         key: "actions",
         header: "",
-        className: "w-24",
+        className: "w-28",
         render: (item) => (
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(item as Guest);
               }}
               aria-label={`Edit ${item.name}`}
-              className="rounded-lg p-2 hover:bg-neutral-100"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <Edit2 className="h-4 w-4 text-muted-foreground" />
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(item.id);
+                setPendingDelete(item as Guest);
               }}
-              disabled={deleting === item.id}
+              disabled={deletingId === item.id}
               aria-label={`Delete ${item.name}`}
-              className="rounded-lg p-2 hover:bg-red-50"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl hover:bg-error-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error-500"
             >
-              <Trash2 className="h-4 w-4 text-accent-red" />
+              <Trash2 className="h-4 w-4 text-error-500" />
             </button>
           </div>
         ),
       },
     ],
-    // handleDelete closes over deleting/eventId; recreate when those change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deleting, eventId, onEdit]
+    [deletingId, onEdit]
   );
 
   return (
     <div className="space-y-2">
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <InlineBanner variant="error" onDismiss={() => setError(null)}>
+          {error}
+        </InlineBanner>
       )}
       <DataTable
         columns={columns}
         data={guests as (Guest & Record<string, unknown>)[]}
         keyExtractor={(item) => item.id}
         emptyMessage="No guests added yet"
+      />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Remove guest?"
+        description={
+          pendingDelete
+            ? `Remove ${pendingDelete.name} from this event? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Remove"
+        loading={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
       />
     </div>
   );
