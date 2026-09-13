@@ -385,7 +385,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   className="text-neutral-400 hover:text-red-500 transition-colors"
                   title="Remove guest"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X aria-label="Remove guest" aria-hidden={false} className="h-3.5 w-3.5" />
                 </button>
               </div>
               <Input
