@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { BETA_MODE, CONTROLLED_BETA_PRICING_PLAN, PUBLIC_PRICING_PLANS } from "@/lib/constants";
 import { getClientUser } from "@/lib/auth/client-auth";
 import { cn } from "@/lib/utils";
+import { ProWaitlistForm } from "./ProWaitlistForm";
 
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
   const plans = BETA_MODE ? [CONTROLLED_BETA_PRICING_PLAN] : PUBLIC_PRICING_PLANS;
@@ -58,9 +59,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
           </div>
           <ul className="my-6 flex-1 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-sm text-neutral-700"><Check className="h-5 w-5 shrink-0 text-primary-600" />{feature}</li>)}</ul>
           {plan.id === "pro_annual" && !annualCheckoutAvailable ? (
-            <button type="button" disabled className="h-10 w-full rounded-lg bg-neutral-200 px-4 text-sm font-medium text-neutral-600">
-              Test billing setup pending
-            </button>
+            <ProWaitlistForm planId={plan.id} />
           ) : plan.id === "pro_annual" && isAuthenticated ? (
             <Button onClick={startAnnualProCheckout} disabled={loading} className="w-full">{loading ? "Opening checkout…" : "Choose annual Pro"}</Button>
           ) : (
