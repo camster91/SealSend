@@ -433,7 +433,7 @@ export default function StepEventDetails({ data, registryLinks, allowPlusOnes, o
                   className="text-gray-400 hover:text-red-500 hover:bg-red-50"
                   tooltip="Remove registry link"
                 >
-                  <X className="h-4 w-4" />
+                  <X aria-label="Remove item" aria-hidden={false} className="h-4 w-4" />
                 </Button>
               </div>
             ))}

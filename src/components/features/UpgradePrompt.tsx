@@ -47,7 +47,7 @@ export function UpgradePrompt({
             onClick={handleDismiss}
             className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
           >
-            <X className="h-5 w-5" />
+            <X aria-label="Close dialog" aria-hidden={false} className="h-5 w-5" />
           </button>
 
           <div className="text-center">
@@ -128,7 +128,7 @@ export function UpgradePrompt({
           onClick={handleDismiss}
           className="absolute right-2 top-2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
         >
-          <X className="h-4 w-4" />
+          <X aria-label="Close dialog" aria-hidden={false} className="h-4 w-4" />
         </button>
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-100">
@@ -187,7 +187,7 @@ export function UpgradePrompt({
               onClick={handleDismiss}
               className="rounded-full p-2 text-neutral-400 hover:bg-white/50 hover:text-neutral-600"
             >
-              <X className="h-5 w-5" />
+              <X aria-label="Close dialog" aria-hidden={false} className="h-5 w-5" />
             </button>
           )}
         </div>
