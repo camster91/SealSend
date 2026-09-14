@@ -9,6 +9,7 @@ import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
 import { getUserTier } from '@/lib/subscription';
 import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist';
+import { EmptyState } from '@/components/dashboard/EmptyState';
 import { queryOne } from '@/lib/db/client';
 import { BETA_MODE } from '@/lib/constants';
 
@@ -310,28 +311,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         {/* Empty State */}
         {allEvents.length === 0 && (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No events yet</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Turn an event idea into an editable invitation, guest workflow, and communication plan. Start manually or use the AI-assisted draft.
-              </p>
-              <div className="mt-6">
-                <Link
-                  href="/events/new"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
-                >
-                  <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create Your First Event
-                </Link>
-              </div>
-            </div>
-          </div>
+          <EmptyState />
         )}
         <BetaFeedback />
         {upgraded === 'true' && <UpgradeSuccessToast />}

@@ -4,14 +4,17 @@ import { useState, useMemo } from "react";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Trash2, ChevronDown, ChevronRight, Mail, UserPlus } from "lucide-react";
-import { formatDateTime } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { InlineBanner } from "@/components/ui/InlineBanner";
+import { useToast } from "@/components/ui/Toast";
+import { formatDateTime, cn } from "@/lib/utils";
 import type { RSVPResponseWithPlusOnes, PlusOne } from "@/types/database";
-import { cn } from "@/lib/utils";
 
 interface ResponseTableProps {
   responses: RSVPResponseWithPlusOnes[];
   eventId: string;
   onRefresh: () => void;
+  onRemoved?: (responseId: string) => void;
   filter?: string;
 }
 
@@ -35,8 +38,16 @@ const inviteStatusBadge: Record<string, { label: string; className: string }> = 
   failed: { label: "Failed", className: "bg-red-100 text-red-700" },
 };
 
-export function ResponseTable({ responses, eventId, onRefresh, filter }: ResponseTableProps) {
+export function ResponseTable({
+  responses,
+  eventId,
+  onRefresh,
+  onRemoved,
+  filter,
+}: ResponseTableProps) {
+  const toast = useToast();
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
@@ -48,21 +59,28 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
     [responses, filter]
   );
 
-  async function handleDelete(responseId: string) {
-    if (!confirm("Delete this response?")) return;
-    setDeleting(responseId);
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
+    setDeleting(id);
     setError(null);
+    setPendingDeleteId(null);
+    onRemoved?.(id);
     try {
-      const res = await fetch(`/api/events/${eventId}/responses/${responseId}`, {
+      const res = await fetch(`/api/events/${eventId}/responses/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
         setError("Failed to delete response. Please try again.");
+        toast.error("Failed to delete response.");
+        onRefresh();
         return;
       }
-      onRefresh();
+      toast.success("Response deleted");
     } catch {
       setError("Network error. Check your connection and try again.");
+      toast.error("Network error. Please try again.");
+      onRefresh();
     } finally {
       setDeleting(null);
     }
@@ -70,13 +88,10 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
 
   function toggleExpand(responseId: string) {
     setExpandedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(responseId)) {
-        newSet.delete(responseId);
-      } else {
-        newSet.add(responseId);
-      }
-      return newSet;
+      const next = new Set(prev);
+      if (next.has(responseId)) next.delete(responseId);
+      else next.add(responseId);
+      return next;
     });
   }
 
@@ -92,11 +107,13 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
           if (!hasPlusOnes) return null;
           return (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleExpand(response.id);
               }}
-              className="p-1 hover:bg-neutral-100 rounded"
+              aria-label={expandedRows.has(response.id) ? "Collapse plus-ones" : "Expand plus-ones"}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               {expandedRows.has(response.id) ? (
                 <ChevronDown className="h-4 w-4 text-neutral-500" />
@@ -141,9 +158,7 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
             <div className="flex items-center gap-1">
               <span>{r.headcount}</span>
               {plusOnesCount > 0 && (
-                <span className="text-xs text-neutral-500">
-                  ({plusOnesCount} named)
-                </span>
+                <span className="text-xs text-neutral-500">({plusOnesCount} named)</span>
               )}
             </div>
           );
@@ -165,33 +180,34 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
         className: "w-12",
         render: (item) => (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete(item.id as string);
+              setPendingDeleteId(item.id as string);
             }}
             disabled={deleting === item.id}
-            className="rounded-lg p-1.5 hover:bg-red-50"
+            aria-label="Delete response"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl hover:bg-error-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error-500"
           >
-            <Trash2 className="h-4 w-4 text-accent-red" />
+            <Trash2 className="h-4 w-4 text-error-500" />
           </button>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deleting, eventId, expandedRows]
+    [deleting, expandedRows]
   );
 
   function renderExpandedRow(response: RSVPResponseWithPlusOnes) {
     if (!expandedRows.has(response.id)) return null;
-
     const plusOnes = response.plus_ones || [];
     if (plusOnes.length === 0) return null;
 
     return (
       <tr className="bg-neutral-50">
         <td colSpan={columns.length} className="px-4 py-3">
-          <div className="pl-8 space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-neutral-600 mb-2">
+          <div className="space-y-2 pl-8">
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-neutral-600">
               <UserPlus className="h-4 w-4" />
               Plus Ones ({plusOnes.length})
             </div>
@@ -199,27 +215,31 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
               {plusOnes.map((plusOne: PlusOne, index: number) => (
                 <div
                   key={plusOne.id}
-                  className="flex items-center justify-between bg-white rounded-lg border border-neutral-200 px-4 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-neutral-400 text-xs w-6">{index + 1}.</span>
+                    <span className="w-6 text-xs text-neutral-400">{index + 1}.</span>
                     <span className="font-medium">{plusOne.name}</span>
                     {plusOne.email && (
-                      <span className="text-neutral-500 flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-neutral-500">
                         <Mail className="h-3 w-3" />
                         {plusOne.email}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={statusVariant[plusOne.status] || "secondary"} className="text-xs">
+                    <Badge
+                      variant={statusVariant[plusOne.status] || "secondary"}
+                      className="text-xs"
+                    >
                       {statusLabel[plusOne.status] || plusOne.status}
                     </Badge>
                     {plusOne.email && (
                       <span
                         className={cn(
-                          "text-xs px-2 py-0.5 rounded-full",
-                          inviteStatusBadge[plusOne.invite_status]?.className || inviteStatusBadge.not_sent.className
+                          "rounded-full px-2 py-0.5 text-xs",
+                          inviteStatusBadge[plusOne.invite_status]?.className ||
+                            inviteStatusBadge.not_sent.className
                         )}
                       >
                         {inviteStatusBadge[plusOne.invite_status]?.label || "Not Sent"}
@@ -238,8 +258,19 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
   return (
     <div className="space-y-2">
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <InlineBanner variant="error" onDismiss={() => setError(null)}>
+          {error}
+        </InlineBanner>
       )}
+      <ConfirmDialog
+        open={!!pendingDeleteId}
+        title="Delete response?"
+        description="This permanently removes the RSVP and any plus-ones. This cannot be undone."
+        confirmLabel="Delete"
+        loading={!!deleting}
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={confirmDelete}
+      />
       <DataTable
         columns={columns}
         data={filtered as (RSVPResponseWithPlusOnes & Record<string, unknown>)[]}

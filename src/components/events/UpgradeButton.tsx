@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { BETA_MODE } from "@/lib/constants";
+import { InlineBanner } from "@/components/ui/InlineBanner";
+import { useToast } from "@/components/ui/Toast";
 
 type UpgradeTier = "silver" | "gold" | "platinum" | "diamond";
 
@@ -50,6 +52,7 @@ interface UpgradeButtonProps {
 }
 
 export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
+  const toast = useToast();
   const [loading, setLoading] = useState<UpgradeTier | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
@@ -85,13 +88,17 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
       const data = await res.json();
 
       if (!res.ok) {
-        setCheckoutError(data.error || "Failed to create checkout session");
+        const msg = data.error || "Failed to create checkout session";
+        setCheckoutError(msg);
+        toast.error(msg);
         return;
       }
 
       window.location.href = data.url;
     } catch {
-      setCheckoutError("Something went wrong. Please try again.");
+      const msg = "Something went wrong. Please try again.";
+      setCheckoutError(msg);
+      toast.error(msg);
     } finally {
       setLoading(null);
     }
@@ -100,9 +107,13 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
   return (
     <div>
       {checkoutError && (
-        <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <InlineBanner
+          variant="error"
+          onDismiss={() => setCheckoutError(null)}
+          className="mb-3"
+        >
           {checkoutError}
-        </div>
+        </InlineBanner>
       )}
       <div className="flex flex-wrap gap-2">
         {availableUpgrades.map((tier) => {
@@ -113,7 +124,7 @@ export function UpgradeButton({ eventId, currentTier }: UpgradeButtonProps) {
             key={tier}
             onClick={() => handleUpgrade(tier)}
             disabled={loading !== null}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50 ${info.style}`}
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500 disabled:opacity-50 ${info.style}`}
           >
             {isLoading ? (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

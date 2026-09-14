@@ -1,52 +1,80 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { formatRelative } from '@/lib/utils';
-import type { EventComment } from '@/types/database';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Trash2, MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { CardListSkeleton } from "@/components/ui/Skeleton";
+import { InlineBanner } from "@/components/ui/InlineBanner";
+import { useToast } from "@/components/ui/Toast";
+import { formatRelative } from "@/lib/utils";
+import type { EventComment } from "@/types/database";
 
 export default function CommentsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
+  const toast = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+
   const [comments, setComments] = useState<EventComment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<EventComment | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/events/${eventId}/comments`);
-    if (res.ok) {
-      const data = await res.json();
-      setComments(data);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/comments`);
+      if (res.ok) {
+        const data = await res.json();
+        setComments(Array.isArray(data) ? data : []);
+      } else {
+        setLoadError("Could not load comments. Please try again.");
+      }
+    } catch {
+      setLoadError("Network error while loading comments.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
 
-  async function handleDelete(commentId: string) {
-    if (!confirm('Delete this comment?')) return;
-    setDeleteError(null);
-
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const comment = pendingDelete;
+    setBusy(true);
+    setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    setPendingDelete(null);
     try {
       const res = await fetch(`/api/events/${eventId}/comments`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commentId }),
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId: comment.id }),
       });
-
-      if (res.ok) {
-        fetchComments();
-      } else {
-        setDeleteError('Failed to delete comment. Please try again.');
+      if (!res.ok) {
+        setComments((prev) =>
+          [...prev, comment].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        );
+        toastRef.current.error("Failed to delete comment.");
+        return;
       }
+      toastRef.current.success("Comment deleted");
     } catch {
-      setDeleteError('Failed to delete comment. Check your connection and try again.');
+      setComments((prev) => [...prev, comment]);
+      toastRef.current.error("Network error. Please try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -55,69 +83,83 @@ export default function CommentsPage() {
       <div className="mb-6">
         <Link
           href={`/events/${eventId}`}
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="mb-2 inline-flex min-h-11 items-center gap-1 rounded-lg text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to event
         </Link>
-        <h1 className="text-2xl font-bold">Comments</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Comments</h1>
         <p className="text-sm text-muted-foreground">
-          {comments.length} comment{comments.length !== 1 ? 's' : ''}
+          {comments.length} comment{comments.length !== 1 ? "s" : ""}
         </p>
       </div>
 
-      {deleteError && (
-        <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          {deleteError}
-        </div>
+      {loadError && (
+        <InlineBanner
+          variant="error"
+          title="Something went wrong"
+          onDismiss={() => setLoadError(null)}
+          className="mb-4"
+        >
+          {loadError}
+        </InlineBanner>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
+        <CardListSkeleton rows={3} />
       ) : comments.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
-          <p className="text-sm text-muted-foreground">No comments yet.</p>
-        </div>
+        <EmptyState
+          icon={MessageSquare}
+          title="No comments yet"
+          description="When guests leave notes on your invite, they’ll appear here."
+        />
       ) : (
         <div className="space-y-3">
           {comments.map((comment) => (
             <div
               key={comment.id}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+              className="animate-fade-in rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{comment.author_name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-neutral-900">{comment.author_name}</p>
                     {comment.is_private && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
-                        <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                        </svg>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800">
                         Private
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{formatRelative(comment.created_at)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatRelative(comment.created_at)}
+                  </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleDelete(comment.id)}
-                  className="text-gray-400 hover:text-red-600"
+                  onClick={() => setPendingDelete(comment)}
+                  className="text-neutral-500 hover:text-error-600"
                   aria-label="Delete comment"
                   tooltip="Delete comment"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{comment.message}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">{comment.message}</p>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete comment?"
+        description="This permanently removes the comment. This cannot be undone."
+        confirmLabel="Delete"
+        loading={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
