@@ -1,4 +1,4 @@
-name: CI Build
+﻿name: CI Build
 
 # Canonical verification workflow. Does not deploy or require production secrets.
 # Fast checks run for every relevant PR; the expensive five-project Playwright
@@ -45,7 +45,7 @@ concurrency:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 15
 
     steps:
@@ -80,3 +80,4 @@ jobs:
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e
+
