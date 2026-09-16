@@ -1,4 +1,4 @@
-﻿name: CI Build
+name: CI Build
 
 # Canonical verification workflow. Does not deploy or require production secrets.
 # Fast checks run for every relevant PR; the expensive five-project Playwright
@@ -72,6 +72,9 @@ jobs:
 
       - name: Unit and readiness tests
         run: npm test
+
+      - name: Build (standalone)
+        run: npm run build
 
       - name: Install browsers
         if: github.actor != 'dependabot[bot]'
