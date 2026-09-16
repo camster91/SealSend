@@ -171,7 +171,11 @@ test('browser CI serves the same standalone artifact shape as production', async
   const pkg = JSON.parse(await read('package.json'));
   const server = await read('scripts/test/start-playwright-server.mjs');
 
-  assert.match(config, /npm run build && npm run start:e2e/);
+  const ciWorkflow = await read('.github/workflows/ci.yml');
+  assert.match(ciWorkflow, /- name: Build \(standalone\)/);
+  assert.match(ciWorkflow, /run: npm run build/);
+  assert.ok(ciWorkflow.indexOf('Build (standalone)') < ciWorkflow.indexOf('Browser smoke tests'));
+  assert.match(config, /command: 'npm run start:e2e'/);
   assert.equal(pkg.scripts['start:e2e'], 'node scripts/test/start-playwright-server.mjs');
   assert.match(server, /\.next[\\/]standalone[\\/]server\.js/);
   assert.match(server, /\.next[\\/]static/);
