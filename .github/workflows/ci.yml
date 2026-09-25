@@ -45,7 +45,7 @@ concurrency:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 15
 
     steps:
@@ -73,6 +73,9 @@ jobs:
       - name: Unit and readiness tests
         run: npm test
 
+      - name: Build (standalone)
+        run: npm run build
+
       - name: Install browsers
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
@@ -80,3 +83,4 @@ jobs:
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e
+
