@@ -4,7 +4,7 @@ import { query, queryOne } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
-import { generateInviteToken } from "@/lib/utils";
+import { generateInviteToken } from "@/lib/invite-token";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
 import { rateLimit } from "@/lib/rate-limit";
 import { validateAndFormatPhone } from "@/lib/phone-validation";

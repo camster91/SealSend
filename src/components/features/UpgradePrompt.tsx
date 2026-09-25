@@ -45,6 +45,7 @@ export function UpgradePrompt({
         >
           <button
             onClick={handleDismiss}
+            aria-label="Close"
             className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
           >
             <X className="h-5 w-5" />
@@ -126,6 +127,7 @@ export function UpgradePrompt({
       >
         <button
           onClick={handleDismiss}
+          aria-label="Dismiss"
           className="absolute right-2 top-2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
         >
           <X className="h-4 w-4" />
@@ -185,6 +187,7 @@ export function UpgradePrompt({
           {onDismiss && (
             <button
               onClick={handleDismiss}
+              aria-label="Dismiss"
               className="rounded-full p-2 text-neutral-400 hover:bg-white/50 hover:text-neutral-600"
             >
               <X className="h-5 w-5" />
