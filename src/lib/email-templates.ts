@@ -1,6 +1,27 @@
 import { formatDateTime, escapeHtml } from "@/lib/utils";
 import { sanitizeUrl } from "@/lib/sanitize";
 
+/** Workspace brand shown in the email footer. White-labelled brands hide SealSend. */
+export interface EmailBrand {
+  name: string;
+  logoUrl?: string | null;
+  whiteLabel: boolean;
+}
+
+const SEALSEND_FOOTER = `<p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Sent with</p>
+              <p style="margin:0;font-size:13px;font-weight:600;">
+                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
+              </p>`;
+
+export function buildEmailFooter(brand?: EmailBrand | null): string {
+  if (!brand) return SEALSEND_FOOTER;
+  const logo = brand.logoUrl ? sanitizeUrl(brand.logoUrl) : null;
+  const logoHtml = logo ? `<img src="${escapeHtml(logo)}" alt="" height="32" style="display:inline-block;max-height:32px;border:0;margin:0 0 6px;" /><br />` : "";
+  const nameHtml = `<p style="margin:0;font-size:13px;font-weight:600;color:#374151;">${escapeHtml(brand.name)}</p>`;
+  const poweredBy = brand.whiteLabel ? "" : `\n              <p style="margin:6px 0 0;font-size:11px;color:#9ca3af;">Sent with SealSend</p>`;
+  return `${logoHtml}${nameHtml}${poweredBy}`;
+}
+
 interface InvitationEmailParams {
   guestName: string;
   eventTitle: string;
@@ -13,6 +34,7 @@ interface InvitationEmailParams {
   rsvpDeadline?: string | null;
   eventTimezone?: string;
   qrCodeUrl?: string;
+  brand?: EmailBrand | null;
 }
 
 export function buildInvitationEmail(params: InvitationEmailParams): {
@@ -187,12 +209,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">
-                Sent with
-              </p>
-              <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
-              </p>
+              ${buildEmailFooter(params.brand)}
             </td>
           </tr>
         </table>
@@ -211,6 +228,7 @@ interface ReminderEmailParams {
   eventDate: string | null;
   locationName: string | null;
   rsvpUrl: string;
+  brand?: EmailBrand | null;
 }
 
 export function buildReminderEmail(params: ReminderEmailParams): {
@@ -309,10 +327,7 @@ export function buildReminderEmail(params: ReminderEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Sent with</p>
-              <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
-              </p>
+              ${buildEmailFooter(params.brand)}
             </td>
           </tr>
         </table>
@@ -331,6 +346,7 @@ interface AnnouncementEmailParams {
   announcementSubject: string;
   announcementMessage: string;
   rsvpUrl: string;
+  brand?: EmailBrand | null;
 }
 
 export function buildAnnouncementEmail(params: AnnouncementEmailParams): {
@@ -390,10 +406,7 @@ export function buildAnnouncementEmail(params: AnnouncementEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              <p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">Sent with</p>
-              <p style="margin:0;font-size:13px;font-weight:600;">
-                <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
-              </p>
+              ${buildEmailFooter(params.brand)}
             </td>
           </tr>
         </table>

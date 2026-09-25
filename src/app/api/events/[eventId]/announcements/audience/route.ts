@@ -7,6 +7,7 @@ import { z } from "zod";
 import { countSmsSegments, estimateDeliveryCost } from "@/lib/messages/cost-estimate";
 import { buildAnnouncementSms } from "@/lib/sms-templates";
 import { createAnnouncementApprovalProof } from "@/lib/messages/approval-proof";
+import { getEventBranding, smsSignature } from "@/lib/brands";
 
 const previewSchema = z.object({
   subject: z.string().min(1).max(200),
@@ -39,6 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
   if (!parsed.success) return NextResponse.json({ error: "Review the message content, audience, and channels before previewing." }, { status: 400 });
   const event = await queryOne<{ title: string; slug: string }>("SELECT title, slug FROM events WHERE id = $1", [eventId]);
   if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const branding = await getEventBranding(eventId);
   const audience = buildAudienceQuery(eventId, parsed.data.audience);
   const recipients = await query<{ id: string; name: string; email: string | null; phone: string | null; invite_token: string | null }>(audience.sql, audience.params);
   const resolvedRecipients = recipients.filter((recipient) => (parsed.data.channels.includes("email") && recipient.email) || (parsed.data.channels.includes("sms") && recipient.phone));
@@ -46,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
   const costRecipients = resolvedRecipients.map((recipient) => ({
     ...recipient,
     smsSegments: recipient.phone && parsed.data.channels.includes("sms")
-      ? countSmsSegments(buildAnnouncementSms({
+      ? countSmsSegments(buildAnnouncementSms({ signature: smsSignature(branding),
           guestName: recipient.name,
           eventTitle: event.title,
           subject: parsed.data.subject,

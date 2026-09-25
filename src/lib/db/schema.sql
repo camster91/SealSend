@@ -799,6 +799,30 @@ CREATE TRIGGER events_default_organization BEFORE INSERT ON events
 UPDATE events SET organization_id = sealsend_personal_organization(user_id) WHERE organization_id IS NULL;
 
 -- =====================
+-- BRANDS (workspace brand kit applied to event pages, emails and SMS)
+-- =====================
+
+CREATE TABLE IF NOT EXISTS brands (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK (char_length(name) BETWEEN 1 AND 80),
+  logo_url TEXT,
+  primary_color TEXT CHECK (primary_color IS NULL OR primary_color ~ '^#[0-9A-Fa-f]{6}$'),
+  background_color TEXT CHECK (background_color IS NULL OR background_color ~ '^#[0-9A-Fa-f]{6}$'),
+  font_family TEXT,
+  sender_name TEXT CHECK (sender_name IS NULL OR char_length(sender_name) BETWEEN 1 AND 60),
+  reply_to_email TEXT,
+  sms_signature TEXT CHECK (sms_signature IS NULL OR char_length(sms_signature) BETWEEN 1 AND 40),
+  white_label BOOLEAN NOT NULL DEFAULT FALSE,
+  is_default BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One default brand per workspace; events use it unless they pick another.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_default_per_organization ON brands(organization_id) WHERE is_default;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands(id) ON DELETE SET NULL;
+
+-- =====================
 -- AUTH CODES FK (after events table exists)
 -- =====================
 

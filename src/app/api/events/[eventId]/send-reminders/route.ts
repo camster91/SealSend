@@ -15,6 +15,7 @@ import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
+import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
 
 type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
 type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at" | "phone_invalid_at">;
@@ -64,6 +65,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const accountPlan = await getUserTier(event.user_id);
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
     const suppressions = await getCommunicationSuppressions(event.user_id);
+    const branding = await getEventBranding(eventId);
     const sendableGuests = guests.map((guest) => {
       const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
         ? guest.email
@@ -85,7 +87,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const smsMetered = smsEnabled && isSmsMetered(accountPlan, event.tier as string);
     if (smsMetered) {
       const requiredSegments = sendableGuests.reduce((total, guest) => total + (guest.phone
-        ? countSmsSegments(buildReminderSms({ guestName: guest.name, eventTitle: event.title, eventDate: event.event_date, rsvpUrl: reminderUrl(guest) }))
+        ? countSmsSegments(buildReminderSms({ signature: smsSignature(branding), guestName: guest.name, eventTitle: event.title, eventDate: event.event_date, rsvpUrl: reminderUrl(guest) }))
         : 0), 0);
       const decision = decideSmsSend(true, await getSmsBalance(eventId), requiredSegments);
       if (!decision.allowed) {
@@ -112,7 +114,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           const errors: Array<{ type: 'email' | 'sms'; message: string }> = [];
 
           if (guest.email) {
-            const { subject, html } = buildReminderEmail({
+            const { subject, html } = buildReminderEmail({ brand: emailBrand(branding),
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
@@ -121,7 +123,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              const result = await sendEmail({
+              const result = await sendEmail({ ...emailSendOptions(branding),
                 to: guest.email,
                 subject,
                 html,
@@ -161,7 +163,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               });
             } else {
               const formattedPhone = phoneValidation.formatted!;
-              const smsBody = buildReminderSms({
+              const smsBody = buildReminderSms({ signature: smsSignature(branding),
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,

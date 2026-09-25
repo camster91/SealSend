@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TIERS } from "@/lib/constants";
@@ -154,6 +155,16 @@ export default function SettingsPage() {
               value={email}
               disabled
             />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand kit</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Put your logo, colours, sender name and text signature on every event page, email and text.</p>
+            <Link href="/settings/brand" className="inline-flex font-medium text-brand-700 hover:underline">Edit brand kit →</Link>
           </CardContent>
         </Card>
 

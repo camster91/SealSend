@@ -10,6 +10,7 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
 import { getUserTier } from "@/lib/subscription";
+import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
 
 type Announcement = {
   id: string; event_id: string; subject: string; message: string; audience: unknown; channels: string[];
@@ -64,6 +65,7 @@ export async function dispatchAnnouncement(announcementId: string) {
     && isSmsMetered(await getUserTier(announcement.user_id), announcement.tier);
   let smsBalance = smsMetered ? await getSmsBalance(announcement.event_id) : Number.POSITIVE_INFINITY;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
+  const branding = await getEventBranding(announcement.event_id);
   for (const delivery of deliveries) {
     if (delivery.channel === "email" && isCommunicationSuppressed(suppressions, "email", delivery.recipient)) {
       await query("UPDATE announcement_deliveries SET status = 'opted_out', error = NULL, updated_at = NOW() WHERE id = $1", [delivery.id]);
@@ -77,8 +79,8 @@ export async function dispatchAnnouncement(announcementId: string) {
     try {
       let providerMessageId: string;
       if (delivery.channel === "email") {
-        const content = buildAnnouncementEmail({ guestName: delivery.name, eventTitle: announcement.title, announcementSubject: announcement.subject, announcementMessage: announcement.message, rsvpUrl });
-        providerMessageId = (await sendEmail({ to: delivery.recipient, subject: content.subject, html: content.html })).id;
+        const content = buildAnnouncementEmail({ brand: emailBrand(branding), guestName: delivery.name, eventTitle: announcement.title, announcementSubject: announcement.subject, announcementMessage: announcement.message, rsvpUrl });
+        providerMessageId = (await sendEmail({ ...emailSendOptions(branding), to: delivery.recipient, subject: content.subject, html: content.html })).id;
       } else {
         if (!isTwilioConfigured()) throw new Error("Twilio is not configured");
         const phone = validateAndFormatPhone(delivery.recipient);
@@ -91,7 +93,7 @@ export async function dispatchAnnouncement(announcementId: string) {
           continue;
         }
         assertApprovedRecipient(phone.formatted);
-        const body = buildAnnouncementSms({ guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, message: announcement.message, rsvpUrl });
+        const body = buildAnnouncementSms({ signature: smsSignature(branding), guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, message: announcement.message, rsvpUrl });
         const segments = countSmsSegments(body);
         if (segments > smsBalance) throw new Error("SMS allowance used up for this event");
         smsBalance -= segments;
