@@ -99,6 +99,7 @@ Release steps, current production state and rollback targets are in `DEPLOYMENT_
 - `docs/launch-operations.md` - Beta and launch operations
 - `docs/paid-beta-evidence-register.md` - Launch evidence
 - `docs/AUTOMATIC_REMINDERS.md` - Reminder scheduling
+- `docs/product-strategy-organizer-platform.md` - Draft product strategy: one-off hosts and the organizer platform
 
 ## Roadmap
 
