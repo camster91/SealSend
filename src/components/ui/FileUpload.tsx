@@ -83,6 +83,7 @@ function FileUpload({
           {onRemove && (
             <button
               onClick={onRemove}
+              aria-label="Remove uploaded file"
               className="rounded-lg p-1.5 hover:bg-neutral-200"
             >
               <X className="h-4 w-4" />

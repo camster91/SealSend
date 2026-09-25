@@ -384,6 +384,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   onClick={() => removePlusOne(index)}
                   className="text-neutral-400 hover:text-red-500 transition-colors"
                   title="Remove guest"
+                  aria-label={`Remove guest ${index + 1}`}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

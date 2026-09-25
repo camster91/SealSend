@@ -170,6 +170,7 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
               handleDelete(item.id as string);
             }}
             disabled={deleting === item.id}
+            aria-label={`Delete response from ${String(item.respondent_name || "guest")}`}
             className="rounded-lg p-1.5 hover:bg-red-50"
           >
             <Trash2 className="h-4 w-4 text-accent-red" />
