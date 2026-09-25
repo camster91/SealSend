@@ -146,11 +146,11 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                   ? 'bg-slate-100 text-slate-700'
                   : ['diamond'].includes(event.tier as string)
                     ? 'bg-indigo-100 text-indigo-700'
-                    : ['silver', 'standard'].includes(event.tier as string)
+                    : ['silver', 'standard', 'event_pass'].includes(event.tier as string)
                       ? 'bg-brand-100 text-brand-700'
                       : 'bg-gray-100 text-gray-600'
             }`}>
-              {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
+              {event.tier === 'event_pass' ? 'Event Pass' : `${(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier`}
             </span>
             {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
           </div>

@@ -62,7 +62,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!BETA_MODE && plan && (
           <div className="mb-6 rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900">
-            <p className="font-semibold">Continue with {plan === 'pro_annual' ? 'SealSend Pro' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`}</p>
+            <p className="font-semibold">Continue with {plan === 'pro_annual' ? 'SealSend Pro' : plan === 'event_pass' ? 'Event Pass' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`}</p>
             <p className="mt-1 text-sm">
               {plan === 'pro_annual'
                 ? 'Review the annual plan and continue to secure Stripe checkout.'

@@ -70,7 +70,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
                 plan.id === "pro_annual" ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700" : "border-border hover:bg-neutral-50"
               )}
             >
-              {plan.id === "controlled_beta" ? "Join controlled beta" : plan.id === "free" ? "Start free" : plan.id === "pro_annual" ? "Sign up for Pro" : "Create an event"}
+              {plan.id === "controlled_beta" ? "Join controlled beta" : plan.id === "free" ? "Start free" : plan.id === "pro_annual" ? "Sign up for Pro" : plan.id === "event_pass" ? "Get an Event Pass" : "Create an event"}
             </Link>
           )}
         </article>

@@ -43,6 +43,15 @@ test('fresh and upgraded guest schemas support reminder tracking', async () => {
   assert.match(migration, /ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ/);
 });
 
+test('fresh and upgraded schemas accept the Event Pass tier', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  assert.match(schema, /tier TEXT DEFAULT 'free' CHECK \(tier IN \('free', 'event_pass',/);
+  assert.match(migration, /DROP CONSTRAINT IF EXISTS events_tier_check/);
+  assert.match(migration, /ADD CONSTRAINT events_tier_check\s+CHECK \(tier IN \('free', 'event_pass',/);
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

@@ -6,6 +6,8 @@ import {
   canUseFeature,
   getEffectiveEventLimits,
   getTeamMemberLimit,
+  isEventTierUpgrade,
+  showsPoweredByBadge,
   type AccountPlan,
   type EventFeature,
   type EventTier,
@@ -13,7 +15,8 @@ import {
 
 test("one-time event tiers retain their own guest and response limits", () => {
   const cases: Array<[EventTier, number]> = [
-    ["free", 15],
+    ["free", 50],
+    ["event_pass", 250],
     ["silver", 50],
     ["gold", 150],
     ["platinum", 500],
@@ -93,8 +96,8 @@ test("event features follow the purchased event tier while annual Pro unlocks al
 
 test("unknown persisted account plans fail closed", () => {
   assert.deepEqual(getEffectiveEventLimits("business" as AccountPlan, "free"), {
-    guests: 15,
-    responses: 15,
+    guests: 50,
+    responses: 50,
   });
 });
 
@@ -105,4 +108,32 @@ test("team collaboration follows account and event limits including the owner", 
   assert.equal(getTeamMemberLimit("free", "silver"), 1);
   assert.equal(getTeamMemberLimit("free", "gold"), 3);
   assert.equal(getTeamMemberLimit("pro_annual", "free"), 10);
+});
+
+test("the Event Pass unlocks every shipped event feature for one event", () => {
+  const features: EventFeature[] = ["smsInvites", "guestTags", "announcements", "signupBoard", "analytics", "teamCollab", "removeBranding"];
+  for (const feature of features) {
+    assert.equal(canUseFeature("free", "event_pass", feature), true, feature);
+  }
+  assert.equal(canUseFeature("free", "free", "smsInvites"), false);
+  assert.equal(getTeamMemberLimit("free", "event_pass"), 3);
+});
+
+test("paid upgrades must raise guest capacity, so legacy large tiers are never downgraded", () => {
+  assert.equal(isEventTierUpgrade("free", "event_pass"), true);
+  assert.equal(isEventTierUpgrade("silver", "event_pass"), true);
+  assert.equal(isEventTierUpgrade("gold", "event_pass"), true);
+  assert.equal(isEventTierUpgrade("event_pass", "event_pass"), false);
+  assert.equal(isEventTierUpgrade("platinum", "event_pass"), false);
+  assert.equal(isEventTierUpgrade("diamond", "event_pass"), false);
+  assert.equal(isEventTierUpgrade("unknown-tier", "event_pass"), true);
+});
+
+test("the Powered by badge stays on free and beta events and is removed by paid plans", () => {
+  assert.equal(showsPoweredByBadge("free", "free"), true);
+  assert.equal(showsPoweredByBadge("beta", "free"), true);
+  assert.equal(showsPoweredByBadge("free", "event_pass"), false);
+  assert.equal(showsPoweredByBadge("free", "silver"), false);
+  assert.equal(showsPoweredByBadge("pro_annual", "free"), false);
+  assert.equal(showsPoweredByBadge("free", "not-a-tier"), true);
 });

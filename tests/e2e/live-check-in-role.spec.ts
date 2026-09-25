@@ -34,7 +34,7 @@ test('check-in-only staff can check in guests and nothing more', async ({ page }
   expect((await page.context().request.post(`/api/events/${eventId}/announcements/audience`, {
     data: { audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false }, channels: ['email'] },
   })).status()).toBe(404);
-  expect((await page.context().request.post('/api/checkout', { data: { eventId, tier: 'silver' } })).status()).toBe(404);
+  expect((await page.context().request.post('/api/checkout', { data: { eventId, tier: 'event_pass' } })).status()).toBe(404);
 
   await page.goto(`/events/${eventId}/check-in`);
   await expect(page.getByRole('heading', { name: 'Guest check-in' })).toBeVisible();

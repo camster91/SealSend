@@ -503,3 +503,7 @@ CREATE TABLE IF NOT EXISTS waitlist_signups (
 -- One signup per email per plan interest; re-submitting is idempotent.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
   ON waitlist_signups (LOWER(email), plan_interest);
+-- Event Pass: the single one-time per-event tier sold from 2026-09. Legacy tiers stay valid.
+ALTER TABLE events DROP CONSTRAINT IF EXISTS events_tier_check;
+ALTER TABLE events ADD CONSTRAINT events_tier_check
+  CHECK (tier IN ('free', 'event_pass', 'silver', 'gold', 'platinum', 'diamond', 'standard', 'premium'));

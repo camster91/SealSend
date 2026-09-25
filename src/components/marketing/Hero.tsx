@@ -40,7 +40,7 @@ export default function Hero() {
             {/* Badge */}
             <motion.div variants={fadeInUp}>
               <Link
-                href="/pricing"
+                href={BETA_MODE ? "/pricing" : "/signup"}
                 className="group inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-sm font-medium text-primary-700 shadow-sm transition-all hover:border-primary-300 hover:shadow-md"
               >
                 <Zap className="h-4 w-4 text-accent-500" />
