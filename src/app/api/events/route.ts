@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { PoolClient } from 'pg';
-import { getDb, query } from '@/lib/db/client';
+import { getDb, query, queryOne } from '@/lib/db/client';
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { eventCreateSchema } from '@/lib/validations';
 import { generateSlug } from '@/lib/utils';
@@ -58,6 +58,21 @@ export async function POST(request: NextRequest) {
     }
 
     const { title, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    // Optional team workspace; the database defaults to the host's personal workspace.
+    const requestedOrganization = typeof body?.organization_id === 'string' ? body.organization_id : null;
+    let organizationId: string | null = null;
+    if (requestedOrganization) {
+      const membership = /^[0-9a-f-]{36}$/i.test(requestedOrganization) ? await queryOne<{ role: string }>(
+        `SELECT m.role FROM organization_members m JOIN organizations o ON o.id = m.organization_id
+          WHERE m.organization_id = $1 AND m.user_id = $2 AND NOT o.is_personal`,
+        [requestedOrganization, user.id],
+      ) : null;
+      if (!membership || !['owner', 'admin', 'planner'].includes(membership.role)) {
+        return NextResponse.json({ error: 'You cannot create events in this workspace.' }, { status: 403 });
+      }
+      organizationId = requestedOrganization;
+    }
+
     const accountPlan = await getUserTier(user.id);
     client = await getDb().connect();
     await client.query('BEGIN');
@@ -98,9 +113,9 @@ export async function POST(request: NextRequest) {
             user_id, title, slug, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code,
             rsvp_deadline, registry_links, max_attendees, allow_plus_ones,
-            max_guests_per_rsvp, design_url, design_type, customization, status
+            max_guests_per_rsvp, design_url, design_type, customization, status, organization_id
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
           ) RETURNING *`,
           [
             user.id,
@@ -128,6 +143,7 @@ export async function POST(request: NextRequest) {
             design_type ?? 'upload',
             JSON.stringify(customization ?? {}),
             status ?? 'draft',
+            organizationId,
           ]
         );
         event = inserted.rows[0] ?? null;

@@ -5,7 +5,7 @@
 import { isValidHexColor } from './utils';
 
 // Allowed font families
-const ALLOWED_FONTS = [
+export const ALLOWED_FONTS = [
   'Inter',
   'Poppins',
   'Georgia',

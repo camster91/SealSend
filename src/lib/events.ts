@@ -31,11 +31,20 @@ export async function getEventsByUser(userId: string) {
 
 export async function getCollaboratingEvents(userId: string) {
   const data = await query<Event & { access_role: string }>(
-    `SELECT e.*, em.role AS access_role
-     FROM event_members em
-     JOIN events e ON e.id = em.event_id
-     WHERE em.user_id = $1
-     ORDER BY e.event_date ASC NULLS LAST
+    `SELECT * FROM (
+       SELECT e.*, em.role AS access_role
+         FROM event_members em
+         JOIN events e ON e.id = em.event_id
+        WHERE em.user_id = $1
+       UNION ALL
+       -- Events in team workspaces the host belongs to (see src/lib/auth/event-access.ts)
+       SELECT e.*, CASE om.role WHEN 'planner' THEN 'manager' WHEN 'check_in' THEN 'check_in' ELSE 'owner' END AS access_role
+         FROM organization_members om
+         JOIN organizations o ON o.id = om.organization_id AND NOT o.is_personal
+         JOIN events e ON e.organization_id = om.organization_id
+        WHERE om.user_id = $1 AND e.user_id <> $1
+     ) shared
+     ORDER BY event_date ASC NULLS LAST
      LIMIT 500`,
     [userId]
   );

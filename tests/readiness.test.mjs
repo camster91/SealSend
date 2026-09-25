@@ -78,6 +78,29 @@ test('fresh and upgraded schemas give every event a workspace', async () => {
   }
 });
 
+test('fresh and upgraded schemas create the workspace brand kit', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS brands \(/);
+    assert.match(sql, /organization_id UUID NOT NULL REFERENCES organizations\(id\) ON DELETE CASCADE/);
+    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_default_per_organization ON brands\(organization_id\) WHERE is_default/);
+    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands\(id\) ON DELETE SET NULL/);
+  }
+});
+
+test('fresh and upgraded schemas store workspace invites as hashed one-time tokens', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_invites \(/);
+    assert.match(sql, /role TEXT NOT NULL CHECK \(role IN \('admin', 'planner', 'check_in'\)\)/);
+    assert.match(sql, /token_hash TEXT UNIQUE NOT NULL/);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

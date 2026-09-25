@@ -16,6 +16,7 @@ import {
 import type { Event, RSVPField } from "@/types/database";
 import { getUserTier } from "@/lib/subscription";
 import { showsPoweredByBadge } from "@/lib/entitlements";
+import { getEventBranding, mergeBrandIntoCustomization } from "@/lib/brands";
 import type { Metadata } from "next";
 
 interface Props {
@@ -58,7 +59,15 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
     [event.id]
   );
-  const showBadge = showsPoweredByBadge(await getUserTier(event.user_id as string), event.tier as string);
+  // Workspace brand fills any look the event itself left unset; a
+  // white-labelled organizer brand also removes the SealSend badge.
+  const branding = await getEventBranding(event.id as string);
+  event.customization = mergeBrandIntoCustomization(
+    event.customization as unknown as Record<string, unknown>,
+    branding,
+  ) as unknown as typeof event.customization;
+  const showBadge = !branding?.whiteLabel
+    && showsPoweredByBadge(await getUserTier(event.user_id as string), event.tier as string);
 
   // Calculate spots remaining for guest limits
   let spotsRemaining: number | null = null;

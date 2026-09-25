@@ -84,6 +84,8 @@ interface WizardContainerProps {
   eventId?: string;
   initialData?: Partial<WizardFormData>;
   draftKey?: string;
+  /** Team workspace the new event belongs to; omitted for the host's personal workspace. */
+  organizationId?: string;
 }
 
 // ── Steps config ───────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ export default function WizardContainer({
   eventId,
   initialData,
   draftKey,
+  organizationId,
 }: WizardContainerProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -363,7 +366,7 @@ export default function WizardContainer({
         const res = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(organizationId ? { ...payload, organization_id: organizationId } : payload),
         });
 
         if (!res.ok) {

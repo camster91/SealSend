@@ -18,6 +18,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ id: string }> {
@@ -42,6 +43,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ id: string }
     subject: params.subject,
     html: params.html,
     text: params.text,
+    replyTo: params.replyTo,
   });
   
   return {

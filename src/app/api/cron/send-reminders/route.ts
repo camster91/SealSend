@@ -12,6 +12,7 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
+import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -141,6 +142,7 @@ export async function GET(request: NextRequest) {
         [event.id]
       );
       const suppressions = await getCommunicationSuppressions(event.user_id);
+      const branding = await getEventBranding(event.id);
       // Event Pass events have a finite SMS allowance. Segments are reserved
       // synchronously before each send so parallel batches cannot overspend.
       const smsMetered = smsEnabled && isSmsMetered(await getUserTier(event.user_id), event.tier);
@@ -226,7 +228,7 @@ export async function GET(request: NextRequest) {
 
             // Send email reminder
             if (guest.email) {
-              const { subject, html } = buildReminderEmail({
+              const { subject, html } = buildReminderEmail({ brand: emailBrand(branding),
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
@@ -235,7 +237,7 @@ export async function GET(request: NextRequest) {
               });
 
               try {
-                const result = await sendEmail({
+                const result = await sendEmail({ ...emailSendOptions(branding),
                   to: guest.email,
                   subject,
                   html,
@@ -264,7 +266,7 @@ export async function GET(request: NextRequest) {
               const phoneValidation = validateAndFormatPhone(guest.phone);
 
               if (phoneValidation.valid && phoneValidation.formatted) {
-                const smsBody = buildReminderSms({
+                const smsBody = buildReminderSms({ signature: smsSignature(branding),
                   guestName: guest.name,
                   eventTitle: event.title,
                   eventDate: event.event_date,

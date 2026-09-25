@@ -17,6 +17,7 @@ import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
+import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
 type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "phone_invalid_at">;
@@ -76,6 +77,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const accountPlan = await getUserTier(event.user_id);
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
     const suppressions = await getCommunicationSuppressions(event.user_id);
+    const branding = await getEventBranding(eventId);
     const sendableGuests = guests.map((guest) => {
       const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
         ? guest.email
@@ -96,7 +98,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       // Estimate with a token of the same length generateInviteToken() produces.
       const sampleUrl = (token: string | null) => `${siteUrl}/invite/accept?token=${token ?? "x".repeat(24)}&event=${event.slug}`;
       const requiredSegments = sendableGuests.reduce((total, guest) => total + (guest.phone
-        ? countSmsSegments(buildInviteSms({
+        ? countSmsSegments(buildInviteSms({ signature: smsSignature(branding),
             guestName: guest.name,
             eventTitle: event.title,
             eventDate: event.event_date,
@@ -145,7 +147,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           // Send email if guest has email
           if (guest.email) {
             const guestEmail = guest.email;
-            const { subject, html } = buildInvitationEmail({
+            const { subject, html } = buildInvitationEmail({ brand: emailBrand(branding),
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
@@ -160,7 +162,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              const result = await withRetry(() => sendEmail({
+              const result = await withRetry(() => sendEmail({ ...emailSendOptions(branding),
                 to: guestEmail,
                 subject,
                 html,
@@ -201,7 +203,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
               });
             } else {
               const formattedPhone = phoneValidation.formatted!;
-              const smsBody = buildInviteSms({
+              const smsBody = buildInviteSms({ signature: smsSignature(branding),
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
