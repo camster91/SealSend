@@ -1,7 +1,7 @@
 import type { EventBriefContext } from "@/lib/event-brief";
 
 export type EventStatus = "draft" | "published" | "archived";
-export type EventTier = "free" | "standard" | "premium" | "silver" | "gold" | "platinum" | "diamond";
+export type EventTier = "free" | "event_pass" | "standard" | "premium" | "silver" | "gold" | "platinum" | "diamond";
 export type RSVPFieldType =
   | "attendance"
   | "text"

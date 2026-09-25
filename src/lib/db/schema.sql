@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS events (
   design_type TEXT DEFAULT 'upload',
   customization JSONB DEFAULT '{}',
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
-  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'silver', 'gold', 'platinum', 'diamond', 'standard', 'premium')),
+  tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'event_pass', 'silver', 'gold', 'platinum', 'diamond', 'standard', 'premium')),
   max_responses INTEGER DEFAULT 15,
   auto_reminders BOOLEAN DEFAULT FALSE,
   reminder_days_before INTEGER DEFAULT 2,
@@ -719,6 +719,20 @@ CREATE TABLE IF NOT EXISTS waitlist_signups (
 -- One signup per email per plan interest; re-submitting is idempotent.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
   ON waitlist_signups (LOWER(email), plan_interest);
+
+-- =====================
+-- EVENT PASS SMS ALLOWANCE (credits from purchases, debits per sent segment)
+-- =====================
+
+CREATE TABLE IF NOT EXISTS event_sms_ledger (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  delta_segments INTEGER NOT NULL CHECK (delta_segments <> 0),
+  reason TEXT NOT NULL CHECK (reason IN ('event_pass', 'sms_top_up', 'sms_sent')),
+  reference TEXT UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_event_sms_ledger_event ON event_sms_ledger(event_id);
 
 -- =====================
 -- AUTH CODES FK (after events table exists)

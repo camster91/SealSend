@@ -14,6 +14,8 @@ import {
   sanitizeInviteToken,
 } from "@/lib/sanitize";
 import type { Event, RSVPField } from "@/types/database";
+import { getUserTier } from "@/lib/subscription";
+import { showsPoweredByBadge } from "@/lib/entitlements";
 import type { Metadata } from "next";
 
 interface Props {
@@ -56,6 +58,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
     [event.id]
   );
+  const showBadge = showsPoweredByBadge(await getUserTier(event.user_id as string), event.tier as string);
 
   // Calculate spots remaining for guest limits
   let spotsRemaining: number | null = null;
@@ -163,8 +166,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
           </div>
         </div>
 
-        {/* Footer branding (free tier) */}
-        {event.tier === "free" && (
+        {/* Footer branding (free events; removed by the removeBranding entitlement) */}
+        {showBadge && (
           <AnimatedSection className="pb-8 text-center">
             <p className="text-xs text-muted-foreground bg-white/80 inline-block px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">
               Powered by{" "}

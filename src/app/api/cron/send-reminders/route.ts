@@ -9,6 +9,9 @@ import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import { BETA_MODE } from "@/lib/constants";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
+import { getUserTier } from "@/lib/subscription";
+import { countSmsSegments } from "@/lib/messages/cost-estimate";
+import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -138,6 +141,10 @@ export async function GET(request: NextRequest) {
         [event.id]
       );
       const suppressions = await getCommunicationSuppressions(event.user_id);
+      // Event Pass events have a finite SMS allowance. Segments are reserved
+      // synchronously before each send so parallel batches cannot overspend.
+      const smsMetered = smsEnabled && isSmsMetered(await getUserTier(event.user_id), event.tier);
+      let smsBalance = smsMetered ? await getSmsBalance(event.id) : Number.POSITIVE_INFINITY;
       const guests = rawGuests.map((guest) => {
         const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
           ? guest.email
@@ -263,29 +270,40 @@ export async function GET(request: NextRequest) {
                   eventDate: event.event_date,
                   rsvpUrl,
                 });
+                const smsSegments = countSmsSegments(smsBody);
 
-                try {
-                  assertApprovedRecipient(phoneValidation.formatted);
-                  const twilioClient = getTwilioClient();
-                  const result = await twilioClient.messages.create({
-                    body: smsBody,
-                    to: phoneValidation.formatted,
-                    ...getTwilioSendOptions(),
-                  });
-                  smsOk = true;
-
-                  await logSendSuccess(event.id, "sms", phoneValidation.formatted, {
-                    guestId: guest.id,
-                    provider: "twilio",
-                    providerMessageId: result.sid,
-                  });
-                } catch (error) {
-                  const message = error instanceof Error ? error.message : "SMS send failed";
-                  console.error(`[CRON] SMS failed for guest=${guest.id}:`, message);
-                  await logSendFailure(event.id, "sms", guest.phone, message, {
+                if (smsSegments > smsBalance) {
+                  await logSendFailure(event.id, "sms", guest.phone, "SMS allowance used up for this event", {
                     guestId: guest.id,
                     provider: "twilio",
                   });
+                } else {
+                  smsBalance -= smsSegments;
+                  try {
+                    assertApprovedRecipient(phoneValidation.formatted);
+                    const twilioClient = getTwilioClient();
+                    const result = await twilioClient.messages.create({
+                      body: smsBody,
+                      to: phoneValidation.formatted,
+                      ...getTwilioSendOptions(),
+                    });
+                    smsOk = true;
+                    if (smsMetered) await recordSmsUsage(event.id, smsSegments, `twilio:${result.sid}`);
+
+                    await logSendSuccess(event.id, "sms", phoneValidation.formatted, {
+                      guestId: guest.id,
+                      provider: "twilio",
+                      providerMessageId: result.sid,
+                    });
+                  } catch (error) {
+                    smsBalance += smsSegments;
+                    const message = error instanceof Error ? error.message : "SMS send failed";
+                    console.error(`[CRON] SMS failed for guest=${guest.id}:`, message);
+                    await logSendFailure(event.id, "sms", guest.phone, message, {
+                      guestId: guest.id,
+                      provider: "twilio",
+                    });
+                  }
                 }
               } else {
                 await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);

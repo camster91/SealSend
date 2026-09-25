@@ -32,7 +32,7 @@ const paidFaqs = [
   {
     question: "What is the difference between an event upgrade and annual Pro?",
     answer:
-      "Silver through Diamond are one-time upgrades for a single event. Annual Pro covers unlimited events for one year, with up to 2,500 guests per event.",
+      "An Event Pass is a one-time upgrade for a single event: up to 250 guests, 500 SMS segments (add 200 more for $5 if you need them), every event feature, and no SealSend badge. Annual Pro covers unlimited events for one year, with up to 2,500 guests per event.",
   },
   {
     question: "What happens when I hit my event or guest limit?",
@@ -42,12 +42,12 @@ const paidFaqs = [
   {
     question: "Does canceling Pro change event upgrades I already purchased?",
     answer:
-      "No. A separately purchased Silver, Gold, Platinum, or Diamond event keeps its event-level capacity after annual Pro ends.",
+      "No. An event with its own Event Pass (or an earlier one-time upgrade) keeps its capacity after annual Pro ends.",
   },
   {
     question: "How many events can I create for free?",
     answer:
-      "A free account can create one event for up to 15 guests. Annual Pro allows unlimited events during the active subscription.",
+      "A free account can create one event for up to 50 guests, with email invitations. Annual Pro allows unlimited events during the active subscription.",
   },
   {
     question: "What payment methods do you accept?",

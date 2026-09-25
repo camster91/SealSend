@@ -8,6 +8,8 @@ import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
 import { CopyLinkButton } from '@/components/dashboard/CopyLinkButton';
 import { CloneEventButton } from '@/components/dashboard/CloneEventButton';
 import { UpgradeButton } from '@/components/events/UpgradeButton';
+import { SmsTopUpButton } from '@/components/events/SmsTopUpButton';
+import { getSmsBalance, isSmsMetered } from '@/lib/sms-allowance';
 import { UpgradeSuccessToast } from '@/components/events/UpgradeSuccessToast';
 import { ExportTools } from '@/components/dashboard/ExportTools';
 import { AutoRemindersToggle } from '@/components/dashboard/AutoRemindersToggle';
@@ -67,6 +69,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const publicUrl = `${siteUrl}/e/${event.slug}`;
   const accountPlan = await getUserTier(event.user_id as string);
   const canSendAnnouncements = canUseFeature(accountPlan, event.tier as EventTier, 'announcements');
+  const smsBalance = isSmsMetered(accountPlan, event.tier as string) ? await getSmsBalance(eventId) : null;
   const canEdit = roleCan(access.role, 'edit_event');
   const canManageGuests = roleCan(access.role, 'manage_guests');
   const canExport = roleCan(access.role, 'export_responses');
@@ -146,13 +149,14 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                   ? 'bg-slate-100 text-slate-700'
                   : ['diamond'].includes(event.tier as string)
                     ? 'bg-indigo-100 text-indigo-700'
-                    : ['silver', 'standard'].includes(event.tier as string)
+                    : ['silver', 'standard', 'event_pass'].includes(event.tier as string)
                       ? 'bg-brand-100 text-brand-700'
                       : 'bg-gray-100 text-gray-600'
             }`}>
-              {(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier
+              {event.tier === 'event_pass' ? 'Event Pass' : `${(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier`}
             </span>
             {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
+            {smsBalance !== null && roleCan(access.role, 'manage_billing') && !isArchived && <SmsTopUpButton eventId={eventId} balance={smsBalance} />}
           </div>
 
           {/* Quick actions */}

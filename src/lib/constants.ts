@@ -81,12 +81,11 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     },
     features: [
       { name: "1 event", included: true },
-      { name: "Up to 15 guests", included: true },
+      { name: "Up to 50 guests", included: true },
       { name: "RSVP tracking", included: true },
       { name: "Basic templates", included: true },
       { name: "Email notifications", included: true },
       { name: "SealSend branding", included: true, tooltip: "Free invitations include SealSend branding" },
-      { name: "Custom domain", included: false },
       { name: "Remove branding", included: false },
       { name: "SMS notifications", included: false },
       { name: "Advanced analytics", included: false },
@@ -117,11 +116,9 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
       { name: "Premium templates", included: true },
       { name: "No SealSend branding", included: true },
       { name: "Custom colors & fonts", included: true },
-      { name: "Photo gallery", included: true },
       { name: "SMS + email notifications", included: true },
       { name: "Guest tags & groups", included: true },
       { name: "Export to CSV", included: true },
-      { name: "Ad-free experience", included: true },
     ],
     popular: true,
     badges: ["Most Popular"],
@@ -148,11 +145,9 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     features: [
       { name: "Everything in Silver", included: true },
       { name: "Up to 150 guests", included: true },
-      { name: "Custom domain", included: true },
       { name: "Team collaboration", included: true },
       { name: "Advanced RSVP fields", included: true },
       { name: "Meal preferences & +1s", included: true },
-      { name: "Seating chart tool", included: true },
       { name: "Message board", included: true },
       { name: "Advanced analytics", included: true },
       { name: "Priority support", included: true },
@@ -163,22 +158,6 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     },
   },
 ];
-
-// Additional per-event tiers (available via API / upgrade flow)
-export const PREMIUM_TIERS = {
-  platinum: {
-    name: "Platinum",
-    price: 34.99,
-    guestsPerEvent: 500,
-    description: "For galas & corporate events",
-  },
-  diamond: {
-    name: "Diamond",
-    price: 49.99,
-    guestsPerEvent: 750,
-    description: "For the biggest celebrations",
-  },
-};
 
 // Unlimited yearly plan (competitor to Evite Pro at $249.99/yr)
 export const PRO_ANNUAL = {
@@ -191,12 +170,21 @@ export const PRO_ANNUAL = {
   stripePriceId: process.env.STRIPE_PRO_YEARLY_PRICE_ID,
 };
 
+export const EVENT_PASS = {
+  name: "Event Pass",
+  priceCents: 1200,
+  guestsPerEvent: 250,
+  smsSegmentsIncluded: 500,
+} as const;
+
+export const SMS_TOP_UP = {
+  segments: 200,
+  priceCents: 500,
+} as const;
+
 export const PUBLIC_PRICING_PLANS = [
-  { id: "free", name: "Free", price: 0, period: "", description: "Try SealSend with one small event", events: "1", guests: "15", features: ["Email invitations", "RSVP tracking", "Guest management"] },
-  { id: "silver", name: "Silver", price: 8.99, period: "/event", description: "Birthdays, dinners, and showers", events: "1", guests: "50", features: ["Email and SMS invitations", "Guest tags", "Announcements"] },
-  { id: "gold", name: "Gold", price: 17.99, period: "/event", description: "Weddings and larger celebrations", events: "1", guests: "150", features: ["Everything in Silver", "Sign-up board", "Analytics"] },
-  { id: "platinum", name: "Platinum", price: 34.99, period: "/event", description: "Galas and company events", events: "1", guests: "500", features: ["Everything in Gold", "Higher guest capacity", "Email and SMS invitations"] },
-  { id: "diamond", name: "Diamond", price: 49.99, period: "/event", description: "Your largest one-off events", events: "1", guests: "750", features: ["Everything in Platinum", "Highest one-time capacity", "Priority handling"] },
+  { id: "free", name: "Free", price: 0, period: "", description: "One small event, free", events: "1", guests: "50", features: ["Email invitations", "RSVP tracking", "Guest management", "\"Powered by SealSend\" badge"] },
+  { id: "event_pass", name: "Event Pass", price: EVENT_PASS.priceCents / 100, period: "/event", description: "Everything for one bigger event", events: "1", guests: "250", features: ["Email invitations and 500 SMS segments (top-ups available)", "Guest tags, announcements and sign-up board", "Analytics and up to 3 co-hosts", "No SealSend badge"] },
   { id: "pro_annual", name: "SealSend Pro", price: 124.99, period: "/year", description: "For repeat hosts and event planners", events: "Unlimited", guests: "2,500", features: ["All shipped premium features", "Unlimited events", "2,500 guests per event"], popular: true },
 ] as const;
 
@@ -227,8 +215,13 @@ export const CONTROLLED_BETA_PRICING_PLAN = {
 export const TIERS = {
   free: {
     price: 0,
-    maxResponses: 15,
+    maxResponses: 50,
     features: ["emailInvites", "basicRsvp"],
+  },
+  event_pass: {
+    price: EVENT_PASS.priceCents,
+    maxResponses: EVENT_PASS.guestsPerEvent,
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "teamCollab", "analytics"],
   },
   silver: {
     price: 899,
@@ -238,17 +231,17 @@ export const TIERS = {
   gold: {
     price: 1799,
     maxResponses: 150,
-    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics"],
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "teamCollab", "analytics"],
   },
   platinum: {
     price: 3499,
     maxResponses: 500,
-    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics", "api"],
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "teamCollab", "analytics", "api"],
   },
   diamond: {
     price: 4999,
     maxResponses: 750,
-    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "customDomain", "teamCollab", "analytics", "api", "priority"],
+    features: ["emailInvites", "smsInvites", "removeBranding", "guestTags", "announcements", "signupBoard", "teamCollab", "analytics", "api", "priority"],
   },
   // Backwards compatibility
   standard: {

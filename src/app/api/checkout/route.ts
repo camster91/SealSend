@@ -5,21 +5,12 @@ import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
 import { isStripeKeyAllowed } from '@/lib/billing';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
+import { isEventTierUpgrade } from '@/lib/entitlements';
 
 const checkoutSchema = z.object({
   eventId: z.string().uuid(),
-  tier: z.enum(["silver", "gold", "platinum", "diamond", "standard", "premium"]),
+  tier: z.literal("event_pass"),
 });
-
-const TIER_RANK: Record<string, number> = {
-  free: 0,
-  silver: 1,
-  standard: 1,
-  gold: 2,
-  premium: 2,
-  platinum: 3,
-  diamond: 4,
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,20 +55,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Test billing is not configured" }, { status: 503 });
     }
 
-    // Verify event is on a lower tier
-    const currentRank = TIER_RANK[event.tier] ?? 0;
-    const targetRank = TIER_RANK[tier] ?? 0;
-
-    if (targetRank <= currentRank) {
+    // A legacy one-time tier with more capacity than the pass must not be downgraded.
+    if (!isEventTierUpgrade(event.tier, tier)) {
       return NextResponse.json(
-        { error: "Event is already on this tier or higher" },
+        { error: "Event already has this capacity or more" },
         { status: 400 }
       );
     }
 
     const url = await createCheckoutSession({
       eventId,
-      tier,
       userId: user.id,
       eventTitle: event.title,
     });

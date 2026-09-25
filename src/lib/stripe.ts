@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
 
 let stripeInstance: Stripe | null = null;
 
@@ -13,41 +14,20 @@ export function getStripe(): Stripe {
   return stripeInstance;
 }
 
-// Per-event pricing (Evite-style, 50% cheaper)
-const EVENT_PRICING = {
-  silver: { amount: 899, name: "Silver", guests: 50 },
-  gold: { amount: 1799, name: "Gold", guests: 150 },
-  platinum: { amount: 3499, name: "Platinum", guests: 500 },
-  diamond: { amount: 4999, name: "Diamond", guests: 750 },
-} as const;
-
-type EventTier = keyof typeof EVENT_PRICING;
-
+// Per-event pricing. Only the Event Pass is sold; legacy one-time tiers keep
+// working for events that already bought them (see src/lib/entitlements.ts).
 export async function createCheckoutSession({
   eventId,
-  tier,
   userId,
   eventTitle,
 }: {
   eventId: string;
-  tier: EventTier | "standard" | "premium";
   userId: string;
   eventTitle: string;
 }): Promise<string> {
   const stripe = getStripe();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
-
-  // Map old tier names to new ones for backwards compatibility
-  const tierMap: Record<string, EventTier> = {
-    standard: "silver",
-    premium: "gold",
-  };
-  const resolvedTier = (tierMap[tier] || tier) as EventTier;
-  const pricing = EVENT_PRICING[resolvedTier];
-
-  if (!pricing) {
-    throw new Error(`Invalid tier: ${tier}`);
-  }
+  const tier = "event_pass";
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -55,21 +35,61 @@ export async function createCheckoutSession({
       price_data: {
         currency: "usd",
         product_data: {
-          name: `SealSend ${pricing.name} — "${eventTitle}"`,
-          description: `Premium invitation for up to ${pricing.guests} guests. No branding, premium templates, SMS + email.`,
+          name: `SealSend ${EVENT_PASS.name} — "${eventTitle}"`,
+          description: `One event for up to ${EVENT_PASS.guestsPerEvent} guests: email and SMS invitations, guest tags, announcements, sign-up board, analytics, co-hosts, and no SealSend badge.`,
         },
-        unit_amount: pricing.amount,
+        unit_amount: EVENT_PASS.priceCents,
       },
       quantity: 1,
     }],
-    metadata: { eventId, tier: resolvedTier, userId },
+    metadata: { eventId, tier, userId },
     success_url: `${siteUrl}/events/${eventId}?upgraded=true`,
     cancel_url: `${siteUrl}/events/${eventId}`,
     payment_intent_data: {
-      metadata: { eventId, tier: resolvedTier, userId },
-      description: `${pricing.name} upgrade for "${eventTitle}"`,
+      metadata: { eventId, tier, userId },
+      description: `${EVENT_PASS.name} for "${eventTitle}"`,
     },
     allow_promotion_codes: true,
+  });
+
+  if (!session.url) {
+    throw new Error("Failed to create checkout session URL");
+  }
+
+  return session.url;
+}
+
+// SMS top-up for an Event Pass event that has used its included segments.
+export async function createSmsTopUpCheckoutSession({
+  eventId,
+  userId,
+  eventTitle,
+}: {
+  eventId: string;
+  userId: string;
+  eventTitle: string;
+}): Promise<string> {
+  const stripe = getStripe();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
+  const metadata = { eventId, userId, kind: "sms_top_up", segments: String(SMS_TOP_UP.segments) };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: `SealSend SMS top-up — "${eventTitle}"`,
+          description: `${SMS_TOP_UP.segments} additional SMS segments for this event.`,
+        },
+        unit_amount: SMS_TOP_UP.priceCents,
+      },
+      quantity: 1,
+    }],
+    metadata,
+    success_url: `${siteUrl}/events/${eventId}?sms_top_up=true`,
+    cancel_url: `${siteUrl}/events/${eventId}`,
+    payment_intent_data: { metadata, description: `SMS top-up for "${eventTitle}"` },
   });
 
   if (!session.url) {

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { signupSchema } from "@/lib/validations";
 import Link from "next/link";
+import { EVENT_PASS } from "@/lib/constants";
 
 export function SignupForm() {
   const [email, setEmail] = useState("");
@@ -19,6 +20,7 @@ export function SignupForm() {
   const authService = new AuthService();
   const plan = searchParams.get("plan");
   const planLabel = plan === 'pro_annual' ? 'SealSend Pro — $124.99 USD/year' :
+    plan === 'event_pass' ? `${EVENT_PASS.name} — $${(EVENT_PASS.priceCents / 100).toFixed(2)} USD per event` :
     plan ? `${plan.charAt(0).toUpperCase()}${plan.slice(1)} — one-time event upgrade` : null;
 
   const isEmailValid = useMemo(() => {

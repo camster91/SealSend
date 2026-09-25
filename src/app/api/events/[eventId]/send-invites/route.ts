@@ -15,6 +15,8 @@ import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
+import { countSmsSegments } from "@/lib/messages/cost-estimate";
+import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
 type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "phone_invalid_at">;
@@ -87,6 +89,26 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }).filter((guest) => guest.email || guest.phone);
     if (sendableGuests.length === 0) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
+    }
+
+    const smsMetered = smsEnabled && isSmsMetered(accountPlan, event.tier as string);
+    if (smsMetered) {
+      // Estimate with a token of the same length generateInviteToken() produces.
+      const sampleUrl = (token: string | null) => `${siteUrl}/invite/accept?token=${token ?? "x".repeat(24)}&event=${event.slug}`;
+      const requiredSegments = sendableGuests.reduce((total, guest) => total + (guest.phone
+        ? countSmsSegments(buildInviteSms({
+            guestName: guest.name,
+            eventTitle: event.title,
+            eventDate: event.event_date,
+            locationName: event.location_name,
+            hostName: event.host_name || undefined,
+            rsvpUrl: sampleUrl(guest.invite_token),
+          }))
+        : 0), 0);
+      const decision = decideSmsSend(true, await getSmsBalance(eventId), requiredSegments);
+      if (!decision.allowed) {
+        return NextResponse.json({ error: smsAllowanceMessage(decision), code: "SMS_ALLOWANCE_EXCEEDED" }, { status: 402 });
+      }
     }
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
@@ -197,6 +219,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 }));
                 smsOk = true;
+                if (smsMetered) await recordSmsUsage(eventId, countSmsSegments(smsBody), `twilio:${result.sid}`);
 
                 // Log successful SMS
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
