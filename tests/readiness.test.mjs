@@ -101,6 +101,18 @@ test('fresh and upgraded schemas store workspace invites as hashed one-time toke
   }
 });
 
+test('fresh and upgraded schemas create clients and hashed client review links', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS clients \(/);
+    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients\(id\) ON DELETE SET NULL/);
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS event_client_shares \(/);
+    assert.match(sql, /token_hash TEXT UNIQUE NOT NULL,\n  token_preview TEXT NOT NULL,\n  created_by UUID/);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

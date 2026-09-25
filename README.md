@@ -22,6 +22,16 @@ SealSend is a modern, high-performance SaaS platform for creating, sending, and 
 - **Automated Reminders:** Scheduled dispatch of event updates
 - **Guest Communication:** SMS and email notifications via Twilio/Mailgun
 
+### For Event Organizers
+- **Workspaces:** Team workspaces with owner, admin, planner and check-in roles
+- **Brand Kit:** Your logo, colours, email sender name and text signature on every event
+- **Clients:** Client records, read-only review links with live RSVP totals, and recorded approvals
+
+### Pricing Model
+- **Free:** One event for up to 50 guests with email invitations
+- **Event Pass:** A one-time upgrade for one bigger event (250 guests, SMS allowance, every feature)
+- **Annual Pro:** Unlimited events for repeat hosts and planners
+
 ### Integrations
 - **Payment Processing:** Stripe integration for premium features
 - **Calendar Export:** Add events to Google, Apple, or Outlook calendars

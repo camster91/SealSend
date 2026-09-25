@@ -88,6 +88,10 @@ docs/             Launch operations, evidence register, policy decisions
 ### Workspaces (organizations)
 - Every event belongs to a workspace (`events.organization_id`). Each host has a personal workspace (`organizations.is_personal`), created on first use by the SQL function `sealsend_personal_organization()`; a `BEFORE INSERT` trigger on `events` fills `organization_id` with it when none is given.
 - Workspace roles (`organization_members.role`): `owner` and `admin` get owner access to every workspace event, `planner` gets manager access, `check_in` gets check-in access. The mapping lives in `src/lib/auth/event-access.ts`.
+- Workspace permissions (`src/lib/auth/organization-access.ts`): use `requireOrganizationPermission(organizationId, permission)` in workspace routes. Owners and admins manage members and the brand; planners manage clients; admins can't change owners or admins; a workspace always keeps at least one owner.
+- Team workspaces (`/settings/team`): invites are hashed one-time tokens in `organization_invites` accepted at `/team/workspace/[token]`. Seat limits per plan are placeholders in `ORGANIZATION_SEAT_LIMITS`. Account deletion hands team workspaces and their events to remaining members (`src/app/api/cron/delete-accounts/route.ts`).
+- Brand kit (`src/lib/brands.ts`, `/settings/brand`): a workspace's default brand fills unset event-page styling and sets the email footer, From display name, Reply-To and SMS signature. Every guest-facing email/SMS send path must pass `getEventBranding()` through `emailBrand()`, `emailSendOptions()` and `smsSignature()`. White-label only applies on organizer plans (`solo`, `studio`, `agency`).
+- Clients (`src/lib/clients.ts`, `/settings/clients`): workspace-scoped client records, `events.client_id`, and read-only review links (`event_client_shares`, public page `/client/[token]`) that show RSVP totals only, never guest details, and record the client's approval in `event_audit_log`.
 - Strategy and roadmap for organizer workspaces: `docs/product-strategy-organizer-platform.md`.
 
 ### Tiers and entitlements

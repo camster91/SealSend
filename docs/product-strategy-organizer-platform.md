@@ -1,6 +1,8 @@
 # SealSend product strategy: one-off hosts and the organizer platform
 
-Status: **Direction accepted by the owner on 2026-09-25** (the recommendations below, except D4 prices and the D6 licence, which stay open). Phases 0–2 are in progress.
+Status: **Direction accepted by the owner on 2026-09-25** (the recommendations below, except D4 prices and the D6 licence, which stay open).
+
+Progress: Phase 0 (Event Pass, SMS allowance and top-ups, honest plan claims), Phase 1 (workspaces, brand kit, team workspaces) and Phase 2 (clients, client review links and approvals) are built. Phase 3 needs infrastructure (reverse proxy, DNS, Mailgun domains, US 10DLC) and Phase 4 is integrate-first.
 
 Drafted: 2026-09-25
 

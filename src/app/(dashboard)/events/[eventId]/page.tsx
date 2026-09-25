@@ -17,6 +17,7 @@ import { canUseFeature, type EventTier } from '@/lib/entitlements';
 import { getUserTier } from '@/lib/subscription';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 import { EventTeamPanel } from '@/components/dashboard/EventTeamPanel';
+import { EventClientPanel } from '@/components/events/EventClientPanel';
 import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
 
 interface EventDetailPageProps {
@@ -312,6 +313,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         )}
 
         {canManageMembers && <EventTeamPanel eventId={eventId} />}
+        {canEdit && !isArchived && <div className="mt-6"><EventClientPanel eventId={eventId} /></div>}
 
         {upgraded === 'true' && <UpgradeSuccessToast />}
       </div>
