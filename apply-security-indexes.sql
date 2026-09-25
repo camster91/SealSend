@@ -612,3 +612,31 @@ CREATE TABLE IF NOT EXISTS organization_invites (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_organization_invites_pending ON organization_invites(organization_id) WHERE accepted_at IS NULL;
+-- Clients: who a workspace runs events for, plus read-only client review links.
+CREATE TABLE IF NOT EXISTS clients (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
+  contact_email TEXT,
+  contact_phone TEXT,
+  notes TEXT CHECK (notes IS NULL OR char_length(notes) <= 2000),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_clients_organization ON clients(organization_id, name);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_events_client ON events(client_id);
+-- Read-only client review links (hashed tokens). Approval is recorded on the link and in event_audit_log.
+CREATE TABLE IF NOT EXISTS event_client_shares (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  token_hash TEXT UNIQUE NOT NULL,
+  token_preview TEXT NOT NULL,
+  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  approver_name TEXT CHECK (approver_name IS NULL OR char_length(approver_name) BETWEEN 1 AND 120),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_event_client_shares_event ON event_client_shares(event_id);

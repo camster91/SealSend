@@ -178,6 +178,16 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Clients</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Keep a record of who you run events for and send them read-only review links.</p>
+            <Link href="/settings/clients" className="inline-flex font-medium text-brand-700 hover:underline">Manage clients →</Link>
+          </CardContent>
+        </Card>
+
         {role === "admin" && (
           <Card>
             <CardHeader>
