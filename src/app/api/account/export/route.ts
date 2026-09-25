@@ -17,7 +17,7 @@ export async function GET() {
   const events = await query<Record<string, unknown>>(
     `SELECT id, title, slug, description, event_date, event_end_date, event_timezone,
             location_name, location_address, host_name, dress_code, rsvp_deadline,
-            status, tier, repeated_from_event_id, created_at, updated_at
+            status, tier, organization_id, repeated_from_event_id, created_at, updated_at
        FROM events WHERE user_id = $1 ORDER BY created_at`,
     [userId],
   );
@@ -28,10 +28,16 @@ export async function GET() {
     comments: await query("SELECT id, event_id, author_name, message, is_private, created_at FROM event_comments WHERE event_id = ANY($1::uuid[]) ORDER BY created_at", [eventIds]),
     signupClaims: await query("SELECT id, event_id, claimant_name, claimant_email, created_at FROM event_signup_claims WHERE event_id = ANY($1::uuid[]) ORDER BY created_at", [eventIds]),
   };
+  const organizations = await query(
+    `SELECT o.id, o.name, o.plan, o.is_personal, m.role, m.created_at AS joined_at
+       FROM organization_members m JOIN organizations o ON o.id = m.organization_id
+      WHERE m.user_id = $1 ORDER BY m.created_at`,
+    [userId],
+  );
   await recordActivationEventSafely({ name: "account_exported", userId });
 
   return NextResponse.json(
-    { exportedAt: new Date().toISOString(), account, events, ...related },
+    { exportedAt: new Date().toISOString(), account, organizations, events, ...related },
     { headers: {
       "Cache-Control": "no-store",
       "Content-Disposition": `attachment; filename="sealsend-account-export-${new Date().toISOString().slice(0, 10)}.json"`,
