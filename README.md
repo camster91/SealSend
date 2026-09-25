@@ -61,7 +61,6 @@ Keep `PAYMENTS_TEST_ONLY=true` and `COMMUNICATIONS_TEST_ONLY=true` outside produ
 ```bash
 # Fresh database
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/lib/db/schema.sql
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/lib/db/waitlist.sql
 
 # Upgrading an existing database (idempotent)
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apply-security-indexes.sql

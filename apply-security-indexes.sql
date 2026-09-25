@@ -492,3 +492,14 @@ CREATE TABLE IF NOT EXISTS beta_support_reviews (
   FOREIGN KEY (user_id, consented_at) REFERENCES beta_participants(user_id, consented_at) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_beta_support_reviews_reviewed ON beta_support_reviews(reviewed_at DESC);
+-- Pro waitlist signups (captured while annual Pro checkout is unavailable).
+CREATE TABLE IF NOT EXISTS waitlist_signups (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email TEXT NOT NULL,
+  plan_interest TEXT NOT NULL DEFAULT 'pro_annual',
+  source TEXT NOT NULL DEFAULT 'pricing',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One signup per email per plan interest; re-submitting is idempotent.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
+  ON waitlist_signups (LOWER(email), plan_interest);

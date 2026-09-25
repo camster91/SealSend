@@ -53,7 +53,7 @@ src/
                   pricing/ marketing/ features/ team/ layout/
   lib/
     auth/         session, api-auth, event-api-access, event-access, auth-service
-    db/           client.ts, schema.sql (fresh schema), waitlist.sql
+    db/           client.ts, schema.sql (fresh schema)
     ai/ messages/ monitoring/ analytics/
     constants.ts  BETA_MODE, FEATURE_FLAGS, tiers and pricing plans
     entitlements.ts, billing.ts, subscription.ts
@@ -81,7 +81,7 @@ docs/             Launch operations, evidence register, policy decisions
 
 ### Database
 - Use `query()` / `queryOne()` from `@/lib/db/client` with parameterized SQL only.
-- `src/lib/db/schema.sql` is the schema for a fresh database (also used by e2e setup and `ops/rehearse-retention.sh`). `src/lib/db/waitlist.sql` creates `waitlist_signups`, which is not yet in `schema.sql` or the upgrade migration and has to be applied separately.
+- `src/lib/db/schema.sql` is the schema for a fresh database (also used by e2e setup and `ops/rehearse-retention.sh`).
 - `apply-security-indexes.sql` (repo root) is the idempotent upgrade migration applied to production with `psql -v ON_ERROR_STOP=1`. `tests/readiness.test.mjs` asserts on its contents, so schema changes usually touch both files plus that test.
 - Write migrations with `IF NOT EXISTS` / `IF EXISTS` so they can run twice.
 

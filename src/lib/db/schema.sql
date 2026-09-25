@@ -706,6 +706,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_account_checkout
   WHERE event_name = 'checkout_completed' AND user_id IS NOT NULL AND event_id IS NULL;
 
 -- =====================
+-- PRO WAITLIST (public capture while annual Pro checkout is unavailable)
+-- =====================
+
+CREATE TABLE IF NOT EXISTS waitlist_signups (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email TEXT NOT NULL,
+  plan_interest TEXT NOT NULL DEFAULT 'pro_annual',
+  source TEXT NOT NULL DEFAULT 'pricing',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One signup per email per plan interest; re-submitting is idempotent.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
+  ON waitlist_signups (LOWER(email), plan_interest);
+
+-- =====================
 -- AUTH CODES FK (after events table exists)
 -- =====================
 
