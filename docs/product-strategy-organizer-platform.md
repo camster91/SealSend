@@ -106,7 +106,7 @@ Each phase is shippable on its own and gives organizers something they'd pay for
 - Resolve issue #152 ("Start free" CTA destination).
 
 ### Phase 1: workspaces and brand kit (the platform's foundation)
-- `organizations`, `organization_members` (roles: owner, admin, planner, assistant, check-in), `brands`.
+- `organizations`, `organization_members` (roles: owner, admin, planner, check-in; implemented in Phase 1a), `brands`.
 - Every event gets an `organization_id`. Existing users get a personal org during migration, so nothing breaks for one-off hosts.
 - Brand kit: logo, colours, fonts, email sender name and reply-to, footer text. It's applied to every event page, invitation email and SMS signature, and per-event `customization` can still override it.
 - White-label switch on paid organizer plans removes all SealSend marks from guest pages and emails. Today only the free-tier badge on event pages is conditional; wire it to the `removeBranding` entitlement and extend it to emails.
@@ -151,7 +151,7 @@ CREATE TABLE organizations (
 CREATE TABLE organization_members (
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('owner','admin','planner','assistant','check_in')),
+  role TEXT NOT NULL CHECK (role IN ('owner','admin','planner','check_in')),
   PRIMARY KEY (organization_id, user_id)
 );
 

@@ -3,7 +3,10 @@ import test from "node:test";
 
 import {
   EVENT_MEMBER_ROLES,
+  ORGANIZATION_ROLES,
   getEventAccess,
+  organizationRoleToEventRole,
+  resolveEventAccessRole,
   roleCan,
 } from "../src/lib/auth/event-access";
 
@@ -48,4 +51,35 @@ test("fails closed for unknown or malformed persisted roles", async () => {
 
   assert.equal(access, null);
   assert.equal(roleCan("administrator" as "owner", "view_event"), false);
+});
+
+test("workspace roles grant the matching access on every workspace event", () => {
+  assert.deepEqual(ORGANIZATION_ROLES, ["owner", "admin", "planner", "check_in"]);
+  assert.equal(organizationRoleToEventRole("owner"), "owner");
+  assert.equal(organizationRoleToEventRole("admin"), "owner");
+  assert.equal(organizationRoleToEventRole("planner"), "manager");
+  assert.equal(organizationRoleToEventRole("check_in"), "check_in");
+  assert.equal(organizationRoleToEventRole("superuser"), null);
+  assert.equal(organizationRoleToEventRole(null), null);
+});
+
+test("the most privileged of event role and workspace role wins, and unknown roles never grant access", () => {
+  assert.equal(resolveEventAccessRole("viewer", "planner"), "manager");
+  assert.equal(resolveEventAccessRole("manager", "check_in"), "manager");
+  assert.equal(resolveEventAccessRole(null, "admin"), "owner");
+  assert.equal(resolveEventAccessRole("owner", null), "owner");
+  assert.equal(resolveEventAccessRole("administrator", "superuser"), null);
+  assert.equal(resolveEventAccessRole(null, null), null);
+});
+
+test("access lookups join workspace membership and accept workspace-only members", async () => {
+  let sql = "";
+  const access = await getEventAccess("user-2", "event-1", async (text) => {
+    sql = text;
+    return { role: null, organization_role: "planner" };
+  });
+
+  assert.equal(access?.role, "manager");
+  assert.match(sql, /LEFT JOIN organization_members om/);
+  assert.match(sql, /om\.user_id = \$2/);
 });

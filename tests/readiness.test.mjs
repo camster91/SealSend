@@ -63,6 +63,21 @@ test('fresh and upgraded schemas create the Event Pass SMS ledger', async () => 
   }
 });
 
+test('fresh and upgraded schemas give every event a workspace', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS organizations \(/);
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_members \(/);
+    assert.match(sql, /role TEXT NOT NULL CHECK \(role IN \('owner', 'admin', 'planner', 'check_in'\)\)/);
+    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_personal_owner ON organizations\(created_by\) WHERE is_personal/);
+    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations\(id\)/);
+    assert.match(sql, /CREATE TRIGGER events_default_organization BEFORE INSERT ON events/);
+    assert.match(sql, /UPDATE events SET organization_id = sealsend_personal_organization\(user_id\) WHERE organization_id IS NULL/);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

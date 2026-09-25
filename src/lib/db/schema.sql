@@ -735,6 +735,70 @@ CREATE TABLE IF NOT EXISTS event_sms_ledger (
 CREATE INDEX IF NOT EXISTS idx_event_sms_ledger_event ON event_sms_ledger(event_id);
 
 -- =====================
+-- ORGANIZATIONS (workspaces that own events; every host has a personal one)
+-- =====================
+
+CREATE TABLE IF NOT EXISTS organizations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
+  slug TEXT UNIQUE NOT NULL,
+  plan TEXT NOT NULL DEFAULT 'personal' CHECK (plan IN ('personal', 'solo', 'studio', 'agency')),
+  is_personal BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One personal workspace per host.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_personal_owner ON organizations(created_by) WHERE is_personal;
+CREATE TABLE IF NOT EXISTS organization_members (
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'planner', 'check_in')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (organization_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_organization_members_user ON organization_members(user_id);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_events_organization ON events(organization_id);
+
+-- Returns the host's personal workspace, creating it (and the owner membership) on first use.
+CREATE OR REPLACE FUNCTION sealsend_personal_organization(owner_id UUID) RETURNS UUID AS $$
+DECLARE
+  org_id UUID;
+BEGIN
+  SELECT id INTO org_id FROM organizations WHERE created_by = owner_id AND is_personal;
+  IF org_id IS NULL THEN
+    INSERT INTO organizations (name, slug, is_personal, created_by)
+    SELECT COALESCE(NULLIF(TRIM(u.name), ''), 'My events'), 'personal-' || REPLACE(u.id::text, '-', ''), TRUE, u.id
+      FROM admin_users u WHERE u.id = owner_id
+    ON CONFLICT DO NOTHING;
+    SELECT id INTO org_id FROM organizations WHERE created_by = owner_id AND is_personal;
+  END IF;
+  IF org_id IS NOT NULL THEN
+    INSERT INTO organization_members (organization_id, user_id, role)
+    VALUES (org_id, owner_id, 'owner') ON CONFLICT DO NOTHING;
+  END IF;
+  RETURN org_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- New events default to the owner's personal workspace unless a workspace is given.
+CREATE OR REPLACE FUNCTION sealsend_events_default_organization() RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.organization_id IS NULL THEN
+    NEW.organization_id := sealsend_personal_organization(NEW.user_id);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS events_default_organization ON events;
+CREATE TRIGGER events_default_organization BEFORE INSERT ON events
+  FOR EACH ROW EXECUTE FUNCTION sealsend_events_default_organization();
+
+-- Backfill: every existing event joins its owner's personal workspace.
+UPDATE events SET organization_id = sealsend_personal_organization(user_id) WHERE organization_id IS NULL;
+
+-- =====================
 -- AUTH CODES FK (after events table exists)
 -- =====================
 

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       }
       await client.query("INSERT INTO deleted_account_upload_cleanup (user_directory) VALUES ($1) ON CONFLICT DO NOTHING", [userId]);
       await client.query("DELETE FROM events WHERE user_id = $1", [userId]);
+      await client.query("DELETE FROM organizations WHERE is_personal AND created_by = $1", [userId]);
       await client.query("DELETE FROM user_subscriptions WHERE user_id = $1", [userId]);
       await client.query("DELETE FROM user_sessions WHERE user_id = $1", [userId]);
       await client.query("DELETE FROM admin_users WHERE id = $1", [userId]);

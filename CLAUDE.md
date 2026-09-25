@@ -73,7 +73,7 @@ docs/             Launch operations, evidence register, policy decisions
 - Cookies: `sealsend_session` (httpOnly, authoritative) and `sealsend_user` (client-readable display data only — never trust it for authorization).
 - In API routes:
   - `requireApiHost()` from `@/lib/auth/api-auth` for any signed-in host.
-  - `requireEventPermission(eventId, permission)` from `@/lib/auth/event-api-access` for anything scoped to an event. It handles owner and co-host roles; use it rather than hand-rolled ownership checks.
+  - `requireEventPermission(eventId, permission)` from `@/lib/auth/event-api-access` for anything scoped to an event. It resolves the event owner, co-host roles (`event_members`) and workspace roles (`organization_members`), taking the most privileged; use it rather than hand-rolled ownership checks.
   - Both return `{ error }` or `{ user }`; return `auth.error` early.
 - Server components: `getCurrentUser()` from `@/lib/auth/session`. Client: `getClientUser()` from `@/lib/auth/client-auth`.
 - `src/proxy.ts` rejects state-changing `/api/*` requests without a same-origin `Origin`/`Referer`, except `/api/webhooks/*` and `/api/cron/*`.
@@ -85,8 +85,14 @@ docs/             Launch operations, evidence register, policy decisions
 - `apply-security-indexes.sql` (repo root) is the idempotent upgrade migration applied to production with `psql -v ON_ERROR_STOP=1`. `tests/readiness.test.mjs` asserts on its contents, so schema changes usually touch both files plus that test.
 - Write migrations with `IF NOT EXISTS` / `IF EXISTS` so they can run twice.
 
+### Workspaces (organizations)
+- Every event belongs to a workspace (`events.organization_id`). Each host has a personal workspace (`organizations.is_personal`), created on first use by the SQL function `sealsend_personal_organization()`; a `BEFORE INSERT` trigger on `events` fills `organization_id` with it when none is given.
+- Workspace roles (`organization_members.role`): `owner` and `admin` get owner access to every workspace event, `planner` gets manager access, `check_in` gets check-in access. The mapping lives in `src/lib/auth/event-access.ts`.
+- Strategy and roadmap for organizer workspaces: `docs/product-strategy-organizer-platform.md`.
+
 ### Tiers and entitlements
-- Per-event tiers (`events.tier`): `free`, `silver`, `gold`, `platinum`, `diamond`. Legacy `standard`/`premium` are still accepted and map to silver/gold limits.
+- Per-event tiers (`events.tier`): `free` (50 guests, email only) and `event_pass` (the only tier sold: 250 guests, every event feature, 500 SMS segments). Legacy `silver`/`gold`/`platinum`/`diamond`/`standard`/`premium` stay valid for events that bought them.
+- Event Pass SMS is metered in `event_sms_ledger` (`src/lib/sms-allowance.ts`): purchases credit segments, each sent SMS debits them. Every SMS send path must check `isSmsMetered()` and record usage.
 - Recurring plans: Pro annual (`PRO_ANNUAL`) plus `SUBSCRIPTION_TIERS` in `constants.ts`.
 - Resolve limits and features through `src/lib/entitlements.ts` (`getEffectiveEventLimits`, `canUseFeature`, `getTeamMemberLimit`), passing the account plan from `getUserTier()` in `src/lib/subscription.ts`. That returns `"beta"` while `BETA_MODE` is on, so don't read tier constants directly.
 - `FeatureGate` (`src/components/features/FeatureGate.tsx`) gates UI by tier.
