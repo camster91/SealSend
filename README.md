@@ -116,7 +116,7 @@ Release steps, current production state and rollback targets are in `DEPLOYMENT_
 
 ## License
 
-Proprietary - All rights reserved.
+MIT. See [LICENSE](LICENSE).
 
 ---
 Developed by Cameron Ashley / Nexus AI.
