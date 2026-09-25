@@ -50,10 +50,6 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy start script and set permissions before switching to non-root user
-# COPY --chown=nextjs:nodejs start.sh ./
-# RUN chmod +x start.sh
-
 USER nextjs
 
 # Run the standalone server

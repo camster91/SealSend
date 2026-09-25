@@ -43,6 +43,16 @@ test('fresh and upgraded guest schemas support reminder tracking', async () => {
   assert.match(migration, /ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ/);
 });
 
+test('fresh and upgraded schemas create the waitlist signup table', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS waitlist_signups \(/);
+    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan\s+ON waitlist_signups \(LOWER\(email\), plan_interest\)/);
+  }
+});
+
 test('production migration backfills and constrains the send logging contract', async () => {
   const migration = await read('apply-security-indexes.sql');
 
