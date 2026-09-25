@@ -721,6 +721,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
   ON waitlist_signups (LOWER(email), plan_interest);
 
 -- =====================
+-- EVENT PASS SMS ALLOWANCE (credits from purchases, debits per sent segment)
+-- =====================
+
+CREATE TABLE IF NOT EXISTS event_sms_ledger (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  delta_segments INTEGER NOT NULL CHECK (delta_segments <> 0),
+  reason TEXT NOT NULL CHECK (reason IN ('event_pass', 'sms_top_up', 'sms_sent')),
+  reference TEXT UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_event_sms_ledger_event ON event_sms_ledger(event_id);
+
+-- =====================
 -- AUTH CODES FK (after events table exists)
 -- =====================
 

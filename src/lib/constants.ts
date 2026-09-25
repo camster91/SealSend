@@ -174,11 +174,17 @@ export const EVENT_PASS = {
   name: "Event Pass",
   priceCents: 1200,
   guestsPerEvent: 250,
+  smsSegmentsIncluded: 500,
+} as const;
+
+export const SMS_TOP_UP = {
+  segments: 200,
+  priceCents: 500,
 } as const;
 
 export const PUBLIC_PRICING_PLANS = [
   { id: "free", name: "Free", price: 0, period: "", description: "One small event, free", events: "1", guests: "50", features: ["Email invitations", "RSVP tracking", "Guest management", "\"Powered by SealSend\" badge"] },
-  { id: "event_pass", name: "Event Pass", price: EVENT_PASS.priceCents / 100, period: "/event", description: "Everything for one bigger event", events: "1", guests: "250", features: ["Email and SMS invitations", "Guest tags, announcements and sign-up board", "Analytics and up to 3 co-hosts", "No SealSend badge"] },
+  { id: "event_pass", name: "Event Pass", price: EVENT_PASS.priceCents / 100, period: "/event", description: "Everything for one bigger event", events: "1", guests: "250", features: ["Email invitations and 500 SMS segments (top-ups available)", "Guest tags, announcements and sign-up board", "Analytics and up to 3 co-hosts", "No SealSend badge"] },
   { id: "pro_annual", name: "SealSend Pro", price: 124.99, period: "/year", description: "For repeat hosts and event planners", events: "Unlimited", guests: "2,500", features: ["All shipped premium features", "Unlimited events", "2,500 guests per event"], popular: true },
 ] as const;
 

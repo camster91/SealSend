@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { EVENT_PASS } from "@/lib/constants";
+import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
 
 let stripeInstance: Stripe | null = null;
 
@@ -50,6 +50,46 @@ export async function createCheckoutSession({
       description: `${EVENT_PASS.name} for "${eventTitle}"`,
     },
     allow_promotion_codes: true,
+  });
+
+  if (!session.url) {
+    throw new Error("Failed to create checkout session URL");
+  }
+
+  return session.url;
+}
+
+// SMS top-up for an Event Pass event that has used its included segments.
+export async function createSmsTopUpCheckoutSession({
+  eventId,
+  userId,
+  eventTitle,
+}: {
+  eventId: string;
+  userId: string;
+  eventTitle: string;
+}): Promise<string> {
+  const stripe = getStripe();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
+  const metadata = { eventId, userId, kind: "sms_top_up", segments: String(SMS_TOP_UP.segments) };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: `SealSend SMS top-up — "${eventTitle}"`,
+          description: `${SMS_TOP_UP.segments} additional SMS segments for this event.`,
+        },
+        unit_amount: SMS_TOP_UP.priceCents,
+      },
+      quantity: 1,
+    }],
+    metadata,
+    success_url: `${siteUrl}/events/${eventId}?sms_top_up=true`,
+    cancel_url: `${siteUrl}/events/${eventId}`,
+    payment_intent_data: { metadata, description: `SMS top-up for "${eventTitle}"` },
   });
 
   if (!session.url) {

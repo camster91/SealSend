@@ -11,6 +11,10 @@ import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import type { Event, Guest } from "@/types/database";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
+import { canUseFeature, type EventTier } from "@/lib/entitlements";
+import { getUserTier } from "@/lib/subscription";
+import { countSmsSegments } from "@/lib/messages/cost-estimate";
+import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
 
 type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
 type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at" | "phone_invalid_at">;
@@ -54,6 +58,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       [eventId, 'sent']
     );
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
+    // Declared before the guest filter below reads it (it previously threw a
+    // ReferenceError because it was declared after use).
+    const accountPlan = await getUserTier(event.user_id);
+    const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
     const suppressions = await getCommunicationSuppressions(event.user_id);
     const sendableGuests = guests.map((guest) => {
       const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
@@ -70,9 +79,19 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
-    const { BETA_MODE } = await import("@/lib/constants");
-    const smsEnabled = isTwilioConfigured() && (BETA_MODE || event.tier !== "free");
+    const reminderUrl = (guest: ReminderGuest) => guest.invite_token
+      ? `${siteUrl}/e/${event.slug}?t=${guest.invite_token}`
+      : `${siteUrl}/e/${event.slug}`;
+    const smsMetered = smsEnabled && isSmsMetered(accountPlan, event.tier as string);
+    if (smsMetered) {
+      const requiredSegments = sendableGuests.reduce((total, guest) => total + (guest.phone
+        ? countSmsSegments(buildReminderSms({ guestName: guest.name, eventTitle: event.title, eventDate: event.event_date, rsvpUrl: reminderUrl(guest) }))
+        : 0), 0);
+      const decision = decideSmsSend(true, await getSmsBalance(eventId), requiredSegments);
+      if (!decision.allowed) {
+        return NextResponse.json({ error: smsAllowanceMessage(decision), code: "SMS_ALLOWANCE_EXCEEDED" }, { status: 402 });
+      }
+    }
 
     const BATCH_SIZE = 10;
     let sent = 0;
@@ -86,9 +105,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
       const results = await Promise.allSettled(
         batch.map(async (guest) => {
-          const rsvpUrl = guest.invite_token
-            ? `${siteUrl}/e/${event.slug}?t=${guest.invite_token}`
-            : `${siteUrl}/e/${event.slug}`;
+          const rsvpUrl = reminderUrl(guest);
 
           let emailOk = false;
           let smsOk = false;
@@ -160,6 +177,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 });
                 smsOk = true;
+                if (smsMetered) await recordSmsUsage(eventId, countSmsSegments(smsBody), `twilio:${result.sid}`);
 
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,

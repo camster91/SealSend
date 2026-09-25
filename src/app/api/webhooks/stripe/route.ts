@@ -5,6 +5,10 @@ import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { toStoredSubscriptionStatus } from "@/lib/billing";
+import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
+import { grantSmsSegments } from "@/lib/sms-allowance";
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Map legacy tier names to unified names
 const TIER_ALIAS: Record<string, string> = {
@@ -12,8 +16,18 @@ const TIER_ALIAS: Record<string, string> = {
   premium: "gold",
 };
 
+async function handleSmsTopUpCheckout(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
+  const { eventId, userId } = session.metadata || {};
+  if (!eventId || !UUID_PATTERN.test(eventId)) return;
+  // The granted amount comes from server constants, never from metadata.
+  await grantSmsSegments(eventId, SMS_TOP_UP.segments, "sms_top_up", `stripe:${session.id}`);
+  await recordActivationEventSafely({ name: "checkout_completed", userId, eventId, metadata: { plan: "sms_top_up" } });
+}
+
 async function handleEventCheckout(session: Stripe.Checkout.Session) {
   if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
+  if (session.metadata?.kind === "sms_top_up") return handleSmsTopUpCheckout(session);
   const { eventId, tier } = session.metadata || {};
 
   if (!eventId || !tier) return;
@@ -33,6 +47,9 @@ async function handleEventCheckout(session: Stripe.Checkout.Session) {
     'UPDATE events SET tier = $1, max_responses = $2, payment_id = $3 WHERE id = $4',
     [tierKey, maxResponses, session.id, eventId]
   );
+  if (tierKey === "event_pass") {
+    await grantSmsSegments(eventId, EVENT_PASS.smsSegmentsIncluded, "event_pass", `stripe:${session.id}`);
+  }
   const userId = session.metadata?.userId;
   await recordActivationEventSafely({ name: "checkout_completed", userId, eventId, metadata: { plan: tier } });
 }

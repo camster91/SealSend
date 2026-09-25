@@ -52,6 +52,17 @@ test('fresh and upgraded schemas accept the Event Pass tier', async () => {
   assert.match(migration, /ADD CONSTRAINT events_tier_check\s+CHECK \(tier IN \('free', 'event_pass',/);
 });
 
+test('fresh and upgraded schemas create the Event Pass SMS ledger', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS event_sms_ledger \(/);
+    assert.match(sql, /reason TEXT NOT NULL CHECK \(reason IN \('event_pass', 'sms_top_up', 'sms_sent'\)\)/);
+    assert.match(sql, /reference TEXT UNIQUE/);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

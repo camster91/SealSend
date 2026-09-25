@@ -32,7 +32,7 @@ const paidFaqs = [
   {
     question: "What is the difference between an event upgrade and annual Pro?",
     answer:
-      "An Event Pass is a one-time upgrade for a single event: up to 250 guests, SMS, every event feature, and no SealSend badge. Annual Pro covers unlimited events for one year, with up to 2,500 guests per event.",
+      "An Event Pass is a one-time upgrade for a single event: up to 250 guests, 500 SMS segments (add 200 more for $5 if you need them), every event feature, and no SealSend badge. Annual Pro covers unlimited events for one year, with up to 2,500 guests per event.",
   },
   {
     question: "What happens when I hit my event or guest limit?",

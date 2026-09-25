@@ -507,3 +507,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_tier_check;
 ALTER TABLE events ADD CONSTRAINT events_tier_check
   CHECK (tier IN ('free', 'event_pass', 'silver', 'gold', 'platinum', 'diamond', 'standard', 'premium'));
+-- Event Pass SMS allowance ledger: purchases credit segments, each sent SMS debits them.
+CREATE TABLE IF NOT EXISTS event_sms_ledger (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  delta_segments INTEGER NOT NULL CHECK (delta_segments <> 0),
+  reason TEXT NOT NULL CHECK (reason IN ('event_pass', 'sms_top_up', 'sms_sent')),
+  reference TEXT UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_event_sms_ledger_event ON event_sms_ledger(event_id);

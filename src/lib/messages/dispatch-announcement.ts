@@ -7,10 +7,13 @@ import { getTwilioClient, getTwilioSendOptions, isTwilioConfigured } from "@/lib
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
+import { countSmsSegments } from "@/lib/messages/cost-estimate";
+import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
+import { getUserTier } from "@/lib/subscription";
 
 type Announcement = {
   id: string; event_id: string; subject: string; message: string; audience: unknown; channels: string[];
-  title: string; slug: string; user_id: string;
+  title: string; slug: string; user_id: string; tier: string;
 };
 type Recipient = { id: string; name: string; email: string | null; phone: string | null; phone_invalid_at: string | null; invite_token: string | null };
 type Delivery = { id: string; guest_id: string; channel: "email" | "sms"; recipient: string; name: string; invite_token: string | null };
@@ -22,7 +25,7 @@ export async function dispatchAnnouncement(announcementId: string) {
   try {
     await client.query("BEGIN");
     const claimed = await client.query<Announcement>(
-      `SELECT a.id, a.event_id, a.subject, a.message, a.audience, a.channels, e.title, e.slug, e.user_id
+      `SELECT a.id, a.event_id, a.subject, a.message, a.audience, a.channels, e.title, e.slug, e.user_id, e.tier
        FROM event_announcements a JOIN events e ON e.id = a.event_id
        WHERE a.id = $1 AND a.status = 'queued' AND a.approved_at IS NOT NULL AND a.scheduled_at <= NOW()
        FOR UPDATE`, [announcementId],
@@ -57,6 +60,9 @@ export async function dispatchAnnouncement(announcementId: string) {
   );
   let sent = 0;
   let failed = 0;
+  const smsMetered = deliveries.some((delivery) => delivery.channel === "sms")
+    && isSmsMetered(await getUserTier(announcement.user_id), announcement.tier);
+  let smsBalance = smsMetered ? await getSmsBalance(announcement.event_id) : Number.POSITIVE_INFINITY;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
   for (const delivery of deliveries) {
     if (delivery.channel === "email" && isCommunicationSuppressed(suppressions, "email", delivery.recipient)) {
@@ -86,7 +92,16 @@ export async function dispatchAnnouncement(announcementId: string) {
         }
         assertApprovedRecipient(phone.formatted);
         const body = buildAnnouncementSms({ guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, message: announcement.message, rsvpUrl });
-        providerMessageId = (await getTwilioClient().messages.create({ body, to: phone.formatted, ...getTwilioSendOptions() })).sid;
+        const segments = countSmsSegments(body);
+        if (segments > smsBalance) throw new Error("SMS allowance used up for this event");
+        smsBalance -= segments;
+        try {
+          providerMessageId = (await getTwilioClient().messages.create({ body, to: phone.formatted, ...getTwilioSendOptions() })).sid;
+        } catch (error) {
+          smsBalance += segments;
+          throw error;
+        }
+        if (smsMetered) await recordSmsUsage(announcement.event_id, segments, `twilio:${providerMessageId}`);
       }
       await query("UPDATE announcement_deliveries SET status = 'accepted', provider_message_id = $2, error = NULL, updated_at = NOW() WHERE id = $1", [delivery.id, providerMessageId]);
       sent++;
