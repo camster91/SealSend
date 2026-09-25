@@ -2,171 +2,114 @@
 
 ## What is SealSend?
 
-SealSend is a modern digital invitation and RSVP management platform (competitor to Evite, 50% cheaper pricing). Users create beautiful event invitations, send them via email/SMS, and manage guest RSVPs with tracking and analytics. Live at https://sealsend.app.
+SealSend is a digital invitation and RSVP platform. Hosts create event invitations, send them by email or SMS, and track guest responses. Live at https://sealsend.app.
+
+**Current state:** controlled beta. `BETA_MODE = true` in `src/lib/constants.ts` hides paid checkout and gives every account the beta entitlement (one active event, up to 100 guests). Payments and outbound messages stay test-only (`PAYMENTS_TEST_ONLY`, `COMMUNICATIONS_TEST_ONLY`) until the launch gates pass. See `DEPLOYMENT_READINESS.md` and `docs/launch-operations.md` before changing any of this.
 
 ## Tech Stack
 
-- **Framework**: Next.js 16.1.6 (App Router) with React 19, TypeScript 5
-- **Styling**: Tailwind CSS 4 with custom design tokens in `globals.css`
-- **Database**: PostgreSQL via `pg` (raw SQL, no ORM)
-- **Auth**: Custom JWT sessions with email/SMS OTP (6-digit codes) + password login for admins
-- **Email**: Mailgun
-- **SMS**: Twilio with phone validation via `libphonenumber-js`
-- **Payments**: Stripe (per-event checkout + subscription billing)
-- **Animations**: Framer Motion
-- **Forms**: React Hook Form + Zod validation
-- **Images**: Sharp for optimization, QR code generation
+- **Framework**: Next.js 16 (App Router), React 19, TypeScript 5 (strict)
+- **Styling**: Tailwind CSS 4, design tokens in `src/app/globals.css`
+- **Database**: PostgreSQL 16 via `pg` (raw SQL, no ORM)
+- **Auth**: Custom database-backed sessions; email/SMS OTP for hosts, password login for admins
+- **Email / SMS**: Mailgun / Twilio (`libphonenumber-js` for phone validation)
+- **Payments**: Stripe
+- **Other**: Framer Motion, React Hook Form + Zod, Sharp, QR code generation
 
 ## Commands
 
 ```bash
-npm run dev          # Start dev server
-npm run build        # Production build (use this to verify changes)
-npm run lint         # ESLint (currently 0 errors, ~50 warnings)
-npm run test:email   # Test email sending
-npm run test:sms     # Test SMS sending
-npm run test:all     # Run all tests
-npm run create-admin # Create admin user via CLI
+npm run dev            # Dev server
+npm run build          # Production build
+npm run typecheck      # tsc for app and scripts
+npm run lint           # ESLint, --max-warnings=0 (any warning fails)
+npm test               # Unit/readiness tests (node --test; files are listed explicitly in package.json)
+npm run test:e2e       # Playwright (5 browser projects, tests/e2e)
+npm run quality:score  # Evidence-bounded release scorecard
+npm run launch:decision
+npm run create-admin   # Create an admin user
 ```
+
+Before pushing, run `typecheck`, `lint`, `test` and `build` — CI (`.github/workflows/ci.yml`) runs the same checks. When adding a unit test file, also add it to the `test` script in `package.json` or it will not run.
 
 ## Project Structure
 
 ```
 src/
   app/
-    (marketing)/          # Public pages: homepage, pricing, how-it-works, use-cases, terms, privacy
-    (auth)/               # Auth pages: login, signup, forgot-password
-    (dashboard)/          # Protected pages: dashboard, events/[eventId]/*, settings
-    api/                  # API routes (~25 endpoints)
-      auth/               # send-code, verify-code, login-password, logout, change-password
-      events/             # CRUD, send-invites, responses, guests, comments, signups, QR
-      checkout/           # Per-event Stripe checkout (silver/gold/platinum/diamond)
-      subscriptions/      # Subscription-based Stripe checkout (pro/business)
-      webhooks/           # Stripe and Twilio callbacks
-      cron/               # send-reminders, cleanup-drafts
-    e/[slug]/             # Public event invitation pages
-  components/
-    ui/                   # Reusable primitives: Button, Card, Input, etc.
-    auth/                 # Login/signup forms
-    marketing/            # Hero, Features, Testimonials, CTA sections
-    dashboard/            # Event management, stats, actions
-    events/wizard/        # Multi-step event creation wizard
-    public-event/         # Public invitation page components
-    pricing/              # Pricing cards, comparison, FAQ
-    features/             # FeatureGate (tier-based access control), UpgradePrompt
-    responses/            # RSVP tracking components
-    guests/               # Guest list, CSV import
+    (marketing)/  (auth)/  (dashboard)/   # Route groups
+    e/[slug]/  invite/  guest/  team/      # Public event, invite, guest and co-host pages
+    api/                                  # ~64 route handlers
+      auth/        send-code, verify-code, login-password, logout, change-password
+      events/      CRUD plus guests, responses, announcements, members, check-in, publish, clone, ...
+      rsvp/ comments/ signups/ calendar/ guest-qr/   # Public, slug/token-scoped endpoints
+      checkout/ subscriptions/                       # Stripe checkout
+      webhooks/    stripe, twilio, mailgun           # Signature-verified
+      cron/        send-reminders, send-announcements, send-host-lifecycle,
+                   cleanup-drafts, cleanup-uploads, delete-accounts
+      operations/ monitoring/ health/                # Ops endpoints (secret-protected except health)
+      ai/ beta/ account/ upload/ uploads/ waitlist/ feedback/ team-invites/
+  components/     ui/ auth/ dashboard/ events/ guests/ responses/ public-event/
+                  pricing/ marketing/ features/ team/ layout/
   lib/
-    auth/                 # Session management, client-auth helpers, auth-service
-    db/                   # PostgreSQL client (client.ts), schema (schema.sql)
-    email-templates.ts    # HTML email builder
-    sms-templates.ts      # SMS message builder
-    stripe.ts             # Stripe checkout session creation
-    subscription.ts       # getUserTier, getTierLimits
-    constants.ts          # BETA_MODE, FEATURE_FLAGS, SUBSCRIPTION_TIERS, TIERS
-    password.ts           # bcrypt hash/verify, strength checker
-    phone-validation.ts   # Phone formatting/validation
-    rate-limit.ts         # Rate limiting utility
-    sanitize.ts           # Input sanitization
-    validations.ts        # Zod schemas for API validation
-  types/
-    database.ts           # TypeScript interfaces for all DB tables
-  middleware.ts           # Auth middleware (route protection)
+    auth/         session, api-auth, event-api-access, event-access, auth-service
+    db/           client.ts, schema.sql (fresh schema), waitlist.sql
+    ai/ messages/ monitoring/ analytics/
+    constants.ts  BETA_MODE, FEATURE_FLAGS, tiers and pricing plans
+    entitlements.ts, billing.ts, subscription.ts
+    beta-*.ts     Controlled-beta enrollment, metrics and acceptance logic
+  proxy.ts        Next 16 proxy (formerly middleware): CSRF origin check + route protection
+tests/            Unit/readiness tests (node:test), e2e/ (Playwright), fixtures/
+scripts/          Admin/beta CLIs, release/ (launch decision, scorecard), load/, test/
+ops/              Backup, health, maintenance and release-rehearsal scripts for the VPS
+config/           Launch evidence, quality scorecard, beta acceptance policy
+docs/             Launch operations, evidence register, policy decisions
 ```
 
-## Key Architectural Patterns
+## Key Patterns
 
-### Authentication
-- **Regular users**: Email/SMS OTP (no passwords). Code sent via `/api/auth/send-code`, verified via `/api/auth/verify-code`.
-- **Admin users**: Password-based login via `/api/auth/login-password`. Stored in separate `admin_users` table.
-- **Sessions**: `sealsend_session` (httpOnly cookie) + `sealsend_user` (non-httpOnly for client reads). 7-day expiry.
-- **Client auth**: Use `getClientUser()` from `@/lib/auth/client-auth` to read user info client-side.
-- **Server auth**: Use `getCurrentUser()` from `@/lib/auth/session` or `getApiUser()` from `@/lib/auth/api-auth`.
+### Authentication and authorization
+- Hosts sign in with a 6-digit email/SMS code (`/api/auth/send-code` → `/api/auth/verify-code`). Admins use `/api/auth/login-password` (`admin_users` table).
+- Cookies: `sealsend_session` (httpOnly, authoritative) and `sealsend_user` (client-readable display data only — never trust it for authorization).
+- In API routes:
+  - `requireApiHost()` from `@/lib/auth/api-auth` for any signed-in host.
+  - `requireEventPermission(eventId, permission)` from `@/lib/auth/event-api-access` for anything scoped to an event. It handles owner and co-host roles; use it rather than hand-rolled ownership checks.
+  - Both return `{ error }` or `{ user }`; return `auth.error` early.
+- Server components: `getCurrentUser()` from `@/lib/auth/session`. Client: `getClientUser()` from `@/lib/auth/client-auth`.
+- `src/proxy.ts` rejects state-changing `/api/*` requests without a same-origin `Origin`/`Referer`, except `/api/webhooks/*` and `/api/cron/*`.
+- Cron routes require `Authorization: Bearer $CRON_SECRET`; operations routes use `OPERATIONS_SECRET`.
 
 ### Database
-- Raw SQL queries via `query()` and `queryOne()` from `@/lib/db/client`.
-- Schema defined in `src/lib/db/schema.sql` (canonical) and `supabase/migrations/` (incremental).
-- Key tables: `events`, `guests`, `rsvp_responses`, `rsvp_fields`, `send_logs`, `admin_users`, `user_sessions`, `user_subscriptions`, `auth_codes`.
+- Use `query()` / `queryOne()` from `@/lib/db/client` with parameterized SQL only.
+- `src/lib/db/schema.sql` is the schema for a fresh database (also used by e2e setup and `ops/rehearse-retention.sh`). `src/lib/db/waitlist.sql` creates `waitlist_signups`, which is not yet in `schema.sql` or the upgrade migration and has to be applied separately.
+- `apply-security-indexes.sql` (repo root) is the idempotent upgrade migration applied to production with `psql -v ON_ERROR_STOP=1`. `tests/readiness.test.mjs` asserts on its contents, so schema changes usually touch both files plus that test.
+- Write migrations with `IF NOT EXISTS` / `IF EXISTS` so they can run twice.
 
-### Tier System
-Two parallel pricing models:
-1. **Per-event tiers** (one-time payment): `free` -> `silver` ($8.99) -> `gold` ($17.99) -> `platinum` ($34.99) -> `diamond` ($49.99). Stored in `events.tier`.
-2. **User subscriptions** (recurring): `free` -> `pro` (Silver, $8.99/mo) -> `business` (Gold, $17.99/mo). Stored in `user_subscriptions.tier`.
+### Tiers and entitlements
+- Per-event tiers (`events.tier`): `free`, `silver`, `gold`, `platinum`, `diamond`. Legacy `standard`/`premium` are still accepted and map to silver/gold limits.
+- Recurring plans: Pro annual (`PRO_ANNUAL`) plus `SUBSCRIPTION_TIERS` in `constants.ts`.
+- Resolve limits and features through `src/lib/entitlements.ts` (`getEffectiveEventLimits`, `canUseFeature`, `getTeamMemberLimit`), passing the account plan from `getUserTier()` in `src/lib/subscription.ts`. That returns `"beta"` while `BETA_MODE` is on, so don't read tier constants directly.
+- `FeatureGate` (`src/components/features/FeatureGate.tsx`) gates UI by tier.
 
-Legacy tier names `standard`/`premium` are mapped to `silver`/`gold` for backwards compatibility.
+### Feature flags (`FEATURE_FLAGS` in `constants.ts`)
+`subscriptions`, `teams` (co-host roles), `templates`, `analytics` are on; `aiAssistant` is off. AI event/announcement drafting lives in `src/lib/ai` and `/api/ai/*`, configured by `AI_PROVIDER`/`AI_MODEL`.
 
-### Feature Flags
-In `src/lib/constants.ts`:
-- `BETA_MODE`: When true, all features free (currently `false`)
-- `FEATURE_FLAGS.subscriptions`: Subscription billing enabled (`true`)
-- `FEATURE_FLAGS.analytics`: Advanced analytics enabled (`true`)
-- `FEATURE_FLAGS.teams/templates/aiAssistant`: Not yet implemented (`false`)
+## Conventions
 
-### Feature Gating
-`FeatureGate` component (`src/components/features/FeatureGate.tsx`) wraps features behind subscription tiers. Modes: `overlay`, `banner`, `hide`. All gates bypass when `BETA_MODE` is true.
+- Validate API input with Zod (`src/lib/validations.ts` and per-feature schemas).
+- Rate-limit sensitive endpoints with `rateLimit()` from `@/lib/rate-limit`.
+- Icons from `lucide-react`; `cn()` from `@/lib/utils` for class merging.
+- Client components need `"use client"`; wrap `useSearchParams()` in `<Suspense>`.
+- UI primitives in `src/components/ui/` use `forwardRef` and extend native element props.
+- Conventional commit messages (`feat:`, `fix:`, `chore:`, `docs:`).
 
-### Stripe Integration
-- Per-event checkout: `/api/checkout` -> `createCheckoutSession()` in `lib/stripe.ts`
-- Subscription checkout: `/api/subscriptions/checkout` -> Stripe subscription session
-- Webhooks: `/api/webhooks/stripe` handles `checkout.session.completed`, `subscription.updated/deleted`, `invoice.payment_failed`
+## Environment
 
-## Environment Variables
-
-Required (see `.env.example` for full list):
-- `DATABASE_URL` - PostgreSQL connection string
-- `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL` - Email sending
-- `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET`, `TWILIO_MESSAGING_SERVICE_SID` - SMS
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` - Payments
-- `CRON_SECRET` - Cron job authentication (Bearer token)
-- `NEXT_PUBLIC_SITE_URL` - Base URL (e.g., https://sealsend.app)
-
-## Development Conventions
-
-### Code Style
-- TypeScript strict mode
-- Tailwind CSS for styling (no CSS modules)
-- Lucide React for icons
-- `cn()` utility from `@/lib/utils` for conditional class merging
-- Zod for API request validation
-- No ORMs - raw SQL with parameterized queries only
-
-### API Routes
-- Always validate with Zod schemas
-- Use `getApiUser()` for authentication
-- Return JSON responses with appropriate status codes
-- Rate limit sensitive endpoints with `rateLimit()` from `@/lib/rate-limit`
-
-### Components
-- Client components: `"use client"` directive at top
-- Server components: default (no directive needed)
-- UI primitives in `src/components/ui/` extend HTML element attributes via `forwardRef`
-- `useSearchParams()` must be wrapped in `<Suspense>` boundary
-
-### Database Migrations
-- Files in `supabase/migrations/` ordered by timestamp prefix
-- Use `IF NOT EXISTS` / `IF EXISTS` for idempotency
-- CHECK constraints on tier columns: events allows `free/silver/gold/platinum/diamond/standard/premium`
-
-### Git Conventions
-- Branch: `claude/finish-app-HDak6` for current development
-- Commit messages: conventional commits (`feat:`, `fix:`, `chore:`)
-- Build must pass (`npm run build`) before pushing
+See `.env.example` for the full list. Core: `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `SESSION_SECRET`, Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL`, `MAILGUN_WEBHOOK_SIGNING_KEY`), Twilio (`TWILIO_*`), Stripe (`STRIPE_*`), `CRON_SECRET`, `OPERATIONS_SECRET`, and the safety switches `PAYMENTS_TEST_ONLY` / `COMMUNICATIONS_TEST_ONLY`.
 
 ## Deployment
 
-- **Hosting**: Docker on Coolify (VPS)
-- **Build**: `Dockerfile` + `docker-compose.yaml` for local dev
-- **Database**: Self-hosted PostgreSQL (migrated from Supabase)
-- **Cron**: External service calls `/api/cron/*` endpoints with `Authorization: Bearer {CRON_SECRET}`
-
-## Known Limitations
-
-- Teams/collaboration features: defined in schema but not implemented in UI
-- Template gallery: feature flag disabled, not built
-- AI design assistant: feature flag disabled, not built
-- Social login (Google OAuth): not implemented
-- Use-case page images (`public/use-cases/*.jpg`) don't exist yet
-- `console.log` statements remain in cron/webhook handlers (intentional for debugging)
+Docker image (`Dockerfile`, Next standalone output) on a Hostinger VPS behind Coolify, with PostgreSQL 16 in its own container. Current production details, release steps and rollback targets are in `DEPLOYMENT_READINESS.md`; operational scripts are in `ops/`. An external scheduler calls the `/api/cron/*` endpoints.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
