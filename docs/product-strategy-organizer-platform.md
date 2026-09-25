@@ -1,10 +1,10 @@
 # SealSend product strategy: one-off hosts and the organizer platform
 
-Status: **Draft for owner review.** Nothing here is approved or scheduled.
+Status: **Direction accepted by the owner on 2026-09-25** (the recommendations below, except D4 prices and the D6 licence, which stay open). Phases 0–2 are in progress.
 
 Drafted: 2026-09-25
 
-Owner decisions are marked **DECISION** and collected in [Open decisions](#open-decisions).
+Owner decisions are marked **DECISION** and collected in [Open decisions](#decisions).
 
 ## 1. The two products
 
@@ -201,14 +201,14 @@ Migration: create a personal organization for every existing user, then backfill
 - Organizer: paying orgs, events per org per month, seats per org, and 3-month retention.
 - Leading indicator: organizers who create a second client event within 30 days.
 
-## Open decisions
+## Decisions
 
-| # | Decision | Recommendation |
+| # | Decision | Status |
 |---|---|---|
-| D1 | Which audience does the next beta cohort target: recurring-community hosts (current approved wedge) or event organizers? | Finish the current cohort for evidence, then recruit an organizer cohort for Phases 1–2 |
-| D2 | One-off pricing: keep four per-event tiers, or Free + one Event Pass + SMS top-ups? | Free + Event Pass + top-ups |
-| D3 | What happens to `pro_annual` (USD 124.99/year)? | Becomes annual Solo, or is retired |
-| D4 | Organizer plan prices and seat counts | Validate with 5–10 organizer interviews first |
-| D5 | Build business tooling (proposals, invoices, payments) or integrate first? | Integrate first (API, webhooks, Zapier), then Stripe Invoicing/Connect if demanded |
-| D6 | Licence now that the repo is public | Decide before Phase 1 ships: AGPL or open-core if the platform is the business |
-| D7 | Custom domains and branded email: which plan tier? | Studio and above |
+| D1 | Next beta cohort audience | **Accepted:** finish the current recurring-community cohort for evidence, then recruit an organizer cohort for Phases 1–2 |
+| D2 | One-off pricing | **Accepted:** Free + one Event Pass + SMS top-ups |
+| D3 | `pro_annual` (USD 124.99/year) | **Accepted:** becomes the annual price of the organizer Solo plan |
+| D4 | Organizer plan prices and seat counts | **Open:** validate with 5–10 organizer interviews first |
+| D5 | Build business tooling or integrate first | **Accepted:** integrate first (API, webhooks, Zapier), then Stripe Invoicing/Connect if demanded |
+| D6 | Licence now that the repo is public | **Open, owner must choose explicitly:** keep MIT, switch the server to AGPL, or open-core. Decide before organizer features ship to production. |
+| D7 | Custom domains and branded email tier | **Accepted:** Studio and above |
