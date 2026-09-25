@@ -597,3 +597,18 @@ CREATE TABLE IF NOT EXISTS brands (
 -- One default brand per workspace; events use it unless they pick another.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_default_per_organization ON brands(organization_id) WHERE is_default;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands(id) ON DELETE SET NULL;
+-- Workspace invites: hashed one-time tokens for joining a team workspace.
+CREATE TABLE IF NOT EXISTS organization_invites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'planner', 'check_in')),
+  token_hash TEXT UNIQUE NOT NULL,
+  token_preview TEXT NOT NULL,
+  invited_by UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ,
+  accepted_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_organization_invites_pending ON organization_invites(organization_id) WHERE accepted_at IS NULL;

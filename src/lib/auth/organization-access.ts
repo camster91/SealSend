@@ -17,6 +17,32 @@ export function organizationRoleCan(role: string, permission: OrganizationPermis
     && ORGANIZATION_PERMISSIONS[role as OrganizationRole].has(permission);
 }
 
+/**
+ * Members per workspace, including the owner. Placeholders until organizer
+ * plan prices and seats are decided (strategy doc decision D4); "personal"
+ * is the unpaid plan for both personal and team workspaces.
+ */
+export const ORGANIZATION_SEAT_LIMITS: Record<string, number> = {
+  personal: 2,
+  solo: 2,
+  studio: 5,
+  agency: 25,
+};
+
+export function organizationSeatLimit(plan: string): number {
+  return ORGANIZATION_SEAT_LIMITS[plan] ?? ORGANIZATION_SEAT_LIMITS.personal;
+}
+
+/** Roles an invite may grant; ownership is never handed out by invitation. */
+export const INVITABLE_ORGANIZATION_ROLES = ["admin", "planner", "check_in"] as const;
+
+/** Admins manage planners and check-in staff; only owners manage owners and admins. */
+export function canManageMemberRole(actorRole: string, targetRole: string): boolean {
+  if (actorRole === "owner") return true;
+  if (actorRole === "admin") return targetRole === "planner" || targetRole === "check_in";
+  return false;
+}
+
 export type OrganizationSummary = {
   id: string;
   name: string;

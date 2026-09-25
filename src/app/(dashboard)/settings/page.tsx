@@ -168,6 +168,16 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Team</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Create a team workspace and invite planners and check-in staff to work on your events.</p>
+            <Link href="/settings/team" className="inline-flex font-medium text-brand-700 hover:underline">Manage team →</Link>
+          </CardContent>
+        </Card>
+
         {role === "admin" && (
           <Card>
             <CardHeader>

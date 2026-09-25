@@ -90,6 +90,17 @@ test('fresh and upgraded schemas create the workspace brand kit', async () => {
   }
 });
 
+test('fresh and upgraded schemas store workspace invites as hashed one-time tokens', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_invites \(/);
+    assert.match(sql, /role TEXT NOT NULL CHECK \(role IN \('admin', 'planner', 'check_in'\)\)/);
+    assert.match(sql, /token_hash TEXT UNIQUE NOT NULL/);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

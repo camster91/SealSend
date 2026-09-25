@@ -106,3 +106,18 @@ test("only workspace owners and admins can change the brand or members", () => {
   assert.equal(organizationRoleCan("check_in", "manage_clients"), false);
   assert.equal(organizationRoleCan("superuser", "view_organization"), false);
 });
+
+test("admins manage planners and check-in staff; only owners manage owners and admins", async () => {
+  const { canManageMemberRole, organizationSeatLimit, INVITABLE_ORGANIZATION_ROLES } = await import("../src/lib/auth/organization-access");
+  assert.equal(canManageMemberRole("owner", "owner"), true);
+  assert.equal(canManageMemberRole("owner", "admin"), true);
+  assert.equal(canManageMemberRole("admin", "planner"), true);
+  assert.equal(canManageMemberRole("admin", "check_in"), true);
+  assert.equal(canManageMemberRole("admin", "admin"), false);
+  assert.equal(canManageMemberRole("admin", "owner"), false);
+  assert.equal(canManageMemberRole("planner", "check_in"), false);
+  assert.deepEqual([...INVITABLE_ORGANIZATION_ROLES], ["admin", "planner", "check_in"]);
+  assert.equal(organizationSeatLimit("personal"), 2);
+  assert.equal(organizationSeatLimit("studio"), 5);
+  assert.equal(organizationSeatLimit("unknown-plan"), 2);
+});
