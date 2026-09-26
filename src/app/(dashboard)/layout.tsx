@@ -1,6 +1,7 @@
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,9 @@ export default function DashboardLayout({
         <DashboardHeader />
         <main id="main-content" className="flex-1 overflow-y-auto bg-neutral-50 p-4 pb-20 sm:p-6 md:pb-6">
           {children}
+          <p className="mt-10 text-center">
+            <SourceCodeLink />
+          </p>
         </main>
       </div>
 

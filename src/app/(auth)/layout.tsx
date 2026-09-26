@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
 
 export default function AuthLayout({
   children,
@@ -18,6 +19,9 @@ export default function AuthLayout({
       <div className="w-full max-w-md rounded-xl border border-border bg-white p-8 shadow-sm">
         {children}
       </div>
+      <p className="mt-6">
+        <SourceCodeLink />
+      </p>
     </main>
   );
 }

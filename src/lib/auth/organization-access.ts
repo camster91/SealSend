@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
 import { requireApiHost, type AuthenticatedUser } from "@/lib/auth/api-auth";
 import { ORGANIZATION_ROLES, type OrganizationRole } from "@/lib/auth/event-access";
+import { ORGANIZER_PLANS } from "@/lib/constants";
 
 export type OrganizationPermission = "view_organization" | "manage_brand" | "manage_members" | "manage_clients";
 
@@ -18,15 +19,15 @@ export function organizationRoleCan(role: string, permission: OrganizationPermis
 }
 
 /**
- * Members per workspace, including the owner. Placeholders until organizer
- * plan prices and seats are decided (strategy doc decision D4); "personal"
- * is the unpaid plan for both personal and team workspaces.
+ * Members per workspace, including the owner. Organizer plan seats come from
+ * ORGANIZER_PLANS; "personal" is the unpaid plan for both personal and team
+ * workspaces.
  */
 export const ORGANIZATION_SEAT_LIMITS: Record<string, number> = {
   personal: 2,
-  solo: 2,
-  studio: 5,
-  agency: 25,
+  solo: ORGANIZER_PLANS.solo.seats,
+  studio: ORGANIZER_PLANS.studio.seats,
+  agency: ORGANIZER_PLANS.agency.seats,
 };
 
 export function organizationSeatLimit(plan: string): number {

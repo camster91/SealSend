@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
 
 export function Footer() {
   return (
@@ -115,6 +116,9 @@ export function Footer() {
                 <a href="mailto:support@sealsend.app" className="text-sm text-muted-foreground hover:text-foreground">
                   support@sealsend.app
                 </a>
+              </li>
+              <li>
+                <SourceCodeLink className="text-sm text-muted-foreground hover:text-foreground" />
               </li>
             </ul>
           </div>

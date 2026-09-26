@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { queryOne } from "@/lib/db/client";
 import { sanitizeFontFamily, sanitizeUrl } from "@/lib/sanitize";
+import { ORGANIZER_PLANS } from "@/lib/constants";
 import { DEFAULT_SMS_SIGNATURE } from "@/lib/sms-templates";
 import type { EmailBrand } from "@/lib/email-templates";
 
@@ -31,11 +32,11 @@ export type EventBranding = {
   whiteLabel: boolean;
 };
 
-const ORGANIZER_PLANS = new Set(["solo", "studio", "agency"]);
+const WHITE_LABEL_PLANS: ReadonlySet<string> = new Set(Object.keys(ORGANIZER_PLANS));
 
 /** Only paid organizer workspaces may hide SealSend entirely. */
 export function canWhiteLabel(organizationPlan: string | null | undefined): boolean {
-  return Boolean(organizationPlan && ORGANIZER_PLANS.has(organizationPlan));
+  return Boolean(organizationPlan && WHITE_LABEL_PLANS.has(organizationPlan));
 }
 
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Use a 6-digit hex colour like #7c3aed");
