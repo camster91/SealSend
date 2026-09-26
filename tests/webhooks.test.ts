@@ -13,11 +13,12 @@ import {
   webhookUrlProblem,
 } from "../src/lib/webhooks";
 
-test("webhooks are an organizer-plan feature", () => {
-  assert.equal(canUseWebhooks("solo"), true);
-  assert.equal(canUseWebhooks("agency"), true);
-  assert.equal(canUseWebhooks("personal"), false);
-  assert.equal(canUseWebhooks(null), false);
+test("webhooks are an organizer-plan feature, open to every workspace during the beta", () => {
+  assert.equal(canUseWebhooks("solo", false), true);
+  assert.equal(canUseWebhooks("agency", false), true);
+  assert.equal(canUseWebhooks("personal", false), false);
+  assert.equal(canUseWebhooks(null, false), false);
+  assert.equal(canUseWebhooks("personal", true), true);
 });
 
 test("signatures verify, and tampering, wrong secrets and stale timestamps fail", () => {

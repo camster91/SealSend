@@ -2,7 +2,7 @@
 
 SealSend can POST a signed JSON message to your URL when something happens on one of your workspace's events. Use it to push RSVPs into a CRM or spreadsheet with Zapier or Make ("Webhooks by Zapier → Catch Hook", "Make → Custom webhook"), or to your own server.
 
-Webhooks are an organizer-plan feature (Solo, Studio, Agency). Workspace owners and admins manage them in **Settings → Integrations**.
+Webhooks are an organizer-plan feature (Solo, Studio, Agency). During the controlled beta (`BETA_MODE`) every workspace can use them. Workspace owners and admins manage them in **Settings → Integrations**.
 
 ## Events
 

@@ -96,7 +96,7 @@ Why: it keeps the free tier generous enough to spread, covers SMS (the only real
 - Later: a small platform fee (e.g. 1%) on client payments processed through Stripe Connect.
 - The existing `pro_annual` (USD 124.99/year) becomes either the annual Solo price or is retired. **DECISION D3.**
 
-These prices were accepted as starting points (D4), not researched market rates. Note for D3: USD 124.99/year is 64% below twelve months of Solo (USD 348), so revisit the annual Solo price (for example USD 290, two months free) before selling it. Confirm them with 5–10 organizer interviews and a competitor check before publishing.
+These prices were accepted as starting points (D4), not researched market rates. Solo is USD 290/year billed annually (D3, revised). Confirm them with 5–10 organizer interviews and a competitor check before publishing.
 
 ## 4. Organizer platform: phased roadmap
 
@@ -209,7 +209,7 @@ Migration: create a personal organization for every existing user, then backfill
 |---|---|---|
 | D1 | Next beta cohort audience | **Accepted:** finish the current recurring-community cohort for evidence, then recruit an organizer cohort for Phases 1–2 |
 | D2 | One-off pricing | **Accepted:** Free + one Event Pass + SMS top-ups |
-| D3 | `pro_annual` (USD 124.99/year) | **Accepted:** becomes the annual price of the organizer Solo plan |
+| D3 | `pro_annual` (USD 124.99/year) | **Revised 2026-09-26:** the Solo annual price is USD 290/year (two months free, `ORGANIZER_PLANS.solo.annualPriceCents`). The existing USD 124.99 Pro annual plan stays as it is for current buyers until organizer checkout replaces it. |
 | D4 | Organizer plan prices and seat counts | **Accepted (low end of the ranges):** Solo USD 29/mo with 2 seats, Studio USD 79/mo with 5 seats, Agency USD 199/mo with 25 seats (`ORGANIZER_PLANS` in `src/lib/constants.ts`). Still validate with organizer interviews before selling. |
 | D5 | Build business tooling or integrate first | **Accepted:** integrate first (API, webhooks, Zapier), then Stripe Invoicing/Connect if demanded |
 | D6 | Licence now that the repo is public | **Accepted: AGPL-3.0-only** for the whole repo from 2026-09-26. Earlier MIT releases stay MIT. |
