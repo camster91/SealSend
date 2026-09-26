@@ -131,7 +131,8 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
   assert.match(route, /Bearer \$\{cronSecret\}/);
   assert.match(route, /deliverDueWebhooks/);
   assert.match(lib, /lookup: publicOnlyLookup/);
-  assert.match(lib, /FOR UPDATE SKIP LOCKED/);
+  assert.match(lib, /FOR UPDATE OF pending SKIP LOCKED/);
+  assert.match(lib, /JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active/);
   assert.doesNotMatch(lib, /\bfetch\(/);
 });
 
@@ -744,6 +745,8 @@ test('operations scripts schedule authenticated maintenance without exposing sec
   assert.doesNotMatch(cron, /echo.*CRON_SECRET|set -x/);
   assert.match(cronDefinition, /run-maintenance\.sh reminders/);
   assert.match(cronDefinition, /run-maintenance\.sh cleanup/);
+  assert.match(cron, /webhooks\) endpoint="\/api\/cron\/deliver-webhooks"/);
+  assert.match(cronDefinition, /^\* \* \* \* \* root \/opt\/sealsend\/bin\/run-maintenance\.sh webhooks/m);
 });
 
 test('load and recovery gates are bounded, read-only, and isolated from production data', async () => {

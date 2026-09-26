@@ -46,7 +46,11 @@ test("private, loopback and link-local addresses are refused", () => {
   for (const address of ["127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "224.0.0.1", "::1", "::", "fd00::1", "fe80::1", "::ffff:10.0.0.1"]) {
     assert.equal(isPrivateAddress(address), true, address);
   }
-  for (const address of ["8.8.8.8", "172.32.0.1", "1.1.1.1", "2606:4700:4700::1111", "::ffff:8.8.8.8"]) {
+  // The URL parser rewrites [::ffff:10.0.0.1] to [::ffff:a00:1], so every notation must be caught.
+  for (const address of ["::ffff:a00:1", "::ffff:7f00:1", "0:0:0:0:0:ffff:a9fe:a9fe", "::a00:1", "64:ff9b::a00:1", "64:ff9b::10.0.0.1", "::ffff:0:1"]) {
+    assert.equal(isPrivateAddress(address), true, address);
+  }
+  for (const address of ["8.8.8.8", "172.32.0.1", "1.1.1.1", "2606:4700:4700::1111", "::ffff:8.8.8.8", "::ffff:808:808", "64:ff9b::808:808"]) {
     assert.equal(isPrivateAddress(address), false, address);
   }
 });
@@ -57,6 +61,9 @@ test("endpoint URLs must be public https", () => {
   assert.equal(webhookUrlProblem("https://localhost/hook"), "The URL must be publicly reachable");
   assert.equal(webhookUrlProblem("https://127.0.0.1/hook"), "The URL must be publicly reachable");
   assert.equal(webhookUrlProblem("https://[::1]/hook"), "The URL must be publicly reachable");
+  assert.equal(webhookUrlProblem("https://[::ffff:10.0.0.1]/hook"), "The URL must be publicly reachable");
+  assert.equal(webhookUrlProblem("https://[::ffff:a00:1]/hook"), "The URL must be publicly reachable");
+  assert.equal(webhookUrlProblem("https://[64:ff9b::7f00:1]/hook"), "The URL must be publicly reachable");
   assert.equal(webhookUrlProblem("https://169.254.169.254/latest/meta-data"), "The URL must be publicly reachable");
   assert.equal(webhookUrlProblem("https://db.internal/hook"), "The URL must be publicly reachable");
   assert.equal(webhookUrlProblem("https://user:pass@example.com/hook"), "The URL can't include a username or password");

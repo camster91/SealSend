@@ -7,6 +7,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 0 14 * * * root /opt/sealsend/bin/run-maintenance.sh host-lifecycle >>/var/log/sealsend-maintenance.log 2>&1
 # RETENTION GATE: enable cleanup only after the draft-retention policy is approved.
 # 20 3 * * * root /opt/sealsend/bin/run-maintenance.sh cleanup >>/var/log/sealsend-maintenance.log 2>&1
+# Delivers workspace webhooks to organizers' own endpoints (not guest messaging), with signed requests and retries.
+* * * * * root /opt/sealsend/bin/run-maintenance.sh webhooks >>/var/log/sealsend-maintenance.log 2>&1
 # Safe to schedule: deletion requires a verified, cooled-off user request and rechecks billing state.
 10 3 * * * root /opt/sealsend/bin/run-maintenance.sh delete-accounts >>/var/log/sealsend-maintenance.log 2>&1
 # Runs in report-only mode unless ENABLE_ORPHAN_UPLOAD_CLEANUP=true.

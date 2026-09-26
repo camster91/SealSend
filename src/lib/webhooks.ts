@@ -94,15 +94,37 @@ export function isPrivateAddress(address: string): boolean {
       || (a === 198 && (b === 18 || b === 19));
   }
   if (version === 6) {
-    const lower = address.toLowerCase();
-    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateAddress(mapped[1]);
-    return lower === "::" || lower === "::1"
-      || lower.startsWith("fc") || lower.startsWith("fd")
-      || /^fe[89ab]/.test(lower)
-      || lower.startsWith("ff");
+    const groups = expandIPv6(address);
+    if (!groups) return true;
+    const [g0, g1, g2, g3, g4, g5, g6, g7] = groups;
+    const embeddedIPv4 = `${g6 >> 8}.${g6 & 255}.${g7 >> 8}.${g7 & 255}`;
+    const upperZero = g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0;
+    // IPv4-mapped (::ffff:a.b.c.d, in any notation), IPv4-compatible (::a.b.c.d) and NAT64 (64:ff9b::/96) carry an IPv4 target.
+    if (upperZero && (g5 === 0xffff || g5 === 0)) return g5 === 0 && g6 === 0 && g7 <= 1 ? true : isPrivateAddress(embeddedIPv4);
+    if (g0 === 0x64 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) return isPrivateAddress(embeddedIPv4);
+    return (g0 & 0xfe00) === 0xfc00 // unique local fc00::/7
+      || (g0 & 0xffc0) === 0xfe80 // link-local fe80::/10
+      || (g0 & 0xff00) === 0xff00; // multicast
   }
   return true;
+}
+
+/** Expands any valid IPv6 text form (including an embedded dotted IPv4 tail) to eight 16-bit groups. */
+function expandIPv6(address: string): number[] | null {
+  let text = address.toLowerCase().split("%")[0];
+  const dotted = text.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const [a, b, c, d] = dotted[1].split(".").map(Number);
+    text = `${text.slice(0, -dotted[1].length)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...tail].map((group) => parseInt(group, 16));
+  return groups.length === 8 && groups.every((group) => Number.isInteger(group) && group >= 0 && group <= 0xffff) ? groups : null;
 }
 
 /** Static URL checks before saving an endpoint. DNS is checked again at delivery time. */
@@ -218,11 +240,13 @@ export async function deliverDueWebhooks(limit = 50): Promise<{ attempted: numbe
         SET next_attempt_at = NOW() + INTERVAL '5 minutes'
       FROM organization_webhooks w
       WHERE d.webhook_id = w.id AND d.id IN (
-        SELECT id FROM webhook_deliveries
-         WHERE status = 'pending' AND next_attempt_at <= NOW()
-         ORDER BY next_attempt_at
+        -- Paused endpoints keep their queued deliveries until they are resumed.
+        SELECT pending.id FROM webhook_deliveries pending
+          JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active
+         WHERE pending.status = 'pending' AND pending.next_attempt_at <= NOW()
+         ORDER BY pending.next_attempt_at
          LIMIT $1
-         FOR UPDATE SKIP LOCKED)
+         FOR UPDATE OF pending SKIP LOCKED)
       RETURNING d.id, d.webhook_id, d.event_type, d.payload, d.attempts, w.url, w.secret`,
     [limit],
   );
