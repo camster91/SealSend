@@ -1,10 +1,38 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db/client";
+import { query, queryOne } from "@/lib/db/client";
 import { requireOrganizationPermission } from "@/lib/auth/organization-access";
-import { clientInputSchema } from "@/lib/clients";
+import { CLIENT_HISTORY_CSV_HEADER, clientHistoryCsvRows, clientInputSchema, getClientEventHistory } from "@/lib/clients";
+import { toCsv } from "@/lib/csv";
 
 type RouteParams = { params: Promise<{ organizationId: string; clientId: string }> };
 const UUID = /^[0-9a-f-]{36}$/i;
+
+/** One client with their event history; `?format=csv` downloads the history. */
+export async function GET(request: Request, { params }: RouteParams) {
+  const { organizationId, clientId } = await params;
+  const auth = await requireOrganizationPermission(organizationId, "manage_clients");
+  if (auth.error) return auth.error;
+  if (!UUID.test(clientId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const client = await queryOne<{ id: string; name: string }>(
+    `SELECT id, name, contact_email, contact_phone, notes, created_at FROM clients WHERE id = $1 AND organization_id = $2`,
+    [clientId, organizationId],
+  );
+  if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const events = await getClientEventHistory(organizationId, clientId);
+
+  if (new URL(request.url).searchParams.get("format") === "csv") {
+    const slug = client.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
+    return new NextResponse(toCsv(CLIENT_HISTORY_CSV_HEADER, clientHistoryCsvRows(events)), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${slug}-events.csv"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
+  return NextResponse.json({ client, events }, { headers: { "Cache-Control": "no-store" } });
+}
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   const { organizationId, clientId } = await params;
