@@ -25,7 +25,8 @@ SealSend is a modern, high-performance SaaS platform for creating, sending, and 
 ### For Event Organizers
 - **Workspaces:** Team workspaces with owner, admin, planner and check-in roles
 - **Brand Kit:** Your logo, colours, email sender name and text signature on every event
-- **Clients:** Client records, read-only review links with live RSVP totals, and recorded approvals
+- **Clients:** Client records, read-only review links with live RSVP totals, recorded approvals, and per-client event history with CSV export
+- **Webhooks:** Signed webhooks for RSVPs, check-ins, publishing and client approvals, for Zapier, Make or your own CRM ([docs](docs/webhooks.md))
 
 ### Pricing Model
 - **Free:** One event for up to 50 guests with email invitations

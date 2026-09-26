@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { queryOne } from "@/lib/db/client";
+import { query, queryOne } from "@/lib/db/client";
 import { hashMagicToken, isValidMagicToken } from "@/lib/magic-token";
 
 const optionalTrimmed = (max: number) => z.string().trim().max(max).transform((value) => value || null).nullable().optional();
@@ -84,4 +84,83 @@ export async function getClientShareView(token: string): Promise<ClientShareView
     [hashMagicToken(token)],
   );
   return row ? toClientShareView(row) : null;
+}
+
+export type ClientEventHistoryItem = {
+  id: string;
+  title: string;
+  eventDate: string | null;
+  status: string;
+  rsvp: ClientShareView["rsvp"];
+  approvedAt: string | null;
+  approverName: string | null;
+};
+
+type HistoryRow = {
+  id: string; title: string; event_date: string | Date | null; status: string;
+  invited: string; attending: string; maybe: string; declined: string; headcount: string;
+  approved_at: string | Date | null; approver_name: string | null;
+};
+
+/** pg returns TIMESTAMPTZ as Date; keep history dates as ISO strings for JSON and CSV alike. */
+function isoOrNull(value: string | Date | null): string | null {
+  if (value === null) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+export function toClientEventHistoryItem(row: HistoryRow): ClientEventHistoryItem {
+  const invited = Number(row.invited);
+  const attending = Number(row.attending);
+  const maybe = Number(row.maybe);
+  const declined = Number(row.declined);
+  return {
+    id: row.id,
+    title: row.title,
+    eventDate: isoOrNull(row.event_date),
+    status: row.status,
+    rsvp: { invited, attending, maybe, declined, awaiting: Math.max(0, invited - attending - maybe - declined), headcount: Number(row.headcount) },
+    approvedAt: isoOrNull(row.approved_at),
+    approverName: row.approver_name,
+  };
+}
+
+/** Every event a workspace ran for one client, newest first, with RSVP totals and the latest client approval. */
+export async function getClientEventHistory(organizationId: string, clientId: string): Promise<ClientEventHistoryItem[]> {
+  const rows = await query<HistoryRow>(
+    `SELECT e.id, e.title, e.event_date, e.status,
+            (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id)::text AS invited,
+            (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending')::text AS attending,
+            (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'maybe')::text AS maybe,
+            (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'not_attending')::text AS declined,
+            (SELECT COALESCE(SUM(r.headcount), 0) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending')::text AS headcount,
+            approval.approved_at, approval.approver_name
+       FROM events e
+       LEFT JOIN LATERAL (
+         SELECT s.approved_at, s.approver_name FROM event_client_shares s
+          WHERE s.event_id = e.id AND s.approved_at IS NOT NULL
+          ORDER BY s.approved_at DESC LIMIT 1
+       ) approval ON TRUE
+      WHERE e.client_id = $1 AND e.organization_id = $2
+      ORDER BY e.event_date DESC NULLS LAST, e.created_at DESC`,
+    [clientId, organizationId],
+  );
+  return rows.map(toClientEventHistoryItem);
+}
+
+export const CLIENT_HISTORY_CSV_HEADER = ["Event", "Date", "Status", "Invited", "Attending", "Maybe", "Declined", "Awaiting", "Headcount", "Approved by", "Approved at"] as const;
+
+export function clientHistoryCsvRows(history: ClientEventHistoryItem[]): unknown[][] {
+  return history.map((event) => [
+    event.title,
+    event.eventDate ?? "",
+    event.status,
+    event.rsvp.invited,
+    event.rsvp.attending,
+    event.rsvp.maybe,
+    event.rsvp.declined,
+    event.rsvp.awaiting,
+    event.rsvp.headcount,
+    event.approverName ?? "",
+    event.approvedAt ?? "",
+  ]);
 }

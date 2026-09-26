@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -7,6 +8,15 @@ import { Button } from "@/components/ui/Button";
 
 type Organization = { id: string; name: string; is_personal: boolean; role: string };
 type Client = { id: string; name: string; contact_email: string | null; contact_phone: string | null; notes: string | null; event_count: number };
+type HistoryEvent = {
+  id: string;
+  title: string;
+  eventDate: string | null;
+  status: string;
+  rsvp: { invited: number; attending: number; maybe: number; declined: number; awaiting: number; headcount: number };
+  approvedAt: string | null;
+  approverName: string | null;
+};
 
 const EMPTY = { name: "", contactEmail: "", contactPhone: "", notes: "" };
 
@@ -16,6 +26,8 @@ export function ClientsSettings() {
   const [clients, setClients] = useState<Client[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryEvent[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -60,6 +72,18 @@ export function ClientsSettings() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function toggleHistory(client: Client) {
+    if (!organizationId) return;
+    if (historyFor === client.id) {
+      setHistoryFor(null);
+      return;
+    }
+    setHistoryFor(client.id);
+    setHistory(null);
+    const res = await fetch(`/api/organizations/${organizationId}/clients/${client.id}`);
+    setHistory(res.ok ? (await res.json()).events : []);
   }
 
   async function remove(client: Client) {
@@ -107,6 +131,15 @@ export function ClientsSettings() {
                   <Button
                     type="button"
                     variant="ghost"
+                    aria-expanded={historyFor === client.id}
+                    aria-label={`Event history for ${client.name}`}
+                    onClick={() => void toggleHistory(client)}
+                  >
+                    History
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
                     disabled={busy}
                     aria-label={`Edit ${client.name}`}
                     onClick={() => {
@@ -118,6 +151,38 @@ export function ClientsSettings() {
                   </Button>
                   <Button type="button" variant="ghost" disabled={busy} aria-label={`Remove ${client.name}`} onClick={() => void remove(client)}>Remove</Button>
                 </div>
+                {historyFor === client.id && (
+                  <div className="w-full rounded-lg bg-gray-50 p-3">
+                    {history === null ? (
+                      <p className="text-gray-500">Loading…</p>
+                    ) : history.length === 0 ? (
+                      <p className="text-gray-500">No events for this client yet. Assign one from an event&apos;s page.</p>
+                    ) : (
+                      <>
+                        <ul className="space-y-2">
+                          {history.map((event) => (
+                            <li key={event.id}>
+                              <Link href={`/events/${event.id}`} className="font-medium text-brand-700 hover:underline">{event.title}</Link>
+                              <span className="text-gray-500">
+                                {" "}· {event.eventDate ? new Date(event.eventDate).toLocaleDateString() : "No date"} · {event.status}
+                              </span>
+                              <p className="text-gray-600">
+                                {event.rsvp.attending} attending ({event.rsvp.headcount} people) · {event.rsvp.maybe} maybe · {event.rsvp.declined} declined · {event.rsvp.awaiting} awaiting
+                                {event.approvedAt && <> · <span className="text-green-700">approved by {event.approverName}</span></>}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                        <a
+                          href={`/api/organizations/${organizationId}/clients/${client.id}?format=csv`}
+                          className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+                        >
+                          Download CSV
+                        </a>
+                      </>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

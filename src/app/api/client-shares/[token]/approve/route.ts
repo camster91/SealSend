@@ -3,6 +3,7 @@ import { z } from "zod";
 import { query } from "@/lib/db/client";
 import { hashMagicToken, isValidMagicToken } from "@/lib/magic-token";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 const approveSchema = z.object({ name: z.string().trim().min(1, "Enter your name").max(120) }).strict();
 
@@ -26,5 +27,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata) VALUES ($1, NULL, 'client_approved', $2::jsonb)`,
     [share.event_id, JSON.stringify({ shareId: share.id, approverName: parsed.data.name })],
   );
+  await enqueueWebhookEvent(share.event_id, "client.approved", { approval: { share_id: share.id, approver_name: parsed.data.name } });
   return NextResponse.json({ success: true });
 }

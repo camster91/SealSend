@@ -32,3 +32,20 @@ test("awaiting replies never goes negative when responses outnumber listed guest
   });
   assert.equal(view.rsvp.awaiting, 0);
 });
+
+test("client history summarises each event and exports formula-safe CSV", async () => {
+  const { toClientEventHistoryItem, clientHistoryCsvRows, CLIENT_HISTORY_CSV_HEADER } = await import("../src/lib/clients");
+  const { toCsv } = await import("../src/lib/csv");
+  const item = toClientEventHistoryItem({
+    id: "e1", title: "=HYPERLINK(\"x\")", event_date: "2026-10-01T18:00:00Z", status: "published",
+    invited: "5", attending: "6", maybe: "0", declined: "1", headcount: "9",
+    approved_at: new Date("2026-09-20T00:00:00Z"), approver_name: "Ana \"A\" Lee",
+  });
+  assert.equal(item.rsvp.awaiting, 0);
+  assert.equal(item.approvedAt, "2026-09-20T00:00:00.000Z");
+  const csv = toCsv(CLIENT_HISTORY_CSV_HEADER, clientHistoryCsvRows([item]));
+  const [header, row] = csv.split("\n");
+  assert.equal(header.split(",").length, CLIENT_HISTORY_CSV_HEADER.length);
+  assert.match(row, /^"'=HYPERLINK\(""x""\)"/);
+  assert.match(row, /"Ana ""A"" Lee"/);
+});

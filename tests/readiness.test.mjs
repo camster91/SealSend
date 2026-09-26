@@ -113,6 +113,29 @@ test('fresh and upgraded schemas create clients and hashed client review links',
   }
 });
 
+test('fresh and upgraded schemas create workspace webhooks and their delivery queue', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+
+  for (const sql of [schema, migration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_webhooks \(\n  id UUID DEFAULT gen_random_uuid\(\) PRIMARY KEY,\n  organization_id UUID NOT NULL REFERENCES organizations\(id\) ON DELETE CASCADE/);
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS webhook_deliveries \(\n  id UUID DEFAULT gen_random_uuid\(\) PRIMARY KEY,\n  webhook_id UUID NOT NULL REFERENCES organization_webhooks\(id\) ON DELETE CASCADE/);
+    assert.match(sql, /status TEXT NOT NULL DEFAULT 'pending' CHECK \(status IN \('pending', 'delivered', 'failed'\)\)/);
+    assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries\(next_attempt_at\) WHERE status = 'pending'/);
+  }
+});
+
+test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-checked, redirect-free POST', async () => {
+  const route = await read('src/app/api/cron/deliver-webhooks/route.ts');
+  const lib = await read('src/lib/webhooks.ts');
+  assert.match(route, /Bearer \$\{cronSecret\}/);
+  assert.match(route, /deliverDueWebhooks/);
+  assert.match(lib, /lookup: publicOnlyLookup/);
+  assert.match(lib, /FOR UPDATE OF pending SKIP LOCKED/);
+  assert.match(lib, /JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active/);
+  assert.doesNotMatch(lib, /\bfetch\(/);
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
@@ -722,6 +745,8 @@ test('operations scripts schedule authenticated maintenance without exposing sec
   assert.doesNotMatch(cron, /echo.*CRON_SECRET|set -x/);
   assert.match(cronDefinition, /run-maintenance\.sh reminders/);
   assert.match(cronDefinition, /run-maintenance\.sh cleanup/);
+  assert.match(cron, /webhooks\) endpoint="\/api\/cron\/deliver-webhooks"/);
+  assert.match(cronDefinition, /^\* \* \* \* \* root \/opt\/sealsend\/bin\/run-maintenance\.sh webhooks/m);
 });
 
 test('load and recovery gates are bounded, read-only, and isolated from production data', async () => {

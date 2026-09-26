@@ -4,6 +4,7 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { getEventAccess, roleCan } from "@/lib/auth/event-access";
 import { getDb, query } from "@/lib/db/client";
+import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 type Params = { params: Promise<{ eventId: string }> };
 const checkInSchema = z.object({
@@ -60,6 +61,11 @@ export async function PATCH(request: Request, { params }: Params) {
       [eventId, auth.user.id, parsed.data.checkedIn ? "guest_checked_in" : "guest_checked_out", JSON.stringify({ guestId: guest.id })],
     );
     await client.query("COMMIT");
+    if (parsed.data.checkedIn) {
+      await enqueueWebhookEvent(eventId, "guest.checked_in", {
+        guest: { id: guest.id, name: guest.name, rsvp_status: guest.rsvp_status, checked_in_at: guest.checked_in_at },
+      });
+    }
     if (parsed.data.checkedIn && ownerId) {
       await recordActivationEventSafely({
         name: "first_guest_checked_in",

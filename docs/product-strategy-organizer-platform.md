@@ -2,7 +2,7 @@
 
 Status: **Direction accepted by the owner on 2026-09-25.** D4 (organizer prices) and D6 (licence) were accepted on 2026-09-26.
 
-Progress: Phase 0 (Event Pass, SMS allowance and top-ups, honest plan claims), Phase 1 (workspaces, brand kit, team workspaces) and Phase 2 (clients, client review links and approvals) are built. Phase 3 needs infrastructure (reverse proxy, DNS, Mailgun domains, US 10DLC) and Phase 4 is integrate-first.
+Progress: Phase 0 (Event Pass, SMS allowance and top-ups, honest plan claims), Phase 1 (workspaces, brand kit, team workspaces) and Phase 2 (clients, client review links and approvals, per-client event history and CSV export) are built. Phase 3 needs infrastructure (reverse proxy, DNS, Mailgun domains, US 10DLC). Phase 4 has started with signed workspace webhooks (`docs/webhooks.md`), which also cover Zapier and Make through their generic webhook triggers; a public API is next.
 
 Drafted: 2026-09-25
 

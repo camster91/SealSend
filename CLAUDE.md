@@ -44,8 +44,8 @@ src/
       events/      CRUD plus guests, responses, announcements, members, check-in, publish, clone, ...
       rsvp/ comments/ signups/ calendar/ guest-qr/   # Public, slug/token-scoped endpoints
       checkout/ subscriptions/                       # Stripe checkout
-      webhooks/    stripe, twilio, mailgun           # Signature-verified
-      cron/        send-reminders, send-announcements, send-host-lifecycle,
+      webhooks/    stripe, twilio, mailgun           # Inbound, signature-verified
+      cron/        send-reminders, send-announcements, send-host-lifecycle, deliver-webhooks,
                    cleanup-drafts, cleanup-uploads, delete-accounts
       operations/ monitoring/ health/                # Ops endpoints (secret-protected except health)
       ai/ beta/ account/ upload/ uploads/ waitlist/ feedback/ team-invites/
@@ -91,7 +91,8 @@ docs/             Launch operations, evidence register, policy decisions
 - Workspace permissions (`src/lib/auth/organization-access.ts`): use `requireOrganizationPermission(organizationId, permission)` in workspace routes. Owners and admins manage members and the brand; planners manage clients; admins can't change owners or admins; a workspace always keeps at least one owner.
 - Team workspaces (`/settings/team`): invites are hashed one-time tokens in `organization_invites` accepted at `/team/workspace/[token]`. Seat limits per plan are in `ORGANIZATION_SEAT_LIMITS`, with organizer plan prices and seats in `ORGANIZER_PLANS` (`constants.ts`); organizer plans are not sold yet. Account deletion hands team workspaces and their events to remaining members (`src/app/api/cron/delete-accounts/route.ts`).
 - Brand kit (`src/lib/brands.ts`, `/settings/brand`): a workspace's default brand fills unset event-page styling and sets the email footer, From display name, Reply-To and SMS signature. Every guest-facing email/SMS send path must pass `getEventBranding()` through `emailBrand()`, `emailSendOptions()` and `smsSignature()`. White-label only applies on organizer plans (`solo`, `studio`, `agency`).
-- Clients (`src/lib/clients.ts`, `/settings/clients`): workspace-scoped client records, `events.client_id`, and read-only review links (`event_client_shares`, public page `/client/[token]`) that show RSVP totals only, never guest details, and record the client's approval in `event_audit_log`.
+- Clients (`src/lib/clients.ts`, `/settings/clients`): workspace-scoped client records, `events.client_id`, and read-only review links (`event_client_shares`, public page `/client/[token]`) that show RSVP totals only, never guest details, and record the client's approval in `event_audit_log`. Each client has an event history with RSVP totals and a CSV export (`GET /api/organizations/[id]/clients/[clientId]`, `?format=csv`); build CSVs with `toCsv()` from `src/lib/csv.ts`, which neutralises spreadsheet formulas.
+- Outbound webhooks (`src/lib/webhooks.ts`, `/settings/integrations`, docs in `docs/webhooks.md`): owners and admins of organizer-plan workspaces register endpoints in `organization_webhooks`. Call `enqueueWebhookEvent(eventId, type, data)` after the change commits (it never throws); `/api/cron/deliver-webhooks` sends queued `webhook_deliveries` with an HMAC `SealSend-Signature` and retries with backoff. Deliveries go through `postWebhook()`, which requires public https targets and re-checks DNS at connect time; never deliver webhooks with `fetch()`.
 - Strategy and roadmap for organizer workspaces: `docs/product-strategy-organizer-platform.md`.
 
 ### Tiers and entitlements

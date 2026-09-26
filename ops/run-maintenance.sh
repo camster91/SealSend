@@ -9,7 +9,8 @@ case "$job" in
   cleanup-uploads) endpoint="/api/cron/cleanup-uploads" ;;
   delete-accounts) endpoint="/api/cron/delete-accounts" ;;
   host-lifecycle) endpoint="/api/cron/send-host-lifecycle" ;;
-  *) echo "Usage: $0 reminders|announcements|cleanup|cleanup-uploads|delete-accounts|host-lifecycle" >&2; exit 64 ;;
+  webhooks) endpoint="/api/cron/deliver-webhooks" ;;
+  *) echo "Usage: $0 reminders|announcements|cleanup|cleanup-uploads|delete-accounts|host-lifecycle|webhooks" >&2; exit 64 ;;
 esac
 
 container="$(docker ps \

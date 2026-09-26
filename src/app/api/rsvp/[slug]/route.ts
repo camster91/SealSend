@@ -8,6 +8,7 @@ import type { Event, RSVPResponse } from "@/types/database";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
+import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 export async function POST(
   request: Request,
@@ -189,6 +190,18 @@ export async function POST(
       userId: event.user_id,
       eventId: event.id,
       metadata: { source: "public_event", status },
+    });
+
+    await enqueueWebhookEvent(event.id, "rsvp.submitted", {
+      response: {
+        id: response.id,
+        respondent_name: response.respondent_name,
+        respondent_email: response.respondent_email ?? null,
+        status: response.status,
+        headcount: response.headcount,
+        guest_id: response.guest_id ?? null,
+        plus_ones: (plus_ones ?? []).map((plusOne) => ({ name: plusOne.name })),
+      },
     });
 
     // Send host notification (best-effort, don't fail the RSVP)
