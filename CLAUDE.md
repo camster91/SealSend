@@ -6,6 +6,17 @@ SealSend is a digital invitation and RSVP platform. Hosts create event invitatio
 
 **Current state:** controlled beta. `BETA_MODE = true` in `src/lib/constants.ts` hides paid checkout and gives every account the beta entitlement (one active event, up to 100 guests). Payments and outbound messages stay test-only (`PAYMENTS_TEST_ONLY`, `COMMUNICATIONS_TEST_ONLY`) until the launch gates pass. See `DEPLOYMENT_READINESS.md` and `docs/launch-operations.md` before changing any of this.
 
+## How to talk to Cameron
+
+- Use simple, plain English (about grade 8 level).
+- Keep answers short. No walls of text.
+- When Cameron needs to decide something, give 2–4 clear choices and say which one you recommend.
+- Lead with the answer or next step. Skip the background unless asked.
+- Use short bullet points instead of long paragraphs.
+- Explain technical terms in a few words, or skip them.
+- Do the hard technical work yourself. Just say what you did and what Cameron needs to decide.
+- This applies to chat replies only. Code, commits, PRs and docs keep their normal detail.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript 5 (strict)
