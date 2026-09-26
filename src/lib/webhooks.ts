@@ -5,7 +5,7 @@ import http from "node:http";
 import { isIP, type LookupFunction } from "node:net";
 import { z } from "zod";
 import { query, queryOne } from "@/lib/db/client";
-import { ORGANIZER_PLANS } from "@/lib/constants";
+import { BETA_MODE, ORGANIZER_PLANS } from "@/lib/constants";
 
 /**
  * Outbound workspace webhooks: SealSend POSTs signed JSON to an organizer's
@@ -26,9 +26,9 @@ const WEBHOOK_DELIVERY_CONCURRENCY = 5;
 
 const WEBHOOK_PLANS: ReadonlySet<string> = new Set(Object.keys(ORGANIZER_PLANS));
 
-/** Webhooks are an organizer-plan feature. */
-export function canUseWebhooks(organizationPlan: string | null | undefined): boolean {
-  return Boolean(organizationPlan && WEBHOOK_PLANS.has(organizationPlan));
+/** Webhooks are an organizer-plan feature; during the controlled beta every workspace gets them. */
+export function canUseWebhooks(organizationPlan: string | null | undefined, betaMode: boolean = BETA_MODE): boolean {
+  return betaMode || Boolean(organizationPlan && WEBHOOK_PLANS.has(organizationPlan));
 }
 
 export const webhookInputSchema = z.object({
@@ -223,8 +223,8 @@ export async function enqueueWebhookEvent(eventId: string, type: WebhookEventTyp
          FROM events e
          JOIN organizations o ON o.id = e.organization_id
          JOIN organization_webhooks w ON w.organization_id = o.id
-        WHERE e.id = $1 AND w.active AND $2 = ANY(w.events) AND o.plan = ANY($4::text[])`,
-      [eventId, type, JSON.stringify(data), [...WEBHOOK_PLANS]],
+        WHERE e.id = $1 AND w.active AND $2 = ANY(w.events) AND ($5 OR o.plan = ANY($4::text[]))`,
+      [eventId, type, JSON.stringify(data), [...WEBHOOK_PLANS], BETA_MODE],
     );
   } catch (error) {
     console.error("[webhooks] Failed to queue", type, error instanceof Error ? error.message : error);

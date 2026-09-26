@@ -188,7 +188,7 @@ export const SMS_TOP_UP = {
  * Seats count every workspace member, including the owner.
  */
 export const ORGANIZER_PLANS = {
-  solo: { name: "Solo", monthlyPriceCents: 2900, seats: 2 },
+  solo: { name: "Solo", monthlyPriceCents: 2900, annualPriceCents: 29000, seats: 2 },
   studio: { name: "Studio", monthlyPriceCents: 7900, seats: 5 },
   agency: { name: "Agency", monthlyPriceCents: 19900, seats: 25 },
 } as const;
