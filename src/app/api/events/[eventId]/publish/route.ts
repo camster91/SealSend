@@ -3,6 +3,7 @@ import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
+import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -63,6 +64,7 @@ export async function POST(
     }
 
     if (newStatus === 'published') {
+      await enqueueWebhookEvent(eventId, 'event.published', {});
       await recordActivationEventSafely({
         name: 'event_published',
         userId: user.id,

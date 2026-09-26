@@ -640,3 +640,34 @@ CREATE TABLE IF NOT EXISTS event_client_shares (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_event_client_shares_event ON event_client_shares(event_id);
+-- Outbound workspace webhooks: signed POSTs to an organizer's endpoint, delivered by /api/cron/deliver-webhooks.
+CREATE TABLE IF NOT EXISTS organization_webhooks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  url TEXT NOT NULL CHECK (char_length(url) BETWEEN 1 AND 500),
+  secret TEXT NOT NULL,
+  events TEXT[] NOT NULL CHECK (cardinality(events) >= 1),
+  description TEXT CHECK (description IS NULL OR char_length(description) <= 120),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  last_success_at TIMESTAMPTZ,
+  last_failure_at TIMESTAMPTZ,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_organization_webhooks_organization ON organization_webhooks(organization_id);
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  webhook_id UUID NOT NULL REFERENCES organization_webhooks(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_status_code INTEGER,
+  last_error TEXT,
+  delivered_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries(next_attempt_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, created_at DESC);

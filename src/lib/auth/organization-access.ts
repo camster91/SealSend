@@ -4,11 +4,11 @@ import { requireApiHost, type AuthenticatedUser } from "@/lib/auth/api-auth";
 import { ORGANIZATION_ROLES, type OrganizationRole } from "@/lib/auth/event-access";
 import { ORGANIZER_PLANS } from "@/lib/constants";
 
-export type OrganizationPermission = "view_organization" | "manage_brand" | "manage_members" | "manage_clients";
+export type OrganizationPermission = "view_organization" | "manage_brand" | "manage_members" | "manage_clients" | "manage_integrations";
 
 const ORGANIZATION_PERMISSIONS: Record<OrganizationRole, ReadonlySet<OrganizationPermission>> = {
-  owner: new Set(["view_organization", "manage_brand", "manage_members", "manage_clients"]),
-  admin: new Set(["view_organization", "manage_brand", "manage_members", "manage_clients"]),
+  owner: new Set(["view_organization", "manage_brand", "manage_members", "manage_clients", "manage_integrations"]),
+  admin: new Set(["view_organization", "manage_brand", "manage_members", "manage_clients", "manage_integrations"]),
   planner: new Set(["view_organization", "manage_clients"]),
   check_in: new Set(["view_organization"]),
 };

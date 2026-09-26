@@ -188,6 +188,16 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Send RSVPs, check-ins and client approvals to your CRM, Zapier or Make with signed webhooks.</p>
+            <Link href="/settings/integrations" className="inline-flex font-medium text-brand-700 hover:underline">Manage webhooks →</Link>
+          </CardContent>
+        </Card>
+
         {role === "admin" && (
           <Card>
             <CardHeader>
