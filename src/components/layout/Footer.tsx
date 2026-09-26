@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
 
 export function Footer() {
   return (
@@ -117,9 +118,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="https://github.com/camster91/SealSend" className="text-sm text-muted-foreground hover:text-foreground">
-                  Source code (AGPL-3.0)
-                </a>
+                <SourceCodeLink className="text-sm text-muted-foreground hover:text-foreground" />
               </li>
             </ul>
           </div>

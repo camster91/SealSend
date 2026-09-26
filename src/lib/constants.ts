@@ -194,6 +194,9 @@ export const ORGANIZER_PLANS = {
 } as const;
 export type OrganizerPlan = keyof typeof ORGANIZER_PLANS;
 
+/** Where users can get this deployment's source code (AGPL-3.0 section 13). Forks must point this at their own source. */
+export const SOURCE_CODE_URL = process.env.NEXT_PUBLIC_SOURCE_CODE_URL || "https://github.com/camster91/SealSend";
+
 export const PUBLIC_PRICING_PLANS = [
   { id: "free", name: "Free", price: 0, period: "", description: "One small event, free", events: "1", guests: "50", features: ["Email invitations", "RSVP tracking", "Guest management", "\"Powered by SealSend\" badge"] },
   { id: "event_pass", name: "Event Pass", price: EVENT_PASS.priceCents / 100, period: "/event", description: "Everything for one bigger event", events: "1", guests: "250", features: ["Email invitations and 500 SMS segments (top-ups available)", "Guest tags, announcements and sign-up board", "Analytics and up to 3 co-hosts", "No SealSend badge"] },
