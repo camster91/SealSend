@@ -116,6 +116,11 @@ export function Footer() {
                   support@sealsend.app
                 </a>
               </li>
+              <li>
+                <a href="https://github.com/camster91/SealSend" className="text-sm text-muted-foreground hover:text-foreground">
+                  Source code (AGPL-3.0)
+                </a>
+              </li>
             </ul>
           </div>
         </div>

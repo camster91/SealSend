@@ -1,6 +1,6 @@
 # SealSend product strategy: one-off hosts and the organizer platform
 
-Status: **Direction accepted by the owner on 2026-09-25** (the recommendations below, except D4 prices and the D6 licence, which stay open).
+Status: **Direction accepted by the owner on 2026-09-25.** D4 (organizer prices) and D6 (licence) were accepted on 2026-09-26.
 
 Progress: Phase 0 (Event Pass, SMS allowance and top-ups, honest plan claims), Phase 1 (workspaces, brand kit, team workspaces) and Phase 2 (clients, client review links and approvals) are built. Phase 3 needs infrastructure (reverse proxy, DNS, Mailgun domains, US 10DLC) and Phase 4 is integrate-first.
 
@@ -88,15 +88,15 @@ Why: it keeps the free tier generous enough to spread, covers SMS (the only real
 
 | Plan | Indicative price | For | Includes |
 |---|---|---|---|
-| Solo | USD 29–39/mo | Independent planner | 1 seat, brand kit, white-label pages, unlimited events, client records, client share links |
-| Studio | USD 79–99/mo | Small team or venue | 5 seats with org roles, custom domain, branded sending domain, client portal with approvals |
-| Agency | USD 199+/mo | Multi-brand agency | Multiple brands, API/webhooks, priority support, higher limits |
+| Solo | USD 29/mo | Independent planner | 2 seats, brand kit, white-label pages, unlimited events, client records, client share links |
+| Studio | USD 79/mo | Small team or venue | 5 seats with org roles, custom domain, branded sending domain, client portal with approvals |
+| Agency | USD 199/mo | Multi-brand agency | Multiple brands, API/webhooks, priority support, higher limits |
 
 - SMS is billed at cost plus margin on every plan, so heavy senders don't erode margin.
 - Later: a small platform fee (e.g. 1%) on client payments processed through Stripe Connect.
 - The existing `pro_annual` (USD 124.99/year) becomes either the annual Solo price or is retired. **DECISION D3.**
 
-These prices are placeholders for validation, not researched market rates. Confirm them with 5–10 organizer interviews and a competitor check before publishing.
+These prices were accepted as starting points (D4), not researched market rates. Note for D3: USD 124.99/year is 64% below twelve months of Solo (USD 348), so revisit the annual Solo price (for example USD 290, two months free) before selling it. Confirm them with 5–10 organizer interviews and a competitor check before publishing.
 
 ## 4. Organizer platform: phased roadmap
 
@@ -192,7 +192,7 @@ Migration: create a personal organization for every existing user, then backfill
 ## 6. Risks
 
 - **Scope.** "Run their whole business" competes with mature CRMs. Lead with the guest experience plus integrations; build business tooling only when there's demand for it.
-- **Open-source licence.** The repo is now public under MIT, which lets anyone host a white-label competitor from this code. If the organizer platform is the business, consider AGPL for the server, or open-core (MIT core with the platform features in a private module) *before* those features ship. **DECISION D6.**
+- **Open-source licence (resolved: AGPL-3.0-only).** Under MIT, anyone could host a white-label competitor from this code. AGPL keeps self-hosting free but requires anyone running a modified copy as a service to publish their source. **DECISION D6.**
 - **Messaging compliance and deliverability.** Multi-tenant SMS needs per-business registration in the US and clear consent records. Custom sending domains need DNS support and bounce monitoring per brand.
 - **Support load.** Organizers running live client events expect fast support. The current target is two business days.
 - **Beta evidence.** The approved beta cohort is recurring-community hosts. Switching the wedge to planners means a new consented cohort under a new approved policy (see `docs/launch-operations.md`).
@@ -210,7 +210,7 @@ Migration: create a personal organization for every existing user, then backfill
 | D1 | Next beta cohort audience | **Accepted:** finish the current recurring-community cohort for evidence, then recruit an organizer cohort for Phases 1–2 |
 | D2 | One-off pricing | **Accepted:** Free + one Event Pass + SMS top-ups |
 | D3 | `pro_annual` (USD 124.99/year) | **Accepted:** becomes the annual price of the organizer Solo plan |
-| D4 | Organizer plan prices and seat counts | **Open:** validate with 5–10 organizer interviews first |
+| D4 | Organizer plan prices and seat counts | **Accepted (low end of the ranges):** Solo USD 29/mo with 2 seats, Studio USD 79/mo with 5 seats, Agency USD 199/mo with 25 seats (`ORGANIZER_PLANS` in `src/lib/constants.ts`). Still validate with organizer interviews before selling. |
 | D5 | Build business tooling or integrate first | **Accepted:** integrate first (API, webhooks, Zapier), then Stripe Invoicing/Connect if demanded |
-| D6 | Licence now that the repo is public | **Open, owner must choose explicitly:** keep MIT, switch the server to AGPL, or open-core. Decide before organizer features ship to production. |
+| D6 | Licence now that the repo is public | **Accepted: AGPL-3.0-only** for the whole repo from 2026-09-26. Earlier MIT releases stay MIT. |
 | D7 | Custom domains and branded email tier | **Accepted:** Studio and above |

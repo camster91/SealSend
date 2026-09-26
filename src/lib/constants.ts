@@ -182,6 +182,18 @@ export const SMS_TOP_UP = {
   priceCents: 500,
 } as const;
 
+/**
+ * Organizer workspace plans (strategy doc decision D4, accepted 2026-09-25).
+ * Not sold yet: there is no checkout for them, and BETA_MODE hides paid plans.
+ * Seats count every workspace member, including the owner.
+ */
+export const ORGANIZER_PLANS = {
+  solo: { name: "Solo", monthlyPriceCents: 2900, seats: 2 },
+  studio: { name: "Studio", monthlyPriceCents: 7900, seats: 5 },
+  agency: { name: "Agency", monthlyPriceCents: 19900, seats: 25 },
+} as const;
+export type OrganizerPlan = keyof typeof ORGANIZER_PLANS;
+
 export const PUBLIC_PRICING_PLANS = [
   { id: "free", name: "Free", price: 0, period: "", description: "One small event, free", events: "1", guests: "50", features: ["Email invitations", "RSVP tracking", "Guest management", "\"Powered by SealSend\" badge"] },
   { id: "event_pass", name: "Event Pass", price: EVENT_PASS.priceCents / 100, period: "/event", description: "Everything for one bigger event", events: "1", guests: "250", features: ["Email invitations and 500 SMS segments (top-ups available)", "Guest tags, announcements and sign-up board", "Analytics and up to 3 co-hosts", "No SealSend badge"] },

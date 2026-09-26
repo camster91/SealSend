@@ -127,7 +127,11 @@ Release steps, current production state and rollback targets are in `DEPLOYMENT_
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). See [LICENSE](LICENSE). Copyright (c) 2026 Cameron Ashley.
+
+You can use, modify and self-host SealSend. If you run a modified version as a network service, you must offer its users the complete source of your version under the same licence.
+
+Code published before the switch to AGPL on 2026-09-26 (up to commit `7361786`) was released under MIT, and copies obtained under that licence keep it.
 
 ---
 Developed by Cameron Ashley / Nexus AI.
