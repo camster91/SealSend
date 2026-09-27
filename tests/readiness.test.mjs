@@ -136,6 +136,19 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
   assert.doesNotMatch(lib, /\bfetch\(/);
 });
 
+test('the welcome tour shows once, only to new hosts, and is an accessible dialog', async () => {
+  const tour = await read('src/components/onboarding/WelcomeTour.tsx');
+  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
+  assert.match(dashboard, /<WelcomeTour show=\{myEvents\.length === 0 && collaboratingEvents\.length === 0\} \/>/);
+  assert.match(tour, /role="dialog"/);
+  assert.match(tour, /aria-modal="true"/);
+  assert.match(tour, /event\.key === "Escape"/);
+  assert.match(tour, /event\.key !== "Tab"/);
+  assert.match(tour, /useReducedMotion/);
+  assert.match(tour, /try \{\s*localStorage\.setItem\(WELCOME_TOUR_STORAGE_KEY, "done"\)/);
+  assert.match(tour, /href="\/events\/new"/);
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

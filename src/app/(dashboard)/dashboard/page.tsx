@@ -9,6 +9,7 @@ import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
 import { getUserTier } from '@/lib/subscription';
 import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist';
+import { WelcomeTour } from '@/components/onboarding/WelcomeTour';
 import { queryOne } from '@/lib/db/client';
 import { BETA_MODE } from '@/lib/constants';
 
@@ -94,6 +95,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
 
+        <WelcomeTour show={myEvents.length === 0 && collaboratingEvents.length === 0} />
         <OnboardingChecklist
           event={firstOwnedEvent ? {
             id: firstOwnedEvent.id,
