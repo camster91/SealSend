@@ -71,6 +71,13 @@
   --color-background: var(--color-neutral-50);
   --color-foreground: var(--color-neutral-900);
   --color-muted: var(--color-neutral-500);
+  /* Secondary text. neutral-600 keeps at least 7:1 contrast on white and neutral-100. */
+  --color-muted-foreground: var(--color-neutral-600);
+  /* Status aliases used across forms and badges; they were referenced before
+     they existed, so error text rendered in the default colour. */
+  --color-accent-red: var(--color-error-600);
+  --color-accent-green: var(--color-success-600);
+  --color-accent-amber: var(--color-warning-500);
   --color-border: var(--color-neutral-200);
   --color-ring: var(--color-primary-500);
 

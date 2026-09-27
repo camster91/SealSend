@@ -167,6 +167,19 @@ test('dashboard confirmations use the accessible dialog, not window.confirm', as
   assert.match(feedback, /cancelRef\.current\?\.focus\(\)/);
 });
 
+test('text-muted-foreground is a registered theme colour and touch targets reach 44px', async () => {
+  const css = await read('src/app/globals.css');
+  const theme = css.slice(css.indexOf('@theme inline {'), css.indexOf('}', css.indexOf('@theme inline {')));
+  assert.match(theme, /--color-muted-foreground: var\(--color-neutral-600\);/);
+  for (const alias of ['accent-red', 'accent-green', 'accent-amber']) assert.match(theme, new RegExp(`--color-${alias}: var\\(--color-`));
+  const button = await read('src/components/ui/Button.tsx');
+  assert.match(button, /md: "[^"]*pointer-coarse:h-11/);
+  assert.match(button, /icon: "[^"]*pointer-coarse:h-11 pointer-coarse:w-11/);
+  const tabBar = await read('src/components/layout/MobileTabBar.tsx');
+  assert.match(tabBar, /min-h-14/);
+  assert.match(tabBar, /aria-current=\{isActive \? 'page' : undefined\}/);
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');

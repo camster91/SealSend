@@ -87,9 +87,9 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
                 onEdit(item as Guest);
               }}
               aria-label={`Edit ${item.name}`}
-              className="rounded-lg p-2 hover:bg-neutral-100"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg pointer-coarse:h-11 pointer-coarse:w-11 hover:bg-neutral-100"
             >
-              <Edit2 className="h-4 w-4 text-muted-foreground" />
+              <Edit2 className="h-4 w-4 text-muted-foreground" aria-hidden />
             </button>
             <button
               onClick={(e) => {
@@ -98,9 +98,9 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
               }}
               disabled={deleting === item.id}
               aria-label={`Delete ${item.name}`}
-              className="rounded-lg p-2 hover:bg-red-50"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg pointer-coarse:h-11 pointer-coarse:w-11 hover:bg-error-50"
             >
-              <Trash2 className="h-4 w-4 text-accent-red" />
+              <Trash2 className="h-4 w-4 text-error-600" aria-hidden />
             </button>
           </div>
         ),

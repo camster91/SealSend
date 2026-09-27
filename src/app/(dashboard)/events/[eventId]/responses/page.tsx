@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { RSVPResponseWithPlusOnes } from "@/types/database";
 import { RsvpIntelligence } from "@/components/responses/RsvpIntelligence";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 export default function ResponsesPage() {
   const params = useParams();
@@ -59,9 +60,7 @@ export default function ResponsesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
+        <TableSkeleton label="Loading responses" columns={4} />
       ) : (
         <>
           <RsvpIntelligence eventId={eventId} />

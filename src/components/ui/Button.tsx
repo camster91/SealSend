@@ -32,10 +32,12 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-sm rounded-md",
-  md: "h-10 px-4 text-sm rounded-lg",
+  // On touch screens every size grows to at least 44px, the minimum
+  // comfortable tap target; mouse layouts keep their compact sizes.
+  sm: "h-8 px-3 text-sm rounded-md pointer-coarse:h-11",
+  md: "h-10 px-4 text-sm rounded-lg pointer-coarse:h-11",
   lg: "h-12 px-6 text-base rounded-lg",
-  icon: "h-10 w-10 rounded-lg",
+  icon: "h-10 w-10 rounded-lg pointer-coarse:h-11 pointer-coarse:w-11",
 };
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
