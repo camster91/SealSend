@@ -53,6 +53,7 @@
   --color-error-100: #ffe4e6;
   --color-error-500: #f43f5e;
   --color-error-600: #e11d48;
+  --color-error-700: #be123c;
 
   /* Neutrals - Warm Slate */
   --color-neutral-50: #fafaf9;
@@ -71,6 +72,15 @@
   --color-background: var(--color-neutral-50);
   --color-foreground: var(--color-neutral-900);
   --color-muted: var(--color-neutral-500);
+  /* Secondary text. neutral-600 keeps at least 7:1 contrast on white and neutral-100. */
+  --color-muted-foreground: var(--color-neutral-600);
+  /* Status aliases used across forms and badges; they were referenced before
+     they existed, so error text rendered in the default colour. Red and green
+     also style small text, so they use the -700 shades: at least 5:1 on white
+     and on red-50. Amber is only used for decorative fills. */
+  --color-accent-red: var(--color-error-700);
+  --color-accent-green: var(--color-success-700);
+  --color-accent-amber: var(--color-warning-500);
   --color-border: var(--color-neutral-200);
   --color-ring: var(--color-primary-500);
 

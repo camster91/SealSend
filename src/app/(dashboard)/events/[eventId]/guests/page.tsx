@@ -10,6 +10,7 @@ import { UserPlus, ArrowLeft, Mail, Loader2, Upload, Bell, Download } from "luci
 import Link from "next/link";
 import type { Guest } from "@/types/database";
 import { useConfirm } from "@/components/ui/Feedback";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 export default function GuestsPage() {
   const params = useParams();
@@ -219,9 +220,7 @@ export default function GuestsPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
+        <TableSkeleton label="Loading guests" columns={4} />
       ) : (
         <GuestTable
           guests={guests}

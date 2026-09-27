@@ -100,7 +100,9 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
                 e.stopPropagation();
                 toggleExpand(response.id);
               }}
-              className="p-1 hover:bg-neutral-100 rounded"
+              aria-expanded={expandedRows.has(response.id)}
+              aria-label={`${expandedRows.has(response.id) ? "Hide" : "Show"} plus-ones for ${response.respondent_name}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg any-pointer-coarse:h-11 any-pointer-coarse:w-11 hover:bg-neutral-100"
             >
               {expandedRows.has(response.id) ? (
                 <ChevronDown className="h-4 w-4 text-neutral-500" />
@@ -175,9 +177,9 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
             }}
             disabled={deleting === item.id}
             aria-label={`Delete response from ${String(item.respondent_name || "guest")}`}
-            className="rounded-lg p-1.5 hover:bg-red-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg any-pointer-coarse:h-11 any-pointer-coarse:w-11 hover:bg-error-50"
           >
-            <Trash2 className="h-4 w-4 text-accent-red" />
+            <Trash2 className="h-4 w-4 text-error-600" aria-hidden />
           </button>
         ),
       },

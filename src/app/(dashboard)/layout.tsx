@@ -11,6 +11,12 @@ export default function DashboardLayout({
 }) {
   return (
     <FeedbackProvider>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[900] focus:rounded-xl focus:bg-brand-700 focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to main content
+      </a>
       <div className="flex h-[100dvh]">
         {/* Desktop sidebar — hidden on mobile */}
         <div className="hidden md:block">
