@@ -139,13 +139,14 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
 test('the welcome tour shows once, only to new hosts, and is an accessible dialog', async () => {
   const tour = await read('src/components/onboarding/WelcomeTour.tsx');
   const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
-  assert.match(dashboard, /<WelcomeTour show=\{myEvents\.length === 0 && collaboratingEvents\.length === 0\} \/>/);
+  assert.match(dashboard, /<WelcomeTour userId=\{user\.id\} show=\{user\.role === 'admin' && myEvents\.length === 0 && collaboratingEvents\.length === 0\} \/>/);
   assert.match(tour, /role="dialog"/);
   assert.match(tour, /aria-modal="true"/);
   assert.match(tour, /event\.key === "Escape"/);
   assert.match(tour, /event\.key !== "Tab"/);
   assert.match(tour, /useReducedMotion/);
-  assert.match(tour, /try \{\s*localStorage\.setItem\(WELCOME_TOUR_STORAGE_KEY, "done"\)/);
+  assert.match(tour, /try \{\s*localStorage\.setItem\(welcomeTourStorageKey\(userId\), "done"\)/);
+  assert.match(tour, /`\$\{WELCOME_TOUR_STORAGE_KEY\}:\$\{userId\}`/);
   assert.match(tour, /href="\/events\/new"/);
 });
 

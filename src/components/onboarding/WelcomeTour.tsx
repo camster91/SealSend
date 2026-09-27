@@ -34,12 +34,17 @@ const STEPS = [
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** Per-user key, so a second host signing in on the same browser still sees the tour. */
+export function welcomeTourStorageKey(userId: string): string {
+  return `${WELCOME_TOUR_STORAGE_KEY}:${userId}`;
+}
+
 /**
- * A three-step welcome shown once, on the dashboard, to people who have no
- * events yet. Dismissal is remembered in localStorage; if storage is blocked
- * the tour simply shows again next time.
+ * A three-step welcome shown once, on the dashboard, to hosts who have no
+ * events yet. Dismissal is remembered per user in localStorage; if storage is
+ * blocked the tour simply shows again next time.
  */
-export function WelcomeTour({ show }: { show: boolean }) {
+export function WelcomeTour({ show, userId }: { show: boolean; userId: string }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -51,7 +56,7 @@ export function WelcomeTour({ show }: { show: boolean }) {
     if (!show) return;
     let seen = false;
     try {
-      seen = localStorage.getItem(WELCOME_TOUR_STORAGE_KEY) === "done";
+      seen = localStorage.getItem(welcomeTourStorageKey(userId)) === "done";
     } catch {
       seen = false;
     }
@@ -59,17 +64,17 @@ export function WelcomeTour({ show }: { show: boolean }) {
       returnFocusRef.current = document.activeElement;
       setOpen(true);
     }
-  }, [show]);
+  }, [show, userId]);
 
   const close = useCallback(() => {
     try {
-      localStorage.setItem(WELCOME_TOUR_STORAGE_KEY, "done");
+      localStorage.setItem(welcomeTourStorageKey(userId), "done");
     } catch {
       // Storage blocked: the tour will show again next visit, which is harmless.
     }
     setOpen(false);
     if (returnFocusRef.current instanceof HTMLElement) returnFocusRef.current.focus();
-  }, []);
+  }, [userId]);
 
   // Move focus to the main button whenever the step changes.
   useEffect(() => {

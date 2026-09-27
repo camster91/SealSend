@@ -95,7 +95,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
 
-        <WelcomeTour show={myEvents.length === 0 && collaboratingEvents.length === 0} />
+        <WelcomeTour userId={user.id} show={user.role === 'admin' && myEvents.length === 0 && collaboratingEvents.length === 0} />
         <OnboardingChecklist
           event={firstOwnedEvent ? {
             id: firstOwnedEvent.id,
