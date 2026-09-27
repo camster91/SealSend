@@ -171,10 +171,12 @@ test('text-muted-foreground is a registered theme colour and touch targets reach
   const css = await read('src/app/globals.css');
   const theme = css.slice(css.indexOf('@theme inline {'), css.indexOf('}', css.indexOf('@theme inline {')));
   assert.match(theme, /--color-muted-foreground: var\(--color-neutral-600\);/);
-  for (const alias of ['accent-red', 'accent-green', 'accent-amber']) assert.match(theme, new RegExp(`--color-${alias}: var\\(--color-`));
+  assert.match(theme, /--color-accent-red: var\(--color-error-700\);/);
+  assert.match(theme, /--color-accent-green: var\(--color-success-700\);/);
+  assert.match(theme, /--color-accent-amber: var\(--color-/);
   const button = await read('src/components/ui/Button.tsx');
-  assert.match(button, /md: "[^"]*pointer-coarse:h-11/);
-  assert.match(button, /icon: "[^"]*pointer-coarse:h-11 pointer-coarse:w-11/);
+  assert.match(button, /md: "[^"]*any-pointer-coarse:h-11/);
+  assert.match(button, /icon: "[^"]*any-pointer-coarse:h-11 any-pointer-coarse:w-11/);
   const tabBar = await read('src/components/layout/MobileTabBar.tsx');
   assert.match(tabBar, /min-h-14/);
   assert.match(tabBar, /aria-current=\{isActive \? 'page' : undefined\}/);
