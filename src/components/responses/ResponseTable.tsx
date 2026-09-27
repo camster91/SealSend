@@ -7,6 +7,7 @@ import { Trash2, ChevronDown, ChevronRight, Mail, UserPlus } from "lucide-react"
 import { formatDateTime } from "@/lib/utils";
 import type { RSVPResponseWithPlusOnes, PlusOne } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
 
 interface ResponseTableProps {
   responses: RSVPResponseWithPlusOnes[];
@@ -39,6 +40,8 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
   const [deleting, setDeleting] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const filtered = useMemo(
     () =>
@@ -49,7 +52,7 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
   );
 
   async function handleDelete(responseId: string) {
-    if (!confirm("Delete this response?")) return;
+    if (!(await confirm({ title: "Delete this response?", description: "The guest's reply and any plus-ones they added will be removed. This can't be undone.", confirmLabel: "Delete response" }))) return;
     setDeleting(responseId);
     setError(null);
     try {
@@ -60,6 +63,7 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
         setError("Failed to delete response. Please try again.");
         return;
       }
+      toast("Response deleted.");
       onRefresh();
     } catch {
       setError("Network error. Check your connection and try again.");

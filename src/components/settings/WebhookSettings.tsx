@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/Feedback";
 
 type Organization = { id: string; name: string; is_personal: boolean; role: string };
 type Webhook = {
@@ -35,6 +36,7 @@ export function WebhookSettings() {
   const [events, setEvents] = useState<string[]>(["rsvp.submitted"]);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -135,10 +137,13 @@ export function WebhookSettings() {
                     () => fetch(`/api/organizations/${organizationId}/webhooks/${webhook.id}`, json("PATCH", { active: !webhook.active })),
                     () => webhook.active ? "Webhook paused." : "Webhook resumed.",
                   )}>{webhook.active ? "Pause" : "Resume"}</Button>
-                  <Button type="button" variant="ghost" disabled={busy} aria-label={`Delete webhook ${webhook.url}`} onClick={() => void run(
-                    () => fetch(`/api/organizations/${organizationId}/webhooks/${webhook.id}`, json("DELETE")),
-                    () => "Webhook deleted.",
-                  )}>Delete</Button>
+                  <Button type="button" variant="ghost" disabled={busy} aria-label={`Delete webhook ${webhook.url}`} onClick={async () => {
+                    if (!(await confirm({ title: "Delete this webhook?", description: "Queued deliveries to this address are dropped, and your app stops receiving events.", confirmLabel: "Delete webhook" }))) return;
+                    void run(
+                      () => fetch(`/api/organizations/${organizationId}/webhooks/${webhook.id}`, json("DELETE")),
+                      () => "Webhook deleted.",
+                    );
+                  }}>Delete</Button>
                 </div>
               </li>
             ))}

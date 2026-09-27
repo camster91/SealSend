@@ -27,7 +27,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     "border border-border bg-transparent hover:bg-neutral-50 text-foreground",
   ghost: "hover:bg-neutral-100 text-foreground",
   destructive:
-    "bg-accent-red text-white hover:bg-red-600 shadow-sm",
+    "bg-error-600 text-white hover:bg-rose-700 shadow-sm",
   link: "text-brand-600 hover:text-brand-700 underline-offset-4 hover:underline p-0 h-auto",
 };
 

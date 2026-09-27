@@ -7,6 +7,7 @@ import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatRelative } from '@/lib/utils';
 import type { EventComment } from '@/types/database';
+import { useConfirm } from '@/components/ui/Feedback';
 
 export default function CommentsPage() {
   const params = useParams();
@@ -14,6 +15,7 @@ export default function CommentsPage() {
   const [comments, setComments] = useState<EventComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -30,7 +32,7 @@ export default function CommentsPage() {
   }, [fetchComments]);
 
   async function handleDelete(commentId: string) {
-    if (!confirm('Delete this comment?')) return;
+    if (!(await confirm({ title: 'Delete this comment?', description: 'It will be removed from the event page.', confirmLabel: 'Delete comment' }))) return;
     setDeleteError(null);
 
     try {

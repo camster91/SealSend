@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { UserPlus, ArrowLeft, Mail, Loader2, Upload, Bell, Download } from "lucide-react";
 import Link from "next/link";
 import type { Guest } from "@/types/database";
+import { useConfirm } from "@/components/ui/Feedback";
 
 export default function GuestsPage() {
   const params = useParams();
@@ -21,6 +22,7 @@ export default function GuestsPage() {
   const [sending, setSending] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "success"; message: string } | null>(null);
+  const confirm = useConfirm();
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
@@ -62,7 +64,12 @@ export default function GuestsPage() {
       return;
     }
 
-    if (!confirm(`Send invitations to ${pendingCount} guest${pendingCount !== 1 ? "s" : ""}?`)) {
+    if (!(await confirm({
+      title: `Send invitations to ${pendingCount} guest${pendingCount !== 1 ? "s" : ""}?`,
+      description: "Each guest who hasn't been invited yet gets their invitation now.",
+      confirmLabel: "Send invitations",
+      tone: "default",
+    }))) {
       return;
     }
 
@@ -102,7 +109,12 @@ export default function GuestsPage() {
       return;
     }
 
-    if (!confirm(`Send reminders to ${reminderCount} guest${reminderCount !== 1 ? "s" : ""}?`)) {
+    if (!(await confirm({
+      title: `Send reminders to ${reminderCount} guest${reminderCount !== 1 ? "s" : ""}?`,
+      description: "Guests who haven't replied yet get a reminder now.",
+      confirmLabel: "Send reminders",
+      tone: "default",
+    }))) {
       return;
     }
 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { SignupItemWithClaims } from '@/types/database';
+import { useConfirm } from '@/components/ui/Feedback';
 
 export default function SignupsPage() {
   const params = useParams();
@@ -18,6 +19,7 @@ export default function SignupsPage() {
   const [category, setCategory] = useState('');
   const [slots, setSlots] = useState('1');
   const [submitting, setSubmitting] = useState(false);
+  const confirm = useConfirm();
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -61,7 +63,7 @@ export default function SignupsPage() {
   }
 
   async function handleDelete(itemId: string) {
-    if (!confirm('Delete this item and all its claims?')) return;
+    if (!(await confirm({ title: 'Delete this sign-up item?', description: 'Everyone who signed up for it will be removed from it too.', confirmLabel: 'Delete item' }))) return;
 
     const res = await fetch(`/api/events/${eventId}/signups`, {
       method: 'DELETE',
