@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/Feedback";
 
 type Organization = { id: string; name: string; plan: string; is_personal: boolean; role: string };
 type Member = { user_id: string; email: string; name: string | null; role: string };
@@ -43,6 +44,7 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("planner");
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadOrganizations = useCallback(async (selectId?: string) => {
@@ -180,14 +182,20 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
                           variant="ghost"
                           disabled={busy}
                           aria-label={self ? "Leave workspace" : `Remove ${member.email}`}
-                          onClick={() => void run(
+                          onClick={async () => {
+                            const ok = await confirm(self
+                              ? { title: `Leave ${selected.name}?`, description: "You'll lose access to this workspace's events until someone invites you again.", confirmLabel: "Leave workspace" }
+                              : { title: `Remove ${member.name || member.email}?`, description: "They'll lose access to this workspace's events right away.", confirmLabel: "Remove member" });
+                            if (!ok) return;
+                            void run(
                             () => fetch(`/api/organizations/${selected.id}/members/${member.user_id}`, json("DELETE")),
                             self ? "You left the workspace." : "Member removed.",
                             async () => {
                               if (self) { setOrganizationId(null); await loadOrganizations(); }
                               else await loadMembers(selected.id);
                             },
-                          )}
+                            );
+                          }}
                         >
                           {self ? "Leave" : "Remove"}
                         </Button>

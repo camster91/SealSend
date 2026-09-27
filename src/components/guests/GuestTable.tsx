@@ -5,6 +5,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Trash2, Edit2 } from "lucide-react";
 import type { Guest, InviteStatus } from "@/types/database";
+import { useConfirm, useToast } from "@/components/ui/Feedback";
 
 const inviteBadge: Record<InviteStatus, { label: string; variant: "secondary" | "success" | "destructive" }> = {
   not_sent: { label: "Not Sent", variant: "secondary" },
@@ -22,9 +23,11 @@ interface GuestTableProps {
 export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTableProps) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   async function handleDelete(guestId: string) {
-    if (!confirm("Are you sure you want to remove this guest?")) return;
+    if (!(await confirm({ title: "Remove this guest?", description: "They'll be taken off the guest list and their invitation link will stop working.", confirmLabel: "Remove guest" }))) return;
     setDeleting(guestId);
     setError(null);
     try {
@@ -35,6 +38,7 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
         setError("Failed to delete guest. Please try again.");
         return;
       }
+      toast("Guest removed.");
       onRefresh();
     } catch {
       setError("Network error. Check your connection and try again.");

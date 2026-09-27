@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/Feedback";
 
 type Organization = { id: string; name: string; is_personal: boolean; role: string };
 type Client = { id: string; name: string; contact_email: string | null; contact_phone: string | null; notes: string | null; event_count: number };
@@ -26,6 +27,7 @@ export function ClientsSettings() {
   const [clients, setClients] = useState<Client[]>([]);
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const confirm = useConfirm();
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEvent[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,6 +90,7 @@ export function ClientsSettings() {
 
   async function remove(client: Client) {
     if (!organizationId) return;
+    if (!(await confirm({ title: `Remove ${client.name}?`, description: "Their events are kept, but they'll no longer be linked to this client.", confirmLabel: "Remove client" }))) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/organizations/${organizationId}/clients/${client.id}`, { method: "DELETE" });

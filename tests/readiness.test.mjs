@@ -150,6 +150,23 @@ test('the welcome tour shows once, only to new hosts, and is an accessible dialo
   assert.match(tour, /href="\/events\/new"/);
 });
 
+test('dashboard confirmations use the accessible dialog, not window.confirm', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const files = execFileSync('git', ['ls-files', 'src/**/*.tsx', 'src/**/*.ts'], { encoding: 'utf8' }).trim().split('\n');
+  const offenders = [];
+  for (const file of files) {
+    if (file === 'src/components/ui/Feedback.tsx') continue;
+    const source = await read(file);
+    if (/(^|[^.\w])confirm\(\s*[`'"]/m.test(source) || /window\.confirm\(/.test(source) || /(^|[^.\w])alert\(/m.test(source)) offenders.push(file);
+  }
+  assert.deepEqual(offenders, []);
+  const layout = await read('src/app/(dashboard)/layout.tsx');
+  assert.match(layout, /<FeedbackProvider>/);
+  const feedback = await read('src/components/ui/Feedback.tsx');
+  assert.match(feedback, /role="alertdialog"/);
+  assert.match(feedback, /cancelRef\.current\?\.focus\(\)/);
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
