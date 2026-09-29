@@ -17,6 +17,7 @@ const useCaseLinks = [
   { label: "Local Nonprofits", href: "/use-cases/nonprofit-events" },
   { label: "Clubs & Associations", href: "/use-cases/clubs-associations" },
   { label: "Professional Gatherings", href: "/use-cases/professional-gatherings" },
+  { label: "Event Planners", href: "/use-cases/event-planners" },
 ];
 
 export function Navbar({ user }: { user?: NavbarUser | null }) {

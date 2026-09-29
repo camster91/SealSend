@@ -79,6 +79,14 @@ export function Footer() {
                   Professional Gatherings
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/use-cases/event-planners"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Event Planners
+                </Link>
+              </li>
             </ul>
           </div>
 

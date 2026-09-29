@@ -14,6 +14,8 @@ import {
   BarChart3,
   Tag,
   Megaphone,
+  Palette,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +35,8 @@ const iconMap: Record<string, LucideIcon> = {
   BarChart3,
   Tag,
   Megaphone,
+  Palette,
+  Plug,
 };
 
 interface Benefit {

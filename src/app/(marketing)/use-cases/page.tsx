@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Briefcase, Heart, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, BadgeCheck, Briefcase, Heart, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { createMetadata } from "@/lib/metadata";
 import { USE_CASES } from "@/lib/use-case-content";
 import CTASection from "@/components/marketing/CTASection";
@@ -17,7 +17,7 @@ export const metadata = createMetadata({
   ],
 });
 
-const iconMap: Record<string, LucideIcon> = { Users, Heart, BadgeCheck, Briefcase };
+const iconMap: Record<string, LucideIcon> = { Users, Heart, BadgeCheck, Briefcase, Sparkles };
 
 export default function UseCasesIndexPage() {
   return (

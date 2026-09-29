@@ -1,6 +1,6 @@
 export interface UseCaseData {
   slug: string;
-  indexIcon: "Users" | "Heart" | "BadgeCheck" | "Briefcase";
+  indexIcon: "Users" | "Heart" | "BadgeCheck" | "Briefcase" | "Sparkles";
   indexDescription: string;
   indexFeatures: string[];
   metaTitle: string;
@@ -106,12 +106,36 @@ export const USE_CASES: Record<string, UseCaseData> = {
     ],
     faqs: [
       { question: "What event size is supported in the beta?", answer: betaCapacityAnswer },
-      { question: "Does SealSend replace an enterprise event platform?", answer: "No. SealSend is intentionally scoped to a small organizer's invitation-to-check-in workflow. It does not currently provide ticketing, sponsor management, venue sourcing, or CRM integrations." },
+      { question: "Does SealSend replace an enterprise event platform?", answer: "No. SealSend is intentionally scoped to a small organizer's invitation-to-check-in workflow. It does not currently provide ticketing, sponsor management, or venue sourcing. RSVPs, check-ins and approvals can be sent to a CRM or Zapier through signed workspace webhooks." },
       { question: "Can we use our own invitation artwork?", answer: "Yes. Organizers can upload supported artwork, review the displayed crop, and retain the uploaded original." },
       { question: "Can attendee information be exported?", answer: "Yes. An authorized organizer can export event-scoped guest or response information for legitimate event operations." },
     ],
     ctaText: "Start a Professional Gathering",
     keywords: ["professional event RSVP", "networking event invitations", "workshop guest management", "small event check in"],
+  },
+  "event-planners": {
+    slug: "event-planners",
+    indexIcon: "Sparkles",
+    indexDescription: "For independent planners and small studios running events for clients: a team workspace, your own brand, client records and review links.",
+    indexFeatures: ["Team workspace", "Brand kit", "Client review links", "Webhooks"],
+    metaTitle: "Event Planner Workspace for Client Events",
+    metaDescription: "Run client events under your own brand with a team workspace, client records, read-only review links with approvals, and RSVP webhooks.",
+    heroHeadline: "Run Client Events Under Your Own Brand",
+    heroSubtext: "For independent planners and small studios. Keep every client event in one team workspace, put your brand on invitations, and get sign-off from clients before anything goes out.",
+    benefits: [
+      { icon: "Users", title: "One workspace for your team", description: "Invite planners and check-in staff to a shared workspace. Roles decide who can edit events, manage clients, or only check guests in at the door." },
+      { icon: "Palette", title: "Your brand on every event", description: "Set your logo, colours, font, email sender name, reply-to address and text-message signature once. Every event in the workspace uses them." },
+      { icon: "Share2", title: "Client review and approval", description: "Keep a record for each client and send them a read-only review link with live RSVP totals, never guest details. Their approval is recorded on the event." },
+      { icon: "Plug", title: "Connect the tools you already use", description: "Signed webhooks send each RSVP, check-in, publish and client approval to Zapier, Make or your own CRM, with retries if your endpoint is down." },
+    ],
+    faqs: [
+      { question: "What is included during the controlled beta?", answer: `${betaCapacityAnswer} Workspaces, the brand kit, client records, review links and webhooks are all available to beta organizers at no cost.` },
+      { question: "Can I remove SealSend's name completely?", answer: "Not yet. During the beta, emails and texts show your brand followed by \"via SealSend\". Full white-label is planned for the paid organizer plans." },
+      { question: "Do my clients need an account?", answer: "No. A client opens the review link in a browser, sees the invitation and RSVP totals, and can approve it by typing their name. Links expire after 30 days and can be revoked at any time." },
+      { question: "Does SealSend handle contracts, invoices or payments from clients?", answer: "No. SealSend covers the guest side of the event: invitations, RSVPs, updates and check-in. Use webhooks to send that data into the CRM or invoicing tool you already use." },
+    ],
+    ctaText: "Join the Organizer Beta",
+    keywords: ["event planner software", "event planner client portal", "branded event invitations", "event planner RSVP tool"],
   },
 };
 
