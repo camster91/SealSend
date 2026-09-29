@@ -14,6 +14,24 @@ The machine-checked quality baseline is product capability **82/100**, competiti
 
 ## Current production
 
+> **2026-09-29 deployment, operator record pending.** The organizer-platform release is serving at `https://sealsend.app`: workspaces, brand kit, clients and review links, SMS metering, webhooks, the welcome tour, confirm dialogs, and the colour/touch-target fixes, up to master `87cca1c` (#193). Checked externally without credentials:
+>
+> - `/api/health` returns 200.
+> - The home page footer shows "Source code (AGPL-3.0)".
+> - `/api/cron/deliver-webhooks` returns 401 without `CRON_SECRET`.
+> - `/client/<invalid>` returns 404 without a login redirect.
+> - HSTS, CSP, `X-Frame-Options: DENY`, `nosniff` and the referrer policy are present.
+>
+> Not yet recorded:
+>
+> - image tag
+> - backup file
+> - rollback target
+> - `apply-security-indexes.sql` output
+> - the installed `sealsend-maintenance.cron` (webhooks job)
+>
+> Add them here from the operator's deploy report. Until then, the image, commit and backup fields below describe the previous (2026-08-27) release.
+
 - Public origin: `https://sealsend.app`
 - Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`

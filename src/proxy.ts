@@ -61,6 +61,7 @@ export async function proxy(request: NextRequest) {
     '/use-cases',
     '/terms',
     '/privacy',
+    '/support',
     '/robots.txt',
     '/sitemap.xml',
     '/invite/accept',

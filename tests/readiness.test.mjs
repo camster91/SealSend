@@ -182,6 +182,15 @@ test('text-muted-foreground is a registered theme colour and touch targets reach
   assert.match(tabBar, /aria-current=\{isActive \? 'page' : undefined\}/);
 });
 
+test('public marketing pages linked from the footer do not require a login', async () => {
+  const proxy = await read('src/proxy.ts');
+  const footer = await read('src/components/layout/Footer.tsx');
+  const publicList = proxy.slice(proxy.indexOf('const publicPaths = ['), proxy.indexOf('];', proxy.indexOf('const publicPaths = [')));
+  for (const href of footer.matchAll(/href="(\/[a-z-]+)(?:\/[a-z-]+)?"/g)) {
+    assert.match(publicList, new RegExp(`'${href[1]}'`), `${href[1]} is linked from the footer but not public`);
+  }
+});
+
 test('fresh and upgraded schemas create the waitlist signup table', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
@@ -720,6 +729,7 @@ test('organizer use cases and comparison stay inside the shipped product scope',
     'nonprofit-events',
     'clubs-associations',
     'professional-gatherings',
+    'event-planners',
   ]) {
     assert.match(content, new RegExp(`slug: ["']${slug}["']`));
     for (const navigationSource of [navbar, footer, sitemap]) {
