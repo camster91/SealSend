@@ -8,7 +8,7 @@ It is inactive until repository variable `COOLIFY_RELEASE_ENABLED=true`. Do not 
 2. Verify `COOLIFY_URL`, `COOLIFY_TOKEN` and `COOLIFY_APP_UUID` against the correct adopted resource. Keep credentials private. Use a trusted HTTPS origin, without `/api/v1` in the URL. The release script validates repository, branch, Dockerfile build pack and `https://sealsend.app` before writing anything.
 3. Disable the adopted resource's direct Git auto-deploy and previews. Keep the old manual deploy and build/push workflows disabled. This workflow must own production deployment.
 4. Create a fresh database backup, preserve uploads and a matching immutable rollback image, and verify recovery on isolated resources. Preserve the application's test-only payment/communication flags and cleanup gates.
-5. Rehearse release polling against the installed Coolify version and verify the exact serving container revision after a candidate deployment. Public readiness is not proof of authenticated workflows or provider delivery.
+5. Enable source-commit inclusion in Coolify. The image accepts `SOURCE_COMMIT` and health reports only a valid full SHA, or null when unavailable. Rehearse release polling against the installed Coolify version; the release script requires both the completed deployment and public health to report the verified SHA. This is not proof of authenticated workflows or provider delivery.
 6. Protect the default branch with appropriate required CI checks. Direct default-branch pushes also fire CI; enforcing merges requires branch protection.
 7. Enable the adoption variable only after the resource is verified. A subsequent checked code merge can exercise the full automatic release path. Documentation-only changes can be excluded by the existing CI path filters.
 

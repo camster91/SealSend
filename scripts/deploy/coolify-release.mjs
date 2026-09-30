@@ -49,8 +49,11 @@ export async function release(env, { fetchImpl = fetch, sleep = ms => new Promis
     if (result.status === 'finished') {
       if (result.commit !== sha) throw new Error('Finished deployment revision does not match verified CI');
       const response = await fetchImpl(health, { redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'Cache-Control': 'no-cache' } });
-      if (!response.ok || (await response.json()).status !== 'ok') throw new Error('Public database readiness check failed');
-      log(`Coolify finished revision ${sha}; public database readiness passed`);
+      if (!response.ok) throw new Error('Public database readiness check failed');
+      const readiness = await response.json();
+      if (readiness.status !== 'ok') throw new Error('Public database readiness check failed');
+      if (readiness.revision !== sha) throw new Error('Public serving revision does not match verified CI');
+      log(`Coolify finished revision ${sha}; public serving revision and database readiness passed`);
       return { sha, deploymentUuid: deployment.deployment_uuid };
     }
     if (!['queued', 'in_progress', 'pending'].includes(result.status)) throw new Error('Coolify deployment failed or returned an unknown status');

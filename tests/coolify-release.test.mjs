@@ -5,9 +5,9 @@ import { release } from '../scripts/deploy/coolify-release.mjs';
 const sha = 'a'.repeat(40);
 const env = { RELEASE_SHA: sha, RELEASE_BRANCH: 'master', COOLIFY_RELEASE_ENABLED: 'true', COOLIFY_APP_UUID: 'app123', COOLIFY_TOKEN: 'test-only-token', COOLIFY_URL: 'https://coolify.example.test' };
 const app = { uuid: 'app123', git_repository: 'https://github.com/camster91/SealSend.git', git_branch: 'master', build_pack: 'dockerfile', fqdn: 'https://sealsend.app', git_commit_sha: 'HEAD', settings: { is_auto_deploy_enabled: false } };
-function harness({ resource = app, retainedSha = sha, deployedSha = sha, status = 'finished', healthStatus = 'ok', queueUuid = 'app123' } = {}) {
+function harness({ resource = app, retainedSha = sha, deployedSha = sha, publicSha = sha, status = 'finished', healthStatus = 'ok', queueUuid = 'app123' } = {}) {
   const calls = [];
-  const responses = [resource, { uuid: 'app123' }, { ...resource, git_commit_sha: retainedSha }, { deployments: [{ resource_uuid: queueUuid, deployment_uuid: 'release123' }] }, { status, commit: deployedSha }, { status: healthStatus }];
+  const responses = [resource, { uuid: 'app123' }, { ...resource, git_commit_sha: retainedSha }, { deployments: [{ resource_uuid: queueUuid, deployment_uuid: 'release123' }] }, { status, commit: deployedSha }, { status: healthStatus, revision: publicSha }];
   return { calls, fetchImpl: async (url, options) => {
     calls.push({ url: String(url), ...options });
     const payload = responses.shift();
@@ -36,7 +36,7 @@ test('partial SHA and unsafe API origins are rejected before sending credentials
   }
 });
 test('unretained pin and mismatched deployment cannot be reported as a release', async () => {
-  for (const options of [{ retainedSha: 'HEAD' }, { queueUuid: 'other123' }, { deployedSha: 'b'.repeat(40) }, { status: 'failed' }, { healthStatus: 'unavailable' }]) {
+  for (const options of [{ retainedSha: 'HEAD' }, { queueUuid: 'other123' }, { deployedSha: 'b'.repeat(40) }, { publicSha: 'c'.repeat(40) }, { publicSha: null }, { status: 'failed' }, { healthStatus: 'unavailable' }]) {
     await assert.rejects(release(env, harness(options)));
   }
 });
