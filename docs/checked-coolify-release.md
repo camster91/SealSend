@@ -1,6 +1,6 @@
 # Checked Coolify release adoption
 
-This release path deploys a successful default-branch push from `CI Build`, pins its full SHA in Coolify, waits for that specific deployment to finish, checks its revision and probes public database readiness. PR CI and manually dispatched CI cannot trigger production. Superseded default-branch revisions are skipped. It supports the current `master` branch; when standardizing on `main`, update CI's push branch and repository integrations together.
+This release path deploys a successful default-branch push from `CI Build`, pins its full SHA in Coolify, waits for that specific deployment to finish, checks its revision and probes public database readiness. PR CI and manually dispatched CI cannot trigger production. Superseded default-branch revisions are skipped. CI verifies pushes to both `main` and preserved legacy `master`; the release workflow accepts only the current default branch. Move the default to protected `main` and update the Coolify resource branch together during adoption. Retaining `master` does not give it a second production release path.
 
 It is inactive until repository variable `COOLIFY_RELEASE_ENABLED=true`. Do not enable that variable until all of the following are verified:
 

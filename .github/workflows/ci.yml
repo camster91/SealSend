@@ -20,7 +20,7 @@ on:
       - '.github/ashbi-local-ci-validation.md'
       - 'dev_server.log'
   push:
-    branches: [master]
+    branches: [main, master]
     paths-ignore:
       - 'docs/**'
       - '**.md'
