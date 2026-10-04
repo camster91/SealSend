@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,10 +31,21 @@ const primaryButton =
   "inline-flex min-h-11 items-center justify-center rounded-lg bg-ink px-4 text-[0.95rem] font-semibold text-white transition-colors hover:bg-wax focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2";
 
 export function Navbar({ user }: { user?: NavbarUser | null }) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [lastPathname, setLastPathname] = useState(pathname);
+  const navRef = useRef<HTMLElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
+
+  // Close both menus whenever the route changes (including back/forward), so an open
+  // drawer never carries over and covers the next page.
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setMobileOpen(false);
+    setDropdownOpen(false);
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -58,12 +70,28 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
         mobileToggleRef.current?.focus();
       }
     }
+    // A tap outside the nav, or widening to the desktop layout, also closes the drawer.
+    function handlePointerDown(e: PointerEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
+      }
+    }
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    function handleBreakpoint(e: MediaQueryListEvent) {
+      if (e.matches) setMobileOpen(false);
+    }
     document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    document.addEventListener("pointerdown", handlePointerDown);
+    desktop.addEventListener("change", handleBreakpoint);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      desktop.removeEventListener("change", handleBreakpoint);
+    };
   }, [mobileOpen]);
 
   return (
-    <nav aria-label="Main" className="sticky top-0 z-50 border-b border-border bg-cotton/95 backdrop-blur-sm">
+    <nav ref={navRef} aria-label="Main" className="sticky top-0 z-50 border-b border-border bg-cotton/95 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Logo />
 
@@ -165,7 +193,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
       </div>
 
       {/* Mobile nav */}
-      {mobileOpen && <div id="mobile-navigation" className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-border bg-cotton lg:hidden">
+      {mobileOpen && <div id="mobile-navigation" className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-cotton lg:hidden">
         <div className="space-y-1 px-4 pb-6 pt-3">
           <Link
             href="/how-it-works"

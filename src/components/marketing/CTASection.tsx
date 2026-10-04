@@ -3,7 +3,7 @@ import { PrimaryCta } from "@/components/marketing/Cta";
 
 export default function CTASection() {
   return (
-    <section className="bg-ink px-4 py-20 text-white sm:px-6 sm:py-24 lg:px-8">
+    <section className="bg-ink px-4 py-14 text-white sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <SealMark className="h-12 w-12" />
         <h2 className="mt-6 font-display text-4xl sm:text-5xl">Your next event, sealed and sent.</h2>

@@ -45,8 +45,8 @@ const linkClass = "inline-flex min-h-9 items-center text-[0.95rem] text-neutral-
 export function Footer() {
   return (
     <footer className="border-t border-border bg-cotton">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-12">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+        <div className="grid gap-8 sm:gap-10 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <Logo />
             <p className="mt-4 max-w-xs leading-relaxed text-neutral-600">
@@ -83,7 +83,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-border pt-8">
+        <div className="mt-10 border-t border-border pt-6 sm:mt-12 sm:pt-8">
           <p className="text-sm text-neutral-600">
             &copy; {new Date().getFullYear()} SealSend. All rights reserved.
           </p>

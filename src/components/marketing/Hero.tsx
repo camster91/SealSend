@@ -7,7 +7,7 @@ import { PRIMARY_CTA_NOTE, PrimaryCta, SecondaryCta } from "@/components/marketi
 export default function Hero() {
   return (
     <section className="relative overflow-hidden bg-[#e8ebf0]">
-      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8 xl:flex xl:min-h-[44rem] xl:items-center xl:py-20">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14 lg:px-8 xl:flex xl:min-h-[44rem] xl:items-center xl:py-20">
         <div className="max-w-xl xl:max-w-[28rem]">
           <SealMark className="animate-seal-press h-14 w-14" />
           <h1 className="mt-6 font-display text-[2.75rem] text-ink sm:text-6xl xl:text-[3.6rem]">
@@ -26,7 +26,7 @@ export default function Hero() {
 
       {/* Below xl the photo stacks under the copy, cropped to the envelope and phone. From xl it runs
           full-bleed behind the copy, which sits on the photo's empty left third. */}
-      <div className="relative mt-10 aspect-[4/3] w-full sm:aspect-[16/9] xl:absolute xl:inset-0 xl:mt-0 xl:aspect-auto">
+      <div className="relative mt-8 aspect-[4/3] sm:mt-10 w-full sm:aspect-[16/9] xl:absolute xl:inset-0 xl:mt-0 xl:aspect-auto">
         <Image
           src="/brand/photos/hero-stationery.webp"
           alt="A cream wedding invitation in an envelope sealed with a red wax S, beside a phone listing guests who are going"

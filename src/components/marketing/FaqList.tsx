@@ -30,8 +30,8 @@ export default function FaqList({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-12">
+    <section className="px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-6 sm:gap-10 lg:grid-cols-12">
         <h2 className="font-display text-4xl text-ink sm:text-5xl lg:col-span-4">{title}</h2>
         <div className="border-t border-border lg:col-span-8">
           {faqs.map((faq) => (

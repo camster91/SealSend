@@ -16,13 +16,13 @@ export const HOW_IT_WORKS_STEPS = [
 
 export default function HowItWorks({ title = "How it works" }: { title?: string }) {
   return (
-    <section id="how-it-works" className="px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+    <section id="how-it-works" className="px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <h2 className="max-w-2xl font-display text-4xl text-ink sm:text-5xl">{title}</h2>
-        <ol className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+        <ol className="mt-8 grid gap-8 sm:mt-12 md:grid-cols-3">
           {HOW_IT_WORKS_STEPS.map((step, index) => (
-            <li key={step.title} className="border-t border-foil pt-6">
-              <span aria-hidden="true" className="font-display text-5xl text-ink">
+            <li key={step.title} className="border-t border-foil pt-5 sm:pt-6">
+              <span aria-hidden="true" className="font-display text-4xl text-ink sm:text-5xl">
                 {index + 1}
               </span>
               <h3 className="mt-4 text-xl font-semibold text-ink">

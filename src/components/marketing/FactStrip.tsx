@@ -17,7 +17,7 @@ export default function FactStrip() {
         {facts.map((fact) => (
           <li
             key={fact}
-            className="border-border px-4 py-6 text-center text-[0.95rem] font-medium text-ink odd:border-r sm:px-6 lg:border-r lg:last:border-r-0 [&:nth-child(-n+2)]:border-b lg:[&:nth-child(-n+2)]:border-b-0"
+            className="border-border px-3 py-4 text-center text-sm sm:px-6 sm:py-6 sm:text-[0.95rem] font-medium text-ink odd:border-r lg:border-r lg:last:border-r-0 [&:nth-child(-n+2)]:border-b lg:[&:nth-child(-n+2)]:border-b-0"
           >
             {fact}
           </li>

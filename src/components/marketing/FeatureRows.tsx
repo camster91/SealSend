@@ -34,14 +34,14 @@ const features = [
 
 export default function FeatureRows() {
   return (
-    <section aria-labelledby="features-title" className="bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+    <section aria-labelledby="features-title" className="bg-white px-4 py-12 sm:px-6 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <h2 id="features-title" className="sr-only">
           What SealSend does
         </h2>
-        <div className="space-y-20 sm:space-y-28">
+        <div className="space-y-12 sm:space-y-28">
           {features.map((feature, index) => (
-            <div key={feature.title} className="grid items-center gap-8 lg:grid-cols-12 lg:gap-16">
+            <div key={feature.title} className="grid items-center gap-5 sm:gap-8 lg:grid-cols-12 lg:gap-16">
               <div
                 className={cn(
                   "relative aspect-[4/3] overflow-hidden rounded-2xl border border-border lg:col-span-7",
@@ -57,9 +57,10 @@ export default function FeatureRows() {
                 />
               </div>
               <div className="lg:col-span-5">
-                <Image src={feature.icon} alt="" width={56} height={56} className="h-14 w-14" />
-                <h3 className="mt-6 font-display text-3xl text-ink sm:text-4xl">{feature.title}</h3>
-                <p className="mt-4 max-w-md text-lg leading-relaxed text-neutral-600">{feature.text}</p>
+                {/* On phones the photo directly above carries the row, so the icon only shows from sm. */}
+                <Image src={feature.icon} alt="" width={56} height={56} className="hidden h-14 w-14 sm:mb-6 sm:block" />
+                <h3 className="font-display text-3xl text-ink sm:text-4xl">{feature.title}</h3>
+                <p className="mt-3 max-w-md leading-relaxed text-neutral-600 sm:mt-4 sm:text-lg">{feature.text}</p>
               </div>
             </div>
           ))}

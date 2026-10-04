@@ -13,6 +13,10 @@ test('navigation and pricing expose one accessible control per action', async ({
     await mobileToggle.click();
     await expect(mobileToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#mobile-navigation')).toBeVisible();
+    // The open drawer covers the page; close it before using page content.
+    await page.keyboard.press('Escape');
+    await expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#mobile-navigation')).toHaveCount(0);
   }
 
   // FAQ answers are native <details>, so they open with the platform's own keyboard and AT support.
