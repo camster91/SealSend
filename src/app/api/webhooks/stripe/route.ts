@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db/client";
+import { getDb, query } from "@/lib/db/client";
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
-import { toStoredSubscriptionStatus } from "@/lib/billing";
+import {
+  invoiceSubscriptionId,
+  isOrganizerPlan,
+  organizationPlanForSubscription,
+  organizerPlanFromSubscription,
+  subscriptionPeriodEnd,
+  toStoredSubscriptionStatus,
+  type StoredSubscriptionStatus,
+} from "@/lib/billing";
+import type { OrganizerPlan } from "@/lib/constants";
 import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
 import { grantSmsSegments } from "@/lib/sms-allowance";
 
@@ -89,6 +98,123 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   await recordActivationEventSafely({ name: "checkout_completed", userId, metadata: { plan: tier } });
 }
 
+function idOf(value: string | { id: string } | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+/**
+ * Stores the workspace subscription and applies the matching organizations.plan in one transaction.
+ * A workspace holds one subscription at a time: an event for a different subscription only replaces
+ * the stored one after that was cancelled, so a late event for an old subscription can't overwrite
+ * the plan the workspace pays for now.
+ */
+async function syncOrganizationSubscription(input: {
+  organizationId: string;
+  plan: OrganizerPlan;
+  status: StoredSubscriptionStatus;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}) {
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    const stored = await client.query(
+      `INSERT INTO organization_subscriptions (organization_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, cancel_at_period_end, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+       ON CONFLICT (organization_id) DO UPDATE SET
+         stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, organization_subscriptions.stripe_customer_id),
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         plan = EXCLUDED.plan,
+         status = EXCLUDED.status,
+         current_period_end = COALESCE(EXCLUDED.current_period_end, organization_subscriptions.current_period_end),
+         cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+         updated_at = NOW()
+       WHERE organization_subscriptions.stripe_subscription_id = EXCLUDED.stripe_subscription_id
+          OR organization_subscriptions.status = 'canceled'
+       RETURNING organization_id`,
+      [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd, input.cancelAtPeriodEnd]
+    );
+    if (stored.rowCount) {
+      await client.query(
+        "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
+        [organizationPlanForSubscription(input.plan, input.status), input.organizationId]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function handleOrganizerCheckout(session: Stripe.Checkout.Session) {
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") return;
+  const { organizationId, plan, userId } = session.metadata || {};
+  if (!organizationId || !UUID_PATTERN.test(organizationId) || !isOrganizerPlan(plan)) return;
+  const stripeSubscriptionId = idOf(session.subscription as string | Stripe.Subscription | null);
+  if (!stripeSubscriptionId) return;
+
+  await syncOrganizationSubscription({
+    organizationId,
+    plan,
+    status: "active",
+    stripeSubscriptionId,
+    stripeCustomerId: idOf(session.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null),
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+  });
+  await recordActivationEventSafely({ name: "checkout_completed", userId, metadata: { plan: `organizer_${plan}` } });
+}
+
+async function handleOrganizerSubscriptionChange(subscription: Stripe.Subscription, deleted: boolean) {
+  const { organizationId } = subscription.metadata || {};
+  if (!organizationId || !UUID_PATTERN.test(organizationId)) return;
+  // The billed price decides the plan, so upgrades and downgrades apply even if metadata is stale.
+  const plan = organizerPlanFromSubscription(subscription);
+  if (!plan) return;
+
+  await syncOrganizationSubscription({
+    organizationId,
+    plan,
+    status: deleted ? "canceled" : toStoredSubscriptionStatus(subscription.status),
+    stripeSubscriptionId: subscription.id,
+    stripeCustomerId: idOf(subscription.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null),
+    currentPeriodEnd: subscriptionPeriodEnd(subscription),
+    cancelAtPeriodEnd: !deleted && Boolean(subscription.cancel_at_period_end || subscription.cancel_at),
+  });
+}
+
+/** Invoice outcomes for workspace subscriptions; a no-op for subscriptions that aren't organizer plans. */
+async function handleOrganizerInvoice(subscriptionId: string, status: "active" | "past_due") {
+  const client = await getDb().connect();
+  try {
+    await client.query("BEGIN");
+    const row = (await client.query<{ organization_id: string; plan: OrganizerPlan }>(
+      `UPDATE organization_subscriptions SET status = $1, updated_at = NOW()
+        WHERE stripe_subscription_id = $2 AND status <> 'canceled'
+        RETURNING organization_id, plan`,
+      [status, subscriptionId]
+    )).rows[0];
+    if (row) {
+      await client.query(
+        "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
+        [organizationPlanForSubscription(row.plan, status), row.organization_id]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription
 ) {
@@ -101,8 +227,7 @@ async function handleSubscriptionUpdated(
   }
 
   const status = toStoredSubscriptionStatus(subscription.status);
-  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
-  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+  const currentPeriodEnd = subscriptionPeriodEnd(subscription);
   const updatedAt = new Date().toISOString();
 
   if (tier && VALID_SUBSCRIPTION_TIERS.includes(tier)) {
@@ -131,11 +256,7 @@ async function handleSubscriptionDeleted(
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
-  const subscriptionId =
-    typeof invoiceAny.subscription === "string"
-      ? invoiceAny.subscription
-      : invoiceAny.subscription?.id;
+  const subscriptionId = invoiceSubscriptionId(invoice);
 
   if (!subscriptionId) return;
 
@@ -144,14 +265,11 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
      WHERE stripe_subscription_id = $3`,
     ["past_due", new Date().toISOString(), subscriptionId]
   );
+  await handleOrganizerInvoice(subscriptionId, "past_due");
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
-  const subscriptionId =
-    typeof invoiceAny.subscription === "string"
-      ? invoiceAny.subscription
-      : invoiceAny.subscription?.id;
+  const subscriptionId = invoiceSubscriptionId(invoice);
 
   if (!subscriptionId) return;
 
@@ -160,6 +278,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
      WHERE stripe_subscription_id = $3 AND status <> 'canceled'`,
     ["active", new Date().toISOString(), subscriptionId]
   );
+  await handleOrganizerInvoice(subscriptionId, "active");
 }
 
 export async function POST(request: NextRequest) {
@@ -186,6 +305,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Test-only payments must never grant access from a live-mode event.
+  if (process.env.PAYMENTS_TEST_ONLY === "true" && event.livemode) {
+    return NextResponse.json({ received: true, ignored: "livemode" });
+  }
+
   const receipt = await query<{ event_id: string }>(
     `INSERT INTO webhook_receipts (provider, event_id)
      VALUES ('stripe', $1)
@@ -200,7 +324,9 @@ export async function POST(request: NextRequest) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.mode === "subscription") {
+        if (session.mode === "subscription" && session.metadata?.kind === "organizer_plan") {
+          await handleOrganizerCheckout(session);
+        } else if (session.mode === "subscription") {
           await handleSubscriptionCheckout(session);
         } else {
           await handleEventCheckout(session);
@@ -208,11 +334,15 @@ export async function POST(request: NextRequest) {
         break;
       }
       case "customer.subscription.updated": {
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        const subscription = event.data.object as Stripe.Subscription;
+        if (subscription.metadata?.kind === "organizer_plan") await handleOrganizerSubscriptionChange(subscription, false);
+        else await handleSubscriptionUpdated(subscription);
         break;
       }
       case "customer.subscription.deleted": {
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        const subscription = event.data.object as Stripe.Subscription;
+        if (subscription.metadata?.kind === "organizer_plan") await handleOrganizerSubscriptionChange(subscription, true);
+        else await handleSubscriptionDeleted(subscription);
         break;
       }
       case "invoice.payment_failed": {

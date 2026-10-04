@@ -34,7 +34,15 @@ Use this register for release decisions. Store no passwords, tokens, payment-car
 | OpenAI | Invalid output/timeout | Deterministic fallback with no external action | Pending | | |
 | Monitoring | Synthetic error | Alert received with sanitized route metadata only | Pending | | |
 
-The current provider-cost proposal is `docs/provider-cost-envelope.md`: USD 0.002 per email, USD 0.020 per billed SMS segment, a second review above USD 10 projected per event, and a monthly pause/reconciliation threshold above USD 50. These values remain **pending owner approval** and must be rechecked against actual provider billing before the `provider_cost_approval` gate can pass.
+`npm run stripe:test-e2e` (see `DEPLOYMENT_READINESS.md`) covers annual Pro checkout and cancellation, signed replay, and, on a workspace subscription, renewal paid, renewal failed, recovery and cancellation, plus the organizer-plan rows below. It prints the checkout session, subscription and event IDs to record here. It does not cover checkout abandonment, delayed payment, refunds, or the "without deleting event data" check, which stay manual. A passing run is the evidence; an unrun script is not.
+
+| Provider | Scenario | Required evidence | Status | Verified by | Date |
+|---|---|---|---|---|---|
+| Stripe test | Organizer plan checkout (4242) | Checkout ID, subscription ID, workspace plan and seats unlocked | Pending | | |
+| Stripe test | Organizer upgrade and downgrade | Subscription update events; workspace plan follows the billed price | Pending | | |
+| Stripe test | Organizer cancel at period end, resume, final cancellation | Plan kept until period end, then free plan; events kept | Pending | | |
+
+The provider-cost envelope in `docs/provider-cost-envelope.md` (USD 0.002 per email, USD 0.020 per billed SMS segment, a second review above USD 10 projected per event, and a monthly pause/reconciliation threshold above USD 50) was **approved by Cameron Ashley on 2026-08-28** for controlled cost estimates and alert thresholds only. Recheck it against actual provider billing before paid launch; the approval does not activate billing or unrestricted communications.
 
 ## Five-host acceptance
 
