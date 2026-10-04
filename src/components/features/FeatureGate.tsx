@@ -53,27 +53,28 @@ export function FeatureGate({
     return (
       <div
         className={cn(
-          "rounded-lg border border-accent-200 bg-accent-50 p-4",
+          "rounded-2xl border border-border bg-white p-4",
           className
         )}
       >
         <div className="flex items-start gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-100">
-            <Sparkles className="h-4 w-4 text-accent-600" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50" aria-hidden="true">
+            <Sparkles className="h-4 w-4 text-ink" />
           </div>
           <div className="flex-1">
-            <p className="font-medium text-accent-900">
+            <p className="font-medium text-ink">
               {featureName} is a {requiredTierDetails?.name} feature
             </p>
             {featureDescription && (
-              <p className="mt-1 text-sm text-accent-700">{featureDescription}</p>
+              <p className="mt-1 text-sm text-neutral-600">{featureDescription}</p>
             )}
             <Link
               href="/pricing"
-              className="mt-2 inline-flex items-center text-sm font-medium text-accent-700 hover:text-accent-800"
+              className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-ink underline-offset-4 hover:underline"
             >
               Upgrade to unlock
               <svg
+                aria-hidden="true"
                 className="ml-1 h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -97,11 +98,11 @@ export function FeatureGate({
   return (
     <div className={cn("relative", className)}>
       {children}
-      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg bg-white/90 p-6 backdrop-blur-sm">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100">
-          <Lock className="h-6 w-6 text-primary-600" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-white/90 p-6 backdrop-blur-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-50" aria-hidden="true">
+          <Lock className="h-6 w-6 text-ink" />
         </div>
-        <h3 className="mt-4 font-display text-lg font-semibold text-neutral-900">
+        <h3 className="mt-4 text-lg font-semibold text-ink">
           {featureName}
         </h3>
         {featureDescription && (
@@ -109,12 +110,12 @@ export function FeatureGate({
             {featureDescription}
           </p>
         )}
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-neutral-600">
           Upgrade to {requiredTierDetails?.name} to unlock
         </p>
         <Link href="/pricing" className="mt-4">
-          <Button className="btn-lift bg-primary-600 hover:bg-primary-700">
-            <Sparkles className="mr-2 h-4 w-4" />
+          <Button className="btn-lift">
+            <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
             Upgrade Now
           </Button>
         </Link>
@@ -142,7 +143,7 @@ export function UsageLimit({ current, limit, label, className }: UsageLimitProps
         <span
           className={cn(
             "font-medium",
-            isAtLimit ? "text-error-600" : isNearLimit ? "text-warning-600" : "text-neutral-900"
+            isAtLimit ? "text-error-700" : "text-ink"
           )}
         >
           {current} / {limit}
@@ -156,18 +157,18 @@ export function UsageLimit({ current, limit, label, className }: UsageLimitProps
               ? "bg-error-500"
               : isNearLimit
               ? "bg-warning-500"
-              : "bg-primary-500"
+              : "bg-ink"
           )}
           style={{ width: `${percentage}%` }}
         />
       </div>
       {isNearLimit && !isAtLimit && (
-        <p className="text-xs text-warning-600">
+        <p className="text-xs text-neutral-700">
           You&apos;re approaching your limit. Consider upgrading for more.
         </p>
       )}
       {isAtLimit && (
-        <p className="text-xs text-error-600">
+        <p className="text-xs text-error-700">
           You&apos;ve reached your limit. Upgrade to continue.
         </p>
       )}

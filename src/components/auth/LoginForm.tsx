@@ -77,14 +77,14 @@ export function LoginForm() {
   if (step === "code") {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-brand-100 bg-brand-50 p-4 text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-brand-100">
-            <svg className="h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="rounded-lg border border-border bg-neutral-50 p-4 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-border" aria-hidden="true">
+            <svg className="h-5 w-5 text-ink" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-brand-700">Check your email</p>
-          <p className="mt-1 text-xs text-brand-600">
+          <p className="text-sm font-semibold text-ink">Check your email</p>
+          <p className="mt-1 text-sm text-neutral-600">
             We sent a login link and code to <strong>{email}</strong>
           </p>
         </div>
@@ -107,7 +107,7 @@ export function LoginForm() {
           />
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+            <div className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-accent-red">
               {error}
             </div>
           )}
@@ -121,7 +121,7 @@ export function LoginForm() {
           <button
             type="button"
             onClick={() => { setStep("email"); setError(null); setOtpCode(""); }}
-            className="text-brand-600 hover:text-brand-700"
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-ink underline-offset-4 hover:underline"
           >
             Use a different email
           </button>
@@ -129,7 +129,7 @@ export function LoginForm() {
             type="button"
             onClick={() => handleSendCode({ preventDefault: () => {} } as React.FormEvent)}
             disabled={loading}
-            className="text-brand-600 hover:text-brand-700"
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-ink underline-offset-4 hover:underline disabled:opacity-50"
           >
             Resend code
           </button>
@@ -152,7 +152,7 @@ export function LoginForm() {
       />
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+        <div className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-accent-red">
           {error}
         </div>
       )}

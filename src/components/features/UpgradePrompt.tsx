@@ -52,10 +52,10 @@ export function UpgradePrompt({
           </button>
 
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-              <Sparkles className="h-8 w-8 text-primary-600" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-50" aria-hidden="true">
+              <Sparkles className="h-8 w-8 text-ink" />
             </div>
-            <h2 className="mt-6 font-display text-2xl font-bold text-neutral-900">
+            <h2 className="mt-6 font-display text-3xl text-ink">
               Unlock {feature}
             </h2>
             <p className="mt-2 text-neutral-600">
@@ -65,7 +65,7 @@ export function UpgradePrompt({
 
           <div className="mt-8 space-y-4">
             {/* Pro Option */}
-            <div className="rounded-xl border-2 border-primary-500 bg-primary-50 p-4">
+            <div className="rounded-2xl border-2 border-ink bg-primary-50 p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-primary-900">
@@ -76,7 +76,7 @@ export function UpgradePrompt({
                   </p>
                 </div>
                 <Link href="/signup?plan=pro">
-                  <Button className="bg-primary-600 hover:bg-primary-700">
+                  <Button>
                     Choose Pro
                   </Button>
                 </Link>
@@ -92,13 +92,13 @@ export function UpgradePrompt({
             </div>
 
             {/* Business Option */}
-            <div className="rounded-xl border border-neutral-200 p-4">
+            <div className="rounded-2xl border border-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-neutral-900">
                     {businessTier?.name}
                   </p>
-                  <p className="text-sm text-neutral-500">
+                  <p className="text-sm text-neutral-600">
                     ${businessTier?.price.monthly}/month
                   </p>
                 </div>
@@ -109,7 +109,7 @@ export function UpgradePrompt({
             </div>
           </div>
 
-          <p className="mt-6 text-center text-sm text-neutral-500">
+          <p className="mt-6 text-center text-sm text-neutral-600">
             14-day money-back guarantee • Cancel anytime
           </p>
         </div>
@@ -121,7 +121,7 @@ export function UpgradePrompt({
     return (
       <div
         className={cn(
-          "fixed bottom-4 right-4 z-40 max-w-sm rounded-xl border border-accent-200 bg-white p-4 shadow-lg",
+          "fixed bottom-4 right-4 z-40 max-w-sm rounded-2xl border border-border bg-white p-4 shadow-lg",
           className
         )}
       >
@@ -133,8 +133,8 @@ export function UpgradePrompt({
           <X className="h-4 w-4" />
         </button>
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-100">
-            <Sparkles className="h-5 w-5 text-accent-600" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50" aria-hidden="true">
+            <Sparkles className="h-5 w-5 text-ink" />
           </div>
           <div>
             <p className="font-medium text-neutral-900">Unlock {feature}</p>
@@ -143,7 +143,7 @@ export function UpgradePrompt({
             </p>
             <Link
               href="/pricing"
-              className="mt-2 inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
+              className="mt-2 inline-flex items-center text-sm font-medium text-ink underline-offset-4 hover:underline"
             >
               See all features
               <ArrowRight className="ml-1 h-4 w-4" />
@@ -158,17 +158,17 @@ export function UpgradePrompt({
   return (
     <div
       className={cn(
-        "rounded-xl border border-accent-200 bg-gradient-to-r from-accent-50 to-primary-50 p-6",
+        "rounded-2xl border border-border bg-white p-6",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-100">
-            <Sparkles className="h-6 w-6 text-accent-600" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-50" aria-hidden="true">
+            <Sparkles className="h-6 w-6 text-ink" />
           </div>
           <div>
-            <h3 className="font-display text-lg font-semibold text-neutral-900">
+            <h3 className="text-lg font-semibold text-ink">
               Unlock {feature}
             </h3>
             <p className="mt-1 text-sm text-neutral-600">
@@ -179,8 +179,8 @@ export function UpgradePrompt({
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <Link href="/pricing">
-            <Button className="btn-lift bg-primary-600 hover:bg-primary-700">
-              <Sparkles className="mr-2 h-4 w-4" />
+            <Button className="btn-lift">
+              <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
               Upgrade Now
             </Button>
           </Link>
@@ -188,7 +188,7 @@ export function UpgradePrompt({
             <button
               onClick={handleDismiss}
               aria-label="Dismiss"
-              className="rounded-full p-2 text-neutral-400 hover:bg-white/50 hover:text-neutral-600"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-ink"
             >
               <X className="h-5 w-5" />
             </button>

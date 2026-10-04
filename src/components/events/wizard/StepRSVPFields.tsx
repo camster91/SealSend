@@ -10,12 +10,13 @@ interface StepRSVPFieldsProps {
 }
 
 const FIELD_TYPE_COLORS: Record<string, string> = {
-  text: 'bg-blue-100 text-blue-700',
-  email: 'bg-purple-100 text-purple-700',
-  select: 'bg-amber-100 text-amber-700',
-  textarea: 'bg-green-100 text-green-700',
-  number: 'bg-pink-100 text-pink-700',
-  tel: 'bg-cyan-100 text-cyan-700',
+  // Field types are labelled in text, so the chips stay quiet and neutral.
+  text: 'bg-neutral-100 text-neutral-700',
+  email: 'bg-neutral-100 text-neutral-700',
+  select: 'bg-neutral-100 text-neutral-700',
+  textarea: 'bg-neutral-100 text-neutral-700',
+  number: 'bg-neutral-100 text-neutral-700',
+  tel: 'bg-neutral-100 text-neutral-700',
 };
 
 export default function StepRSVPFields({ fields, onUpdate }: StepRSVPFieldsProps) {

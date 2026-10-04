@@ -12,6 +12,8 @@ import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist'
 import { WelcomeTour } from '@/components/onboarding/WelcomeTour';
 import { queryOne } from '@/lib/db/client';
 import { BETA_MODE } from '@/lib/constants';
+import { SealMark } from '@/components/layout/Logo';
+import { Calendar, CalendarCheck, MapPin, Plus, Users } from 'lucide-react';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -59,39 +61,39 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-cotton">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!BETA_MODE && plan && (
-          <div className="mb-6 rounded-xl border border-brand-200 bg-brand-50 p-4 text-brand-900">
+          <div className="mb-6 rounded-2xl border border-border bg-white p-5 text-ink">
             <p className="font-semibold">Continue with {plan === 'pro_annual' ? 'SealSend Pro' : plan === 'event_pass' ? 'Event Pass' : `${plan.charAt(0).toUpperCase()}${plan.slice(1)}`}</p>
-            <p className="mt-1 text-sm">
+            <p className="mt-1 text-sm text-neutral-600">
               {plan === 'pro_annual'
                 ? 'Review the annual plan and continue to secure Stripe checkout.'
                 : 'Create your event first, then apply this one-time event upgrade.'}
             </p>
-            <Link href={plan === 'pro_annual' ? '/pricing' : `/events/new?plan=${encodeURIComponent(plan)}`} className="mt-3 inline-flex rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+            <Link href={plan === 'pro_annual' ? '/pricing' : `/events/new?plan=${encodeURIComponent(plan)}`} className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-input bg-white px-4 text-sm font-medium text-ink hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2">
               {plan === 'pro_annual' ? 'Continue to Pro checkout' : 'Create your event'}
             </Link>
           </div>
         )}
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="mt-2 text-gray-600">
-                Welcome back, {user?.email || user?.phone || 'User'}!
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="font-display text-4xl text-ink">Dashboard</h1>
+              <p className="mt-2 truncate text-neutral-600">
+                Welcome back, {user?.email || user?.phone || 'User'}
               </p>
             </div>
-            <Link
-              href="/events/new"
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
-            >
-              <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Create Event
-            </Link>
+            {allEvents.length > 0 && (
+              <Link
+                href="/events/new"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              >
+                <Plus className="h-5 w-5" aria-hidden />
+                Create event
+              </Link>
+            )}
           </div>
         </div>
 
@@ -122,116 +124,71 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">My Events</dt>
-                    <dd className="text-lg font-medium text-gray-900">{myEvents.length}</dd>
-                  </dl>
-                </div>
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+          {[
+            { label: 'My events', value: myEvents.length, Icon: Calendar },
+            { label: 'Invited to', value: invitedEvents.length, Icon: Users },
+            { label: 'Total events', value: allEvents.length, Icon: CalendarCheck },
+          ].map(({ label, value, Icon }) => (
+            <div key={label} className="flex items-center gap-4 rounded-2xl border border-border bg-white p-5">
+              <Icon className="h-5 w-5 shrink-0 text-neutral-500" strokeWidth={1.75} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <dt className="truncate text-sm font-medium text-neutral-600">{label}</dt>
+                <dd className="text-2xl font-semibold tabular-nums text-ink">{value}</dd>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Invited To</dt>
-                    <dd className="text-lg font-medium text-gray-900">{invitedEvents.length}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Events</dt>
-                    <dd className="text-lg font-medium text-gray-900">{allEvents.length}</dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          ))}
+        </dl>
 
         {/* My Events Section */}
         {myEvents.length > 0 && (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md mb-8">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
+          <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-white">
+            <div className="border-b border-border px-4 py-5 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">My Events</h3>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                  <h2 className="text-lg font-semibold text-ink">My events</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-neutral-600">
                     Events you created and manage
                   </p>
                 </div>
                 {myEvents.length > 3 && <EventSearchFilter />}
               </div>
             </div>
-            <ul className="divide-y divide-gray-200" id="my-events-list">
+            <ul className="divide-y divide-border" id="my-events-list">
               {myEvents.map((event) => (
-                <li key={event.id} className="flex items-center justify-between hover:bg-gray-50">
-                  <Link href={`/events/${event.id}`} className="block flex-1">
+                <li key={event.id} className="flex items-center justify-between hover:bg-neutral-50">
+                  <Link href={`/events/${event.id}`} className="block flex-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink">
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center">
-                            <p className="text-sm font-medium text-brand-600 truncate">
+                            <p className="truncate text-sm font-semibold text-ink">
                               {event.title}
                             </p>
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-100 text-brand-800">
+                            <span className="ml-2 inline-flex items-center rounded-md border border-border bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
                               Owner
                             </span>
                           </div>
-                          <div className="mt-2 flex">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+                          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                            <div className="flex items-center text-sm text-neutral-600">
+                              <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                               <span>
                                 {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'No date set'}
                               </span>
                             </div>
-                            <div className="ml-6 flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                              <span>{event.location_name || 'No location'}</span>
+                            <div className="flex min-w-0 items-center text-sm text-neutral-600">
+                              <MapPin className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                              <span className="truncate">{event.location_name || 'No location'}</span>
                             </div>
                           </div>
                         </div>
                         <div className="ml-4 flex-shrink-0">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            event.status === 'published' 
-                              ? 'bg-green-100 text-green-800'
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                            event.status === 'published'
+                              ? 'bg-success-50 text-success-700'
                               : event.status === 'draft'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-warning-50 text-neutral-700 ring-1 ring-inset ring-warning-500/40'
+                              : 'bg-neutral-100 text-neutral-700'
                           }`}>
                             {event.status}
                           </span>
@@ -256,49 +213,44 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         {/* Invited Events Section */}
         {invitedEvents.length > 0 && (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md mb-8">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Events I&apos;m Invited To</h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-white">
+            <div className="border-b border-border px-4 py-5 sm:px-6">
+              <h2 className="text-lg font-semibold text-ink">Events I&apos;m invited to</h2>
+              <p className="mt-1 max-w-2xl text-sm text-neutral-600">
                 Events you&apos;ve been invited to as a guest
               </p>
             </div>
-            <ul className="divide-y divide-gray-200">
+            <ul className="divide-y divide-border">
               {invitedEvents.map((event) => (
                 <li key={event.id}>
-                  <Link href={`/events/${event.id}/guest`} className="block hover:bg-gray-50">
+                  <Link href={`/events/${event.id}/guest`} className="block hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink">
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center">
-                            <p className="text-sm font-medium text-brand-600 truncate">
+                            <p className="truncate text-sm font-semibold text-ink">
                               {event.title}
                             </p>
-                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <span className="ml-2 inline-flex items-center rounded-md bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
                               Invited
                             </span>
                           </div>
-                          <div className="mt-2 flex">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+                          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                            <div className="flex items-center text-sm text-neutral-600">
+                              <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                               <span>
                                 {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'No date set'}
                               </span>
                             </div>
-                            <div className="ml-6 flex items-center text-sm text-gray-500">
-                              <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                              <span>{event.location_name || 'No location'}</span>
+                            <div className="flex min-w-0 items-center text-sm text-neutral-600">
+                              <MapPin className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                              <span className="truncate">{event.location_name || 'No location'}</span>
                             </div>
                           </div>
                         </div>
                         <div className="ml-4 flex-shrink-0">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Guest View
+                          <span className="inline-flex items-center rounded-full border border-border bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-700">
+                            Guest view
                           </span>
                         </div>
                       </div>
@@ -312,26 +264,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
         {/* Empty State */}
         {allEvents.length === 0 && (
-          <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No events yet</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Turn an event idea into an editable invitation, guest workflow, and communication plan. Start manually or use the AI-assisted draft.
-              </p>
-              <div className="mt-6">
-                <Link
-                  href="/events/new"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
-                >
-                  <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create Your First Event
-                </Link>
-              </div>
+          <div className="mb-8 rounded-2xl border border-border bg-white px-6 py-14 text-center">
+            <SealMark className="mx-auto h-16 w-16" />
+            <h2 className="mt-5 text-lg font-semibold text-ink">No events yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">
+              Create your first event to write the invitation, add guests and track every reply in one place.
+            </p>
+            <div className="mt-6">
+              <Link
+                href="/events/new"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-ink px-5 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              >
+                <Plus className="h-5 w-5" aria-hidden />
+                Create event
+              </Link>
             </div>
           </div>
         )}

@@ -28,20 +28,25 @@ export function MobileTabBar() {
               href={tab.href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
+                'group flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink',
                 isActive
-                  ? 'text-brand-700'
-                  : 'text-neutral-600 active:text-neutral-800'
+                  ? 'text-ink font-semibold'
+                  : 'text-neutral-600 active:text-ink'
               )}
             >
-              <Icon
+              {/* The active tab gets a filled Ink-tinted pill behind its icon, so the state does not rely on colour alone. */}
+              <span
                 className={cn(
-                  'h-6 w-6 transition-transform',
-                  isActive && 'scale-110'
+                  'flex h-7 w-14 items-center justify-center rounded-full transition-colors',
+                  isActive ? 'bg-primary-100' : 'group-active:bg-neutral-100'
                 )}
-                strokeWidth={isActive ? 2.5 : 1.75}
-                aria-hidden
-              />
+              >
+                <Icon
+                  className="h-5 w-5"
+                  strokeWidth={isActive ? 2.25 : 1.75}
+                  aria-hidden
+                />
+              </span>
               {tab.label}
             </Link>
           );
