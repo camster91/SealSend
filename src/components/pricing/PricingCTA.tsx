@@ -1,62 +1,25 @@
-"use client";
-
-import Link from "next/link";
-import { ArrowRight, Sparkles, Shield, Clock } from "lucide-react";
 import { BETA_MODE } from "@/lib/constants";
+import { SealMark } from "@/components/layout/Logo";
+import { PrimaryCta, SecondaryCta } from "@/components/marketing/Cta";
 
 export function PricingCTA() {
   return (
-    <section className="gradient-brand px-4 py-20 text-white">
-      <div className="mx-auto max-w-4xl text-center">
-        <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-          {BETA_MODE
-            ? "Ready to run one real event?"
-            : "Ready to get started?"}
+    <section className="bg-ink px-4 py-20 text-white sm:px-6 sm:py-24">
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+        <SealMark className="h-12 w-12" />
+        <h2 className="mt-6 font-display text-4xl sm:text-5xl">
+          {BETA_MODE ? "Ready to run one real event?" : "Your next event, sealed and sent."}
         </h2>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
+        <p className="mt-4 max-w-xl text-lg text-white/80">
           {BETA_MODE
-            ? "Use the complete shipped workflow for one active event with up to 100 guests, at no cost during the controlled beta."
-            : "Create beautiful invitations and manage your event in one place."}
+            ? "Free during the controlled beta for one active event with up to 100 guests. No credit card required."
+            : "Free for your first event. No credit card required."}
         </p>
-
-        {/* Trust badges */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            <span>One active beta event</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            <span>No credit card required</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span>Simple setup</span>
-          </div>
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link
-            href="/signup"
-            className="group inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-primary-600 shadow-lg transition-all hover:bg-primary-50 hover:shadow-xl"
-          >
-            Join Controlled Beta
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-          </Link>
-          <Link
-            href="/how-it-works"
-            className="inline-flex items-center gap-2 rounded-xl border-2 border-white/30 px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-white/10"
-          >
-            See How It Works
-          </Link>
-        </div>
-
-        {/* Social proof */}
-        <div className="mt-12">
-          <p className="mt-4 text-sm text-white/80">
-            Free during the controlled beta. No credit card required.
-          </p>
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <PrimaryCta onInk />
+          <SecondaryCta href="/how-it-works" onInk>
+            See how it works
+          </SecondaryCta>
         </div>
       </div>
     </section>

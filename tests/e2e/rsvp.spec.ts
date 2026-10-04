@@ -6,15 +6,16 @@ test.describe('Public marketing experience', () => {
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('approved guest workflow');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText("Send the invitation. Know who's coming.");
     await expect(page.getByText(/all features free/i)).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: /One approved workflow from brief to check-in/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'How it works' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: /One flat price per event, never per guest/i })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
   test('pricing and legal pages are reachable', async ({ page }) => {
     for (const [path, heading] of [
-      ['/pricing', /run one complete event in the controlled beta/i],
+      ['/pricing', /run one complete event, free, during the beta/i],
       ['/privacy', 'Privacy Policy'],
       ['/terms', 'Terms of Service'],
     ] as const) {

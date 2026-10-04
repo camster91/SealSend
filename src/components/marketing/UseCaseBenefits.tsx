@@ -51,26 +51,17 @@ export default function UseCaseBenefits({
   benefits: Benefit[];
 }) {
   return (
-    <section className="px-4 py-20">
-      <div className="mx-auto max-w-5xl">
-        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
-          Why Choose Seal and Send
-        </h2>
-        <div className="mt-12 grid gap-8 sm:grid-cols-2">
+    <section className="border-y border-border bg-white px-4 py-20 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <h2 className="max-w-2xl font-display text-4xl text-ink sm:text-5xl">What SealSend takes care of</h2>
+        <div className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
           {benefits.map((b) => {
             const Icon = iconMap[b.icon] ?? Heart;
             return (
-              <div
-                key={b.title}
-                className="rounded-xl border border-border bg-white p-6"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <h3 className="mt-4 text-lg font-semibold">{b.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {b.description}
-                </p>
+              <div key={b.title} className="border-t border-border pt-6">
+                <Icon className="h-6 w-6 text-ink" strokeWidth={1.75} aria-hidden="true" />
+                <h3 className="mt-4 text-lg font-semibold text-ink">{b.title}</h3>
+                <p className="mt-2 max-w-md leading-relaxed text-neutral-600">{b.description}</p>
               </div>
             );
           })}

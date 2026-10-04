@@ -8,64 +8,64 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-3xl font-bold text-neutral-900 mb-8">Terms of Service</h1>
-      <p className="text-sm text-neutral-500 mb-8">Last updated: August 8, 2026</p>
+    <div className="mx-auto max-w-3xl px-4 py-16 leading-relaxed text-neutral-700 sm:px-6 sm:py-24">
+      <h1 className="mb-4 font-display text-5xl text-ink sm:text-6xl">Terms of Service</h1>
+      <p className="mb-10 text-sm text-neutral-600">Last updated: August 8, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">1. Acceptance of Terms</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">1. Acceptance of Terms</h2>
           <p>By accessing or using SealSend (&quot;the Service&quot;), operated by Seal and Send (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">2. Description of Service</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">2. Description of Service</h2>
           <p>SealSend provides a platform for creating, sending, and managing digital invitations and collecting RSVPs for events. The Service includes both free and paid tiers.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">3. User Accounts</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">3. User Accounts</h2>
           <p>You must provide accurate information when creating an account. You are responsible for maintaining the security of your account and all activity under it. You must be at least 16 years old to use the Service.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">4. Payments and Billing</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">4. Payments and Billing</h2>
           <p>Paid features are billed per event or as annual subscriptions through Stripe. All prices are in USD. Per-event purchases are non-refundable once invitations have been sent. We offer a 14-day money-back guarantee on subscription plans.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">5. Acceptable Use</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">5. Acceptable Use</h2>
           <p>You agree not to use the Service to: send spam or unsolicited invitations; distribute illegal, harmful, or offensive content; impersonate others; or violate any applicable laws.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">6. Intellectual Property</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">6. Intellectual Property</h2>
           <p>You retain ownership of content you create. By uploading content, you grant us a limited license to host and display it as part of the Service. SealSend branding, design templates, and code remain our property.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">7. Data and Privacy</h2>
-          <p>Your use of the Service is also governed by our <a href="/privacy" className="font-medium text-primary-700 underline underline-offset-2">Privacy Policy</a>. We process guest data only as necessary to provide the Service.</p>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">7. Data and Privacy</h2>
+          <p>Your use of the Service is also governed by our <a href="/privacy" className="font-medium text-ink underline underline-offset-2">Privacy Policy</a>. We process guest data only as necessary to provide the Service.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">8. Termination</h2>
-          <p>We may suspend or terminate your account for violation of these terms. You may request account and data deletion at any time from your authenticated Settings page or by contacting <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations.</p>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">8. Termination</h2>
+          <p>We may suspend or terminate your account for violation of these terms. You may request account and data deletion at any time from your authenticated Settings page or by contacting <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">9. Limitation of Liability</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">9. Limitation of Liability</h2>
           <p>The Service is provided &quot;as is&quot; without warranties. We are not liable for any indirect, incidental, or consequential damages arising from your use of the Service.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">10. Changes to Terms</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">10. Changes to Terms</h2>
           <p>We may update these terms from time to time. Continued use of the Service after changes constitutes acceptance of the updated terms.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">11. Contact</h2>
+          <p>Questions about these terms? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>

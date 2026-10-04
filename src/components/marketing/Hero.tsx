@@ -1,158 +1,40 @@
-"use client";
+import Image from "next/image";
+import { SealMark } from "@/components/layout/Logo";
+import { PRIMARY_CTA_NOTE, PrimaryCta, SecondaryCta } from "@/components/marketing/Cta";
 
-import Link from "next/link";
-import { ArrowRight, Play, Star, Users, Zap } from "lucide-react";
-import { motion } from "framer-motion";
-import { BETA_MODE } from "@/lib/constants";
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
-};
-
-const staggerContainer = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
+// Server-rendered hero. The only motion on the page is the seal pressing in (CSS, 400ms),
+// which is switched off under prefers-reduced-motion in globals.css.
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-primary-50 via-white to-white">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/4 h-[800px] w-[800px] rounded-full bg-primary-100/50 blur-3xl" />
-        <div className="absolute -bottom-1/4 -left-1/4 h-[600px] w-[600px] rounded-full bg-accent-100/50 blur-3xl" />
+    <section className="relative overflow-hidden bg-[#e8ebf0]">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8 xl:flex xl:min-h-[44rem] xl:items-center xl:py-20">
+        <div className="max-w-xl xl:max-w-[28rem]">
+          <SealMark className="animate-seal-press h-14 w-14" />
+          <h1 className="mt-6 font-display text-[2.75rem] text-ink sm:text-6xl xl:text-[3.6rem]">
+            Send the invitation. Know who&apos;s coming.
+          </h1>
+          <p className="mt-6 text-lg leading-relaxed text-neutral-700">
+            SealSend handles the invitation, RSVPs, guest updates and check-in at the door. Your guests just tap a link, with no app or account to set up.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <PrimaryCta />
+            <SecondaryCta href="/how-it-works">See how it works</SecondaryCta>
+          </div>
+          <p className="mt-4 text-sm text-neutral-600">{PRIMARY_CTA_NOTE}</p>
+        </div>
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-        <motion.div
-          className="grid gap-12 lg:grid-cols-2 lg:gap-8"
-          initial={false}
-          animate="animate"
-          variants={staggerContainer}
-        >
-          {/* Left content */}
-          <div className="flex flex-col justify-center">
-            {/* Badge */}
-            <motion.div variants={fadeInUp}>
-              <Link
-                href={BETA_MODE ? "/pricing" : "/signup"}
-                className="group inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-sm font-medium text-primary-700 shadow-sm transition-all hover:border-primary-300 hover:shadow-md"
-              >
-                <Zap className="h-4 w-4 text-accent-500" />
-                <span>{BETA_MODE ? "Controlled beta — one active event, up to 100 guests" : "Start free — upgrade when you need more"}</span>
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            </motion.div>
-
-            {/* Heading */}
-            <motion.h1
-              variants={fadeInUp}
-              className="mt-6 font-display text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl"
-            >
-              Turn an event brief into an{" "}
-              <span className="text-gradient">approved guest workflow</span>
-            </motion.h1>
-
-            {/* Subheading */}
-            <motion.p
-              variants={fadeInUp}
-              className="mt-6 text-lg text-neutral-600 sm:text-xl"
-            >
-              For recurring community organizers and independent planners: build the invitation, RSVP, actionable guest list, host-approved updates, and check-in in one place.
-            </motion.p>
-
-            {/* CTA Buttons */}
-            <motion.div
-              variants={fadeInUp}
-              className="mt-8 flex flex-col gap-4 sm:flex-row"
-            >
-              <Link
-                href="/signup"
-                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-primary-600/25 transition-all hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-xl"
-              >
-                Build Your Event Workflow
-                <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Link>
-              <Link
-                href="#how-it-works"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-neutral-200 bg-white px-8 py-4 text-lg font-semibold text-neutral-700 transition-all hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-neutral-50"
-              >
-                <Play className="h-5 w-5" />
-                See How It Works
-              </Link>
-            </motion.div>
-
-            <motion.div variants={fadeInUp} className="mt-10">
-              <p className="text-sm font-medium text-neutral-600">
-                No app download for guests. The controlled beta needs no credit card.
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Right content - Hero image/mockup */}
-          <motion.div
-            variants={fadeInUp}
-            className="relative flex items-center justify-center lg:justify-end"
-          >
-            <div className="relative w-full max-w-lg">
-              {/* Main card */}
-              <div className="relative overflow-hidden rounded-2xl bg-white shadow-2xl">
-                <div className="aspect-[4/5] bg-gradient-to-br from-primary-100 to-accent-100 p-6">
-                  {/* Mock invitation preview */}
-                  <div className="h-full rounded-xl bg-white p-6 shadow-lg">
-                    <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
-                      <div className="h-8 w-24 rounded bg-primary-100" />
-                      <div className="h-8 w-8 rounded-full bg-accent-100" />
-                    </div>
-                    <div className="mt-6 space-y-4">
-                      <div className="h-32 rounded-xl bg-gradient-to-br from-primary-50 to-accent-50" />
-                      <div className="h-8 w-3/4 rounded bg-neutral-100" />
-                      <div className="h-4 w-full rounded bg-neutral-50" />
-                      <div className="h-4 w-2/3 rounded bg-neutral-50" />
-                    </div>
-                    <div className="mt-8 flex gap-3">
-                      <div className="h-10 flex-1 rounded-lg bg-primary-600" />
-                      <div className="h-10 flex-1 rounded-lg border-2 border-neutral-200" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating elements */}
-              <motion.div
-                className="absolute -left-8 top-1/4 rounded-xl bg-white p-4 shadow-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-100">
-                    <Users className="h-5 w-5 text-success-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-neutral-500">Example workflow</p>
-                    <p className="font-semibold text-neutral-900">New RSVP received</p>
-                  </div>
-                </div>
-              </motion.div>
-
-              <motion.div
-                className="absolute -right-4 bottom-1/4 rounded-xl bg-white p-4 shadow-xl"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-100">
-                    <Star className="h-4 w-4 text-accent-600" />
-                  </div>
-                  <p className="text-sm font-medium text-neutral-900">
-                    Guest list updated
-                  </p>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </motion.div>
+      {/* Below xl the photo stacks under the copy, cropped to the envelope and phone. From xl it runs
+          full-bleed behind the copy, which sits on the photo's empty left third. */}
+      <div className="relative mt-10 aspect-[4/3] w-full sm:aspect-[16/9] xl:absolute xl:inset-0 xl:mt-0 xl:aspect-auto">
+        <Image
+          src="/brand/photos/hero-stationery.webp"
+          alt="A cream wedding invitation in an envelope sealed with a red wax S, beside a phone listing guests who are going"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[78%_center] sm:object-[70%_center] xl:object-center"
+        />
       </div>
     </section>
   );

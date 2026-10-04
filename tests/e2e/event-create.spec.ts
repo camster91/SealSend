@@ -9,7 +9,8 @@ test.describe('Protected event creation', () => {
 
   test('homepage CTA leads to account creation', async ({ page }) => {
     await page.goto('/');
-    const cta = page.getByRole('link', { name: 'Build Your Event Workflow' });
+    // BETA_MODE is on, so the primary CTA is the beta variant (see src/components/marketing/Cta.tsx).
+    const cta = page.getByRole('main').getByRole('link', { name: 'Join the free beta' }).first();
     await expect(cta).toHaveAttribute('href', '/signup');
     await Promise.all([
       page.waitForURL(/\/signup$/, { timeout: 15_000 }),
