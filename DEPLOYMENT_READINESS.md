@@ -12,6 +12,83 @@ Payments and external communications must remain explicitly test-only until thei
 
 The machine-checked quality baseline is product capability **82/100**, competitive position **69/100**, and paid-launch readiness **7/18 (38.9%)**. Run `npm run quality:score` for the current evidence-bounded result; the scorecard refuses earned points without linked evidence and requires missing proof for every partial category.
 
+## Monetization update (PR #202, 2026-10-04)
+
+Not merged or deployed. While `BETA_MODE` is on, nothing here is sold in production; the readiness score stays 7/18 because no external gate has new evidence.
+
+### Gates closed in code on this branch
+
+- [x] **Organizer plan checkout:** owner-only Solo/Studio/Agency checkout for team workspaces (`POST /api/organizations/[id]/billing/checkout`). It is beta-gated and refuses `sk_live_` keys while `PAYMENTS_TEST_ONLY=true`.
+- [x] **Plan change and cancellation:** owners can upgrade, downgrade, cancel at period end, and resume from Settings → Team (`GET`/`POST /api/organizations/[id]/billing/subscription`). The route only asks Stripe. The signed webhook is the only thing that changes `organizations.plan`.
+- [x] **Webhook reads the current Stripe API shape.** The pinned SDK (`2026-02-25.clover`) moved `invoice.subscription` to `invoice.parent.subscription_details.subscription` and `current_period_end` onto subscription items. As a result, `invoice.paid` and `invoice.payment_failed` had silently stopped updating Pro subscriptions, and the period end was never stored. The handler now reads both the old and new shapes.
+- [x] **Plan follows the billed price.** Previously, an upgrade or downgrade made in Stripe (dashboard or portal) kept the old plan, because the plan came from checkout metadata.
+- [x] **Stale events can't overwrite a newer subscription.** A late event for an older subscription no longer replaces the one the workspace pays for now.
+- [x] **Stripe lifecycle tooling:** one command runs the whole test-mode lifecycle (next section).
+- [x] Unit and readiness tests cover all of the above (291 pass). The webhook SQL was also exercised against a PostgreSQL engine (PGlite) with signed, clover-shaped events covering checkout, replay, upgrade by price, failed and recovered invoices, scheduled cancellation, stale-event rejection, deletion, resubscription, livemode rejection, and bad signatures.
+
+`apply-security-indexes.sql` adds `organization_subscriptions` (with `cancel_at_period_end`). Apply it before deploying this branch.
+
+### Stripe test-mode end-to-end run
+
+```bash
+npm run stripe:test-e2e
+```
+
+Needs `STRIPE_SECRET_KEY=sk_test_…` and a **local** `DATABASE_URL`, in the shell or `.env.local`. An empty database gets the fresh schema, and an older one gets the idempotent migration. No webhook secret, Stripe CLI, or running app is needed.
+
+What it does:
+
+1. Finds or creates test products and prices by lookup key (Solo, Studio and Agency monthly, plus Pro annual) and prints the price IDs for the test environment. Price IDs already set in the environment are used instead, after checking that they are test-mode and recurring.
+2. Creates a disposable host and team workspace, then a Stripe test clock and customer with the 4242 card (`pm_card_visa`).
+3. Checks out Solo with card 4242, using the real `buildOrganizerCheckoutParams` session.
+4. Pulls the real test-mode events from Stripe, signs them, and delivers them to the real webhook handler. After each step it checks the workspace plan, seat limit, and white-label entitlement. Steps:
+   - checkout
+   - signed replay (acknowledged once, nothing changes)
+   - forged signature (HTTP 400)
+   - upgrade to Studio
+   - downgrade to Solo
+   - renewal paid (period end advances)
+   - renewal failed with `pm_card_chargeCustomerFail` (`past_due`, paid features withheld)
+   - recovery (plan restored)
+   - cancel at period end (plan kept)
+   - resume
+   - cancellation at period end (free plan)
+   - Pro annual checkout and cancellation
+5. Deletes the test clock (which deletes its customer and subscriptions) and the database fixtures. It prints a pass/fail line per step and the IDs to record in `docs/paid-beta-evidence-register.md`, and exits 1 on any failure.
+
+Options:
+
+- `--checkout=browser` pays on the hosted Checkout page with Playwright.
+- `--checkout=manual` prints the Checkout URL so you can pay with 4242 yourself.
+- `--app-url=http://localhost:3000` posts the signed events to a running app instead. The app needs the same `DATABASE_URL` and `STRIPE_WEBHOOK_SECRET`.
+- `--skip-pro` skips the Pro annual steps.
+- `--keep` leaves the fixtures in place for inspection.
+
+In the default `--checkout=api` mode, the 4242 payment goes through the API, and `checkout.session.completed` is built from the real (then expired) test session. Use `browser` or `manual` to put the hosted Checkout page itself on record.
+
+Safety:
+
+- Refuses to start unless the key starts with `sk_test_`.
+- Forces `PAYMENTS_TEST_ONLY=true` and aborts on any livemode object.
+- Refuses a non-local database unless `STRIPE_E2E_ALLOW_REMOTE_DB=true`.
+- Never touches production.
+
+**Status:** not yet run against a Stripe account (no test key was available). The key/database guards and the webhook and database parts were verified locally; the Stripe API calls were not. Run it once with Cameron's test account and record the result before marking `stripe_test_lifecycle` as passed.
+
+For a real deployment, the Stripe webhook endpoint must send `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` and `invoice.payment_failed`. Prefer endpoint API version `2026-02-25.clover` to match the SDK; older versions are still handled.
+
+### Still open (needs people, accounts, or legal review)
+
+- [ ] Stripe test account: reauthenticate, create test prices (or let the runner create them), set the `STRIPE_*_PRICE_ID` values and `STRIPE_WEBHOOK_SECRET`, then run and record `npm run stripe:test-e2e`.
+- [ ] Mailgun: production credentials return HTTP 401, and the webhook signing key is missing.
+- [ ] Twilio: credentials return HTTP 401, and callback authentication is incomplete.
+- [ ] Alerting: point `ERROR_ALERT_WEBHOOK_URL` at a receiver and record a synthetic alert.
+- [ ] Five real hosts complete the controlled-beta matrix.
+- [ ] Physical-device accessibility checks: iOS and macOS VoiceOver, Android TalkBack, Windows NVDA.
+- [ ] Qualified reviews: privacy and terms, refund/cancellation and entitlement treatment, sales tax, CASL/TCPA.
+- [ ] Launch metrics: activation, conversion, delivery, support, and willingness-to-pay evidence.
+- [ ] A self-serve cancellation path for annual Pro. Workspace plans have one now, but Pro still needs the Stripe dashboard or a billing portal. Decide on the refund/cancellation policy before building it.
+
 ## Current production
 
 > **2026-09-29 deployment, operator record pending.** The organizer-platform release is serving at `https://sealsend.app`: workspaces, brand kit, clients and review links, SMS metering, webhooks, the welcome tour, confirm dialogs, and the colour/touch-target fixes, up to master `87cca1c` (#193). Checked externally without credentials:
@@ -113,7 +190,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 
 - `PAYMENTS_TEST_ONLY=true` must remain set.
 - `COMMUNICATIONS_TEST_ONLY=true` must remain set.
-- Use a Stripe **test-mode** secret, recurring annual Pro price, and webhook secret before payment QA. Verify success, cancellation, failure, delayed payment, renewal/update, cancellation, and webhook replay.
+- Use a Stripe **test-mode** secret, recurring annual Pro price, organizer Solo/Studio/Agency monthly prices, and webhook secret before payment QA. Verify success, cancellation, failure, delayed payment, renewal/update, plan change, cancellation, and webhook replay; `npm run stripe:test-e2e` runs most of this in one command (see the monetization update above).
 - Verify Mailgun/Twilio credentials and allowlists before sending only to approved recipients. Confirm queued, accepted, delivered, failed, bounced, and opted-out states where supported.
 - Configure `ERROR_ALERT_WEBHOOK_URL`, then call the secret-protected monitoring test route and verify receipt. The health cron alone does not prove alert delivery.
 - Review and approve `docs/provider-cost-envelope.md`, then set channel-specific `EMAIL_ESTIMATED_COST_MICROS` per email and `SMS_ESTIMATED_COST_MICROS` per billed SMS segment before relying on the approval estimate.
