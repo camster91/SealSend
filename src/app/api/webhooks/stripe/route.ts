@@ -4,7 +4,15 @@ import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
-import { isOrganizerPlan, organizationPlanForSubscription, toStoredSubscriptionStatus, type StoredSubscriptionStatus } from "@/lib/billing";
+import {
+  invoiceSubscriptionId,
+  isOrganizerPlan,
+  organizationPlanForSubscription,
+  organizerPlanFromSubscription,
+  subscriptionPeriodEnd,
+  toStoredSubscriptionStatus,
+  type StoredSubscriptionStatus,
+} from "@/lib/billing";
 import type { OrganizerPlan } from "@/lib/constants";
 import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
 import { grantSmsSegments } from "@/lib/sms-allowance";
@@ -95,7 +103,12 @@ function idOf(value: string | { id: string } | null | undefined): string | null 
   return typeof value === "string" ? value : value.id;
 }
 
-/** Stores the workspace subscription and applies the matching organizations.plan in one transaction. */
+/**
+ * Stores the workspace subscription and applies the matching organizations.plan in one transaction.
+ * A workspace holds one subscription at a time: an event for a different subscription only replaces
+ * the stored one after that was cancelled, so a late event for an old subscription can't overwrite
+ * the plan the workspace pays for now.
+ */
 async function syncOrganizationSubscription(input: {
   organizationId: string;
   plan: OrganizerPlan;
@@ -103,26 +116,33 @@ async function syncOrganizationSubscription(input: {
   stripeSubscriptionId: string;
   stripeCustomerId: string | null;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
 }) {
   const client = await getDb().connect();
   try {
     await client.query("BEGIN");
-    await client.query(
-      `INSERT INTO organization_subscriptions (organization_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    const stored = await client.query(
+      `INSERT INTO organization_subscriptions (organization_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, cancel_at_period_end, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        ON CONFLICT (organization_id) DO UPDATE SET
          stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, organization_subscriptions.stripe_customer_id),
          stripe_subscription_id = EXCLUDED.stripe_subscription_id,
          plan = EXCLUDED.plan,
          status = EXCLUDED.status,
          current_period_end = COALESCE(EXCLUDED.current_period_end, organization_subscriptions.current_period_end),
-         updated_at = NOW()`,
-      [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd]
+         cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+         updated_at = NOW()
+       WHERE organization_subscriptions.stripe_subscription_id = EXCLUDED.stripe_subscription_id
+          OR organization_subscriptions.status = 'canceled'
+       RETURNING organization_id`,
+      [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd, input.cancelAtPeriodEnd]
     );
-    await client.query(
-      "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
-      [organizationPlanForSubscription(input.plan, input.status), input.organizationId]
-    );
+    if (stored.rowCount) {
+      await client.query(
+        "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
+        [organizationPlanForSubscription(input.plan, input.status), input.organizationId]
+      );
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -146,14 +166,17 @@ async function handleOrganizerCheckout(session: Stripe.Checkout.Session) {
     stripeSubscriptionId,
     stripeCustomerId: idOf(session.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null),
     currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
   });
   await recordActivationEventSafely({ name: "checkout_completed", userId, metadata: { plan: `organizer_${plan}` } });
 }
 
 async function handleOrganizerSubscriptionChange(subscription: Stripe.Subscription, deleted: boolean) {
-  const { organizationId, plan } = subscription.metadata || {};
-  if (!organizationId || !UUID_PATTERN.test(organizationId) || !isOrganizerPlan(plan)) return;
-  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
+  const { organizationId } = subscription.metadata || {};
+  if (!organizationId || !UUID_PATTERN.test(organizationId)) return;
+  // The billed price decides the plan, so upgrades and downgrades apply even if metadata is stale.
+  const plan = organizerPlanFromSubscription(subscription);
+  if (!plan) return;
 
   await syncOrganizationSubscription({
     organizationId,
@@ -161,7 +184,8 @@ async function handleOrganizerSubscriptionChange(subscription: Stripe.Subscripti
     status: deleted ? "canceled" : toStoredSubscriptionStatus(subscription.status),
     stripeSubscriptionId: subscription.id,
     stripeCustomerId: idOf(subscription.customer as string | Stripe.Customer | Stripe.DeletedCustomer | null),
-    currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    currentPeriodEnd: subscriptionPeriodEnd(subscription),
+    cancelAtPeriodEnd: !deleted && Boolean(subscription.cancel_at_period_end || subscription.cancel_at),
   });
 }
 
@@ -203,8 +227,7 @@ async function handleSubscriptionUpdated(
   }
 
   const status = toStoredSubscriptionStatus(subscription.status);
-  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end;
-  const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
+  const currentPeriodEnd = subscriptionPeriodEnd(subscription);
   const updatedAt = new Date().toISOString();
 
   if (tier && VALID_SUBSCRIPTION_TIERS.includes(tier)) {
@@ -233,11 +256,7 @@ async function handleSubscriptionDeleted(
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
-  const subscriptionId =
-    typeof invoiceAny.subscription === "string"
-      ? invoiceAny.subscription
-      : invoiceAny.subscription?.id;
+  const subscriptionId = invoiceSubscriptionId(invoice);
 
   if (!subscriptionId) return;
 
@@ -250,11 +269,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const invoiceAny = invoice as unknown as { subscription: string | { id: string } | null | undefined };
-  const subscriptionId =
-    typeof invoiceAny.subscription === "string"
-      ? invoiceAny.subscription
-      : invoiceAny.subscription?.id;
+  const subscriptionId = invoiceSubscriptionId(invoice);
 
   if (!subscriptionId) return;
 

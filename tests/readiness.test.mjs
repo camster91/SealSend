@@ -1682,7 +1682,7 @@ test('organizer plan checkout is owner-only, beta-gated, and synced from verifie
   const envExample = await read('.env.example');
 
   for (const sql of [schema, migration]) {
-    assertColumns(sql, 'organization_subscriptions', ['organization_id', 'stripe_customer_id', 'stripe_subscription_id', 'plan', 'status', 'current_period_end']);
+    assertColumns(sql, 'organization_subscriptions', ['organization_id', 'stripe_customer_id', 'stripe_subscription_id', 'plan', 'status', 'current_period_end', 'cancel_at_period_end']);
     assert.match(tableDefinition(sql, 'organization_subscriptions'), /organization_id UUID PRIMARY KEY REFERENCES organizations\(id\) ON DELETE CASCADE/);
     assert.match(tableDefinition(sql, 'organization_subscriptions'), /plan TEXT NOT NULL CHECK \(plan IN \('solo', 'studio', 'agency'\)\)/);
   }
@@ -1701,4 +1701,43 @@ test('organizer plan checkout is owner-only, beta-gated, and synced from verifie
   for (const name of ['SOLO', 'STUDIO', 'AGENCY']) {
     assert.match(envExample, new RegExp(`^STRIPE_ORGANIZER_${name}_PRICE_ID=`, 'm'));
   }
+});
+
+test('organizer plan changes and cancellations are owner-only, beta-gated, and applied only by the webhook', async () => {
+  const route = await read('src/app/api/organizations/[organizationId]/billing/subscription/route.ts');
+  const webhook = await read('src/app/api/webhooks/stripe/route.ts');
+  const migration = await read('apply-security-indexes.sql');
+
+  assert.match(route, /auth\.role !== "owner"/);
+  assert.match(route, /if \(BETA_MODE\)/);
+  assert.match(route, /isStripeKeyAllowed\(\)/);
+  assert.match(route, /rateLimit\(`org-billing:/);
+  assert.match(route, /changeOrganizerSubscriptionPlan/);
+  assert.match(route, /setOrganizerSubscriptionCancellation/);
+  // The route asks Stripe; only the signed webhook writes the plan.
+  assert.doesNotMatch(route, /UPDATE organizations/);
+  assert.doesNotMatch(route, /organization_subscriptions SET/);
+
+  // Plan comes from the billed price, period end and invoice links read the current API shape.
+  assert.match(webhook, /organizerPlanFromSubscription\(subscription\)/);
+  assert.match(webhook, /subscriptionPeriodEnd\(subscription\)/);
+  assert.match(webhook, /invoiceSubscriptionId\(invoice\)/);
+  assert.doesNotMatch(webhook, /as unknown as \{ current_period_end/);
+  // A late event for an older subscription can't overwrite the current one.
+  assert.match(webhook, /WHERE organization_subscriptions\.stripe_subscription_id = EXCLUDED\.stripe_subscription_id\s+OR organization_subscriptions\.status = 'canceled'/);
+  assert.match(webhook, /if \(stored\.rowCount\)/);
+
+  assert.match(migration, /ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;/);
+});
+
+test('the Stripe test-mode end-to-end run refuses live keys and non-local databases', async () => {
+  const pkg = JSON.parse(await read('package.json'));
+  const script = await read('scripts/stripe/test-e2e.ts');
+
+  assert.equal(pkg.scripts['stripe:test-e2e'], 'tsx scripts/stripe/test-e2e.ts');
+  assert.match(script, /assertStripeTestKey\(process\.env\.STRIPE_SECRET_KEY\)/);
+  assert.match(script, /process\.env\.PAYMENTS_TEST_ONLY = "true"/);
+  assert.match(script, /livemode/);
+  assert.match(script, /STRIPE_E2E_ALLOW_REMOTE_DB/);
+  assert.doesNotMatch(script, /sk_live_[A-Za-z0-9]/);
 });
