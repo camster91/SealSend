@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/Feedback";
+import { BETA_MODE, ORGANIZER_PLANS, type OrganizerPlan } from "@/lib/constants";
 
 type Organization = { id: string; name: string; plan: string; is_personal: boolean; role: string };
 type Member = { user_id: string; email: string; name: string | null; role: string };
@@ -34,6 +35,15 @@ const ROLE_HELP: Record<string, string> = {
 function canManage(viewerRole: string, targetRole: string) {
   if (viewerRole === "owner") return true;
   return viewerRole === "admin" && (targetRole === "planner" || targetRole === "check_in");
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  personal: "Free",
+  ...Object.fromEntries(Object.entries(ORGANIZER_PLANS).map(([id, plan]) => [id, plan.name])),
+};
+
+function formatMonthly(cents: number) {
+  return `$${(cents / 100).toFixed(0)}/mo`;
 }
 
 export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string }) {
@@ -74,6 +84,22 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
       }
       setMessage({ type: "success", text: success });
       await after?.(body);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startCheckout(id: string, plan: OrganizerPlan) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/organizations/${id}/billing/checkout`, json("POST", { plan }));
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || typeof body.url !== "string") {
+        setMessage({ type: "error", text: body.error || "Checkout couldn't start. Please try again." });
+        return;
+      }
+      window.location.assign(body.url);
     } finally {
       setBusy(false);
     }
@@ -258,6 +284,37 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
             )}
             {selected.is_personal && (
               <p className="text-sm text-gray-500">Personal workspaces have one member. Create a team workspace above to work with others.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selected && data && !selected.is_personal && (
+        <Card>
+          <CardHeader><CardTitle>Workspace plan</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Current plan: <span className="font-semibold">{PLAN_LABELS[data.organization?.plan ?? "personal"] ?? data.organization?.plan}</span> · {data.seatLimit} seats
+            </p>
+            {BETA_MODE ? (
+              <p className="text-sm text-gray-500">Paid workspace plans aren&apos;t available during the controlled beta.</p>
+            ) : viewerRole === "owner" ? (
+              <ul className="grid gap-3 sm:grid-cols-3">
+                {(Object.entries(ORGANIZER_PLANS) as [OrganizerPlan, (typeof ORGANIZER_PLANS)[OrganizerPlan]][]).map(([id, plan]) => {
+                  const current = data.organization?.plan === id;
+                  return (
+                    <li key={id} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 text-sm">
+                      <p className="font-semibold text-gray-900">{plan.name}</p>
+                      <p className="text-gray-700">{formatMonthly(plan.monthlyPriceCents)} · {plan.seats} seats</p>
+                      <Button type="button" disabled={busy || current} onClick={() => void startCheckout(selected.id, id)}>
+                        {current ? "Current plan" : `Choose ${plan.name}`}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">Only the workspace owner can change the plan.</p>
             )}
           </CardContent>
         </Card>

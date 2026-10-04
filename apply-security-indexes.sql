@@ -671,3 +671,16 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries(next_attempt_at) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, created_at DESC);
+
+-- Stripe subscriptions for organizer plans (one per team workspace). The Stripe webhook keeps
+-- organizations.plan in sync: only active/trialing subscriptions unlock solo/studio/agency.
+CREATE TABLE IF NOT EXISTS organization_subscriptions (
+  organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT UNIQUE NOT NULL,
+  plan TEXT NOT NULL CHECK (plan IN ('solo', 'studio', 'agency')),
+  status TEXT NOT NULL CHECK (status IN ('active', 'past_due', 'canceled', 'trialing')),
+  current_period_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

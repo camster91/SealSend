@@ -98,39 +98,3 @@ export async function createSmsTopUpCheckoutSession({
 
   return session.url;
 }
-
-// Pro annual subscription checkout
-export async function createProCheckoutSession({
-  userId,
-}: {
-  userId: string;
-}): Promise<string> {
-  const stripe = getStripe();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: "SealSend Pro — Annual",
-          description: "Unlimited premium events, up to 2,500 guests per event, all features included.",
-        },
-        unit_amount: 12499,
-        recurring: { interval: "year" },
-      },
-      quantity: 1,
-    }],
-    metadata: { userId, plan: "pro_annual" },
-    success_url: `${siteUrl}/dashboard?upgraded=true`,
-    cancel_url: `${siteUrl}/pricing`,
-    allow_promotion_codes: true,
-  });
-
-  if (!session.url) {
-    throw new Error("Failed to create checkout session URL");
-  }
-
-  return session.url;
-}

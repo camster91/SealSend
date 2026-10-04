@@ -1673,3 +1673,32 @@ test('operator-created admin accounts require a hashed password and never print 
   assert.doesNotMatch(script, /console\.log\([^\n]*password/i);
   assert.doesNotMatch(script, /INSERT INTO admin_users \(email\) VALUES/);
 });
+
+test('organizer plan checkout is owner-only, beta-gated, and synced from verified Stripe webhooks', async () => {
+  const schema = await read('src/lib/db/schema.sql');
+  const migration = await read('apply-security-indexes.sql');
+  const route = await read('src/app/api/organizations/[organizationId]/billing/checkout/route.ts');
+  const webhook = await read('src/app/api/webhooks/stripe/route.ts');
+  const envExample = await read('.env.example');
+
+  for (const sql of [schema, migration]) {
+    assertColumns(sql, 'organization_subscriptions', ['organization_id', 'stripe_customer_id', 'stripe_subscription_id', 'plan', 'status', 'current_period_end']);
+    assert.match(tableDefinition(sql, 'organization_subscriptions'), /organization_id UUID PRIMARY KEY REFERENCES organizations\(id\) ON DELETE CASCADE/);
+    assert.match(tableDefinition(sql, 'organization_subscriptions'), /plan TEXT NOT NULL CHECK \(plan IN \('solo', 'studio', 'agency'\)\)/);
+  }
+
+  assert.match(route, /auth\.role !== "owner"/);
+  assert.match(route, /if \(BETA_MODE\)/);
+  assert.match(route, /isOrganizerCheckoutAvailable/);
+  assert.match(route, /organization\.is_personal/);
+  assert.match(route, /rateLimit\(`org-checkout:/);
+
+  assert.match(webhook, /metadata\?\.kind === "organizer_plan"/);
+  assert.match(webhook, /INSERT INTO organization_subscriptions/);
+  assert.match(webhook, /UPDATE organizations SET plan = \$1/);
+  assert.match(webhook, /PAYMENTS_TEST_ONLY === "true" && event\.livemode/);
+
+  for (const name of ['SOLO', 'STUDIO', 'AGENCY']) {
+    assert.match(envExample, new RegExp(`^STRIPE_ORGANIZER_${name}_PRICE_ID=`, 'm'));
+  }
+});
