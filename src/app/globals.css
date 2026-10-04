@@ -3,44 +3,58 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ========================================
-   SEALSEND DESIGN SYSTEM
-   Modern SaaS Color Palette & Tokens
+   SEALSEND DESIGN SYSTEM: Brand Lock
+   "Fine stationery that works like software." Brief: docs/brand/BRIEF.md
+   Ink #1B2A4A, Wax #B4233C, Cotton #F4F5F8, White, Sage #6E8B74, Foil #C9A45C.
    ======================================== */
 
 @theme inline {
+  /* ---------- BRAND LOCK ---------- */
+  --color-ink: #1b2a4a;
+  /* Wax is the seal, and only for key moments: one accent per view. */
+  --color-wax: #b4233c;
+  --color-wax-dark: #8f1b30;
+  --color-cotton: #f4f5f8;
+  /* Sage is 3.7:1 on white, so it is for fills and icons. Success text uses sage-dark. */
+  --color-sage: #6e8b74;
+  --color-sage-dark: #4a6450;
+  /* Foil is a rare hairline accent; never use it for text on light backgrounds. */
+  --color-foil: #c9a45c;
+  --color-hairline: rgb(27 42 74 / 0.1);
+
   /* ---------- COLORS ---------- */
-  /* Primary - Deep Indigo */
-  --color-primary-50: oklch(0.97 0.02 270);
-  --color-primary-100: oklch(0.93 0.04 270);
-  --color-primary-200: oklch(0.87 0.08 270);
-  --color-primary-300: oklch(0.78 0.12 270);
-  --color-primary-400: oklch(0.68 0.15 270);
-  --color-primary-500: oklch(0.58 0.18 270);
-  --color-primary-600: oklch(0.49 0.19 270);
-  --color-primary-700: oklch(0.42 0.16 270);
-  --color-primary-800: oklch(0.35 0.12 270);
-  --color-primary-900: oklch(0.28 0.09 270);
-  --color-primary-950: oklch(0.18 0.06 270);
+  /* Primary - Ink. 600 is Ink itself, so primary buttons, links and focus rings are Ink. */
+  --color-primary-50: #f1f3f7;
+  --color-primary-100: #e3e7ef;
+  --color-primary-200: #c6cddc;
+  --color-primary-300: #9ba7bf;
+  --color-primary-400: #6c7b9a;
+  --color-primary-500: #43537a;
+  --color-primary-600: #1b2a4a;
+  --color-primary-700: #15213b;
+  --color-primary-800: #101a2f;
+  --color-primary-900: #0c1324;
+  --color-primary-950: #070c17;
 
-  /* Accent - Warm Amber */
-  --color-accent-50: oklch(0.98 0.02 85);
-  --color-accent-100: oklch(0.95 0.05 85);
-  --color-accent-200: oklch(0.91 0.09 85);
-  --color-accent-300: oklch(0.85 0.13 85);
-  --color-accent-400: oklch(0.77 0.15 85);
-  --color-accent-500: oklch(0.69 0.16 85);
-  --color-accent-600: oklch(0.6 0.15 85);
-  --color-accent-700: oklch(0.51 0.13 85);
-  --color-accent-800: oklch(0.43 0.11 85);
-  --color-accent-900: oklch(0.35 0.09 85);
-  --color-accent-950: oklch(0.22 0.06 85);
+  /* Accent - Wax */
+  --color-accent-50: #fbeff1;
+  --color-accent-100: #f6dce1;
+  --color-accent-200: #edb8c2;
+  --color-accent-300: #e08a9b;
+  --color-accent-400: #cf5a71;
+  --color-accent-500: #b4233c;
+  --color-accent-600: #9c1e34;
+  --color-accent-700: #82192b;
+  --color-accent-800: #681423;
+  --color-accent-900: #50101b;
+  --color-accent-950: #2e0910;
 
-  /* Success - Emerald */
-  --color-success-50: #ecfdf5;
-  --color-success-100: #d1fae5;
-  --color-success-500: #10b981;
-  --color-success-600: #059669;
-  --color-success-700: #047857;
+  /* Success - Sage. 500 is the fill; 700 is Sage-dark for text. */
+  --color-success-50: #f0f4f1;
+  --color-success-100: #dde7df;
+  --color-success-500: #6e8b74;
+  --color-success-600: #5a7660;
+  --color-success-700: #4a6450;
 
   /* Warning - Amber */
   --color-warning-50: #fffbeb;
@@ -48,29 +62,29 @@
   --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
 
-  /* Error - Rose */
-  --color-error-50: #fff1f2;
-  --color-error-100: #ffe4e6;
-  --color-error-500: #f43f5e;
-  --color-error-600: #e11d48;
-  --color-error-700: #be123c;
+  /* Error - a plain red, kept distinct from Wax so errors never read as the brand accent. */
+  --color-error-50: #fdf1f1;
+  --color-error-100: #fbe2e2;
+  --color-error-500: #d93a3a;
+  --color-error-600: #c02626;
+  --color-error-700: #a11d1d;
 
-  /* Neutrals - Warm Slate */
-  --color-neutral-50: #fafaf9;
-  --color-neutral-100: #f5f5f4;
-  --color-neutral-200: #e7e5e4;
-  --color-neutral-300: #d6d3d1;
-  --color-neutral-400: #a8a29e;
-  --color-neutral-500: #78716c;
-  --color-neutral-600: #57534e;
-  --color-neutral-700: #44403c;
-  --color-neutral-800: #292524;
-  --color-neutral-900: #1c1917;
-  --color-neutral-950: #0c0a09;
+  /* Neutrals - cool paper greys tinted toward Ink. 50 is Cotton, 900 is Ink. */
+  --color-neutral-50: #f4f5f8;
+  --color-neutral-100: #ebedf2;
+  --color-neutral-200: #dce0e8;
+  --color-neutral-300: #c3c9d5;
+  --color-neutral-400: #8f98ab;
+  --color-neutral-500: #667085;
+  --color-neutral-600: #444d61;
+  --color-neutral-700: #333b4d;
+  --color-neutral-800: #232a3a;
+  --color-neutral-900: #1b2a4a;
+  --color-neutral-950: #0b101b;
 
   /* Semantic Aliases */
-  --color-background: var(--color-neutral-50);
-  --color-foreground: var(--color-neutral-900);
+  --color-background: var(--color-cotton);
+  --color-foreground: var(--color-ink);
   --color-muted: var(--color-neutral-500);
   /* Secondary text. neutral-600 keeps at least 7:1 contrast on white and neutral-100. */
   --color-muted-foreground: var(--color-neutral-600);
@@ -81,8 +95,11 @@
   --color-accent-red: var(--color-error-700);
   --color-accent-green: var(--color-success-700);
   --color-accent-amber: var(--color-warning-500);
-  --color-border: var(--color-neutral-200);
-  --color-ring: var(--color-primary-500);
+  /* Hairline borders (Ink at 10%) instead of drop shadows. */
+  --color-border: var(--color-hairline);
+  /* Form fields need a boundary of at least 3:1 on white, so they get a firmer edge. */
+  --color-input: #8a93a6;
+  --color-ring: var(--color-ink);
 
   /* Brand Aliases */
   --color-brand-50: var(--color-primary-50);
@@ -98,8 +115,10 @@
   --color-brand-950: var(--color-primary-950);
 
   /* ---------- TYPOGRAPHY ---------- */
-  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Loaded with next/font in src/app/layout.tsx. Libre Caslon Display is for large headlines only
+     (it is a display cut with a single weight); Hanken Grotesk carries all UI and body text. */
+  --font-sans: var(--font-hanken), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-caslon), Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* ---------- SPACING ---------- */
@@ -120,22 +139,26 @@
   --spacing-24: 6rem;
 
   /* ---------- BORDER RADIUS ---------- */
+  /* Controls are 10px (rounded-md, rounded-lg); cards are 16px (rounded-xl, rounded-2xl). */
   --radius-none: 0;
   --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.625rem;
   --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-3xl: 2rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
   --radius-full: 9999px;
 
   /* ---------- SHADOWS ---------- */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  /* Hairlines do the work, so shadows are faint and Ink-tinted. shadow-float is the one soft
+     shadow, reserved for the floating hero invitation. */
+  --shadow-sm: 0 1px 2px 0 rgb(27 42 74 / 0.04);
+  --shadow-md: 0 2px 6px -1px rgb(27 42 74 / 0.06);
+  --shadow-lg: 0 8px 20px -6px rgb(27 42 74 / 0.08);
+  --shadow-xl: 0 16px 32px -12px rgb(27 42 74 / 0.12);
+  --shadow-2xl: 0 24px 48px -16px rgb(27 42 74 / 0.18);
+  --shadow-inner: inset 0 1px 2px 0 rgb(27 42 74 / 0.05);
+  --shadow-float: 0 32px 64px -24px rgb(27 42 74 / 0.32);
 
   /* ---------- ANIMATION ---------- */
   --duration-instant: 0ms;
@@ -154,54 +177,54 @@
   --z-popover: 600;
   --z-tooltip: 700;
 
-  /* Shadcn defaults */
-  --radius: 0.5rem;
-  --background: oklch(0.985 0.001 270);
-  --foreground: oklch(0.22 0.01 270);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.01 270);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.01 270);
-  --primary: oklch(0.49 0.19 270);
-  --primary-foreground: oklch(0.985 0.001 270);
-  --secondary: oklch(0.96 0.01 270);
-  --secondary-foreground: oklch(0.3 0.02 270);
-  --muted: oklch(0.96 0.01 270);
-  --muted-foreground: oklch(0.55 0.05 270);
-  --accent: oklch(0.96 0.01 270);
-  --accent-foreground: oklch(0.3 0.02 270);
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.985 0.001 270);
-  --border: oklch(0.9 0.01 270);
-  --input: oklch(0.9 0.01 270);
-  --ring: oklch(0.49 0.19 270);
-  --chart-1: oklch(0.65 0.15 270);
-  --chart-2: oklch(0.6 0.15 150);
-  --chart-3: oklch(0.7 0.15 45);
-  --chart-4: oklch(0.6 0.15 300);
-  --chart-5: oklch(0.65 0.15 25);
+  /* Shadcn defaults, mapped to the Brand Lock */
+  --radius: 0.625rem;
+  --background: #f4f5f8;
+  --foreground: #1b2a4a;
+  --card: #ffffff;
+  --card-foreground: #1b2a4a;
+  --popover: #ffffff;
+  --popover-foreground: #1b2a4a;
+  --primary: #1b2a4a;
+  --primary-foreground: #ffffff;
+  --secondary: #ebedf2;
+  --secondary-foreground: #1b2a4a;
+  --muted: #ebedf2;
+  --muted-foreground: #444d61;
+  --accent: #ebedf2;
+  --accent-foreground: #1b2a4a;
+  --destructive: #c02626;
+  --destructive-foreground: #ffffff;
+  --border: rgb(27 42 74 / 0.1);
+  --input: #8a93a6;
+  --ring: #1b2a4a;
+  --chart-1: #1b2a4a;
+  --chart-2: #6e8b74;
+  --chart-3: #c9a45c;
+  --chart-4: #b4233c;
+  --chart-5: #8f98ab;
 }
 
 .dark {
-  --background: oklch(0.18 0.02 270);
-  --foreground: oklch(0.95 0.01 270);
-  --card: oklch(0.22 0.02 270);
-  --card-foreground: oklch(0.95 0.01 270);
-  --popover: oklch(0.22 0.02 270);
-  --popover-foreground: oklch(0.95 0.01 270);
-  --primary: oklch(0.6 0.15 270);
-  --primary-foreground: oklch(0.18 0.02 270);
-  --secondary: oklch(0.3 0.03 270);
-  --secondary-foreground: oklch(0.95 0.01 270);
-  --muted: oklch(0.3 0.03 270);
-  --muted-foreground: oklch(0.65 0.05 270);
-  --accent: oklch(0.3 0.03 270);
-  --accent-foreground: oklch(0.95 0.01 270);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.985 0.001 270);
-  --border: oklch(0.3 0.03 270);
-  --input: oklch(0.3 0.03 270);
-  --ring: oklch(0.6 0.15 270);
+  --background: #0f1729;
+  --foreground: #eef0f5;
+  --card: #17213a;
+  --card-foreground: #eef0f5;
+  --popover: #17213a;
+  --popover-foreground: #eef0f5;
+  --primary: #e3e7ef;
+  --primary-foreground: #1b2a4a;
+  --secondary: #243150;
+  --secondary-foreground: #eef0f5;
+  --muted: #243150;
+  --muted-foreground: #aab3c5;
+  --accent: #243150;
+  --accent-foreground: #eef0f5;
+  --destructive: #e05252;
+  --destructive-foreground: #ffffff;
+  --border: rgb(238 240 245 / 0.12);
+  --input: rgb(238 240 245 / 0.3);
+  --ring: #e3e7ef;
 }
 
 /* ========================================
@@ -221,90 +244,78 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+@layer base {
+  /* Libre Caslon Display ships one weight, so never let the browser fake a bold. Set it the way
+     engraved stationery is set: slightly tight, close leading. Utilities still override these. */
+  .font-display {
+    font-synthesis: none;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+
+  /* Visible keyboard focus everywhere: 2px Ink, offset 2px. Components that draw their own ring
+     (focus-visible:outline-none + ring) keep it; this covers links and controls that had none. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
+/* Fixed bottom bars sit above the iOS home indicator. */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* ========================================
    UTILITY CLASSES
    ======================================== */
 
-.gradient-brand {
-  background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-500) 50%, var(--color-accent-500) 100%);
-}
-
-.gradient-hero {
-  background: linear-gradient(135deg, var(--color-primary-700) 0%, var(--color-primary-500) 50%, var(--color-accent-400) 100%);
-}
-
-.gradient-subtle {
-  background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-neutral-50) 100%);
-}
-
-.text-gradient {
-  background: linear-gradient(135deg, var(--color-primary-600), var(--color-accent-500));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
 /* Glass effect */
 .glass {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--color-hairline);
 }
 
 /* Focus styles */
 .focus-ring {
-  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2;
 }
 
-/* Animation utilities */
+/* Small fade used by toasts and dialogs that answer a user's action. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.25s ease-out forwards;
 }
 
-.animate-slide-in {
-  animation: slideIn 0.5s ease-out forwards;
+/* The one orchestrated moment: the wax seal presses into place on the home hero. */
+@keyframes sealPress {
+  0% { opacity: 0; transform: scale(1.08) rotate(-8deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
-/* Stagger children animations */
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeIn 0.5s ease-out forwards;
+.animate-seal-press {
+  animation: sealPress 400ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both;
 }
 
-.stagger-children > *:nth-child(1) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.3s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.4s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.5s; }
-
-/* ========================================
-   SHADCN COMPONENT OVERRIDES
-   ======================================== */
-
-/* Button hover lift effect */
+/* Kept for the upgrade prompts: a quiet colour change, no lift. */
 .btn-lift {
-  @apply transition-all duration-200;
+  @apply transition-colors duration-200;
 }
 
-.btn-lift:hover {
-  @apply -translate-y-0.5 shadow-lg;
-}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 
-/* Card hover effect */
-.card-hover {
-  @apply transition-all duration-300;
-}
-
-.card-hover:hover {
-  @apply -translate-y-1 shadow-xl;
+  .animate-fade-in,
+  .animate-seal-press {
+    animation: none;
+  }
 }
