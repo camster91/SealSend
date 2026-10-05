@@ -50,7 +50,7 @@
       "id": "stripe_test_lifecycle",
       "kind": "external",
       "status": "pending",
-      "blocker": "Stripe app requires reauthentication and no test-mode annual price is configured"
+      "blocker": "Code and the one-command runner (npm run stripe:test-e2e) are ready, but no run against a Stripe test account is recorded: the Stripe app requires reauthentication and no test-mode prices or webhook secret are configured"
     },
     {
       "id": "mailgun_delivery_lifecycle",
