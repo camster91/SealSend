@@ -10,7 +10,9 @@ export async function GET() {
       return NextResponse.json({ status: 'unavailable' }, { status: 503, headers });
     }
 
-    return NextResponse.json({ status: 'ok' }, { headers });
+    const sourceCommit = process.env.SOURCE_COMMIT;
+    const revision = sourceCommit && /^[a-f0-9]{40}$/.test(sourceCommit) ? sourceCommit : null;
+    return NextResponse.json({ status: 'ok', revision }, { headers });
   } catch {
     return NextResponse.json({ status: 'unavailable' }, { status: 503, headers });
   }

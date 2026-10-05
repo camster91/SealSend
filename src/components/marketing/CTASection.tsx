@@ -1,81 +1,14 @@
-"use client";
-
-import Link from "next/link";
-import { ArrowRight, Sparkles, Shield, Clock, Heart } from "lucide-react";
-import { motion } from "framer-motion";
-import { BETA_MODE } from "@/lib/constants";
+import { SealMark } from "@/components/layout/Logo";
+import { PrimaryCta } from "@/components/marketing/Cta";
 
 export default function CTASection() {
   return (
-    <section className="relative overflow-hidden gradient-brand px-4 py-24 text-white">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute left-0 top-0 h-full w-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />
-      </div>
-
-      <div className="relative mx-auto max-w-4xl text-center">
-        <motion.div
-          initial={{ opacity: 1, y: 0 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
-          {/* Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-            <Heart className="h-4 w-4 text-accent-300" />
-            <span>Plan, invite, and track in one place</span>
-          </div>
-
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            {BETA_MODE
-              ? "Ready to run one complete event workflow?"
-              : "Ready to turn your event idea into an operating plan?"}
-          </h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
-            {BETA_MODE
-              ? "Use the controlled beta for one active event with up to 100 guests. Review communications before they are sent and help us verify the workflow with real hosting evidence."
-              : "Build the invitation, RSVP questions, guest workflow, and communication drafts together. Review every AI suggestion before anything is saved or sent."}
-          </p>
-
-          {/* Trust badges */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-white/70">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span>One active beta event</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              <span>No credit card required</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span>AI-assisted, always host-approved</span>
-            </div>
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/signup"
-              className="group inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 text-lg font-semibold text-primary-600 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:bg-primary-50 hover:shadow-xl"
-            >
-              Join Controlled Beta
-              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-            </Link>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-white/30 px-8 py-4 text-lg font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/10"
-            >
-              See Beta Details
-            </Link>
-          </div>
-
-          <div className="mt-12">
-            <p className="mt-4 text-sm text-white/80">
-              Free during the controlled beta. No credit card required.
-            </p>
-          </div>
-        </motion.div>
+    <section className="bg-ink px-4 py-14 text-white sm:px-6 sm:py-24 lg:px-8">
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+        <SealMark className="h-12 w-12" />
+        <h2 className="mt-6 font-display text-4xl sm:text-5xl">Your next event, sealed and sent.</h2>
+        <p className="mt-4 text-lg text-white/80">Free for your first event.</p>
+        <PrimaryCta onInk className="mt-8" />
       </div>
     </section>
   );

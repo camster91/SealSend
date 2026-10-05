@@ -22,19 +22,19 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   default:
-    "bg-brand-600 text-white hover:bg-brand-700 shadow-sm",
+    "bg-ink text-white hover:bg-primary-700",
   outline:
-    "border border-border bg-transparent hover:bg-neutral-50 text-foreground",
-  ghost: "hover:bg-neutral-100 text-foreground",
+    "border border-input bg-white hover:bg-neutral-50 text-ink",
+  ghost: "hover:bg-neutral-100 text-ink",
   destructive:
-    "bg-error-600 text-white hover:bg-rose-700 shadow-sm",
-  link: "text-brand-600 hover:text-brand-700 underline-offset-4 hover:underline p-0 h-auto",
+    "bg-error-600 text-white hover:bg-error-700",
+  link: "text-ink hover:text-primary-700 underline underline-offset-4 decoration-ink/30 hover:decoration-ink p-0 h-auto",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
   // When any pointer is touch (including touchscreen laptops), every size grows to at least 44px, the minimum
   // comfortable tap target; mouse layouts keep their compact sizes.
-  sm: "h-8 px-3 text-sm rounded-md any-pointer-coarse:h-11",
+  sm: "h-8 px-3 text-sm rounded-lg any-pointer-coarse:h-11",
   md: "h-10 px-4 text-sm rounded-lg any-pointer-coarse:h-11",
   lg: "h-12 px-6 text-base rounded-lg",
   icon: "h-10 w-10 rounded-lg any-pointer-coarse:h-11 any-pointer-coarse:w-11",
@@ -58,7 +58,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
           variantStyles[variant],
           sizeStyles[size],
           className

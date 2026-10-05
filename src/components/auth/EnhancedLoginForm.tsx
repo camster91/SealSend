@@ -149,14 +149,14 @@ export function EnhancedLoginForm({
               type="button"
               aria-pressed={method === 'email'}
               onClick={() => setMethod('email')}
-              className={`p-4 rounded-lg border-2 text-center transition-colors ${
+              className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
                 method === 'email'
-                  ? 'border-brand-500 bg-brand-50 text-brand-700'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-ink bg-primary-50 text-ink'
+                  : 'border-border text-neutral-700 hover:border-primary-300'
               }`}
             >
-              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
+                <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
               </div>
@@ -167,14 +167,14 @@ export function EnhancedLoginForm({
               type="button"
               aria-pressed={method === 'phone'}
               onClick={() => setMethod('phone')}
-              className={`p-4 rounded-lg border-2 text-center transition-colors ${
+              className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
                 method === 'phone'
-                  ? 'border-brand-500 bg-brand-50 text-brand-700'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-ink bg-primary-50 text-ink'
+                  : 'border-border text-neutral-700 hover:border-primary-300'
               }`}
             >
-              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
+                <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
                 </svg>
               </div>
@@ -199,14 +199,14 @@ export function EnhancedLoginForm({
             type="button"
             aria-pressed={method === 'email'}
             onClick={() => setMethod('email')}
-            className={`p-4 rounded-lg border-2 text-center transition-colors ${
+            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
               method === 'email'
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'border-ink bg-primary-50 text-ink'
+                : 'border-border text-neutral-700 hover:border-primary-300'
             }`}
           >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
+              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
             </div>
@@ -217,14 +217,14 @@ export function EnhancedLoginForm({
             type="button"
             aria-pressed={method === 'password'}
             onClick={() => setMethod('password')}
-            className={`p-4 rounded-lg border-2 text-center transition-colors ${
+            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
               method === 'password'
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'border-ink bg-primary-50 text-ink'
+                : 'border-border text-neutral-700 hover:border-primary-300'
             }`}
           >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
+              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
             </div>
@@ -235,14 +235,14 @@ export function EnhancedLoginForm({
             type="button"
             aria-pressed={method === 'phone'}
             onClick={() => setMethod('phone')}
-            className={`p-4 rounded-lg border-2 text-center transition-colors ${
+            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
               method === 'phone'
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-gray-200 hover:border-gray-300'
+                ? 'border-ink bg-primary-50 text-ink'
+                : 'border-border text-neutral-700 hover:border-primary-300'
             }`}
           >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
+              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
               </svg>
             </div>
@@ -313,13 +313,13 @@ export function EnhancedLoginForm({
         </div>
 
         {error && (
-          <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+          <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-accent-red">
             {error}
           </div>
         )}
 
         {success && (
-          <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+          <div role="status" className="rounded-lg border border-success-100 bg-success-50 p-3 text-sm text-success-700">
             {success}
           </div>
         )}
@@ -342,22 +342,22 @@ export function EnhancedLoginForm({
   const renderCodeForm = () => {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4 text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100">
+        <div className="rounded-lg border border-border bg-neutral-50 p-4 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-border" aria-hidden="true">
             {method === 'email' ? (
-              <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-5 w-5 text-ink" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
             ) : (
-              <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-5 w-5 text-ink" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
               </svg>
             )}
           </div>
-          <p className="text-sm font-medium text-indigo-700">
+          <p className="text-sm font-semibold text-ink">
             Check your {method === 'email' ? 'email' : 'phone'}
           </p>
-          <p className="mt-1 text-xs text-indigo-600">
+          <p className="mt-1 text-sm text-neutral-600">
             We sent a {isGuestMode ? 'guest access' : 'login'} code to{" "}
             <strong>{method === 'email' ? email : phone}</strong>
           </p>
@@ -382,7 +382,7 @@ export function EnhancedLoginForm({
           />
 
           {error && (
-            <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
+            <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-accent-red">
               {error}
             </div>
           )}
@@ -401,7 +401,7 @@ export function EnhancedLoginForm({
               setCode(""); 
               setSuccess(null);
             }}
-            className="text-brand-600 hover:text-brand-700"
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-ink underline-offset-4 hover:underline"
           >
             Use a different {method === 'email' ? 'email' : 'phone'}
           </button>
@@ -409,7 +409,7 @@ export function EnhancedLoginForm({
             type="button"
             onClick={() => handleSendCode({ preventDefault: () => {} } as React.FormEvent)}
             disabled={loading}
-            className="text-brand-600 hover:text-brand-700"
+            className="inline-flex min-h-11 items-center rounded-lg font-medium text-ink underline-offset-4 hover:underline disabled:opacity-50"
           >
             Resend code
           </button>
@@ -423,7 +423,7 @@ export function EnhancedLoginForm({
       {step === "input" ? renderInputForm() : renderCodeForm()}
       
       {!isGuestMode && (
-        <div className="pt-4 border-t border-gray-200">
+        <div className="pt-4 border-t border-border">
           <p className="text-center text-sm text-muted-foreground">
             Are you an event guest? Check your invitation link to access your event.
           </p>

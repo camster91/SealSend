@@ -1,8 +1,4 @@
-"use client";
-
-import { useState } from "react";
-import { ChevronDown, HelpCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import FaqList from "@/components/marketing/FaqList";
 import { BETA_MODE } from "@/lib/constants";
 
 const betaFaqs = [
@@ -56,87 +52,15 @@ const paidFaqs = [
   },
 ];
 
+export const PRICING_FAQS = BETA_MODE ? betaFaqs : paidFaqs;
+
 export function PricingFAQ() {
-  const faqs = BETA_MODE ? betaFaqs : paidFaqs;
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
-
   return (
-    <section className="bg-neutral-50 px-4 py-20">
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-12 text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100">
-            <HelpCircle className="h-6 w-6 text-primary-600" />
-          </div>
-          <h2 className="font-display text-3xl font-bold text-neutral-900">
-            Frequently asked questions
-          </h2>
-          <p className="mt-4 text-neutral-600">
-            {BETA_MODE ? "What to expect from the controlled beta" : "Everything you need to know about pricing and billing"}
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {faqs.map((faq, index) => (
-            <div
-              key={index}
-              className="rounded-xl border border-neutral-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-            >
-              <button
-                aria-expanded={openIndex === index}
-                aria-controls={`pricing-faq-answer-${index}`}
-                onClick={() =>
-                  setOpenIndex(openIndex === index ? null : index)
-                }
-                className="flex w-full items-center justify-between p-6 text-left"
-              >
-                <span className="font-medium text-neutral-900">
-                  {faq.question}
-                </span>
-                <ChevronDown
-                  className={cn(
-                    "h-5 w-5 shrink-0 text-neutral-500 transition-transform duration-200",
-                    openIndex === index && "rotate-180"
-                  )}
-                />
-              </button>
-              <div
-                id={`pricing-faq-answer-${index}`}
-                hidden={openIndex !== index}
-                className={cn(
-                  "grid transition-all duration-200",
-                  openIndex === index
-                    ? "grid-rows-[1fr] opacity-100"
-                    : "grid-rows-[0fr] opacity-0"
-                )}
-              >
-                <div className="overflow-hidden">
-                  <p className="px-6 pb-6 text-neutral-600 leading-relaxed">
-                    {faq.answer}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Still have questions */}
-        <div className="mt-12 rounded-2xl bg-primary-600 p-8 text-center text-white">
-          <h3 className="font-display text-xl font-semibold">
-            Still have questions?
-          </h3>
-          <p className="mt-2 text-primary-100">
-            Email us with a pricing or billing question.
-          </p>
-          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a
-              href="mailto:support@sealsend.app"
-              className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50"
-            >
-              Contact Support
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
+    <FaqList faqs={PRICING_FAQS} title={BETA_MODE ? "About the beta" : "Pricing questions"}>
+      Still have a question?{" "}
+      <a href="mailto:support@sealsend.app" className="font-semibold text-ink underline underline-offset-4">
+        Email support@sealsend.app
+      </a>
+    </FaqList>
   );
 }

@@ -1,140 +1,91 @@
 import Link from "next/link";
+import { Logo } from "@/components/layout/Logo";
 import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
+
+const columns = [
+  {
+    title: "Product",
+    links: [
+      { label: "How it works", href: "/how-it-works" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Log in", href: "/login" },
+      { label: "Get started", href: "/signup" },
+    ],
+  },
+  {
+    title: "Use cases",
+    links: [
+      { label: "Event planners", href: "/use-cases/event-planners" },
+      { label: "Weddings", href: "/use-cases/weddings" },
+      { label: "Birthday parties", href: "/use-cases/birthday-parties" },
+      { label: "Community events", href: "/use-cases/community-events" },
+      { label: "Clubs and associations", href: "/use-cases/clubs-associations" },
+      { label: "Local nonprofits", href: "/use-cases/nonprofit-events" },
+      { label: "Professional gatherings", href: "/use-cases/professional-gatherings" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "Support", href: "/support" },
+      { label: "support@sealsend.app", href: "mailto:support@sealsend.app" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+    ],
+  },
+];
+
+const linkClass = "inline-flex min-h-9 items-center text-[0.95rem] text-neutral-600 transition-colors hover:text-ink";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-neutral-50">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-5">
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <span className="text-xl font-bold">
-              <span className="text-foreground">Seal</span>
-              <span className="text-brand-600">Send</span>
-            </span>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Turn an event brief into an approved invitation, actionable guest
-              list, host-controlled updates, and event-day check-in.
+    <footer className="border-t border-border bg-cotton">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+        <div className="grid gap-8 sm:gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <Logo />
+            <p className="mt-4 max-w-xs leading-relaxed text-neutral-600">
+              Send the invitation, know who&apos;s coming, and check guests in at the door, all from one link.
             </p>
           </div>
 
-          {/* Product */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Product</h3>
-            <ul className="mt-3 space-y-2">
-              <li>
-                <Link
-                  href="/how-it-works"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  How It Works
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/pricing"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Pricing
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Use Cases */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Use Cases
-            </h3>
-            <ul className="mt-3 space-y-2">
-              <li>
-                <Link
-                  href="/use-cases/community-events"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Community Events
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/use-cases/nonprofit-events"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Local Nonprofits
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/use-cases/clubs-associations"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Clubs &amp; Associations
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/use-cases/professional-gatherings"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Professional Gatherings
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/use-cases/event-planners"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Event Planners
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal & Support */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Legal</h3>
-            <ul className="mt-3 space-y-2">
-              <li>
-                <Link
-                  href="/terms"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/privacy"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-            <h3 className="mt-6 text-sm font-semibold text-foreground">
-              Support
-            </h3>
-            <ul className="mt-3 space-y-2">
-              <li>
-                <Link href="/support" className="text-sm text-muted-foreground hover:text-foreground">
-                  Support expectations
-                </Link>
-              </li>
-              <li>
-                <a href="mailto:support@sealsend.app" className="text-sm text-muted-foreground hover:text-foreground">
-                  support@sealsend.app
-                </a>
-              </li>
-              <li>
-                <SourceCodeLink className="text-sm text-muted-foreground hover:text-foreground" />
-              </li>
-            </ul>
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 lg:col-span-8">
+            {columns.map((column) => (
+              <div key={column.title}>
+                <h2 className="text-sm font-semibold text-ink">{column.title}</h2>
+                <ul className="mt-3 space-y-1">
+                  {column.links.map((link) => (
+                    <li key={link.href}>
+                      {link.href.startsWith("mailto:") ? (
+                        <a href={link.href} className={linkClass}>
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link href={link.href} className={linkClass}>
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                  {column.title === "Company" && (
+                    <li>
+                      <SourceCodeLink className={linkClass} />
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="mt-8 border-t border-border pt-8">
-          <p className="text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Seal and Send. All rights reserved.
+        <div className="mt-10 border-t border-border pt-6 sm:mt-12 sm:pt-8">
+          <p className="text-sm text-neutral-600">
+            &copy; {new Date().getFullYear()} SealSend. All rights reserved.
           </p>
         </div>
       </div>

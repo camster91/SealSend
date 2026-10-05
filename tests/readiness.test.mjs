@@ -186,7 +186,10 @@ test('public marketing pages linked from the footer do not require a login', asy
   const proxy = await read('src/proxy.ts');
   const footer = await read('src/components/layout/Footer.tsx');
   const publicList = proxy.slice(proxy.indexOf('const publicPaths = ['), proxy.indexOf('];', proxy.indexOf('const publicPaths = [')));
-  for (const href of footer.matchAll(/href="(\/[a-z-]+)(?:\/[a-z-]+)?"/g)) {
+  // Footer links are data (href: "/path") or JSX (href="/path"); both forms are checked.
+  const hrefs = [...footer.matchAll(/href(?:=|:\s*)"(\/[a-z-]+)(?:\/[a-z-]+)?"/g)];
+  assert.ok(hrefs.length >= 10, 'expected the footer links to be found');
+  for (const href of hrefs) {
     assert.match(publicList, new RegExp(`'${href[1]}'`), `${href[1]} is linked from the footer but not public`);
   }
 });
@@ -294,10 +297,15 @@ test('browser QA covers five engines and the hero is hydration-safe with reduced
   assert.match(config, /Desktop Firefox/);
   assert.match(config, /Desktop Safari/);
   assert.match(config, /iPhone 15/);
+  // The hero is a server component with a single CSS seal-press animation that
+  // prefers-reduced-motion switches off, so there is no client motion state to hydrate.
   const hero = await read('src/components/marketing/Hero.tsx');
-  assert.match(hero, /initial=\{false\}/);
-  assert.doesNotMatch(hero, /useReducedMotion/);
-  assert.doesNotMatch(hero, /repeat:\s*Infinity/);
+  const css = await read('src/app/globals.css');
+  assert.doesNotMatch(hero, /^["']use client["']/m);
+  assert.doesNotMatch(hero, /framer-motion|useReducedMotion/);
+  assert.doesNotMatch(hero, /repeat:\s*Infinity|infinite/);
+  assert.match(hero, /animate-seal-press/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.animate-seal-press[\s\S]*animation: none/);
 });
 
 test('recurring-organizer marketing describes the explicit next-event workflow', async () => {
@@ -316,12 +324,12 @@ test('recurring-organizer marketing describes the explicit next-event workflow',
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
   const config = await read('next.config.ts');
   const proxy = await read('src/proxy.ts');
-  const openGraphImage = await read('src/app/opengraph-image.tsx');
 
   assert.match(config, /turbopack:\s*\{[\s\S]*?root:\s*process\.cwd\(\)/);
   assert.match(config, /NEXT_PUBLIC_SITE_URL\?\.startsWith\('https:\/\/'\)/);
   assert.match(proxy, /export async function proxy\(/);
-  assert.doesNotMatch(openGraphImage, /runtime\s*=\s*["']edge["']/);
+  // The generated (edge-prone) Open Graph route was replaced by the static public/brand/og.jpg.
+  await assert.rejects(read('src/app/opengraph-image.tsx'));
 });
 
 test('browser CI serves the same standalone artifact shape as production', async () => {
@@ -500,7 +508,7 @@ test('public marketing does not ship invented social proof', async () => {
   const hero = await read('src/components/marketing/Hero.tsx');
   const pricingCta = await read('src/components/pricing/PricingCTA.tsx');
   const cta = await read('src/components/marketing/CTASection.tsx');
-  const openGraphImage = await read('src/app/opengraph-image.tsx');
+  const factStrip = await read('src/components/marketing/FactStrip.tsx');
   const marketingDirectory = new URL('../src/components/marketing/', import.meta.url);
   const marketingComponents = await Promise.all(
     (await readdir(marketingDirectory))
@@ -510,37 +518,45 @@ test('public marketing does not ship invented social proof', async () => {
 
   assert.doesNotMatch(marketingPage, /<Testimonials\s*\/>/);
   assert.doesNotMatch(useCasePage, /<UseCaseTestimonial\b/);
-  for (const source of [hero, pricingCta, cta]) {
-    assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%/i);
+  for (const source of [hero, pricingCta, cta, factStrip]) {
+    assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%|trusted by|loved by/i);
   }
   for (const source of marketingComponents) {
     assert.doesNotMatch(source, /10,000\+|200,000\+|500K\+|4\.9\/5|99% satisfaction/i);
     assert.doesNotMatch(source, /Sarah Mitchell|David Chen|Emily Rodriguez/);
   }
-  assert.doesNotMatch(openGraphImage, /10,000\+|200,000\+|500K\+|4\.9\/5|99%/i);
-  assert.match(openGraphImage, /Controlled Beta/);
-  assert.match(openGraphImage, /One Event · Up to 100 Guests/);
+  // The fact strip states product facts; the guest limit is read from the plan constants.
+  assert.match(factStrip, /PUBLIC_PRICING_PLANS/);
+  assert.match(factStrip, /Guests never need an account/);
 });
 
-test('public offer is a bounded controlled beta for recurring community organizers', async () => {
+test('public offer is a bounded controlled beta with BETA_MODE-aware calls to action', async () => {
   const constants = await read('src/lib/constants.ts');
   const hero = await read('src/components/marketing/Hero.tsx');
+  const cta = await read('src/components/marketing/Cta.tsx');
   const howItWorks = await read('src/components/marketing/HowItWorks.tsx');
+  const pricingTeaser = await read('src/components/marketing/PricingTeaser.tsx');
   const pricingCards = await read('src/components/pricing/PricingCards.tsx');
   const pricingFaq = await read('src/components/pricing/PricingFAQ.tsx');
 
   assert.match(constants, /export const BETA_MODE = true/);
   assert.match(constants, /CONTROLLED_BETA_PRICING_PLAN[\s\S]*guests:\s*"100"/);
-  assert.match(hero, /recurring community organizers/i);
-  assert.match(hero, /approved guest workflow/i);
+  assert.match(hero, /Send the invitation\. Know who&apos;s coming\./);
+  assert.match(hero, /PRIMARY_CTA_NOTE/);
+  assert.match(cta, /BETA_MODE \? "Join the free beta" : "Plan your first event free"/);
+  assert.match(cta, /Free during the beta: one event, up to 100 guests\./);
+  assert.match(cta, /href="\/signup"/);
   for (const stage of [
-    'Start from the event brief',
-    'Review the invitation and RSVP',
-    'Act on the guest list',
-    'Run event day',
+    'Describe your event',
+    'Send it your way',
+    'Watch replies arrive, then check guests in',
   ]) {
     assert.match(howItWorks, new RegExp(stage, 'i'));
   }
+  // Home page prices come from the billing constants, and the beta keeps its checkout-disabled message.
+  assert.match(pricingTeaser, /PUBLIC_PRICING_PLANS\.map/);
+  assert.doesNotMatch(pricingTeaser, /\$\d/);
+  assert.match(pricingTeaser, /BETA_MODE && [\s\S]*Paid checkout is disabled during the beta/);
   assert.match(pricingCards, /BETA_MODE\s*\?\s*\[CONTROLLED_BETA_PRICING_PLAN\]/);
   assert.match(pricingFaq, /one active event for up to 100 guests/i);
   assert.match(pricingFaq, /paid checkout is disabled/i);
@@ -548,7 +564,12 @@ test('public offer is a bounded controlled beta for recurring community organize
 
 test('public feature marketing stays inside the shipped approval-controlled workflow', async () => {
   const constants = await read('src/lib/constants.ts');
-  const features = await read('src/components/marketing/FeaturesGrid.tsx');
+  const features = [
+    await read('src/components/marketing/FeatureRows.tsx'),
+    await read('src/components/marketing/OrganizersSection.tsx'),
+    await read('src/components/marketing/UseCaseGrid.tsx'),
+    await read('src/app/(marketing)/page.tsx'),
+  ].join('\n');
   const metadata = await read('src/lib/metadata.ts');
 
   for (const staleClaim of [
@@ -578,9 +599,22 @@ test('public feature marketing stays inside the shipped approval-controlled work
   assert.match(constants, /resolved audience/i);
   assert.match(constants, /required new schedule/i);
   assert.match(constants, /guest contact reuse/i);
-  assert.match(features, /Join controlled beta/);
-  assert.match(metadata, /approved guest workflow/i);
-  assert.match(metadata, /recurring community organizers/i);
+  // Every marketed capability maps to something shipped: templates, RSVP fields, announcements,
+  // QR check-in, workspace roles, brand kit, client review links, repeat events and webhooks.
+  for (const shippedClaim of [
+    'Pick a design',
+    'only to guests who said yes',
+    'Scan guests in from any phone',
+    'owner, admin, planner and check-in roles',
+    'Client review links with live RSVP totals and recorded approvals',
+    'Repeat an event and keep the guest list',
+    'Signed webhooks',
+  ]) {
+    assert.match(features, new RegExp(shippedClaim, 'i'));
+  }
+  assert.match(metadata, /SealSend: Online Invitations with RSVP Tracking & Check-in/);
+  assert.match(metadata, /Free for your first event\./);
+  assert.match(metadata, /\/brand\/og\.jpg/);
 });
 
 test('controlled beta remains free and enforces one active event throughout the authenticated app', async () => {
@@ -663,21 +697,26 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   assert.match(eventPage, /Previous event/);
 });
 
-test('root discovery metadata matches the recurring-organizer controlled beta', async () => {
+test('root discovery metadata uses the brief positioning and the committed brand assets', async () => {
   const layout = await read('src/app/layout.tsx');
-  const manifest = await read('public/manifest.json');
-  const icon = await read('public/icons/icon.svg');
+  const metadata = await read('src/lib/metadata.ts');
+  const manifest = JSON.parse(await read('public/manifest.json'));
 
-  for (const source of [layout, manifest]) {
-    assert.match(source, /recurring (community )?organizers/i);
-    assert.match(source, /approved guest workflow/i);
-    assert.doesNotMatch(source, /wedding invitations|party invitations|beautiful digital invitations/i);
-  }
+  assert.match(layout, /title:\s*DEFAULT_TITLE/);
+  assert.match(layout, /description:\s*DEFAULT_DESCRIPTION/);
+  assert.match(layout, /images:\s*\[OG_IMAGE\]/);
+  assert.match(metadata, /url:\s*"\/brand\/og\.jpg",\s*width:\s*1200,\s*height:\s*630/);
   assert.match(layout, /manifest:\s*["']\/manifest\.json["']/);
-  assert.doesNotMatch(layout, /\/og-image\.jpg/);
-  assert.match(layout, /\/opengraph-image/);
-  assert.match(manifest, /\/icons\/icon\.svg/);
-  assert.match(icon, /<svg/);
+  assert.match(layout, /\/brand\/favicon-32\.png/);
+  assert.match(layout, /\/brand\/apple-touch-icon\.png/);
+  assert.match(layout, /Hanken_Grotesk/);
+  assert.match(layout, /Libre_Caslon_Display/);
+  for (const source of [layout, metadata, JSON.stringify(manifest)]) {
+    assert.doesNotMatch(source, /approved guest workflow/i);
+  }
+  for (const asset of ['public/brand/og.jpg', ...manifest.icons.map((icon) => `public${icon.src}`)]) {
+    assert.ok((await readFile(new URL(`../${asset}`, import.meta.url))).length > 0, `${asset} must exist`);
+  }
 });
 
 test('every sitemap marketing page declares a canonical URL', async () => {
@@ -701,7 +740,7 @@ test('candidate publishes factual support expectations without promising round-t
   assert.match(support, /not a 24\/7 or guaranteed resolution time/i);
   assert.match(support, /Never email passwords, one-time codes, session cookies, payment-card data/i);
   assert.match(support, /controlled beta/i);
-  assert.match(footer, /href="\/support"/);
+  assert.match(footer, /href(?:=|:\s*)"\/support"/);
   assert.match(sitemap, /`\$\{SITE_URL\}\/support`/);
 });
 
@@ -730,6 +769,8 @@ test('organizer use cases and comparison stay inside the shipped product scope',
     'clubs-associations',
     'professional-gatherings',
     'event-planners',
+    'weddings',
+    'birthday-parties',
   ]) {
     assert.match(content, new RegExp(`slug: ["']${slug}["']`));
     for (const navigationSource of [navbar, footer, sitemap]) {
@@ -746,7 +787,13 @@ test('organizer use cases and comparison stay inside the shipped product scope',
   assert.doesNotMatch(content, /testimonial\s*:|Twyla Tyler|Monica W|Ashley Corbett|Brian Stuart/);
   assert.doesNotMatch(content, /music\s*(?:&|and)\s*video|photo sharing|gift tracking|1,200 replies/i);
 
-  assert.match(home, /<OrganizerFit\s*\/>/);
+  assert.match(home, /<OrganizersSection\s*\/>/);
+  assert.match(indexPage, /<OrganizerFit\s*\/>/);
+  // New use-case pages have real hero photos, breadcrumbs and no legacy redirect shadowing them.
+  assert.match(detailPage, /breadcrumbJsonLd/);
+  assert.match(content, /image: "\/brand\/photos\/weddings\.webp"/);
+  assert.match(content, /image: "\/brand\/photos\/birthdays\.webp"/);
+  assert.doesNotMatch(content.slice(content.indexOf('LEGACY_USE_CASE_REDIRECTS')), /weddings|birthday-parties/);
   for (const alternative of [
     'Spreadsheets and group chats',
     'Invitation-first tools',

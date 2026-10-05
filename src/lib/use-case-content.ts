@@ -1,6 +1,10 @@
 export interface UseCaseData {
   slug: string;
-  indexIcon: "Users" | "Heart" | "BadgeCheck" | "Briefcase" | "Sparkles";
+  /** Short name for cards, menus and breadcrumbs. */
+  name: string;
+  /** Photo in public/brand/photos, used on cards and as the page hero. */
+  image: string;
+  imageAlt: string;
   indexDescription: string;
   indexFeatures: string[];
   metaTitle: string;
@@ -19,12 +23,14 @@ const betaCapacityAnswer =
 export const USE_CASES: Record<string, UseCaseData> = {
   "community-events": {
     slug: "community-events",
-    indexIcon: "Users",
+    name: "Community events",
+    image: "/brand/photos/community.webp",
+    imageAlt: "Neighbours setting out dishes at a community potluck while an organizer checks the guest list on a tablet",
     indexDescription: "Keep invitations, RSVPs, guest segments, approved updates, and arrival status connected for a real community gathering.",
     indexFeatures: ["Guest tags", "Co-host roles", "Mobile check-in", "Approved updates"],
     metaTitle: "Community Event Invitations and RSVP Workflow",
     metaDescription: "Run a community event from an editable invitation and RSVP through guest updates and check-in in SealSend's controlled beta.",
-    heroHeadline: "One Guest Workflow for Community Events",
+    heroHeadline: "Run the monthly potluck without the spreadsheet.",
     heroSubtext: "For creative communities, alumni groups, neighborhood organizers, and recurring gatherings that need more than a link and a spreadsheet.",
     benefits: [
       { icon: "ClipboardList", title: "Start from the event brief", description: "Build an editable event page and RSVP questions from the details your organizing team already has." },
@@ -38,17 +44,19 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "Can several organizers help?", answer: "Yes. The controlled beta allows up to three team members including the owner, with manager, check-in, and viewer roles." },
       { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Live email and SMS are enabled only after provider readiness is confirmed for the consented beta host." },
     ],
-    ctaText: "Start a Community Event",
+    ctaText: "Start a community event",
     keywords: ["community event RSVP", "community event invitations", "event guest list", "community event check in"],
   },
   "nonprofit-events": {
     slug: "nonprofit-events",
-    indexIcon: "Heart",
+    name: "Local nonprofits",
+    image: "/brand/photos/door-checkin.webp",
+    imageAlt: "A volunteer at a welcome table scanning the QR code on a guest's phone as she arrives",
     indexDescription: "Coordinate local nonprofit gatherings, volunteer events, and supporter briefings without adopting enterprise event software.",
     indexFeatures: ["Custom RSVP fields", "Sign-up board", "Guest export", "Co-host access"],
     metaTitle: "Local Nonprofit Event Invitations and RSVP",
     metaDescription: "Coordinate a local nonprofit or volunteer event with custom RSVP questions, sign-ups, guest updates, and check-in.",
-    heroHeadline: "Practical Event Operations for Local Nonprofits",
+    heroHeadline: "Volunteer nights and supporter events, without enterprise software.",
     heroSubtext: "Collect the participation details your team needs, coordinate volunteer responsibilities, and keep the guest record usable through event day.",
     benefits: [
       { icon: "ClipboardList", title: "Ask the questions that affect delivery", description: "Add custom RSVP fields for accessibility needs, dietary requirements, roles, or other event-specific planning details." },
@@ -62,17 +70,19 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "Can we collect accessibility or volunteer details?", answer: "Yes. Organizers can configure custom RSVP questions and use a sign-up board for event-specific roles or items." },
       { question: "How is guest communication controlled?", answer: "The organizer reviews recipients, channels, schedule, and the available cost estimate before approving an external send. Provider readiness remains a separate beta gate." },
     ],
-    ctaText: "Start a Nonprofit Event",
+    ctaText: "Start a nonprofit event",
     keywords: ["nonprofit event RSVP", "volunteer event invitations", "nonprofit guest management", "community nonprofit events"],
   },
   "clubs-associations": {
     slug: "clubs-associations",
-    indexIcon: "BadgeCheck",
+    name: "Clubs and associations",
+    image: "/brand/photos/guest-updates.webp",
+    imageAlt: "A guest outside a community hall holding a phone with a text from the hosts: doors open at 6:30, parking is behind the hall",
     indexDescription: "Run chapter meetings, member gatherings, workshops, and annual events from a repeatable organizer workflow.",
     indexFeatures: ["Next-event setup", "Member tags", "RSVP status", "Calendar links"],
     metaTitle: "Club and Association Event RSVP Workflow",
     metaDescription: "Create repeatable club and association events with invitations, custom RSVP questions, member tags, updates, and check-in.",
-    heroHeadline: "A Repeatable Event Workflow for Clubs and Associations",
+    heroHeadline: "Every meeting starts from the last one.",
     heroSubtext: "Give recurring organizers a reliable starting point without turning SealSend into a membership database or enterprise event suite.",
     benefits: [
       { icon: "Calendar", title: "Reuse structure with a new schedule", description: "Start the next event from a proven structure, choose a new schedule, and explicitly decide whether to carry guest contact details forward." },
@@ -86,17 +96,19 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "Can an organizer reuse a previous event?", answer: "Yes. An authorized organizer can start the next event as a new draft, choose a new schedule, and explicitly decide whether to reuse guest contact details before publishing." },
       { question: "Can guests correct an RSVP?", answer: "The host can manage responses and send a scoped guest update link when an invited guest needs to revise submitted information." },
     ],
-    ctaText: "Start a Club Event",
+    ctaText: "Start a club event",
     keywords: ["club event RSVP", "association event invitations", "member event guest list", "chapter event check in"],
   },
   "professional-gatherings": {
     slug: "professional-gatherings",
-    indexIcon: "Briefcase",
+    name: "Professional gatherings",
+    image: "/brand/photos/track-rsvps.webp",
+    imageAlt: "A host at a table reading a guest list that shows who is going, who might come and dietary notes",
     indexDescription: "Operate workshops, networking nights, alumni gatherings, and small professional events with clear approvals.",
     indexFeatures: ["Uploaded artwork", "Custom questions", "Guest segments", "Check-in and export"],
     metaTitle: "Small Professional Event Invitations and RSVP",
     metaDescription: "Run a workshop, networking event, or small professional gathering with custom RSVP fields, guest updates, and check-in.",
-    heroHeadline: "Professional Guest Operations Without Enterprise Overhead",
+    heroHeadline: "Workshops and networking nights, handled from one guest list.",
     heroSubtext: "For independent planners and small teams that need a polished event page, actionable attendee information, and a controlled event-day workflow.",
     benefits: [
       { icon: "Share2", title: "Use approved event artwork", description: "Choose a shipped template or upload invitation artwork while preserving the original file and reviewing the crop." },
@@ -110,17 +122,19 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "Can we use our own invitation artwork?", answer: "Yes. Organizers can upload supported artwork, review the displayed crop, and retain the uploaded original." },
       { question: "Can attendee information be exported?", answer: "Yes. An authorized organizer can export event-scoped guest or response information for legitimate event operations." },
     ],
-    ctaText: "Start a Professional Gathering",
+    ctaText: "Start a professional event",
     keywords: ["professional event RSVP", "networking event invitations", "workshop guest management", "small event check in"],
   },
   "event-planners": {
     slug: "event-planners",
-    indexIcon: "Sparkles",
+    name: "Event planners",
+    image: "/brand/photos/planners.webp",
+    imageAlt: "A planner's desk with a laptop showing a client approval marked Approved, a floor plan, fabric swatches and a wax seal stamp",
     indexDescription: "For independent planners and small studios running events for clients: a team workspace, your own brand, client records and review links.",
     indexFeatures: ["Team workspace", "Brand kit", "Client review links", "Webhooks"],
     metaTitle: "Event Planner Workspace for Client Events",
     metaDescription: "Run client events under your own brand with a team workspace, client records, read-only review links with approvals, and RSVP webhooks.",
-    heroHeadline: "Run Client Events Under Your Own Brand",
+    heroHeadline: "Run client events under your own brand.",
     heroSubtext: "For independent planners and small studios. Keep every client event in one team workspace, put your brand on invitations, and get sign-off from clients before anything goes out.",
     benefits: [
       { icon: "Users", title: "One workspace for your team", description: "Invite planners and check-in staff to a shared workspace. Roles decide who can edit events, manage clients, or only check guests in at the door." },
@@ -134,15 +148,65 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "Do my clients need an account?", answer: "No. A client opens the review link in a browser, sees the invitation and RSVP totals, and can approve it by typing their name. Links expire after 30 days and can be revoked at any time." },
       { question: "Does SealSend handle contracts, invoices or payments from clients?", answer: "No. SealSend covers the guest side of the event: invitations, RSVPs, updates and check-in. Use webhooks to send that data into the CRM or invoicing tool you already use." },
     ],
-    ctaText: "Join the Organizer Beta",
-    keywords: ["event planner software", "event planner client portal", "branded event invitations", "event planner RSVP tool"],
+    ctaText: "Join the organizer beta",
+    keywords: ["event planner software", "event planner client portal", "event planner client approval", "branded event invitations", "event planner RSVP tool"],
+  },
+  weddings: {
+    slug: "weddings",
+    name: "Weddings",
+    image: "/brand/photos/weddings.webp",
+    imageAlt: "Place cards sealed with red wax beside a navy welcome sign and a phone showing the wedding guest list",
+    indexDescription: "One list for every reply, meal choice and plus-one, from the save-the-date to the welcome table.",
+    indexFeatures: ["Wedding templates", "Plus-ones", "Meal and dietary questions", "Check-in"],
+    metaTitle: "Wedding RSVP Website with Online Invitations",
+    metaDescription: "Send your wedding invitation online, collect RSVPs with meal choices and plus-ones, message guests, and check them in at the door.",
+    heroHeadline: "Every RSVP, meal choice and plus-one in one list.",
+    heroSubtext: "Send a wedding invitation guests can open on any phone, collect the answers you need for the caterer, and keep the whole guest list in one place.",
+    benefits: [
+      { icon: "Palette", title: "Start from a wedding design", description: "Choose the Garden, City or Coastal wedding template, or upload your own invitation artwork, then add your photo and colours." },
+      { icon: "ClipboardList", title: "Ask what the caterer needs", description: "Collect plus-ones and dietary needs, and add your own RSVP questions such as meal choice or song requests." },
+      { icon: "Mail", title: "Keep guests in the loop", description: "Send a change of venue time or shuttle details by email, or by text with an Event Pass, to everyone or only to guests who said yes." },
+      { icon: "Users", title: "Hand the door to someone else", description: "Invite a co-host to help with the list and let a friend check guests in from their phone on the day." },
+    ],
+    faqs: [
+      { question: "How many guests can I invite?", answer: `${betaCapacityAnswer} Once paid plans open, an Event Pass covers one event with up to 250 guests.` },
+      { question: "Do guests need an app or an account?", answer: "No. Guests open the invitation link in a browser and reply in a minute, with no download and no sign-up." },
+      { question: "Can I import my guest list?", answer: "Yes. Upload a CSV with names, emails and phone numbers, or add guests one at a time." },
+      { question: "Can guests tell me about allergies and plus-ones?", answer: "Yes. Turn on plus-ones and the dietary question, and add your own RSVP questions for anything else you need to know." },
+    ],
+    ctaText: "Start your wedding invitation",
+    keywords: ["wedding RSVP website", "online wedding invitations", "wedding guest list", "wedding RSVP tracking"],
+  },
+  "birthday-parties": {
+    slug: "birthday-parties",
+    name: "Birthday parties",
+    image: "/brand/photos/birthdays.webp",
+    imageAlt: "A parent holding a phone that shows 18 kids coming, with children playing behind a backyard table set with a birthday cake",
+    indexDescription: "Know how many are coming before you buy the cake, whether it's a backyard party or a milestone dinner.",
+    indexFeatures: ["Birthday templates", "Headcount", "Updates by email", "Calendar links"],
+    metaTitle: "Birthday Party Invitations with RSVP Tracking",
+    metaDescription: "Send a birthday party invitation online, see a live headcount as replies come in, and update every guest at once if plans change.",
+    heroHeadline: "Know how many kids are coming before you buy the cake.",
+    heroSubtext: "Send one link to the class chat or the family group, watch the headcount fill in, and tell everyone at once if the party moves indoors.",
+    benefits: [
+      { icon: "Cake", title: "A party invitation in minutes", description: "Start from the Bold Birthday or Milestone Toast template, or upload your own design, and preview exactly what guests will see." },
+      { icon: "Users", title: "A headcount you can trust", description: "See who's coming, who said maybe and who hasn't answered, including plus-ones, updated the moment a guest replies." },
+      { icon: "Megaphone", title: "Rain plan? Tell everyone", description: "Send an update to every guest or only to those who said yes, so nobody turns up at the wrong place." },
+      { icon: "Calendar", title: "Easy for guests to remember", description: "Guests can add the party to their calendar from the invitation, with the address and time already filled in." },
+    ],
+    faqs: [
+      { question: "What does it cost?", answer: betaCapacityAnswer },
+      { question: "Do parents need to sign up to reply?", answer: "No. They open the link in a browser and reply without an account or an app." },
+      { question: "Can I share the invitation in a group chat?", answer: "Yes. Every event has a link you can paste anywhere, as well as email invitations." },
+      { question: "Can guests bring siblings?", answer: "Yes. Turn on plus-ones and guests can tell you who else is coming when they reply." },
+    ],
+    ctaText: "Start a party invitation",
+    keywords: ["birthday party invitations", "online birthday invitation with RSVP", "kids party RSVP", "birthday RSVP tracking"],
   },
 };
 
 export const LEGACY_USE_CASE_REDIRECTS: Record<string, keyof typeof USE_CASES> = {
-  weddings: "professional-gatherings",
   "baby-showers": "community-events",
-  "birthday-parties": "community-events",
   "corporate-events": "professional-gatherings",
 };
 

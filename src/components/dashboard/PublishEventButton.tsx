@@ -39,17 +39,17 @@ export function PublishEventButton({ eventId, isPublished }: { eventId: string; 
         onClick={() => void togglePublication()}
         disabled={busy}
         aria-busy={busy}
-        className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${
+        className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${
           isPublished
-            ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-            : 'bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-md shadow-brand-500/20 hover:shadow-lg'
+            ? 'border border-input bg-white text-ink hover:bg-neutral-50'
+            : 'bg-wax text-white hover:bg-wax-dark'
         }`}
       >
-        {busy ? 'Updating…' : isPublished ? 'Unpublish' : 'Publish Event'}
+        {busy ? 'Updating…' : isPublished ? 'Unpublish' : 'Publish event'}
       </button>
 
       {error && (
-        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div role="alert" className="rounded-2xl border border-warning-500/50 bg-warning-50 p-4 text-sm text-neutral-800">
           <p className="font-semibold">{error}</p>
           {blockers.length > 0 && (
             <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -57,7 +57,7 @@ export function PublishEventButton({ eventId, isPublished }: { eventId: string; 
             </ul>
           )}
           {!isPublished && (
-            <Link href={`/events/${eventId}/edit`} className="mt-3 inline-flex font-semibold text-brand-700 underline underline-offset-2">
+            <Link href={`/events/${eventId}/edit`} className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4">
               Review event details
             </Link>
           )}
