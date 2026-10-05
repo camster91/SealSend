@@ -278,6 +278,8 @@ test('CI runs automatically and failures are blocking', async () => {
   const ci = await read('.github/workflows/ci.yml');
 
   assert.match(ci, /pull_request:/);
+  // "Build" is a required check, so every PR (docs-only too) must report it.
+  assert.doesNotMatch(ci, /pull_request:\s*\n\s*paths(-ignore)?:/);
   assert.doesNotMatch(ci, /continue-on-error:\s*true/);
   assert.match(ci, /npm audit --omit=dev --audit-level=high/);
 });

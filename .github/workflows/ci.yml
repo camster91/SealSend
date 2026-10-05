@@ -6,18 +6,9 @@ name: CI Build
 # covered by audit, typecheck, lint, and unit/readiness tests.
 
 on:
+  # No paths-ignore on pull_request: "Build" is a required check, and a PR
+  # that never reports it (e.g. docs-only) can never be merged.
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-      - 'CHANGES_SUMMARY.md'
-      - 'DEPLOYMENT_*.md'
-      - 'DEPLOY_*.md'
-      - 'AUTHENTICATION_*.md'
-      - 'CORE_FEATURES_*.md'
-      - 'DASHBOARD_*.md'
-      - 'CHANGES_*.md'
-      - 'dev_server.log'
   push:
     branches: [main, master]
     paths-ignore:
