@@ -3,10 +3,16 @@ set -eu
 
 # Run on the SealSend VPS. The operations secret is read only inside the
 # running container and is never written to stdout or passed through argv.
-container="$(docker ps \
-  --filter 'label=coolify.resourceName=seal-send' \
-  --filter 'status=running' \
-  --format '{{.Names}}' | head -n 1)"
+# Coolify app was recreated as resource "sealsend" (formerly "seal-send");
+# accept either so the cron keeps working across both setups.
+container=""
+for resource in sealsend seal-send; do
+  container="$(docker ps \
+    --filter "label=coolify.resourceName=$resource" \
+    --filter 'status=running' \
+    --format '{{.Names}}' | head -n 1)"
+  [ -n "$container" ] && break
+done
 
 if [ -z "$container" ]; then
   echo "SealSend application container is not running" >&2

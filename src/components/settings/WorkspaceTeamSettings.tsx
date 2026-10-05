@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/Feedback";
+import { BETA_MODE, ORGANIZER_PLANS, type OrganizerPlan } from "@/lib/constants";
 
 type Organization = { id: string; name: string; plan: string; is_personal: boolean; role: string };
 type Member = { user_id: string; email: string; name: string | null; role: string };
 type Invite = { id: string; email: string; role: string; expires_at: string };
+type WorkspaceSubscription = { plan: string; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean };
 type MembersResponse = {
   organization: { name: string; plan: string; is_personal: boolean } | null;
   members: Member[];
@@ -36,6 +38,26 @@ function canManage(viewerRole: string, targetRole: string) {
   return viewerRole === "admin" && (targetRole === "planner" || targetRole === "check_in");
 }
 
+const PLAN_LABELS: Record<string, string> = {
+  personal: "Free",
+  ...Object.fromEntries(Object.entries(ORGANIZER_PLANS).map(([id, plan]) => [id, plan.name])),
+};
+
+function formatMonthly(cents: number) {
+  return `$${(cents / 100).toFixed(0)}/mo`;
+}
+
+function formatDate(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
+}
+
+function subscriptionSummary(subscription: WorkspaceSubscription) {
+  const date = formatDate(subscription.currentPeriodEnd);
+  if (subscription.status === "past_due") return "The last payment failed, so paid features are paused until Stripe collects it.";
+  if (subscription.cancelAtPeriodEnd) return date ? `Cancels on ${date}. Paid features stay on until then.` : "Cancels at the end of this billing period.";
+  return date ? `Renews on ${date}.` : null;
+}
+
 export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
@@ -59,8 +81,20 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
     setData(res.ok ? await res.json() : null);
   }, []);
 
+  const [subscription, setSubscription] = useState<WorkspaceSubscription | null>(null);
+
+  const loadSubscription = useCallback(async (id: string) => {
+    const res = await fetch(`/api/organizations/${id}/billing/subscription`);
+    const body: { subscription: WorkspaceSubscription | null } = res.ok ? await res.json() : { subscription: null };
+    setSubscription(body.subscription);
+  }, []);
+
   useEffect(() => { void loadOrganizations(); }, [loadOrganizations]);
   useEffect(() => { if (organizationId) void loadMembers(organizationId); }, [organizationId, loadMembers]);
+  useEffect(() => {
+    setSubscription(null);
+    if (!BETA_MODE && organizationId && data?.viewerRole === "owner" && !data.organization?.is_personal) void loadSubscription(organizationId);
+  }, [organizationId, data?.viewerRole, data?.organization?.is_personal, loadSubscription]);
 
   async function run(action: () => Promise<Response>, success: string, after?: (body: Record<string, unknown>) => Promise<void> | void) {
     setBusy(true);
@@ -77,6 +111,35 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
     } finally {
       setBusy(false);
     }
+  }
+
+  async function startCheckout(id: string, plan: OrganizerPlan) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/organizations/${id}/billing/checkout`, json("POST", { plan }));
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || typeof body.url !== "string") {
+        setMessage({ type: "error", text: body.error || "Checkout couldn't start. Please try again." });
+        return;
+      }
+      window.location.assign(body.url);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Stripe confirms changes through the webhook, so reload shortly after Stripe accepts them.
+  function updateSubscription(id: string, payload: { action: "change"; plan: OrganizerPlan } | { action: "cancel" | "resume" }, success: string) {
+    return run(
+      () => fetch(`/api/organizations/${id}/billing/subscription`, json("POST", payload)),
+      success,
+      () => new Promise<void>((resolve) => {
+        window.setTimeout(() => {
+          void Promise.all([loadMembers(id), loadSubscription(id)]).finally(resolve);
+        }, 2500);
+      }),
+    );
   }
 
   const json = (method: string, payload?: unknown): RequestInit => ({
@@ -258,6 +321,83 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
             )}
             {selected.is_personal && (
               <p className="text-sm text-gray-500">Personal workspaces have one member. Create a team workspace above to work with others.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selected && data && !selected.is_personal && (
+        <Card>
+          <CardHeader><CardTitle>Workspace plan</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Current plan: <span className="font-semibold">{PLAN_LABELS[data.organization?.plan ?? "personal"] ?? data.organization?.plan}</span> · {data.seatLimit} seats
+            </p>
+            {BETA_MODE ? (
+              <p className="text-sm text-gray-500">Paid workspace plans aren&apos;t available during the controlled beta.</p>
+            ) : viewerRole === "owner" ? (
+              <>
+                {subscription && subscription.status !== "canceled" && subscriptionSummary(subscription) && (
+                  <p className="text-sm text-gray-600">{subscriptionSummary(subscription)}</p>
+                )}
+                <ul className="grid gap-3 sm:grid-cols-3">
+                  {(Object.entries(ORGANIZER_PLANS) as [OrganizerPlan, (typeof ORGANIZER_PLANS)[OrganizerPlan]][]).map(([id, plan]) => {
+                    const subscribed = subscription !== null && subscription.status !== "canceled";
+                    const current = subscribed ? subscription.plan === id : data.organization?.plan === id;
+                    return (
+                      <li key={id} className="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 text-sm">
+                        <p className="font-semibold text-gray-900">{plan.name}</p>
+                        <p className="text-gray-700">{formatMonthly(plan.monthlyPriceCents)} · {plan.seats} seats</p>
+                        <Button
+                          type="button"
+                          disabled={busy || current}
+                          onClick={async () => {
+                            if (!subscribed) return void startCheckout(selected.id, id);
+                            const ok = await confirm({
+                              title: `Switch to ${plan.name}?`,
+                              description: `${plan.name} is ${formatMonthly(plan.monthlyPriceCents)} with ${plan.seats} seats. Stripe prorates the difference on your next invoice.`,
+                              confirmLabel: `Switch to ${plan.name}`,
+                            });
+                            if (ok) void updateSubscription(selected.id, { action: "change", plan: id }, `Switching to ${plan.name}. This page updates once Stripe confirms.`);
+                          }}
+                        >
+                          {current ? "Current plan" : subscribed ? `Switch to ${plan.name}` : `Choose ${plan.name}`}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {subscription && subscription.status !== "canceled" && (
+                  subscription.cancelAtPeriodEnd ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void updateSubscription(selected.id, { action: "resume" }, "Your plan will keep renewing.")}
+                    >
+                      Keep my plan
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Cancel the workspace plan?",
+                          description: "Paid features stay on until the end of this billing period. After that the workspace moves to the free plan with 2 seats. Events and guests are kept.",
+                          confirmLabel: "Cancel plan",
+                        });
+                        if (ok) void updateSubscription(selected.id, { action: "cancel" }, "Your plan will end at the close of this billing period.");
+                      }}
+                    >
+                      Cancel plan
+                    </Button>
+                  )
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">Only the workspace owner can change the plan.</p>
             )}
           </CardContent>
         </Card>

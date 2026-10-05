@@ -13,10 +13,16 @@ case "$job" in
   *) echo "Usage: $0 reminders|announcements|cleanup|cleanup-uploads|delete-accounts|host-lifecycle|webhooks" >&2; exit 64 ;;
 esac
 
-container="$(docker ps \
-  --filter 'label=coolify.resourceName=seal-send' \
-  --filter 'status=running' \
-  --format '{{.Names}}' | head -n 1)"
+# Coolify app was recreated as resource "sealsend" (formerly "seal-send");
+# accept either so the cron keeps working across both setups.
+container=""
+for resource in sealsend seal-send; do
+  container="$(docker ps \
+    --filter "label=coolify.resourceName=$resource" \
+    --filter 'status=running' \
+    --format '{{.Names}}' | head -n 1)"
+  [ -n "$container" ] && break
+done
 
 if [ -z "$container" ]; then
   echo "SealSend application container is not running" >&2

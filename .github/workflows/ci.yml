@@ -17,10 +17,9 @@ on:
       - 'CORE_FEATURES_*.md'
       - 'DASHBOARD_*.md'
       - 'CHANGES_*.md'
-      - '.github/ashbi-local-ci-validation.md'
       - 'dev_server.log'
   push:
-    branches: [master]
+    branches: [main, master]
     paths-ignore:
       - 'docs/**'
       - '**.md'
@@ -31,7 +30,6 @@ on:
       - 'CORE_FEATURES_*.md'
       - 'DASHBOARD_*.md'
       - 'CHANGES_*.md'
-      - '.github/ashbi-local-ci-validation.md'
       - 'dev_server.log'
   workflow_dispatch:
 
@@ -53,13 +51,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Release automation safety tests
+        run: node --test tests/coolify-release.test.mjs
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
