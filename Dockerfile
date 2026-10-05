@@ -32,6 +32,8 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 
 # Install curl for healthchecks (required by Coolify)
 RUN apk add --no-cache curl
