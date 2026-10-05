@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { Menu, X, ChevronDown, User as UserIcon } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/layout/Logo";
+import { PRIMARY_CTA_LABEL } from "@/components/marketing/Cta";
 
 interface NavbarUser {
   id: string;
@@ -13,18 +16,36 @@ interface NavbarUser {
 }
 
 const useCaseLinks = [
-  { label: "Community Events", href: "/use-cases/community-events" },
-  { label: "Local Nonprofits", href: "/use-cases/nonprofit-events" },
-  { label: "Clubs & Associations", href: "/use-cases/clubs-associations" },
-  { label: "Professional Gatherings", href: "/use-cases/professional-gatherings" },
-  { label: "Event Planners", href: "/use-cases/event-planners" },
+  { label: "Event planners", href: "/use-cases/event-planners" },
+  { label: "Weddings", href: "/use-cases/weddings" },
+  { label: "Birthday parties", href: "/use-cases/birthday-parties" },
+  { label: "Community events", href: "/use-cases/community-events" },
+  { label: "Clubs and associations", href: "/use-cases/clubs-associations" },
+  { label: "Local nonprofits", href: "/use-cases/nonprofit-events" },
+  { label: "Professional gatherings", href: "/use-cases/professional-gatherings" },
 ];
 
+const navLink =
+  "inline-flex min-h-11 items-center rounded-lg px-3 text-[0.95rem] font-medium text-neutral-700 transition-colors hover:text-ink";
+const primaryButton =
+  "inline-flex min-h-11 items-center justify-center rounded-lg bg-ink px-4 text-[0.95rem] font-semibold text-white transition-colors hover:bg-wax focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2";
+
 export function Navbar({ user }: { user?: NavbarUser | null }) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [lastPathname, setLastPathname] = useState(pathname);
+  const navRef = useRef<HTMLElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
+
+  // Close both menus whenever the route changes (including back/forward), so an open
+  // drawer never carries over and covers the next page.
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setMobileOpen(false);
+    setDropdownOpen(false);
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -49,164 +70,175 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
         mobileToggleRef.current?.focus();
       }
     }
+    // A tap outside the nav, or widening to the desktop layout, also closes the drawer.
+    function handlePointerDown(e: PointerEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setMobileOpen(false);
+      }
+    }
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    function handleBreakpoint(e: MediaQueryListEvent) {
+      if (e.matches) setMobileOpen(false);
+    }
     document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    document.addEventListener("pointerdown", handlePointerDown);
+    desktop.addEventListener("change", handleBreakpoint);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      desktop.removeEventListener("change", handleBreakpoint);
+    };
   }, [mobileOpen]);
 
   return (
-    <>
-      <div className="gradient-top-bar h-1" />
-      <nav className="border-b border-border bg-white sticky top-0 z-50">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold">
-              <span className="text-foreground">Seal</span>
-              <span className="text-brand-600">Send</span>
-            </span>
+    <nav ref={navRef} aria-label="Main" className="sticky top-0 z-50 border-b border-border bg-cotton/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <Logo />
+
+        {/* Desktop nav */}
+        <div className="hidden items-center gap-1 lg:flex">
+          <Link href="/how-it-works" className={navLink}>
+            How it works
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden items-center gap-6 lg:flex">
-            <Link
-              href="/how-it-works"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              How It Works
-            </Link>
-
-            {/* Use Cases dropdown */}
-            <div ref={dropdownRef} className="relative">
-              <button
-                aria-expanded={dropdownOpen}
-                aria-controls="desktop-use-cases-menu"
-                className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") setDropdownOpen(false);
-                }}
-              >
-                Use Cases
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 transition-transform",
-                    dropdownOpen && "rotate-180"
-                  )}
-                />
-              </button>
-              {dropdownOpen && (
-                <div id="desktop-use-cases-menu" className="absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-border bg-white py-1 shadow-lg animate-in fade-in slide-in-from-top-2">
-                  {useCaseLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="block px-4 py-2 text-sm text-muted-foreground hover:bg-neutral-50 hover:text-foreground transition-colors"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Link
-              href="/pricing"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Pricing
-            </Link>
-
-            {user ? (
-              <Link href="/dashboard" className="inline-flex h-8 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                  <UserIcon className="h-4 w-4" />
-                  Dashboard
-              </Link>
-            ) : (
-              <div className="flex items-center gap-4 ml-2 border-l border-border pl-6">
-                <Link href="/login" className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-sm font-medium transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    Sign in
-                </Link>
-                <Link href="/signup" className="inline-flex h-8 items-center justify-center rounded-md bg-brand-600 px-3 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    Get Started
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="flex items-center gap-4 lg:hidden">
-            {user && (
-              <Link href="/dashboard" className="text-sm font-medium text-brand-600">
-                Dashboard
-              </Link>
-            )}
+          {/* Use cases dropdown */}
+          <div ref={dropdownRef} className="relative">
             <button
-              ref={mobileToggleRef}
-              aria-label="Toggle mobile navigation menu"
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-navigation"
-              className="rounded-lg p-2 hover:bg-neutral-100 transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
+              type="button"
+              aria-expanded={dropdownOpen}
+              aria-controls="desktop-use-cases-menu"
+              className={cn(navLink, "gap-1")}
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setDropdownOpen(false);
+              }}
             >
-              {mobileOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
+              Use cases
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  dropdownOpen && "rotate-180"
+                )}
+              />
             </button>
-          </div>
-        </div>
-
-        {/* Mobile nav */}
-        {mobileOpen && <div id="mobile-navigation" className="border-b border-border bg-white/95 shadow-md backdrop-blur-sm lg:hidden">
-          <div className="space-y-2 px-4 pb-4">
-            <Link
-              href="/how-it-works"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-neutral-50"
-              onClick={() => setMobileOpen(false)}
-            >
-              How It Works
-            </Link>
-
-            <div className="px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                Use Cases
-              </p>
-              <div className="mt-1 space-y-1">
+            {dropdownOpen && (
+              <div id="desktop-use-cases-menu" className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-white p-1.5 shadow-lg">
+                <Link
+                  href="/use-cases"
+                  className="flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-ink hover:bg-cotton"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  All use cases
+                </Link>
                 {useCaseLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="block rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-neutral-50 hover:text-foreground"
-                    onClick={() => setMobileOpen(false)}
+                    className="flex min-h-11 items-center rounded-lg px-3 text-sm text-neutral-700 hover:bg-cotton hover:text-ink"
+                    onClick={() => setDropdownOpen(false)}
                   >
                     {link.label}
                   </Link>
                 ))}
               </div>
-            </div>
-
-            <Link
-              href="/pricing"
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-neutral-50"
-              onClick={() => setMobileOpen(false)}
-            >
-              Pricing
-            </Link>
-
-            {!user && (
-              <div className="flex gap-2 pt-4 border-t border-border mt-2">
-                <Link href="/login" className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-border text-sm font-medium hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    Sign in
-                </Link>
-                <Link href="/signup" className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    Get Started
-                </Link>
-              </div>
             )}
           </div>
-        </div>}
-      </nav>
-    </>
+
+          <Link href="/pricing" className={navLink}>
+            Pricing
+          </Link>
+
+          <div className="ml-4 flex items-center gap-2 border-l border-border pl-5">
+            {user ? (
+              <Link href="/dashboard" className={primaryButton}>
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className={navLink}>
+                  Log in
+                </Link>
+                <Link href="/signup" className={primaryButton}>
+                  {PRIMARY_CTA_LABEL}
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile menu button */}
+        <div className="flex items-center gap-2 lg:hidden">
+          {user && (
+            <Link href="/dashboard" className={navLink}>
+              Dashboard
+            </Link>
+          )}
+          <button
+            ref={mobileToggleRef}
+            type="button"
+            aria-label="Toggle mobile navigation menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink transition-colors hover:bg-white"
+            onClick={() => setMobileOpen(!mobileOpen)}
+          >
+            {mobileOpen ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile nav */}
+      {mobileOpen && <div id="mobile-navigation" className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-cotton lg:hidden">
+        <div className="space-y-1 px-4 pb-6 pt-3">
+          <Link
+            href="/how-it-works"
+            className="flex min-h-11 items-center rounded-lg px-3 text-base font-medium text-ink hover:bg-white"
+            onClick={() => setMobileOpen(false)}
+          >
+            How it works
+          </Link>
+
+          <div className="px-3 pt-3">
+            <p className="text-sm font-medium text-neutral-600">Use cases</p>
+            <div className="mt-1">
+              {useCaseLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex min-h-11 items-center rounded-lg px-2 text-base text-neutral-700 hover:bg-white hover:text-ink"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <Link
+            href="/pricing"
+            className="flex min-h-11 items-center rounded-lg px-3 text-base font-medium text-ink hover:bg-white"
+            onClick={() => setMobileOpen(false)}
+          >
+            Pricing
+          </Link>
+
+          {!user && (
+            <div className="mt-3 flex gap-2 border-t border-border pt-4">
+              <Link href="/login" className="inline-flex h-12 flex-1 items-center justify-center rounded-lg border border-ink/20 bg-white text-base font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2">
+                Log in
+              </Link>
+              <Link href="/signup" className={cn(primaryButton, "h-12 flex-1 text-base")}>
+                {PRIMARY_CTA_LABEL}
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>}
+    </nav>
   );
 }

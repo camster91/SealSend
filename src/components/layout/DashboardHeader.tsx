@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getClientUser } from "@/lib/auth/client-auth";
 import { getInitials } from "@/lib/utils";
-import Link from "next/link";
+import { Logo } from "@/components/layout/Logo";
 
 export function DashboardHeader() {
   const [email, setEmail] = useState<string | null>(null);
@@ -16,18 +16,13 @@ export function DashboardHeader() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-white px-4 sm:h-16 sm:px-6">
       {/* Mobile logo */}
-      <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
-        <span className="text-lg font-bold">
-          <span className="text-foreground">Seal</span>
-          <span className="text-brand-600">Send</span>
-        </span>
-      </Link>
+      <Logo href="/dashboard" className="md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2" />
       <div className="hidden md:block" />
       <div className="flex items-center gap-3">
         {email && (
           <>
-            <span className="hidden text-sm text-muted-foreground sm:block">{email}</span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+            <span className="hidden text-sm text-neutral-600 sm:block">{email}</span>
+            <div aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-primary-50 text-xs font-semibold text-ink">
               {getInitials(email.split("@")[0])}
             </div>
           </>

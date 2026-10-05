@@ -132,7 +132,7 @@ export default function SettingsPage() {
       gold: "bg-amber-100 text-amber-700",
       premium: "bg-amber-100 text-amber-700",
       platinum: "bg-slate-100 text-slate-700",
-      diamond: "bg-indigo-100 text-indigo-700",
+      diamond: "bg-primary-100 text-ink",
       silver: "bg-brand-100 text-brand-700",
       standard: "bg-brand-100 text-brand-700",
     };

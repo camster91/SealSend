@@ -1,40 +1,44 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { PRIMARY_CTA_NOTE, PrimaryCta, SecondaryCta } from "@/components/marketing/Cta";
 
 interface UseCaseHeroProps {
+  name: string;
   headline: string;
   subtext: string;
   ctaText: string;
+  image: string;
+  imageAlt: string;
 }
 
-export default function UseCaseHero({
-  headline,
-  subtext,
-  ctaText,
-}: UseCaseHeroProps) {
+export default function UseCaseHero({ name, headline, subtext, ctaText, image, imageAlt }: UseCaseHeroProps) {
   return (
-    <section className="gradient-brand px-4 py-20 text-center text-white sm:py-28">
-      <div className="mx-auto max-w-3xl">
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          {headline}
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 sm:text-xl">
-          {subtext}
-        </p>
-        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link
-            href="/signup"
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-600 shadow-lg transition hover:bg-white/90"
-          >
-            {ctaText}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            href="/pricing"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
-          >
-            See Pricing
-          </Link>
+    <section className="px-4 pb-16 pt-10 sm:px-6 sm:pb-24 lg:px-8">
+      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-12 lg:gap-16">
+        <div className="lg:col-span-6">
+          <nav aria-label="Breadcrumb">
+            <ol className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
+              <li>
+                <Link href="/use-cases" className="rounded underline-offset-4 hover:text-ink hover:underline">
+                  Use cases
+                </Link>
+              </li>
+              <li aria-hidden="true">/</li>
+              <li aria-current="page" className="text-ink">
+                {name}
+              </li>
+            </ol>
+          </nav>
+          <h1 className="mt-8 font-display text-[2.6rem] text-ink sm:text-6xl">{headline}</h1>
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-neutral-700">{subtext}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <PrimaryCta label={ctaText} />
+            <SecondaryCta href="/pricing">See pricing</SecondaryCta>
+          </div>
+          <p className="mt-4 text-sm text-neutral-600">{PRIMARY_CTA_NOTE}</p>
+        </div>
+        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border lg:col-span-6 lg:max-h-[38rem]">
+          <Image src={image} alt={imageAlt} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
         </div>
       </div>
     </section>

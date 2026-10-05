@@ -87,10 +87,10 @@ export function PromptToEventGenerator({ timezone, onApply }: {
     setResult(null);
   }
 
-  const inputClass = "mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm";
-  return <section className="mb-6 rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-purple-50 p-5" aria-labelledby="prompt-event-title">
-    <h2 id="prompt-event-title" className="text-lg font-bold text-gray-900">Start with an AI-assisted event draft <span className="rounded-full bg-brand-100 px-2 py-1 text-xs text-brand-800">Beta</span></h2>
-    <p className="mt-1 text-sm text-gray-600">Create a reviewed event brief first. SealSend uses your explicit decisions to build an editable draft; it never saves, publishes, or sends automatically.</p>
+  const inputClass = "mt-1 w-full rounded-lg border border-input bg-white px-4 py-3 text-sm text-ink focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2";
+  return <section className="mb-6 rounded-2xl border border-border bg-white p-5" aria-labelledby="prompt-event-title">
+    <h2 id="prompt-event-title" className="text-lg font-semibold text-ink">Start with an AI-assisted event draft <span className="rounded-full border border-border bg-neutral-50 px-2 py-1 text-xs font-medium text-neutral-700">Beta</span></h2>
+    <p className="mt-1 text-sm text-neutral-600">Create a reviewed event brief first. SealSend uses your explicit decisions to build an editable draft; it never saves, publishes, or sends automatically.</p>
     <label htmlFor="event-summary" className="mt-4 block text-sm font-semibold">Event purpose</label>
     <textarea id="event-summary" rows={3} maxLength={2000} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="A monthly community dinner for neighbourhood volunteers to reconnect and welcome new helpers." className={inputClass} />
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -103,14 +103,14 @@ export function PromptToEventGenerator({ timezone, onApply }: {
     </div>
     {accessibilityStatus === "requirements_known" && <div className="mt-3"><label htmlFor="brief-accessibility-notes" className="block text-sm font-semibold">Accessibility requirements</label><textarea id="brief-accessibility-notes" rows={2} maxLength={1000} value={accessibilityNotes} onChange={(event) => setAccessibilityNotes(event.target.value)} className={inputClass} /></div>}
     <p className="mt-3 text-xs text-gray-600">Any blank schedule, location, or capacity remains an explicit publish blocker for host review.</p>
-    <button type="button" disabled={busy} onClick={() => void generate()} className="mt-3 min-h-11 rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Building draft…" : "Build editable draft"}</button>
+    <button type="button" disabled={busy} onClick={() => void generate()} className="mt-3 min-h-11 rounded-lg bg-ink px-5 text-sm font-semibold text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50">{busy ? "Building draft…" : "Build editable draft"}</button>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {result && <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
       {result.fallback && <p role="status" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The AI provider was unavailable, so SealSend created a conservative local draft. Missing facts remain blank.</p>}
       <h3 className="font-bold">{result.draft.event.title}</h3><p className="mt-1 text-sm text-gray-600">{result.draft.event.description}</p>
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><div><dt className="font-semibold">Audience</dt><dd>{result.brief.audience}</dd></div><div><dt className="font-semibold">Communication</dt><dd>{result.brief.communicationPreference.replaceAll("_", " ")}</dd></div><div><dt className="font-semibold">Date</dt><dd>{result.draft.event.eventDate || "Needs your input"}</dd></div><div><dt className="font-semibold">Location</dt><dd>{result.draft.event.locationName || "Needs your input"}</dd></div><div><dt className="font-semibold">Capacity</dt><dd>{result.draft.event.maxAttendees || "Needs your input"}</dd></div><div><dt className="font-semibold">RSVP questions</dt><dd>{result.draft.rsvpFields.length}</dd></div></dl>
       {result.draft.missingInformation.length > 0 && <div className="mt-4"><p className="text-sm font-semibold">Missing information</p><ul className="mt-1 list-disc pl-5 text-sm text-amber-800">{result.draft.missingInformation.map((item) => <li key={item}>{item.replace(/^event\./, "").replace(/([A-Z])/g, " $1").toLowerCase()}</li>)}</ul></div>}
-      <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={() => void apply()} className="min-h-11 rounded-xl bg-brand-600 px-5 text-sm font-semibold text-white">Apply to wizard</button><button type="button" disabled={busy} onClick={() => void reject()} className="min-h-11 rounded-xl px-4 text-sm font-medium text-gray-600">Discard</button></div>
+      <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={() => void apply()} className="min-h-11 rounded-lg bg-ink px-5 text-sm font-semibold text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50">Apply to wizard</button><button type="button" disabled={busy} onClick={() => void reject()} className="min-h-11 rounded-lg px-4 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-ink">Discard</button></div>
     </div>}
   </section>;
 }

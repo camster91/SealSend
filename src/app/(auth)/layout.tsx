@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Logo } from "@/components/layout/Logo";
 import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
 
 export default function AuthLayout({
@@ -7,16 +7,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center bg-cotton px-4 py-12">
       <div className="mb-8">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold">
-            <span className="text-foreground">Seal</span>
-            <span className="text-brand-600">Send</span>
-          </span>
-        </Link>
+        <Logo size="lg" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-cotton" />
       </div>
-      <div className="w-full max-w-md rounded-xl border border-border bg-white p-8 shadow-sm">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-white p-6 sm:p-8">
         {children}
       </div>
       <p className="mt-6">

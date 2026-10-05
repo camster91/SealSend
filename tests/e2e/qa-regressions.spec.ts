@@ -13,12 +13,18 @@ test('navigation and pricing expose one accessible control per action', async ({
     await mobileToggle.click();
     await expect(mobileToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#mobile-navigation')).toBeVisible();
+    // The open drawer covers the page; close it before using page content.
+    await page.keyboard.press('Escape');
+    await expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#mobile-navigation')).toHaveCount(0);
   }
 
-  const faq = page.getByRole('button', { name: /what is included in the controlled beta/i });
-  await expect(faq).toHaveAttribute('aria-expanded', 'false');
-  await faq.click();
-  await expect(faq).toHaveAttribute('aria-expanded', 'true');
+  // FAQ answers are native <details>, so they open with the platform's own keyboard and AT support.
+  const faq = page.locator('details', { has: page.locator('summary', { hasText: /what is included in the controlled beta/i }) });
+  await expect(faq).not.toHaveAttribute('open', '');
+  await faq.locator('summary').click();
+  await expect(faq).toHaveAttribute('open', '');
+  await expect(faq.getByText(/one active event for up to 100 guests/i)).toBeVisible();
 });
 
 test('paid plan intent survives signup and sign-in routing', async ({ page }) => {
@@ -48,6 +54,9 @@ test('organizer use cases are reachable and legacy links redirect', async ({ pag
     '/use-cases/nonprofit-events',
     '/use-cases/clubs-associations',
     '/use-cases/professional-gatherings',
+    '/use-cases/event-planners',
+    '/use-cases/weddings',
+    '/use-cases/birthday-parties',
   ]) {
     await expect(page.locator('main').locator(`a[href="${route}"]`)).toHaveCount(1);
     const response = await page.goto(route);
@@ -56,7 +65,7 @@ test('organizer use cases are reachable and legacy links redirect', async ({ pag
     await page.goBack();
   }
 
-  const legacyResponse = await page.request.get('/use-cases/weddings', { maxRedirects: 0 });
+  const legacyResponse = await page.request.get('/use-cases/corporate-events', { maxRedirects: 0 });
   expect([307, 308]).toContain(legacyResponse.status());
   const redirectLocation = legacyResponse.headers().location;
   expect(redirectLocation).toBeTruthy();

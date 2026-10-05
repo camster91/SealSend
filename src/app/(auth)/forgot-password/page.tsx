@@ -9,9 +9,9 @@ export default function ForgotPasswordPage() {
   return (
     <>
       <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold">Recover your account</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sign in with an email code, then set a new password in Settings
+        <h1 className="font-display text-3xl text-ink">Recover your account</h1>
+        <p className="mt-3 text-sm text-neutral-600">
+          Sign in with an email code, then set a new password in Settings.
         </p>
       </div>
       <ForgotPasswordForm />

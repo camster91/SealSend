@@ -8,13 +8,13 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-3xl font-bold text-neutral-900 mb-8">Privacy Policy</h1>
-      <p className="text-sm text-neutral-500 mb-8">Last updated: August 28, 2026</p>
+    <div className="mx-auto max-w-3xl px-4 py-16 leading-relaxed text-neutral-700 sm:px-6 sm:py-24">
+      <h1 className="mb-4 font-display text-5xl text-ink sm:text-6xl">Privacy Policy</h1>
+      <p className="mb-10 text-sm text-neutral-600">Last updated: August 28, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">1. Information We Collect</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">1. Information We Collect</h2>
           <p><strong>Account Information:</strong> Email address, name (optional), and authentication data when you create an account.</p>
           <p><strong>Event Data:</strong> Event details, guest lists, RSVP responses, and messages you create through the Service.</p>
           <p><strong>Usage Data:</strong> Browser type, device information, IP address, pages visited, and feature usage to improve the Service.</p>
@@ -24,54 +24,54 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">2. How We Use Your Information</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">2. How We Use Your Information</h2>
           <p>We use your data to: provide and improve the Service; send invitations and notifications on your behalf; process payments; understand privacy-limited activation and reliability trends; respond to feedback when permitted; communicate service updates; and prevent fraud.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">3. Guest Data</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">3. Guest Data</h2>
           <p>When you add guests to an event, we process their email addresses and phone numbers to deliver invitations, service messages, and collect RSVPs. We do not use guest data for third-party advertising. Delivery providers process the contact data needed to send messages.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">4. Data Sharing</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">4. Data Sharing</h2>
           <p>We do not sell your data. We use service providers for payments, email delivery, SMS delivery, hosting, and, when you request an AI draft, AI processing. AI prompt content is not stored in SealSend's database; we retain generation metadata and a one-way prompt hash for security, limits, and product reliability. Provider processing remains subject to the provider's applicable data terms.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">5. Data Security</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">5. Data Security</h2>
           <p>We use encryption in transit (TLS) and at rest. Access to production data is restricted. We perform regular security reviews.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">6. Data Retention</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">6. Data Retention</h2>
           <p>Active account data is retained while your account exists and as needed to operate, secure, and comply with legal obligations for the Service. You may request deletion from your authenticated Settings page or by contacting support. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations. We will identify any provider records outside that scope when confirming the request.</p>
           <p>Automatic cleanup is currently disabled during the controlled beta. If cleanup is later activated, a draft event becomes eligible 90 days after its last update, with a 14-day warning before eligibility. An unreferenced upload that is not attached to an event becomes eligible after 7 days. Enabling either cleanup job requires a separate operational approval.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">7. Your Rights</h2>
-          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">7. Your Rights</h2>
+          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">8. Cookies</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">8. Cookies</h2>
           <p>We use essential cookies for authentication and session management. We do not use third-party advertising cookies.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">9. Children</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">9. Children</h2>
           <p>The Service is not intended for children under 16. We do not knowingly collect data from children.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">10. Changes</h2>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">10. Changes</h2>
           <p>We may update this policy. We will notify you of material changes via email or in-app notice.</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mt-8 mb-4">11. Contact</h2>
-          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-primary-700 underline underline-offset-2">support@sealsend.app</a>.</p>
+          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">11. Contact</h2>
+          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>.</p>
         </section>
       </div>
     </div>

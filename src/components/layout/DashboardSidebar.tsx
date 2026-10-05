@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { clientSignOut } from "@/lib/auth/client-auth";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/layout/Logo";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -33,16 +34,11 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-border bg-white">
-      <div className="flex h-16 items-center border-b border-border px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold">
-            <span className="text-foreground">Seal</span>
-            <span className="text-brand-600">Send</span>
-          </span>
-        </Link>
+      <div className="flex h-16 items-center border-b border-border px-5">
+        <Logo href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2" />
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav aria-label="Dashboard" className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -53,14 +49,15 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
               key={item.href}
               href={item.href}
               onClick={onNavigate}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2",
                 isActive
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-muted-foreground hover:bg-neutral-50 hover:text-foreground"
+                  ? "bg-primary-50 text-ink before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-ink"
+                  : "text-neutral-600 hover:bg-neutral-50 hover:text-ink"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden />
               {item.label}
             </Link>
           );
@@ -70,9 +67,10 @@ export function DashboardSidebar({ onNavigate }: DashboardSidebarProps) {
       <div className="border-t border-border p-3">
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-neutral-50 hover:text-foreground"
+          type="button"
+          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           Sign out
         </button>
       </div>

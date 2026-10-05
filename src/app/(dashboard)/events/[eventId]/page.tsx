@@ -40,10 +40,24 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
   // Optimized: Consolidating three database queries into one using scalar subqueries.
   // This reduces database round-trips from 3 to 1, significantly improving TTFB.
-  const event = await queryOne<Event & { response_count: number; guest_count: number; repeated_from_title: string | null }>(
+  const event = await queryOne<Event & {
+    response_count: number;
+    guest_count: number;
+    going_count: number;
+    maybe_count: number;
+    not_going_count: number;
+    no_reply_count: number;
+    repeated_from_title: string | null;
+  }>(
     `SELECT *,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id) AS response_count,
       (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count,
+      (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'attending') AS going_count,
+      (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'maybe') AS maybe_count,
+      (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'not_attending') AS not_going_count,
+      (SELECT COUNT(*)::int FROM guests g
+        WHERE g.event_id = events.id AND g.parent_guest_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = events.id AND r.guest_id = g.id)) AS no_reply_count,
       (SELECT source.title FROM events source
         WHERE source.id = events.repeated_from_event_id AND source.user_id = events.user_id) AS repeated_from_title
      FROM events
@@ -62,10 +76,10 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const isArchived = event.status === 'archived';
   const statusLabel = isPublished ? 'Published' : isArchived ? 'Archived' : 'Draft';
   const statusClass = isPublished
-    ? 'bg-green-500/90 text-white'
+    ? 'bg-success-50 text-success-700 ring-1 ring-inset ring-success-500/40'
     : isArchived
-      ? 'bg-slate-700/90 text-white'
-      : 'bg-amber-500/90 text-white';
+      ? 'bg-neutral-100 text-neutral-700 ring-1 ring-inset ring-neutral-300'
+      : 'bg-warning-50 text-neutral-700 ring-1 ring-inset ring-warning-500/50';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
   const publicUrl = `${siteUrl}/e/${event.slug}`;
   const accountPlan = await getUserTier(event.user_id as string);
@@ -94,65 +108,42 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         {/* Back link */}
         <Link
           href="/dashboard"
-          className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700"
+          className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-medium text-neutral-600 transition-colors hover:text-ink"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Dashboard
         </Link>
 
-        {/* Hero header */}
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        {/* Header */}
+        <div className="overflow-hidden rounded-2xl border border-border bg-white">
           {/* Design preview strip */}
-          {event.design_url ? (
-            <div className="relative h-48 sm:h-56">
+          {event.design_url && (
+            <div className="h-40 border-b border-border bg-neutral-50 sm:h-52">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={event.design_url as string}
                 alt=""
                 className="h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-sm ${statusClass}`}
-                    >
-                      {statusLabel}
-                    </span>
-                    <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="relative bg-gradient-to-r from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8">
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
-              >
-                {statusLabel}
-              </span>
-              <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">{event.title as string}</h1>
-              {event.description && (
-                <p className="mt-2 max-w-xl text-sm text-white/80">{event.description as string}</p>
-              )}
             </div>
           )}
+          <div className="p-6 sm:p-8">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
+            >
+              {statusLabel}
+            </span>
+            <h1 className="mt-3 break-words font-display text-3xl text-ink sm:text-4xl">{event.title as string}</h1>
+          </div>
 
           {/* Tier + Upgrade */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3 sm:px-6">
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              ['gold', 'premium'].includes(event.tier as string)
-                ? 'bg-amber-100 text-amber-700'
-                : ['platinum'].includes(event.tier as string)
-                  ? 'bg-slate-100 text-slate-700'
-                  : ['diamond'].includes(event.tier as string)
-                    ? 'bg-indigo-100 text-indigo-700'
-                    : ['silver', 'standard', 'event_pass'].includes(event.tier as string)
-                      ? 'bg-brand-100 text-brand-700'
-                      : 'bg-gray-100 text-gray-600'
+              ['free'].includes(event.tier as string)
+                ? 'bg-neutral-100 text-neutral-700'
+                : 'border border-primary-200 bg-primary-50 text-ink'
             }`}>
               {event.tier === 'event_pass' ? 'Event Pass' : `${(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier`}
             </span>
@@ -161,7 +152,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           </div>
 
           {/* Quick actions */}
-          <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-4 sm:flex sm:gap-2">
+          <div className="grid grid-cols-2 gap-2 border-t border-border p-4 sm:flex sm:flex-wrap sm:gap-2 sm:px-6">
             {!isArchived && canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
             {canExport && <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />}
             {canManageGuests && <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount} />}
@@ -176,28 +167,29 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Stats */}
           <div className="space-y-4 lg:col-span-1">
-            <StatBlock
-              value={responseCount}
-              label="Responses"
-              color="from-blue-500 to-indigo-600"
-              icon="responses"
-            />
-            <StatBlock
-              value={guestCount}
-              label="Guests"
-              color="from-emerald-500 to-teal-600"
-              icon="guests"
-            />
+            {/* RSVP summary: large, readable counts. No reply = invited guests without a response. */}
+            <section aria-labelledby="rsvp-summary-heading" className="rounded-2xl border border-border bg-white p-5">
+              <h2 id="rsvp-summary-heading" className="text-sm font-semibold text-ink">RSVP summary</h2>
+              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
+                <StatBlock value={event.going_count ?? 0} label="Going" marker="bg-sage" />
+                <StatBlock value={event.maybe_count ?? 0} label="Maybe" marker="bg-foil" />
+                <StatBlock value={event.not_going_count ?? 0} label="Not going" marker="bg-neutral-400" />
+                <StatBlock value={event.no_reply_count ?? 0} label="No reply" marker="bg-neutral-200" />
+              </dl>
+              <p className="mt-5 border-t border-border pt-4 text-sm text-neutral-600">
+                {responseCount} {responseCount === 1 ? 'response' : 'responses'} from {guestCount} {guestCount === 1 ? 'guest' : 'guests'} on the list
+              </p>
+            </section>
 
             {/* Public link */}
             {isPublished && (
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Public Link</p>
+              <div className="rounded-2xl border border-border bg-white p-5">
+                <h2 className="text-sm font-semibold text-ink">Public link</h2>
                 <div className="mt-2 flex items-center gap-2">
                   <Link
                     href={publicUrl}
                     target="_blank"
-                    className="min-w-0 flex-1 truncate rounded-lg bg-gray-50 px-3 py-2 text-sm font-mono text-brand-600 hover:text-brand-700 hover:underline"
+                    className="min-w-0 flex-1 truncate rounded-lg bg-neutral-50 px-3 py-2 text-sm font-mono text-ink underline-offset-4 hover:underline"
                   >
                     /e/{event.slug as string}
                   </Link>
@@ -206,7 +198,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <a
                   href={`/api/events/${eventId}/qr`}
                   download={`${event.slug}-qr.png`}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-all hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 active:scale-[0.98]"
+                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-input bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-neutral-50"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4v4H3V4zm0 8h4v4H3v-4zm8-8h4v4h-4V4zm8 0h4v4h-4V4zm0 8h4v4h-4v-4zm-8 8h4v4h-4v-4z" />
@@ -227,8 +219,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             {/* Publish / delete / clone */}
             <div className="space-y-2">
               {isArchived && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <p className="font-semibold text-slate-900">Archived event history</p>
+                <div className="rounded-2xl border border-border bg-neutral-50 p-4 text-sm text-neutral-700">
+                  <p className="font-semibold text-ink">Archived event history</p>
                   <p className="mt-1">This event cannot be republished directly. Use Repeat event to create a reviewed new draft.</p>
                 </div>
               )}
@@ -246,17 +238,17 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
           {/* Details */}
           <div className="space-y-6 lg:col-span-2">
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-slate-50/50 px-6 py-3.5">
-                <h2 className="text-sm font-semibold text-gray-900">Event Details</h2>
+            <div className="overflow-hidden rounded-2xl border border-border bg-white">
+              <div className="border-b border-border px-6 py-3.5">
+                <h2 className="text-sm font-semibold text-ink">Event details</h2>
               </div>
-              <div className="divide-y divide-gray-50 p-1">
+              <div className="divide-y divide-border">
                 {access.role === 'owner' && event.repeated_from_event_id && event.repeated_from_title && (
-                  <div className="flex items-start gap-3 rounded-xl px-5 py-3 transition-colors hover:bg-gray-50/50">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500" aria-hidden="true">↩</div>
+                  <div className="flex items-start gap-3 px-6 py-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600" aria-hidden="true">↩</div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Previous event</p>
-                      <Link href={`/events/${event.repeated_from_event_id}`} className="mt-0.5 block truncate text-sm font-medium text-brand-700 hover:underline">
+                      <p className="text-xs font-medium text-neutral-600">Previous event</p>
+                      <Link href={`/events/${event.repeated_from_event_id}`} className="mt-0.5 block truncate text-sm font-medium text-ink underline underline-offset-4 decoration-ink/30 hover:decoration-ink">
                         {event.repeated_from_title}
                       </Link>
                     </div>
@@ -286,9 +278,9 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
             {/* Description */}
             {event.description && (
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="text-sm font-semibold text-gray-900">Description</h2>
-                <p className="mt-3 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{event.description as string}</p>
+              <div className="rounded-2xl border border-border bg-white p-6">
+                <h2 className="text-sm font-semibold text-ink">Description</h2>
+                <p className="mt-3 text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{event.description as string}</p>
               </div>
             )}
           </div>
@@ -337,34 +329,25 @@ function ActionLink({ href, icon, label, count }: { href: string; icon: string; 
   return (
     <Link
       href={href}
-      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-all hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 active:scale-[0.98] sm:py-2.5"
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-input bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-neutral-50"
     >
-      {icons[icon]}
+      <span className="text-neutral-600" aria-hidden="true">{icons[icon]}</span>
       {label}
       {count !== undefined && count > 0 && (
-        <span className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">{count}</span>
+        <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-ink">{count}</span>
       )}
     </Link>
   );
 }
 
-function StatBlock({ value, label, color, icon }: { value: number; label: string; color: string; icon: string }) {
-  const icons: Record<string, React.ReactNode> = {
-    responses: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" /></svg>,
-    guests: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>,
-  };
-
+function StatBlock({ value, label, marker }: { value: number; label: string; marker?: string }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${color} text-white shadow-sm`}>
-          {icons[icon]}
-        </div>
-        <div>
-          <p className="text-3xl font-bold text-gray-900">{value}</p>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-        </div>
-      </div>
+    <div className="flex flex-col-reverse">
+      <dt className="mt-1 flex items-center gap-1.5 text-sm font-medium text-neutral-600">
+        {marker && <span aria-hidden="true" className={`h-2 w-2 rounded-full ${marker}`} />}
+        {label}
+      </dt>
+      <dd className="text-4xl font-semibold leading-none tabular-nums text-ink">{value}</dd>
     </div>
   );
 }
@@ -385,14 +368,14 @@ function DetailRow({ icon, label, value, subtitle, mono }: { icon: string; label
   };
 
   return (
-    <div className="flex items-start gap-3 rounded-xl px-5 py-3 transition-colors hover:bg-gray-50/50">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+    <div className="flex items-start gap-3 px-6 py-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600" aria-hidden="true">
         {iconMap[icon]}
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">{label}</p>
-        <p className={`mt-0.5 text-sm text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
-        {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+        <p className="text-xs font-medium text-neutral-600">{label}</p>
+        <p className={`mt-0.5 break-words text-sm text-ink ${mono ? 'font-mono' : ''}`}>{value}</p>
+        {subtitle && <p className="text-xs text-neutral-600">{subtitle}</p>}
       </div>
     </div>
   );
