@@ -8,9 +8,9 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 
 **Events and invitations**
 - Step-by-step event wizard: details, design upload, customization, custom RSVP fields, guest list and preview
-- Optional AI draft: describe the event and get a structured draft that never invents venues, prices or dates (OpenAI, with a non-AI fallback)
+- Optional AI draft: describe the event and get a structured draft for the host to review; the model is told not to invent venues, prices or dates, and every assumption is flagged for confirmation (OpenAI, with a non-AI fallback)
 - Event templates, one-click clone for repeat events, and a publish readiness check before invitations go out
-- Public event page with add-to-calendar (Google, Apple, Outlook / `.ics`), map, comments and a sign-up board
+- Public event page with add-to-calendar (Google, Apple, Outlook / `.ics`), comments and a sign-up board
 
 **Guests and RSVPs**
 - Guest list with CSV import (partial imports and duplicate detection), tags, plus-ones and custom questions
@@ -26,10 +26,10 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 
 **Accounts, billing and safety**
 - Passwordless sign-in with 6-digit email or SMS codes (password sign-in also supported), database-backed sessions
-- Stripe checkout: free tier, one-time Event Pass, annual Pro, and SMS top-ups
+- Stripe billing for a free tier, one-time Event Pass, annual Pro and SMS top-ups. During the controlled beta (`BETA_MODE` in `src/lib/constants.ts`) paid checkout is turned off and every account gets the beta plan
 - Test-only switches for payments and outbound messages, plus opt-out and suppression handling for SMS and email
-- Account data export and deletion, rate limiting, upload quotas and a strict CSP
-- Installable PWA (manifest and service worker)
+- Account data export and deletion, rate limiting, upload quotas, and a Content Security Policy with HSTS and `frame-ancestors 'none'`
+- Web app manifest, so it can be added to a home screen
 
 ## Tech stack
 
