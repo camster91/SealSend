@@ -794,7 +794,8 @@ test('operations scripts schedule authenticated maintenance without exposing sec
   const cron = await read('ops/run-maintenance.sh');
   const cronDefinition = await read('ops/sealsend-maintenance.cron');
 
-  assert.match(cron, /coolify\.resourceName=seal-send/);
+  assert.match(cron, /coolify\.resourceName=\$resource/);
+  assert.match(cron, /for resource in sealsend seal-send/);
   assert.match(cron, /Authorization: Bearer \$CRON_SECRET/);
   assert.match(cron, /api\/cron\/send-reminders/);
   assert.match(cron, /api\/cron\/cleanup-drafts/);
@@ -1643,7 +1644,8 @@ test('operations readiness is secret-gated and never returns credential values',
   assert.match(route, /status: 404/);
   assert.match(route, /Cache-Control.*no-store/);
   assert.doesNotMatch(readiness, /return.*STRIPE_SECRET_KEY|return.*MAILGUN_API_KEY|return.*TWILIO_AUTH_TOKEN/);
-  assert.match(operatorScript, /coolify\.resourceName=seal-send/);
+  assert.match(operatorScript, /coolify\.resourceName=\$resource/);
+  assert.match(operatorScript, /for resource in sealsend seal-send/);
   assert.match(operatorScript, /Authorization: Bearer \$OPERATIONS_SECRET/);
   assert.match(operatorScript, /api\/operations\/readiness/);
   assert.doesNotMatch(operatorScript, /echo.*OPERATIONS_SECRET|set -x/);
