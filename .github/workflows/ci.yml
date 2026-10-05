@@ -17,7 +17,6 @@ on:
       - 'CORE_FEATURES_*.md'
       - 'DASHBOARD_*.md'
       - 'CHANGES_*.md'
-      - '.github/ashbi-local-ci-validation.md'
       - 'dev_server.log'
   push:
     branches: [main, master]
@@ -31,7 +30,6 @@ on:
       - 'CORE_FEATURES_*.md'
       - 'DASHBOARD_*.md'
       - 'CHANGES_*.md'
-      - '.github/ashbi-local-ci-validation.md'
       - 'dev_server.log'
   workflow_dispatch:
 
@@ -53,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
