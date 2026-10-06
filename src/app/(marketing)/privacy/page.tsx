@@ -1,77 +1,116 @@
 import type { Metadata } from "next";
+import { SENDER_LEGAL_NAME, SENDER_POSTAL_ADDRESS, SUPPORT_EMAIL } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy - SealSend",
-  description: "Privacy Policy for SealSend digital invitation platform.",
+  description: "Plain-language Privacy Policy for SealSend digital invitations.",
   alternates: { canonical: "/privacy" },
 };
+
+const linkClass = "font-medium text-ink underline underline-offset-2";
+const h2Class = "mb-3 mt-10 text-xl font-semibold text-ink";
+const listClass = "list-disc space-y-1 pl-6";
 
 export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 leading-relaxed text-neutral-700 sm:px-6 sm:py-24">
       <h1 className="mb-4 font-display text-5xl text-ink sm:text-6xl">Privacy Policy</h1>
-      <p className="mb-10 text-sm text-neutral-600">Last updated: August 28, 2026</p>
+      <p className="mb-10 text-sm text-neutral-600">Last updated: October 6, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">1. Information We Collect</h2>
-          <p><strong>Account Information:</strong> Email address, name (optional), and authentication data when you create an account.</p>
-          <p><strong>Event Data:</strong> Event details, guest lists, RSVP responses, and messages you create through the Service.</p>
-          <p><strong>Usage Data:</strong> Browser type, device information, IP address, pages visited, and feature usage to improve the Service.</p>
-          <p><strong>Payment Data:</strong> Processed securely by Stripe. We do not store credit card numbers.</p>
-          <p><strong>AI Draft Data:</strong> If you use AI-assisted event drafting, the event description you enter is sent to our configured AI provider to create an editable draft.</p>
-          <p><strong>Beta Feedback:</strong> If you submit in-product feedback, we store your rating, selected workflow area, written feedback, and whether you gave permission for us to contact you.</p>
+          <p>SealSend is run by Cameron Ashley, operating as {SENDER_LEGAL_NAME}, in Ontario, Canada. This page explains what information we collect, why, and what choices you have. Canadian privacy law (PIPEDA) applies to us.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">2. How We Use Your Information</h2>
-          <p>We use your data to: provide and improve the Service; send invitations and notifications on your behalf; process payments; understand privacy-limited activation and reliability trends; respond to feedback when permitted; communicate service updates; and prevent fraud.</p>
+          <h2 className={h2Class}>1. What we collect</h2>
+          <p><strong>From hosts (people who make events):</strong></p>
+          <ul className={listClass}>
+            <li>Account details: email, name, sign-in codes and sign-in sessions.</li>
+            <li>Event details, images and files you upload, and your branding.</li>
+            <li>Client records, if you use them.</li>
+            <li>Simple product-usage events, so we can see what is used and what breaks. We do not use third-party analytics or tracking scripts.</li>
+          </ul>
+          <p><strong>Guest data that hosts upload or guests give us:</strong></p>
+          <ul className={listClass}>
+            <li>Names, emails, phone numbers, notes, tags and plus-ones.</li>
+            <li>RSVP answers, including dietary and accessibility notes. These can be sensitive, so please only share what you are comfortable with.</li>
+            <li>Comments, sign-up board claims and check-in times.</li>
+          </ul>
+          <p><strong>Technical records:</strong></p>
+          <ul className={listClass}>
+            <li>Delivery logs of the emails we send, and opt-out (unsubscribe) records.</li>
+            <li>IP addresses and email addresses in short-lived rate-limit records, which stop abuse.</li>
+            <li>Server error logs.</li>
+          </ul>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">3. Guest Data</h2>
-          <p>When you add guests to an event, we process their email addresses and phone numbers to deliver invitations, service messages, and collect RSVPs. We do not use guest data for third-party advertising. Delivery providers process the contact data needed to send messages.</p>
+          <h2 className={h2Class}>2. How we use it</h2>
+          <p>We use your information to run SealSend: sign you in, show your events, send invitations and reminders you ask for, collect RSVPs, keep the Service secure, fix problems, and answer your questions. We do not sell your information, and we do not use it for advertising.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">4. Data Sharing</h2>
-          <p>We do not sell your data. We use service providers for payments, email delivery, SMS delivery, hosting, and, when you request an AI draft, AI processing. AI prompt content is not stored in SealSend's database; we retain generation metadata and a one-way prompt hash for security, limits, and product reliability. Provider processing remains subject to the provider's applicable data terms.</p>
+          <h2 className={h2Class}>3. Guest data and the host&apos;s role</h2>
+          <p>The host decides what guest data to upload and is responsible for having permission to contact those guests. SealSend handles that data on the host&apos;s behalf, only to run the Service.</p>
+          <p>Hosts can also set up webhooks and client review links. These send event data to places the host chooses. We do not control those places.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">5. Data Security</h2>
-          <p>We use encryption in transit (TLS) and at rest. Access to production data is restricted. We perform regular security reviews.</p>
+          <h2 className={h2Class}>4. Who we share it with</h2>
+          <p>We use these service providers to run SealSend:</p>
+          <ul className={listClass}>
+            <li><strong>Mailgun</strong> sends our emails (based in the United States).</li>
+            <li><strong>Hostinger</strong> hosts our servers.</li>
+            <li><strong>Cloudflare</strong> handles our domain name (DNS).</li>
+            <li><strong>OpenAI</strong> is used only when you use AI drafting. We send the event details you enter. They are not used to train OpenAI&apos;s models.</li>
+            <li><strong>Twilio</strong> would send text messages. SMS is turned off for now.</li>
+            <li><strong>Stripe</strong> would handle payments. Payments are turned off for now.</li>
+          </ul>
+          <p>Your data may be stored or processed outside Canada, including in the United States. Laws there may differ from Canadian law. We may also share information if the law requires it.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">6. Data Retention</h2>
-          <p>Active account data is retained while your account exists and as needed to operate, secure, and comply with legal obligations for the Service. You may request deletion from your authenticated Settings page or by contacting support. After we verify the request, applicable account data is permanently removed within 30 days, except where limited retention is required for legal, fraud-prevention, security, dispute, or payment-record obligations. We will identify any provider records outside that scope when confirming the request.</p>
-          <p>Automatic cleanup is currently disabled during the controlled beta. If cleanup is later activated, a draft event becomes eligible 90 days after its last update, with a 14-day warning before eligibility. An unreferenced upload that is not attached to an event becomes eligible after 7 days. Enabling either cleanup job requires a separate operational approval.</p>
+          <h2 className={h2Class}>5. Cookies</h2>
+          <p>We use two cookies, both to make the site work. We do not use advertising cookies.</p>
+          <ul className={listClass}>
+            <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days.</li>
+            <li><code>sealsend_user</code> lets the page show your name and role. Scripts on the page can read it, and it includes your email and role.</li>
+          </ul>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">7. Your Rights</h2>
-          <p>You can: access and export your data; correct inaccurate information; delete your account and data; and opt out of non-essential communications. To exercise these rights, email <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>.</p>
+          <h2 className={h2Class}>6. How long we keep it</h2>
+          <p>We keep your data while your account is active. When you ask to delete your account, we treat it as a deletion request: it is scheduled and finished within 7 days. Backups are kept for up to 30 days, so deleted data can stay in backups for up to about 37 days in total.</p>
+          <p>We keep opt-out lists so we can keep honouring them.</p>
+          <p>Automatic cleanup is currently disabled. If cleanup is later turned on, a draft event becomes eligible 90 days after its last update, with a 14-day warning first, and an unreferenced upload that is not attached to an event becomes eligible after 7 days.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">8. Cookies</h2>
-          <p>We use essential cookies for authentication and session management. We do not use third-party advertising cookies.</p>
+          <h2 className={h2Class}>7. Your choices and rights</h2>
+          <p><strong>Hosts:</strong> you can export your data or delete your account in Settings. You can also email <a href={`mailto:${SUPPORT_EMAIL}`} className={linkClass}>{SUPPORT_EMAIL}</a>.</p>
+          <p><strong>Guests:</strong> every guest email has an unsubscribe link that stops that host&apos;s emails. To ask for access, correction or deletion of your information, email <a href={`mailto:${SUPPORT_EMAIL}`} className={linkClass}>{SUPPORT_EMAIL}</a>. We may need to involve the host who invited you.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">9. Children</h2>
-          <p>The Service is not intended for children under 16. We do not knowingly collect data from children.</p>
+          <h2 className={h2Class}>8. Children</h2>
+          <p>SealSend is for people 16 and older. We do not knowingly collect information from anyone under 16.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">10. Changes</h2>
-          <p>We may update this policy. We will notify you of material changes via email or in-app notice.</p>
+          <h2 className={h2Class}>9. Security</h2>
+          <p>We use HTTPS to protect data in transit, sign-in codes and sessions to protect accounts, and we limit who can reach production data. No system is perfectly secure, so we cannot promise absolute security.</p>
         </section>
 
         <section>
-          <h2 className="mb-3 mt-10 text-xl font-semibold text-ink">11. Contact</h2>
-          <p>Privacy questions? Contact us at <a href="mailto:support@sealsend.app" className="font-medium text-ink underline underline-offset-2">support@sealsend.app</a>.</p>
+          <h2 className={h2Class}>10. Contact and complaints</h2>
+          <p>Our privacy contact is Cameron Ashley, {SENDER_LEGAL_NAME}, {SENDER_POSTAL_ADDRESS}, <a href={`mailto:${SUPPORT_EMAIL}`} className={linkClass}>{SUPPORT_EMAIL}</a>.</p>
+          <p>If we have not solved your concern, you can complain to the <a href="https://www.priv.gc.ca" className={linkClass}>Office of the Privacy Commissioner of Canada</a>.</p>
+        </section>
+
+        <section>
+          <h2 className={h2Class}>11. Changes</h2>
+          <p>We may update this policy. We will change the date at the top and, for important changes, email you or show a notice in the app.</p>
         </section>
       </div>
     </div>

@@ -3,19 +3,19 @@ import { BETA_MODE } from "@/lib/constants";
 
 const betaFaqs = [
   {
-    question: "What is included in the controlled beta?",
+    question: "What is included in the free beta?",
     answer:
-      "A controlled beta account can run one active event for up to 100 guests, including the shipped invitation, RSVP, guest-management, communications, co-host, analytics, and check-in tools.",
+      "A free beta account can run one active event for up to 100 guests, including the shipped invitation, RSVP, guest-management, communications, co-host, analytics, and check-in tools.",
   },
   {
     question: "Will I be charged during the beta?",
     answer:
-      "No. Paid checkout is disabled during the controlled beta, and SealSend does not ask for a payment card.",
+      "No. Paid checkout is disabled during the free beta, and SealSend does not ask for a payment card.",
   },
   {
     question: "Are guest communications sent automatically?",
     answer:
-      "No. The host reviews and deliberately starts every email to guests. Provider delivery is verified with each approved beta host before live use.",
+      "No. The host reviews and deliberately starts every email to guests.",
   },
   {
     question: "Do guests need an account or app?",

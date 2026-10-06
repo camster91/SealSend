@@ -52,8 +52,8 @@ export default function SupportPage() {
         </article>
 
         <article className="rounded-2xl border border-border bg-white p-6">
-          <h2 className="text-xl font-semibold text-ink">Controlled-beta boundary</h2>
-          <p className="mt-3 text-neutral-600">SealSend is operating a controlled beta. Provider-dependent payments and external communications remain limited until their separate test, compliance, and approval gates pass.</p>
+          <h2 className="text-xl font-semibold text-ink">Where things stand</h2>
+          <p className="mt-3 text-neutral-600">SealSend is a free beta. Email invitations and reminders work. SMS (text messages) and payments are turned off for now.</p>
           <p className="mt-4 text-sm text-neutral-500">Support contact does not itself authorize a charge, refund, external send, account change, or production release.</p>
         </article>
       </section>
