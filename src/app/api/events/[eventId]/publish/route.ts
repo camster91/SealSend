@@ -3,6 +3,7 @@ import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
+import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
 import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -18,9 +19,9 @@ export async function POST(
     const user = auth.user;
 
     // Fetch the current event to get its status
-    const event = await queryOne<PublicationCandidate & { id: string; status: string }>(
+    const event = await queryOne<PublicationCandidate & InvitationCopyInput & { id: string; status: string }>(
       `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
-              invitation_headline, invitation_body, rsvp_deadline, event_brief
+              invitation_headline, invitation_body, rsvp_deadline, event_brief, host_name, event_timezone
          FROM events WHERE id = $1`,
       [eventId]
     );
@@ -51,10 +52,20 @@ export async function POST(
       }
     }
 
-    const updatedEvent = await queryOne(
-      'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',
-      [newStatus, eventId]
-    );
+    // Guests should never see empty invitation copy: fill blanks when publishing.
+    const filled = newStatus === 'published' ? withDefaultInvitationCopy(event) : event;
+    const copyChanged =
+      filled.invitation_headline !== event.invitation_headline ||
+      filled.invitation_body !== event.invitation_body;
+    const updatedEvent = copyChanged
+      ? await queryOne(
+          'UPDATE events SET status = $1, invitation_headline = $3, invitation_body = $4 WHERE id = $2 RETURNING *',
+          [newStatus, eventId, filled.invitation_headline, filled.invitation_body]
+        )
+      : await queryOne(
+          'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',
+          [newStatus, eventId]
+        );
 
     if (!updatedEvent) {
       return NextResponse.json(
