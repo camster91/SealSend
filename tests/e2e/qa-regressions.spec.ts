@@ -20,7 +20,7 @@ test('navigation and pricing expose one accessible control per action', async ({
   }
 
   // FAQ answers are native <details>, so they open with the platform's own keyboard and AT support.
-  const faq = page.locator('details', { has: page.locator('summary', { hasText: /what is included in the controlled beta/i }) });
+  const faq = page.locator('details', { has: page.locator('summary', { hasText: /what is included in the free beta/i }) });
   await expect(faq).not.toHaveAttribute('open', '');
   await faq.locator('summary').click();
   await expect(faq).toHaveAttribute('open', '');

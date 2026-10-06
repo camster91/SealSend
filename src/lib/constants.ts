@@ -205,7 +205,7 @@ export const PUBLIC_PRICING_PLANS = [
 
 export const CONTROLLED_BETA_PRICING_PLAN = {
   id: "controlled_beta",
-  name: "Free Beta",
+  name: "Beta",
   price: 0,
   period: "",
   description: "Run one real event, free",

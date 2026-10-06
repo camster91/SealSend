@@ -76,7 +76,7 @@ export default function PrivacyPage() {
           <h2 className={h2Class}>5. Cookies</h2>
           <p>We use two cookies, both to make the site work. We do not use advertising cookies.</p>
           <ul className={listClass}>
-                        <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days. Guests who use their invite or access link also get it.</li>
+            <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days. Guests who use their invite or access link also get it.</li>
             <li><code>sealsend_user</code> lets the page show who you are. Scripts on the page can read it. It can include your email, phone, role and event id.</li>
           </ul>
         </section>
