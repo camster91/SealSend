@@ -54,3 +54,21 @@ export function checkRegistryLink(label: string, url: string, count: number): st
   const problem = checkLink(url);
   return problem === LINK_ERROR ? "Add a full web address, starting with https://" : problem;
 }
+
+export const STORED_LINK_ERROR = "This link needs to start with https://";
+
+/** A whitespace-only link is an empty one; anything else is returned as typed. */
+export function normalizeLink(url: string): string {
+  return url.trim() === "" ? "" : url;
+}
+
+/** Old events can hold http:// links saved before https-only. Only the scheme changes. */
+export function upgradeHttp(url: string): string {
+  return /^http:\/\//i.test(url) ? `https://${url.slice(7)}` : url;
+}
+
+/** What to show under a link that is already stored on the event, or undefined if it is fine. */
+export function storedLinkProblem(url: string): string | undefined {
+  const problem = checkLink(url);
+  return problem === LINK_ERROR ? STORED_LINK_ERROR : problem;
+}

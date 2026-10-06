@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/utils";
-import { checkRegistryLink, REGISTRY_LABEL_MAX, TEXT_LIMITS } from "@/lib/event-builder/field-checks";
+import { checkRegistryLink, REGISTRY_LABEL_MAX, storedLinkProblem, TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderData } from "@/lib/event-builder/schema";
 import { Field } from "./Field";
 
@@ -149,18 +149,24 @@ export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsPr
           {registryError && <p id="registry-error" role="alert" className="text-sm font-medium text-wax">{registryError}</p>}
           {view.registry_links.length > 0 && (
             <ul className="divide-y divide-border rounded-xl border border-border">
-              {view.registry_links.map((link, i) => (
+              {view.registry_links.map((link, i) => {
+                const problem = storedLinkProblem(link.url);
+                const problemId = `registry-link-error-${i}`;
+                return (
                 <li key={`${link.url}-${i}`} className="flex items-center justify-between gap-2 px-4 py-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink">{link.label}</p>
                     <p className="truncate text-xs text-muted-foreground">{link.url}</p>
+                    {problem && <p id={problemId} className="text-sm font-medium text-wax">{problem}</p>}
                   </div>
                   <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${link.label}`}
+                    aria-describedby={problem ? problemId : undefined}
                     onClick={() => update({ registry_links: view.registry_links.filter((_, j) => j !== i) })}>
                     <X aria-hidden="true" className="h-4 w-4" />
                   </Button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </fieldset>

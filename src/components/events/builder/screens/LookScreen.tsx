@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
 import { EVENT_TEMPLATES } from "@/lib/event-templates";
-import { checkLink } from "@/lib/event-builder/field-checks";
+import { checkLink, normalizeLink, storedLinkProblem } from "@/lib/event-builder/field-checks";
 import { applyStyle, uploadFailureMessage } from "@/lib/event-builder/look";
 import type { EventCustomization } from "@/types/database";
 import type { ScreenContext } from "../BuilderShell";
@@ -32,9 +32,11 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
   const [failed, setFailed] = useState<string>();
   // A half-typed or non-https image link stays here, with an error, until it is one the server accepts.
   const [typedLink, setTypedLink] = useState<string>();
-  const linkError = typedLink === undefined ? undefined : checkLink(typedLink);
-
   const mode: Mode = data.design_type === "video" ? "video" : data.design_type === "url" ? "url" : "upload";
+  // A link already stored on the event that the server would refuse (for example ftp:) is flagged the same way.
+  const linkError = typedLink !== undefined
+    ? checkLink(typedLink)
+    : mode === "url" ? storedLinkProblem(data.design_url) : undefined;
   const imageFit = custom.imageFit ?? "contain";
   const imagePosition = custom.imagePosition ?? "center";
   const showVideo = data.design_type === "video" || isVideoUrl(data.design_url);
@@ -48,7 +50,8 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
   }, [blocking, setBlocking]);
   useEffect(() => () => setBlocking(false), [setBlocking]);
 
-  const typeLink = (value: string) => {
+  const typeLink = (raw: string) => {
+    const value = normalizeLink(raw); // spaces only means cleared
     if (checkLink(value)) {
       setTypedLink(value);
       return;

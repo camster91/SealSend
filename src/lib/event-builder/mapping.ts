@@ -1,5 +1,6 @@
 import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from "@/lib/datetime";
 import type { Event, EventCustomization, RSVPField } from "@/types/database";
+import { upgradeHttp } from "./field-checks";
 import type { BuilderData, BuilderRsvpField, EventUpdatePayload } from "./schema";
 
 const DATE_KEYS = ["event_date", "event_end_date", "rsvp_deadline"] as const;
@@ -8,12 +9,12 @@ function customizationFrom(source: Partial<EventCustomization> | null | undefine
   return {
     primaryColor: source?.primaryColor ?? "#1b2a4a",
     backgroundColor: source?.backgroundColor ?? "#ffffff",
-    backgroundImage: source?.backgroundImage ?? "",
+    backgroundImage: upgradeHttp(source?.backgroundImage ?? ""),
     fontFamily: source?.fontFamily ?? "Inter",
     buttonStyle: source?.buttonStyle ?? "rounded",
     showCountdown: source?.showCountdown ?? true,
-    audioUrl: source?.audioUrl ?? "",
-    logoUrl: source?.logoUrl ?? "",
+    audioUrl: upgradeHttp(source?.audioUrl ?? ""),
+    logoUrl: upgradeHttp(source?.logoUrl ?? ""),
     imageFit: source?.imageFit ?? "contain",
     imagePosition: source?.imagePosition ?? "center",
   };
@@ -59,11 +60,11 @@ export function fromEvent(event: Event, rsvpFields: RSVPField[]): BuilderData {
     host_name: event.host_name ?? "",
     dress_code: event.dress_code ?? "",
     rsvp_deadline: local(event.rsvp_deadline),
-    registry_links: event.registry_links ?? [],
+    registry_links: (event.registry_links ?? []).map((l) => ({ ...l, url: upgradeHttp(l.url) })),
     max_attendees: event.max_attendees,
     allow_plus_ones: event.allow_plus_ones,
     max_guests_per_rsvp: event.max_guests_per_rsvp,
-    design_url: event.design_url ?? "",
+    design_url: upgradeHttp(event.design_url ?? ""),
     design_type: event.design_type ?? "upload",
     invitation_headline: event.invitation_headline ?? "",
     invitation_body: event.invitation_body ?? "",
