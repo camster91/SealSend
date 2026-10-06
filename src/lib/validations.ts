@@ -27,11 +27,16 @@ const optionalSafeHttpUrl = z
   .refine((v) => v === "" || isSafeHttpUrl(v), "URL must be https:// or a /uploads/ path")
   .optional();
 
-const optionalNullableSafeHttpUrl = z
-  .string()
-  .max(500)
-  .nullable()
-  .refine((v) => v === null || isSafeHttpUrl(v), "URL must be https:// or a /uploads/ path");
+// "" means "not set" (no logo, background or music); clients send it for blank
+// pickers, so treat it as null rather than rejecting the whole event.
+const optionalNullableSafeHttpUrl = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+  z
+    .string()
+    .max(500)
+    .nullable()
+    .refine((v) => v === null || isSafeHttpUrl(v), "URL must be https:// or a /uploads/ path"),
+);
 
 export const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
