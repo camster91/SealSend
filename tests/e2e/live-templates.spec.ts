@@ -41,9 +41,10 @@ test('all launch templates populate isolated editable drafts at mobile and deskt
         await expect(page.getByText(`Starting with ${template.name}.`)).toBeVisible();
         await page.getByRole('button', { name: /Build it yourself/ }).click();
 
-        // The first save creates the draft; read its id from the create response.
+        // Leaving the name field (blur) creates the draft; fill alone doesn't blur. Read its id from the response.
         const created = page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname === '/api/events');
         await page.getByLabel('Name of your event').fill(`QA ${template.name} ${width}`);
+        await page.getByLabel('Name of your event').press('Tab');
         const response = await created;
         expect(response.status()).toBe(201);
         eventId = (await response.json()).id as string;
@@ -52,7 +53,12 @@ test('all launch templates populate isolated editable drafts at mobile and deskt
         const res = await page.request.get(`/api/events/${eventId}`);
         expect(res.ok()).toBe(true);
         const event = await res.json();
-        expect(event.customization).toMatchObject(template.customization);
+        // Blank media is stored as not set (null), so compare the style and check media is empty.
+        const { logoUrl, backgroundImage, audioUrl, ...style } = template.customization;
+        expect(event.customization).toMatchObject(style);
+        for (const [key, value] of Object.entries({ logoUrl, backgroundImage, audioUrl })) {
+          expect(event.customization?.[key] ?? '', key).toBe(value);
+        }
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       } finally {
         // Free the account's one-event limit for the next template.

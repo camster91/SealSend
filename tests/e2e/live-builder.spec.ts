@@ -36,6 +36,8 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     await signIn(page);
+    // Lets Copy link really write to the clipboard; the test still passes if the browser refuses.
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => undefined);
     let eventId: string | undefined;
     try {
       // Start screen
@@ -44,10 +46,12 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       await expectAccessibleAndContained(page, 'start');
       await page.getByRole('button', { name: /Build it yourself/ }).click();
 
-      // Basics: name, date, place. The first save creates the draft.
+      // Basics: name, date, place. Leaving the name field (blur) creates the draft; fill alone doesn't blur.
       const created = page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname === '/api/events');
       await page.getByLabel('Name of your event').fill(`QA builder ${viewport.width}`);
+      await page.getByLabel('Name of your event').press('Tab');
       const response = await created;
+      expect(response.status()).toBe(201);
       eventId = (await response.json()).id as string;
       const start = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
       const pad = (n: number) => String(n).padStart(2, '0');
@@ -69,19 +73,36 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       // Look
       await page.getByRole('button', { name: /Next: The look/ }).click();
       await expect(page.getByLabel('Main colour')).toBeVisible();
+      await page.getByLabel('Main colour').fill('#2a6f4e');
+      await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+      await expect.poll(async () => (await (await page.request.get(`/api/events/${eventId}`)).json()).customization?.primaryColor).toBe('#2a6f4e');
       await expectAccessibleAndContained(page, 'look');
 
       // Guests
       await page.getByRole('button', { name: /^Next: / }).click();
       await expect(page.getByLabel('Name', { exact: true })).toBeVisible();
       await expectAccessibleAndContained(page, 'guests');
-      await page.getByRole('button', { name: 'Add guests later' }).click();
+      await page.getByLabel('Name', { exact: true }).fill('QA Guest');
+      await page.getByLabel('Email (optional)').fill(`qa-guest-${viewport.width}@example.com`);
+      const guestAdded = page.waitForResponse((res) => res.request().method() === 'POST' && /\/api\/events\/[^/]+\/guests/.test(new URL(res.url()).pathname));
+      await page.getByRole('button', { name: 'Add guest', exact: true }).click();
+      expect((await guestAdded).ok()).toBe(true);
+      await expect(page.getByRole('region', { name: /Your guest list/ }).getByText('QA Guest', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: /^Next: / }).click();
 
       // Review, publish
       await expect(page.getByRole('heading', { name: 'Must-haves' })).toBeVisible();
+      // New drafts show the server's default questions; switch one off and wait for it to save.
+      const questions = page.getByRole('region', { name: 'Questions to ask guests' }).getByRole('switch');
+      await expect(questions.first()).toBeVisible();
+      const questionsSaved = page.waitForResponse((res) => res.request().method() === 'PUT' && new URL(res.url()).pathname === `/api/events/${eventId}/rsvp-fields`);
+      await questions.last().click();
+      expect((await questionsSaved).ok()).toBe(true);
       await expectAccessibleAndContained(page, 'review');
       await page.getByRole('button', { name: 'Publish', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Your invite is live' })).toBeVisible();
+      await page.getByRole('button', { name: 'Copy link' }).click();
+      await expect(page.getByText(/^(Link copied|Could not copy\.)/)).toBeVisible();
       await expectAccessibleAndContained(page, 'published');
       await page.screenshot({ path: path.join(output, `published-${viewport.width}.png`), fullPage: true });
 
@@ -99,7 +120,10 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       await expectAccessibleAndContained(page, 'edit');
     } finally {
       // Free the account's one-event limit for the next viewport.
-      if (eventId) await page.request.delete(`/api/events/${eventId}`);
+      if (eventId) {
+        const del = await page.request.delete(`/api/events/${eventId}`);
+        expect(del.ok()).toBe(true);
+      }
     }
 
     expect(errors).toEqual([]);
