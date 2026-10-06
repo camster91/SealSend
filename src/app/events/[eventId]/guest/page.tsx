@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
 import { getEvent } from "@/lib/events";
+import { isTwilioConfigured } from "@/lib/twilio";
 import { Logo } from "@/components/layout/Logo";
 
 interface GuestLoginPageProps {
@@ -65,6 +66,7 @@ export default async function GuestLoginPage({ params }: GuestLoginPageProps) {
             defaultMethod="email"
             eventId={eventId}
             isGuestMode={true}
+            smsEnabled={isTwilioConfigured()}
           />
         </Suspense>
 

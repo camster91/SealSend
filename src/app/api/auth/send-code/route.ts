@@ -5,9 +5,9 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
 import twilio from 'twilio';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
-import { getTwilioSendOptions } from '@/lib/twilio';
+import { getTwilioSendOptions, isTwilioConfigured } from '@/lib/twilio';
 import { sendCodeSchema } from '@/lib/validations';
-import { assertApprovedRecipient } from '@/lib/communications-safety';
+import { assertApprovedRecipient, isApprovedRecipient } from '@/lib/communications-safety';
 import { hashAuthCode } from '@/lib/auth/code-hash';
 
 function getTwilioClient() {
@@ -58,6 +58,14 @@ export async function POST(request: NextRequest) {
 
     const { method, email, phone, eventId } = parsed.data;
 
+    // SMS is off whenever Twilio isn't configured; say so instead of failing at send time.
+    if (method === 'phone' && !isTwilioConfigured()) {
+      return NextResponse.json(
+        { error: 'Text message sign-in is turned off right now. Please use your email.' },
+        { status: 400 }
+      );
+    }
+
     // Validate and format phone number if using SMS
     let formattedPhone: string | null = null;
     if (method === 'phone' && phone) {
@@ -80,6 +88,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Too many codes requested for this address. Please wait a few minutes.' },
         { status: 429 }
+      );
+    }
+
+    // While COMMUNICATIONS_TEST_ONLY is on, only allow-listed recipients can get a code.
+    // Check before creating one, so the visitor gets a clear answer rather than a send failure.
+    if (!isApprovedRecipient(recipientKey)) {
+      return NextResponse.json(
+        { error: "SealSend is invite-only right now, so we can't send a code to this address yet." },
+        { status: 403 }
       );
     }
 

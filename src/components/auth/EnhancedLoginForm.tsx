@@ -12,12 +12,14 @@ interface EnhancedLoginFormProps {
   defaultMethod?: AuthMethod;
   eventId?: string; // For guest login
   isGuestMode?: boolean;
+  smsEnabled?: boolean; // Pass isTwilioConfigured() from the server; SMS options are hidden otherwise
 }
 
-export function EnhancedLoginForm({ 
-  defaultMethod = 'email', 
+export function EnhancedLoginForm({
+  defaultMethod = 'email',
   eventId,
-  isGuestMode = false 
+  isGuestMode = false,
+  smsEnabled = false,
 }: EnhancedLoginFormProps) {
   const [method, setMethod] = useState<AuthMethod>(defaultMethod);
   const [email, setEmail] = useState("");
@@ -134,6 +136,17 @@ export function EnhancedLoginForm({
   };
 
   const renderMethodSelector = () => {
+    if (isGuestMode && !smsEnabled) {
+      return (
+        <div className="text-center">
+          <h3 className="text-lg font-semibold">Guest Access</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            We&apos;ll email you an access code
+          </p>
+        </div>
+      );
+    }
+
     if (isGuestMode) {
       return (
         <div className="space-y-3">
@@ -194,7 +207,7 @@ export function EnhancedLoginForm({
           </p>
         </div>
         
-        <div className="grid grid-cols-3 gap-3">
+        <div className={`grid ${smsEnabled ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
           <button
             type="button"
             aria-pressed={method === 'email'}
@@ -230,7 +243,8 @@ export function EnhancedLoginForm({
             </div>
             <span className="text-sm font-medium">Password</span>
           </button>
-          
+
+          {smsEnabled && (
           <button
             type="button"
             aria-pressed={method === 'phone'}
@@ -248,6 +262,7 @@ export function EnhancedLoginForm({
             </div>
             <span className="text-sm font-medium">SMS</span>
           </button>
+          )}
         </div>
       </div>
     );
