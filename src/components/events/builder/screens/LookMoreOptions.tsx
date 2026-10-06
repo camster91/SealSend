@@ -6,6 +6,7 @@ import { Select } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/utils";
 import type { EventCustomization } from "@/types/database";
+import { storedLinkProblem } from "@/lib/event-builder/field-checks";
 import { uploadFailureMessage } from "@/lib/event-builder/look";
 import { Field } from "./Field";
 
@@ -30,6 +31,9 @@ interface MediaPickerProps {
 function MediaPicker({ id, label, hint, value, accept, kind, ensureDraft, onValue }: MediaPickerProps) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string>();
+  // A link saved on the event that the server would now refuse (for example ftp:).
+  const linkProblem = value ? storedLinkProblem(value) : undefined;
+  const linkProblemId = `${id}-link-error`;
 
   const upload = async (file: File) => {
     setBusy(true);
@@ -82,6 +86,7 @@ function MediaPicker({ id, label, hint, value, accept, kind, ensureDraft, onValu
           )}
           <button
             type="button"
+            aria-describedby={linkProblem ? linkProblemId : undefined}
             onClick={() => onValue("")}
             className="min-h-11 rounded-[10px] px-3 text-sm font-medium text-ink underline underline-offset-4"
           >
@@ -89,6 +94,7 @@ function MediaPicker({ id, label, hint, value, accept, kind, ensureDraft, onValu
           </button>
         </div>
       )}
+      {linkProblem && value && !busy && <p id={linkProblemId} className="text-sm font-medium text-wax">{linkProblem}</p>}
       <p aria-live="polite" className={cn("text-sm font-medium text-wax", !failed && "sr-only")}>
         {failed ?? ""}
       </p>
