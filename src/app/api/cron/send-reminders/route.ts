@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
 import { sendEmail } from "@/lib/email";
+import { reserveEmailQuota } from "@/lib/email-quota";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
@@ -237,6 +238,7 @@ export async function GET(request: NextRequest) {
               });
 
               try {
+                if (!(await reserveEmailQuota(event.user_id, 1)).success) throw new Error("Daily email limit reached for this account");
                 const result = await sendEmail({ ...emailSendOptions(branding),
                   to: guest.email,
                   subject,

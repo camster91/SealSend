@@ -6,6 +6,7 @@ import { buildAnnouncementSms } from "@/lib/sms-templates";
 import { getTwilioClient, getTwilioSendOptions, isTwilioConfigured } from "@/lib/twilio";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
+import { reserveEmailQuota } from "@/lib/email-quota";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
@@ -43,7 +44,8 @@ export async function dispatchAnnouncement(announcementId: string) {
         await client.query(`INSERT INTO announcement_deliveries (announcement_id, guest_id, channel, recipient)
           VALUES ($1, $2, 'email', $3) ON CONFLICT (announcement_id, guest_id, channel) DO NOTHING`, [announcement.id, guest.id, guest.email]);
       }
-      if (announcement.channels.includes("sms") && guest.phone && !guest.phone_invalid_at) {
+      // No SMS deliveries while Twilio is off, so an email+SMS announcement isn't reported as failed.
+      if (announcement.channels.includes("sms") && isTwilioConfigured() && guest.phone && !guest.phone_invalid_at) {
         const phone = validateAndFormatPhone(guest.phone);
         if (phone.valid && phone.formatted && isCommunicationSuppressed(suppressions, "sms", phone.formatted)) continue;
         await client.query(`INSERT INTO announcement_deliveries (announcement_id, guest_id, channel, recipient)
@@ -79,6 +81,7 @@ export async function dispatchAnnouncement(announcementId: string) {
     try {
       let providerMessageId: string;
       if (delivery.channel === "email") {
+        if (!(await reserveEmailQuota(announcement.user_id, 1)).success) throw new Error("Daily email limit reached for this account");
         const content = buildAnnouncementEmail({ brand: emailBrand(branding), guestName: delivery.name, eventTitle: announcement.title, announcementSubject: announcement.subject, announcementMessage: announcement.message, rsvpUrl });
         providerMessageId = (await sendEmail({ ...emailSendOptions(branding), to: delivery.recipient, subject: content.subject, html: content.html })).id;
       } else {
