@@ -37,3 +37,31 @@ test('SaveIndicator has the status copy', async () => {
     assert.ok(src.includes(needle), `missing ${needle}`);
   }
 });
+
+test('LookScreen has the copy, upload route and template wiring', async () => {
+  const src = await read(`${dir}screens/LookScreen.tsx`);
+  for (const needle of [
+    'Make it yours',
+    'font-display',
+    'Artwork crop and focus',
+    'keeps the uploaded original',
+    'max 10 MB for images, 50 MB for video',
+    "That file didn't upload. Try a smaller file (max 10 MB for images, 50 MB for video).",
+    '/api/upload',
+    'EVENT_TEMPLATES',
+    'ensureDraft',
+    'aria-live="polite"',
+  ]) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+});
+
+test('Look screen files use no banned tokens or phrases', async () => {
+  for (const file of ['LookScreen', 'LookMoreOptions']) {
+    const src = await read(`${dir}screens/${file}.tsx`).catch(() => '');
+    assert.ok(src.length > 0, `${file} missing`);
+    for (const word of [...BANNED, 'publish blocker', 'operations brief', 'explicit decisions', 'communication plan']) {
+      assert.ok(!src.includes(word), `${file} contains ${word}`);
+    }
+  }
+});
