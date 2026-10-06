@@ -25,6 +25,8 @@ export interface ScreenContext {
   markPublished(): void;
   flush(): Promise<void>;
   retry(): void;
+  /** Set when Next was pressed on Basics without a name; Basics shows it under the Name field. */
+  nameError?: string;
 }
 
 export interface BuilderShellProps {
@@ -61,6 +63,7 @@ export function BuilderShell({
   const [direction, setDirection] = useState(1);
   const [published, setPublished] = useState(initialStatus === "published");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [nameError, setNameError] = useState<string | undefined>();
   const moved = useRef(false);
 
   const index = BUILDER_SCREENS.indexOf(screen);
@@ -98,6 +101,23 @@ export function BuilderShell({
     markPublished: () => setPublished(true),
     flush: draft.flush,
     retry: draft.retry,
+    nameError,
+  };
+
+  // Next from Basics must not leave a create flow without a server draft.
+  const onNext = async () => {
+    if (!next) return;
+    if (screen === "basics" && !draft.eventId) {
+      try {
+        await draft.ensureDraft();
+      } catch {
+        // A blank name gets the inline message; any other failure shows in the save indicator.
+        if (!draft.data.title.trim()) setNameError("Add a name for your event.");
+        return;
+      }
+    }
+    setNameError(undefined);
+    goTo(next);
   };
 
   const slide = reduceMotion ? 0 : SLIDE_DISTANCE;
@@ -148,7 +168,7 @@ export function BuilderShell({
             Preview
           </Button>
           {next && (
-            <Button type="button" size="lg" className="ml-auto" onClick={() => goTo(next)}>
+            <Button type="button" size="lg" className="ml-auto" onClick={onNext}>
               {`Next: ${SCREEN_NAMES[next]}`}
             </Button>
           )}
