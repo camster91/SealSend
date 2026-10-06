@@ -15,16 +15,18 @@ interface StepNavProps {
   /** Highest step index the host has reached; every step is open when `all` is set. */
   reached: number;
   all: boolean;
+  /** Disables every step while the screen has values that would be lost by leaving. */
+  locked?: boolean;
   onSelect: (screen: BuilderScreen) => void;
 }
 
-export function StepNav({ current, reached, all, onSelect }: StepNavProps) {
+export function StepNav({ current, reached, all, locked = false, onSelect }: StepNavProps) {
   const index = BUILDER_SCREENS.indexOf(current);
   return (
     <nav aria-label="Steps">
       <ol className="flex gap-2">
         {BUILDER_SCREENS.map((screen, i) => {
-          const open = all || i <= reached;
+          const open = !locked && (all || i <= reached);
           const isCurrent = screen === current;
           return (
             <li key={screen} className="min-w-0 flex-1">

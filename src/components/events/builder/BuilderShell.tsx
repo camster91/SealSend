@@ -27,6 +27,8 @@ export interface ScreenContext {
   retry(): void;
   /** Set when Next was pressed on Basics without a name; Basics shows it under the Name field. */
   nameError?: string;
+  /** Basics sets this while a published event holds values that are not valid yet; the shell then blocks leaving. */
+  setBlocking(blocking: boolean): void;
 }
 
 export interface BuilderShellProps {
@@ -64,6 +66,7 @@ export function BuilderShell({
   const [published, setPublished] = useState(initialStatus === "published");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [nameError, setNameError] = useState<string | undefined>();
+  const [blocking, setBlocking] = useState(false);
   const moved = useRef(false);
 
   const index = BUILDER_SCREENS.indexOf(screen);
@@ -102,6 +105,7 @@ export function BuilderShell({
     flush: draft.flush,
     retry: draft.retry,
     nameError,
+    setBlocking,
   };
 
   // Next from Basics must not leave a create flow without a server draft.
@@ -128,7 +132,7 @@ export function BuilderShell({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p aria-live="polite" className="mb-2 text-sm font-medium text-muted-foreground">{`Step ${index + 1} of ${BUILDER_SCREENS.length}`}</p>
-          <StepNav current={screen} reached={reached} all={mode === "edit"} onSelect={goTo} />
+          <StepNav current={screen} reached={reached} all={mode === "edit"} locked={blocking} onSelect={goTo} />
         </div>
         <SaveIndicator status={draft.status} onRetry={draft.retry} />
       </header>
@@ -157,9 +161,12 @@ export function BuilderShell({
       </div>
 
       <div className="sticky bottom-0 z-30 -mx-4 mt-8 border-t border-border bg-cotton px-4 py-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0">
+        <p aria-live="polite" className="mb-2 text-sm font-medium text-ink empty:hidden">
+          {blocking ? "Fix the highlighted fields before moving on." : ""}
+        </p>
         <div className="flex items-center gap-3">
           {back && (
-            <Button type="button" variant="outline" size="lg" onClick={() => goTo(back)}>
+            <Button type="button" variant="outline" size="lg" disabled={blocking} onClick={() => goTo(back)}>
               Back
             </Button>
           )}
@@ -168,7 +175,7 @@ export function BuilderShell({
             Preview
           </Button>
           {next && (
-            <Button type="button" size="lg" className="ml-auto" onClick={onNext}>
+            <Button type="button" size="lg" className="ml-auto" disabled={blocking} onClick={onNext}>
               {`Next: ${SCREEN_NAMES[next]}`}
             </Button>
           )}

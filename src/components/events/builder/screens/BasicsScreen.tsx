@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { validateBasics } from "@/lib/event-builder/basics-validation";
+import { resolveHeld, validateBasics } from "@/lib/event-builder/basics-validation";
 import type { BuilderData } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
 import { BasicsMoreOptions } from "./BasicsMoreOptions";
@@ -34,30 +34,18 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
     errors[field] ?? ctx.fieldErrors[field] ?? (field === "title" && !view.title.trim() ? ctx.nameError : undefined);
 
   const set = (patch: Partial<BuilderData>) => {
-    if (!published) {
-      ctx.update(patch);
-      return;
-    }
-    const candidate: BuilderData = { ...view, ...patch };
-    const found = validateBasics(candidate, { published: true });
-    const send: Partial<BuilderData> = {};
-    const keep: Partial<BuilderData> = {};
-    const release: Array<keyof BuilderData> = [];
-    for (const key of Object.keys(patch) as Array<keyof BuilderData>) {
-      const blocked = found[key] !== undefined || (key === "event_timezone" && Object.keys(found).length > 0);
-      if (blocked) Object.assign(keep, { [key]: patch[key] });
-      else {
-        Object.assign(send, { [key]: patch[key] });
-        release.push(key);
-      }
-    }
-    setHeld((prev) => {
-      const next = { ...prev, ...keep };
-      for (const key of release) delete next[key];
-      return next;
-    });
-    if (Object.keys(send).length > 0) ctx.update(send);
+    const result = resolveHeld(data, held, patch, published);
+    setHeld(result.held);
+    if (Object.keys(result.send).length > 0) ctx.update(result.send);
   };
+
+  // Tell the shell to lock navigation while a held value would be lost by leaving.
+  const blocking = Object.keys(held).length > 0;
+  const { setBlocking } = ctx;
+  useEffect(() => {
+    setBlocking(blocking);
+  }, [blocking, setBlocking]);
+  useEffect(() => () => setBlocking(false), [setBlocking]);
 
   const ensureNamed = () => {
     if (mode === "create" && !ctx.eventId && data.title.trim()) ctx.ensureDraft().catch(() => undefined);

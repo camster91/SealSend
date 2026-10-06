@@ -36,3 +36,36 @@ export function validateBasics(d: BuilderData, opts: { published: boolean }): Ba
   }
   return errors;
 }
+
+export interface HeldResolution {
+  /** Values that are valid now and may go to the draft. */
+  send: Partial<BuilderData>;
+  /** Values still invalid on a published event; they stay on screen only. */
+  held: Partial<BuilderData>;
+  errors: BasicsErrors;
+}
+
+/**
+ * Decides what a Basics edit sends. On a published event a value that fails
+ * validateBasics is held back; every earlier held value is re-checked too, so
+ * fixing the start time releases a held end time or RSVP deadline.
+ */
+export function resolveHeld(
+  server: BuilderData,
+  held: Partial<BuilderData>,
+  patch: Partial<BuilderData>,
+  published: boolean,
+): HeldResolution {
+  const pending = { ...held, ...patch };
+  const candidate: BuilderData = { ...server, ...pending };
+  const errors = validateBasics(candidate, { published });
+  if (!published) return { send: patch, held: {}, errors };
+  const anyError = Object.keys(errors).length > 0;
+  const send: Partial<BuilderData> = {};
+  const keep: Partial<BuilderData> = {};
+  for (const key of Object.keys(pending) as Array<keyof BuilderData>) {
+    const blocked = errors[key] !== undefined || (key === "event_timezone" && anyError);
+    Object.assign(blocked ? keep : send, { [key]: pending[key] });
+  }
+  return { send, held: keep, errors };
+}
