@@ -2,12 +2,18 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
+import { isTwilioConfigured } from "@/lib/twilio";
 
 export const metadata: Metadata = {
   title: "Host Sign In - SealSend",
 };
 
+// Rendered per request so the SMS option follows the runtime Twilio configuration,
+// not whatever the build environment happened to have.
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
+  const smsEnabled = isTwilioConfigured();
   return (
     <>
       <div className="mb-8 text-center">
@@ -18,7 +24,7 @@ export default function LoginPage() {
       </div>
 
       <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-neutral-100" />}>
-        <EnhancedLoginForm defaultMethod="email" />
+        <EnhancedLoginForm defaultMethod="email" smsEnabled={smsEnabled} />
       </Suspense>
 
       <div className="mt-8 border-t border-border pt-6">
@@ -33,7 +39,9 @@ export default function LoginPage() {
             </Link>
           </p>
           <p className="mt-2 text-xs text-neutral-600">
-            Sign in with an email code, a text message code or a password.
+            {smsEnabled
+              ? "Sign in with an email code, a text message code or a password."
+              : "Sign in with an email code or a password."}
           </p>
         </div>
       </div>

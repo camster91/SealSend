@@ -5,16 +5,21 @@ function normalizeRecipient(value: string): string {
   return trimmed.includes("@") ? trimmed.toLowerCase() : trimmed.replace(/[\s()-]/g, "");
 }
 
-export function assertApprovedRecipient(
-  recipient: string,
-  environment: SafetyEnvironment = {
+function currentEnvironment(): SafetyEnvironment {
+  return {
     testOnly: process.env.COMMUNICATIONS_TEST_ONLY,
     allowed: process.env.COMMUNICATIONS_ALLOWED_RECIPIENTS,
-  },
-): void {
-  if (environment.testOnly === "false") return;
+  };
+}
+
+export function isApprovedRecipient(recipient: string, environment: SafetyEnvironment = currentEnvironment()): boolean {
+  if (environment.testOnly === "false") return true;
   const allowed = new Set((environment.allowed ?? "").split(",").map(normalizeRecipient).filter(Boolean));
-  if (!allowed.has(normalizeRecipient(recipient))) {
+  return allowed.has(normalizeRecipient(recipient));
+}
+
+export function assertApprovedRecipient(recipient: string, environment: SafetyEnvironment = currentEnvironment()): void {
+  if (!isApprovedRecipient(recipient, environment)) {
     throw new Error("Communication recipient is not approved for controlled testing.");
   }
 }
