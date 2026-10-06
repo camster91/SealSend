@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db/client';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
+import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -52,9 +53,9 @@ export async function PATCH(
     if (auth.error) return auth.error;
 
     // Verify ownership
-    const existing = await queryOne<PublicationCandidate & { id: string; status: string }>(
+    const existing = await queryOne<PublicationCandidate & InvitationCopyInput & { id: string; status: string }>(
       `SELECT id, status, title, event_date, event_end_date, location_name, max_attendees,
-              invitation_headline, invitation_body, rsvp_deadline, event_brief
+              invitation_headline, invitation_body, rsvp_deadline, event_brief, host_name, event_timezone
          FROM events WHERE id = $1`,
       [eventId]
     );
@@ -113,7 +114,14 @@ export async function PATCH(
       'status', 'auto_reminders',
     ];
 
-    const updates = parsed.data as Record<string, unknown>;
+    const updates = { ...parsed.data } as Record<string, unknown>;
+    if (targetStatus === 'published') {
+      // Fill blank invitation copy from the merged row so host text is never overwritten.
+      const merged = { ...existing, ...parsed.data };
+      const filled = withDefaultInvitationCopy(merged);
+      if (filled.invitation_headline !== merged.invitation_headline) updates.invitation_headline = filled.invitation_headline;
+      if (filled.invitation_body !== merged.invitation_body) updates.invitation_body = filled.invitation_body;
+    }
     const keys = Object.keys(updates).filter((key) => ALLOWED_COLUMNS.includes(key));
 
     if (keys.length === 0) {

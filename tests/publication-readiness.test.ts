@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { getPublicationReadiness } from "../src/lib/publication-readiness";
 
-test("publication readiness identifies every missing host decision", () => {
+test("publication readiness lists the three things a host must add", () => {
   const result = getPublicationReadiness({
     title: " ",
     event_date: null,
@@ -21,13 +21,22 @@ test("publication readiness identifies every missing host decision", () => {
     "title",
     "event_date",
     "location_name",
-    "max_attendees",
-    "event_brief.audience",
-    "event_brief.accessibilityStatus",
-    "event_brief.communicationPreference",
-    "invitation_headline",
-    "invitation_body",
   ]);
+});
+
+test("capacity, brief and invitation copy no longer block publishing", () => {
+  const result = getPublicationReadiness({
+    title: "Dinner",
+    event_date: "2026-09-18T22:00:00.000Z",
+    location_name: "Hall",
+    max_attendees: null,
+    event_brief: null,
+    invitation_headline: null,
+    invitation_body: null,
+  });
+
+  assert.equal(result.ready, true);
+  assert.deepEqual(result.blockers, []);
 });
 
 test("publication readiness rejects invalid schedule ordering", () => {

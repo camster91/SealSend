@@ -15,7 +15,7 @@ export type PublicationCandidate = {
 };
 
 export type PublicationBlocker = {
-  field: keyof PublicationCandidate | "event_brief.audience" | "event_brief.accessibilityStatus" | "event_brief.communicationPreference";
+  field: "title" | "event_date" | "event_end_date" | "location_name" | "rsvp_deadline";
   message: string;
 };
 
@@ -39,38 +39,16 @@ export function getPublicationReadiness(candidate: PublicationCandidate): {
   const deadline = timestamp(candidate.rsvp_deadline);
 
   if (!hasText(candidate.title)) {
-    blockers.push({ field: "title", message: "Add an event title." });
+    blockers.push({ field: "title", message: "Add a name for your event." });
   }
   if (start === null || Number.isNaN(start)) {
-    blockers.push({ field: "event_date", message: "Set a valid start date and time." });
+    blockers.push({ field: "event_date", message: "Pick a start date and time." });
   }
   if (end !== null && (Number.isNaN(end) || (start !== null && !Number.isNaN(start) && end <= start))) {
-    blockers.push({ field: "event_end_date", message: "Set an end time after the event starts." });
+    blockers.push({ field: "event_end_date", message: "Set an end time after the start." });
   }
   if (!hasText(candidate.location_name)) {
-    blockers.push({ field: "location_name", message: "Add the event location or access details." });
-  }
-  if (!Number.isInteger(candidate.max_attendees) || Number(candidate.max_attendees) < 1) {
-    blockers.push({ field: "max_attendees", message: "Set the event capacity." });
-  }
-  if (!hasText(candidate.event_brief?.audience)) {
-    blockers.push({ field: "event_brief.audience", message: "Describe who the event is for." });
-  }
-  if (
-    !candidate.event_brief
-    || candidate.event_brief.accessibilityStatus === "not_reviewed"
-    || (candidate.event_brief.accessibilityStatus === "requirements_known" && !hasText(candidate.event_brief.accessibilityNotes))
-  ) {
-    blockers.push({ field: "event_brief.accessibilityStatus", message: "Review the event's accessibility needs." });
-  }
-  if (!candidate.event_brief || candidate.event_brief.communicationPreference === "undecided") {
-    blockers.push({ field: "event_brief.communicationPreference", message: "Choose the intended guest communication approach." });
-  }
-  if (!hasText(candidate.invitation_headline)) {
-    blockers.push({ field: "invitation_headline", message: "Review and add the invitation headline." });
-  }
-  if (!hasText(candidate.invitation_body)) {
-    blockers.push({ field: "invitation_body", message: "Review and add the invitation message." });
+    blockers.push({ field: "location_name", message: "Add where it's happening." });
   }
   if (deadline !== null && (Number.isNaN(deadline) || (start !== null && !Number.isNaN(start) && deadline >= start))) {
     blockers.push({ field: "rsvp_deadline", message: "Set the RSVP deadline before the event starts." });

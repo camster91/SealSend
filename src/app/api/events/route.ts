@@ -9,6 +9,7 @@ import { canCreateEvent } from '@/lib/entitlements';
 import { getUserTier } from '@/lib/subscription';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness } from '@/lib/publication-readiness';
+import { withDefaultInvitationCopy } from '@/lib/invitation-defaults';
 
 export async function GET() {
   try {
@@ -57,7 +58,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { title, description, invitation_headline, invitation_body, reminder_sequence, event_brief, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const publishCopy = parsed.data.status === 'published' ? withDefaultInvitationCopy(parsed.data) : parsed.data;
+    const { title, description, reminder_sequence, event_brief, ai_generation_id, ai_edit_count, event_date, event_end_date, event_timezone, location_name, location_address, host_name, dress_code, rsvp_deadline, registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type, customization, status } = parsed.data;
+    const { invitation_headline, invitation_body } = publishCopy;
     // Optional team workspace; the database defaults to the host's personal workspace.
     const requestedOrganization = typeof body?.organization_id === 'string' ? body.organization_id : null;
     let organizationId: string | null = null;
