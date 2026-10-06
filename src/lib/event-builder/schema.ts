@@ -78,7 +78,7 @@ export const builderDataSchema: z.ZodType<BuilderData> = z.object({
   }),
   rsvp_fields: z.array(z.object({
     field_name: z.string(),
-    field_type: z.enum(["attendance", "text", "select", "multiselect", "number", "email", "phone"]),
+    field_type: z.enum(["attendance", "text", "select", "multiselect", "number", "email", "phone", "textarea"]),
     field_label: z.string(),
     is_required: z.boolean(),
     is_enabled: z.boolean(),

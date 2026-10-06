@@ -55,3 +55,9 @@ test("date fields round-trip through toPatch/fromEvent in the event timezone", (
 test("clearing a date sends null", () => {
   assert.deepEqual(toPatch(filled, { ...filled, rsvp_deadline: "" }), { rsvp_deadline: null });
 });
+
+test("a cleared date patch passes eventUpdateSchema", () => {
+  const patch = toPatch(filled, { ...filled, event_end_date: "" });
+  assert.deepEqual(patch, { event_end_date: null });
+  assert.equal(eventUpdateSchema.safeParse(patch).success, true);
+});

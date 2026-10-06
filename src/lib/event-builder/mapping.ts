@@ -3,12 +3,6 @@ import type { Event, EventCustomization, RSVPField } from "@/types/database";
 import type { BuilderData, EventUpdatePayload } from "./schema";
 
 const DATE_KEYS = ["event_date", "event_end_date", "rsvp_deadline"] as const;
-type DateKey = (typeof DATE_KEYS)[number];
-
-/** A patch where a cleared date is sent as null. */
-export type BuilderPatch = Partial<Omit<EventUpdatePayload, DateKey>> & {
-  [K in DateKey]?: string | null;
-};
 
 function customizationFrom(source: Partial<EventCustomization> | null | undefined): EventCustomization {
   return {
@@ -92,7 +86,7 @@ export function fromEvent(event: Event, rsvpFields: RSVPField[]): BuilderData {
  * or null when nothing changed. rsvp_fields is left out (it has its own route).
  * If the timezone changes, set dates are re-sent so they keep their wall-clock time.
  */
-export function toPatch(prev: BuilderData, next: BuilderData): BuilderPatch | null {
+export function toPatch(prev: BuilderData, next: BuilderData): Partial<EventUpdatePayload> | null {
   const patch: Record<string, unknown> = {};
   const timezoneChanged = prev.event_timezone !== next.event_timezone;
 
@@ -109,5 +103,5 @@ export function toPatch(prev: BuilderData, next: BuilderData): BuilderPatch | nu
       patch[key] = next[key];
     }
   }
-  return Object.keys(patch).length === 0 ? null : (patch as BuilderPatch);
+  return Object.keys(patch).length === 0 ? null : (patch as Partial<EventUpdatePayload>);
 }
