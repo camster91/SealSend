@@ -12,7 +12,7 @@ export function PricingCTA() {
         </h2>
         <p className="mt-4 max-w-xl text-lg text-white/80">
           {BETA_MODE
-            ? "Free during the controlled beta for one active event with up to 100 guests. No credit card required."
+            ? "Free during the free beta for one active event with up to 100 guests. No credit card required."
             : "Free for your first event. No credit card required."}
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">

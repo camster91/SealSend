@@ -46,3 +46,16 @@ test('sign-up form shows the terms line with links', async () => {
   assert.match(f, /href="\/terms"/);
   assert.match(f, /href="\/privacy"/);
 });
+
+test('no stale money-back, gate or controlled-beta wording in public copy', async () => {
+  const { execSync } = await import('node:child_process');
+  const grep = (re) => { try { return execSync(`git grep -n -i -E "${re}" -- src`, { encoding: 'utf8' }); } catch { return ''; } };
+  assert.equal(grep('money-back'), '');
+  assert.equal(grep('consented beta host'), '');
+  const privacy = await read('src/app/(marketing)/privacy/page.tsx');
+  assert.match(privacy, /feedback/i);
+  assert.match(privacy, /waitlist/i);
+  for (const p of ['src/app/(marketing)/pricing/page.tsx', 'src/components/pricing/PricingCTA.tsx', 'src/components/pricing/PricingCards.tsx', 'src/components/pricing/PricingFAQ.tsx']) {
+    assert.doesNotMatch(await read(p), /controlled beta/i, p);
+  }
+});

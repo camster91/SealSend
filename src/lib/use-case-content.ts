@@ -42,7 +42,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { question: "What size community event fits the beta?", answer: betaCapacityAnswer },
       { question: "Do guests need a SealSend account?", answer: "No. Guests open the published event link in a browser and submit the RSVP form without creating an account or installing an app." },
       { question: "Can several organizers help?", answer: "Yes. The free beta allows up to three team members including the owner, with manager, check-in, and viewer roles." },
-      { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Live email and SMS are enabled only after provider readiness is confirmed for the consented beta host." },
+      { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Email invitations work today. SMS is turned off for now." },
     ],
     ctaText: "Start a community event",
     keywords: ["community event RSVP", "community event invitations", "event guest list", "community event check in"],
@@ -61,7 +61,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     benefits: [
       { icon: "ClipboardList", title: "Ask the questions that affect delivery", description: "Add custom RSVP fields for accessibility needs, dietary requirements, roles, or other event-specific planning details." },
       { icon: "Calendar", title: "Coordinate sign-up needs", description: "Use the event sign-up board for bounded roles or items, with availability kept alongside the event." },
-      { icon: "Mail", title: "Keep communication deliberate", description: "Resolve the intended audience and require host approval before email or SMS communication leaves SealSend." },
+      { icon: "Mail", title: "Keep communication deliberate", description: "Resolve the intended audience and require host approval before any email leaves SealSend." },
       { icon: "BarChart3", title: "Retain a usable record", description: "Review aggregate response status and export guest information for an authorized operational follow-up or event-day fallback." },
     ],
     faqs: [

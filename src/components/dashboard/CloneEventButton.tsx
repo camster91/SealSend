@@ -171,7 +171,7 @@ export function CloneEventButton({
                     <span className="block text-sm font-medium text-amber-950">Archive the current event</span>
                     <span className="block text-xs text-amber-800">
                       {mustArchiveSource
-                        ? "Required by the controlled beta's one-active-event limit. The finished event remains available in your history."
+                        ? "Required by the free beta's one-active-event limit. The finished event remains available in your history."
                         : 'Optional. The finished event remains available in your history.'}
                     </span>
                   </span>

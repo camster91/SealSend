@@ -29,6 +29,8 @@ export default function PrivacyPage() {
             <li>Account details: email, name, sign-in codes and sign-in sessions.</li>
             <li>Event details, images and files you upload, and your branding.</li>
             <li>Client records, if you use them.</li>
+            <li>Beta participation and feedback, if you join the beta or send feedback: your consent choice, your rating, the area you picked, what you wrote, whether we may contact you, and simple milestones from your events.</li>
+            <li>Your email, if you join a waitlist.</li>
             <li>Simple product-usage events, so we can see what is used and what breaks. We do not use third-party analytics or tracking scripts.</li>
           </ul>
           <p><strong>Guest data that hosts upload or guests give us:</strong></p>
@@ -47,7 +49,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className={h2Class}>2. How we use it</h2>
-          <p>We use your information to run SealSend: sign you in, show your events, send invitations and reminders you ask for, collect RSVPs, keep the Service secure, fix problems, and answer your questions. We do not sell your information, and we do not use it for advertising.</p>
+          <p>We use your information to run SealSend: sign you in, show your events, send invitations and reminders you ask for, learn from beta feedback and milestones, collect RSVPs, keep the Service secure, fix problems, and answer your questions. We do not sell your information, and we do not use it for advertising.</p>
         </section>
 
         <section>
@@ -74,8 +76,8 @@ export default function PrivacyPage() {
           <h2 className={h2Class}>5. Cookies</h2>
           <p>We use two cookies, both to make the site work. We do not use advertising cookies.</p>
           <ul className={listClass}>
-            <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days.</li>
-            <li><code>sealsend_user</code> lets the page show your name and role. Scripts on the page can read it, and it includes your email and role.</li>
+                        <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days. Guests who use their invite or access link also get it.</li>
+            <li><code>sealsend_user</code> lets the page show who you are. Scripts on the page can read it. It can include your email, phone, role and event id.</li>
           </ul>
         </section>
 
