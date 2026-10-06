@@ -129,11 +129,11 @@ test("429 shows the server message without retrying", async () => {
   assert.deepEqual(h.sleeps, []);
 });
 
-test("a 4xx without an error string fails with the default message", async () => {
+test("a 400 without details asks the host to check the highlighted fields", async () => {
   const h = harness(() => new Response("nope", { status: 400 }));
   h.queue.enqueue(base, A);
   await h.queue.flush();
-  assert.deepEqual(h.last(), { kind: "failed", message: "Couldn't save your changes." });
+  assert.deepEqual(h.last(), { kind: "failed", message: "Some details couldn't be saved. Check the highlighted fields." });
   assert.equal(h.sent.length, 1);
 });
 
@@ -248,7 +248,8 @@ test("a refused draft create surfaces the server error and rejects", async () =>
 test("a draft create that fails and then succeeds on retry no longer shows failed", async () => {
   // Only a name is typed, so the created event round-trips equal and no PATCH follows.
   const d = draftHarness(A, (call) => (call === 1 ? json(503, { error: "Internal server error" }) : json(201, { ...A, id: "e1" })));
-  await assert.rejects(d.ensureDraft(), /Internal server error/);
+  await assert.rejects(d.ensureDraft(), /Couldn't save your changes\./);
+  assert.deepEqual(d.errors(), ["Couldn't save your changes."], "the raw server string is never shown");
   assert.equal(d.last().kind, "failed");
   assert.equal(await d.ensureDraft(), "e1");
   await d.queue.flush();

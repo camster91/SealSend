@@ -69,7 +69,7 @@ export function StartScreen({ decision: initialDecision, template, organization 
   if (building) {
     return (
       <>
-        {intro}
+        <div className="mx-auto w-full max-w-6xl px-4 lg:px-6 empty:hidden">{intro}</div>
         <EventBuilder
           mode="create"
           initial={emptyBuilderData(building.timezone, building.template?.customization)}
@@ -82,7 +82,7 @@ export function StartScreen({ decision: initialDecision, template, organization 
 
   if (decision.kind === "continue-draft") {
     return (
-      <section aria-labelledby="start-heading">
+      <section aria-labelledby="start-heading" className="mx-auto max-w-3xl">
         <h1 id="start-heading" className="font-display text-3xl text-ink">Continue your draft</h1>
         <p className="mt-2 text-sm text-ink">You have a draft called <strong>{decision.title}</strong>.</p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -96,7 +96,7 @@ export function StartScreen({ decision: initialDecision, template, organization 
 
   if (decision.kind === "at-limit") {
     return (
-      <section aria-labelledby="start-heading">
+      <section aria-labelledby="start-heading" className="mx-auto max-w-3xl">
         <h1 id="start-heading" className="font-display text-3xl text-ink">What are you planning?</h1>
         <p className="mt-4 text-sm text-ink">
           Free accounts can have one active event. Open{" "}
@@ -108,7 +108,7 @@ export function StartScreen({ decision: initialDecision, template, organization 
   }
 
   return (
-    <section aria-labelledby="start-heading">
+    <section aria-labelledby="start-heading" className="mx-auto max-w-3xl">
       {intro}
       <h1 id="start-heading" className="font-display text-3xl text-ink">What are you planning?</h1>
       <div className="mt-6 grid gap-4">

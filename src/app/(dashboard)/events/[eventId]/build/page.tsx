@@ -30,7 +30,7 @@ export default async function BuildEventPage({ params }: { params: Promise<{ eve
 
   return (
     <div className="py-8">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <div className="mx-auto max-w-6xl">
         <EventBuilder
           mode="create"
           eventId={eventId}

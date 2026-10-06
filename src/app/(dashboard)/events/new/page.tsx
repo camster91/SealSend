@@ -36,7 +36,7 @@ export default async function NewEventPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="py-8">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <div className="mx-auto max-w-6xl">
         <StartScreen decision={decision} template={template} organization={organization ?? undefined} />
       </div>
     </div>

@@ -1,18 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageIcon, Link as LinkIcon, Video } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
 import { EVENT_TEMPLATES } from "@/lib/event-templates";
+import { checkLink } from "@/lib/event-builder/field-checks";
+import { applyStyle, uploadFailureMessage } from "@/lib/event-builder/look";
 import type { EventCustomization } from "@/types/database";
 import type { ScreenContext } from "../BuilderShell";
 import { Field } from "./Field";
 import { LookMoreOptions } from "./LookMoreOptions";
 
 const FONTS = ["Inter", "Poppins", "Georgia", "Courier"].map((f) => ({ value: f, label: f }));
-const UPLOAD_FAILED = "That file didn't upload. Try a smaller file (max 10 MB for images, 50 MB for video).";
 const LIMITS = "max 10 MB for images, 50 MB for video";
 const MODES = [
   { mode: "upload", label: "Upload image", Icon: ImageIcon },
@@ -28,7 +29,10 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
   const { data } = ctx;
   const custom = data.customization;
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string>();
+  // A half-typed or non-https image link stays here, with an error, until it is one the server accepts.
+  const [typedLink, setTypedLink] = useState<string>();
+  const linkError = typedLink === undefined ? undefined : checkLink(typedLink);
 
   const mode: Mode = data.design_type === "video" ? "video" : data.design_type === "url" ? "url" : "upload";
   const imageFit = custom.imageFit ?? "contain";
@@ -36,27 +40,48 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
   const showVideo = data.design_type === "video" || isVideoUrl(data.design_url);
   const change = (changes: Partial<EventCustomization>) => ctx.update({ customization: { ...custom, ...changes } });
 
+  // Leaving now would lose the held link, so lock the steps until it is fixed or cleared.
+  const { setBlocking } = ctx;
+  const blocking = linkError !== undefined;
+  useEffect(() => {
+    setBlocking(blocking);
+  }, [blocking, setBlocking]);
+  useEffect(() => () => setBlocking(false), [setBlocking]);
+
+  const typeLink = (value: string) => {
+    if (checkLink(value)) {
+      setTypedLink(value);
+      return;
+    }
+    setTypedLink(undefined);
+    ctx.update({ design_url: value, design_type: "url" });
+  };
+
   const upload = async (file: File) => {
     setBusy(true);
-    setFailed(false);
+    setFailed(undefined);
     try {
       await ctx.ensureDraft();
       const body = new FormData();
       body.append("file", file);
       const res = await fetch(mode === "video" ? "/api/upload?type=video" : "/api/upload", { method: "POST", body });
-      if (!res.ok) throw new Error("upload");
+      if (!res.ok) {
+        setFailed(uploadFailureMessage(res.status));
+        return;
+      }
       const json = (await res.json()) as { url?: string };
       if (!json.url) throw new Error("upload");
       ctx.update({ design_url: json.url, design_type: mode === "video" ? "video" : "upload" });
     } catch {
-      setFailed(true);
+      setFailed(uploadFailureMessage(undefined));
     } finally {
       setBusy(false);
     }
   };
 
   const pickMode = (next: Mode) => {
-    setFailed(false);
+    setFailed(undefined);
+    setTypedLink(undefined);
     ctx.update(data.design_url ? { design_type: next, design_url: "" } : { design_type: next });
   };
 
@@ -74,7 +99,7 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
             <li key={t.id}>
               <button
                 type="button"
-                onClick={() => ctx.update({ customization: { ...custom, ...t.customization } })}
+                onClick={() => ctx.update({ customization: applyStyle(custom, t.customization) })}
                 aria-pressed={custom.primaryColor === t.customization.primaryColor && custom.backgroundColor === t.customization.backgroundColor}
                 className="flex min-h-11 w-full flex-col gap-2 rounded-2xl border border-border bg-white p-3 text-left aria-pressed:border-ink aria-pressed:ring-2 aria-pressed:ring-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
               >
@@ -123,9 +148,9 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
         </div>
 
         {mode === "url" ? (
-          <Field id="design_url" label="Image link">
-            {(aria) => <Input {...aria} type="url" className="h-11" value={data.design_url} placeholder="https://example.com/your-design.png"
-              onChange={(e) => ctx.update({ design_url: e.target.value, design_type: "url" })} />}
+          <Field id="design_url" label="Image link" error={linkError}>
+            {(aria) => <Input {...aria} type="url" className="h-11" value={typedLink ?? data.design_url} placeholder="https://example.com/your-design.png"
+              onChange={(e) => typeLink(e.target.value)} />}
           </Field>
         ) : (
           <Field id="design_file" label={mode === "video" ? "Video file" : "Image file"} hint={`MP4 or WebM for video, JPEG, PNG, GIF or WebP for images. ${LIMITS}`}>
@@ -142,7 +167,7 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
           </Field>
         )}
         {busy && <p className="text-sm text-muted-foreground">Uploading…</p>}
-        <p aria-live="polite" className={cn("text-sm font-medium text-wax", !failed && "sr-only")}>{failed ? UPLOAD_FAILED : ""}</p>
+        <p aria-live="polite" className={cn("text-sm font-medium text-wax", !failed && "sr-only")}>{failed ?? ""}</p>
 
         {data.design_url && (
           <div className="space-y-3">
@@ -153,7 +178,7 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
               <img src={data.design_url} alt="Your artwork" style={{ objectPosition: imagePosition }}
                 className={cn("aspect-[4/3] w-full rounded-2xl border border-border", imageFit === "cover" ? "object-cover" : "object-contain")} />
             )}
-            <button type="button" onClick={() => ctx.update({ design_url: "", design_type: "upload" })}
+            <button type="button" onClick={() => { setTypedLink(undefined); ctx.update({ design_url: "", design_type: "upload" }); }}
               className="min-h-11 rounded-[10px] px-3 text-sm font-medium text-ink underline underline-offset-4">
               Remove artwork
             </button>

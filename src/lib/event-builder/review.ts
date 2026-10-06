@@ -1,5 +1,6 @@
 import type { PublicationBlocker, PublicationCandidate } from "@/lib/publication-readiness";
 import { builderDataToPreviewEvent } from "./mapping";
+import type { SaveStatus } from "./save-machine";
 import type { BuilderData, BuilderRsvpField } from "./schema";
 
 export interface PrimaryAction {
@@ -42,6 +43,45 @@ export function describePublishError(status: number, body: unknown): { blockers:
   }
   if (status === 409) return { blockers: [], message: "This event is archived, so it can't be published. Repeat it to start a new draft." };
   return { blockers: [], message: GENERIC };
+}
+
+export const CHANGES_NOT_SAVED = "Some changes didn't save yet. Fix the highlighted fields, then try again.";
+
+export interface SaveProblem {
+  message: string;
+  /** What went wrong, in plain words, one line each. */
+  details: string[];
+}
+
+/** A save that ended failed or blocked must stop Publish and the save buttons. */
+export function flushProblem(status: SaveStatus): SaveProblem | null {
+  if (status.kind === "failed") return { message: CHANGES_NOT_SAVED, details: [status.message] };
+  if (status.kind === "blocked") return { message: CHANGES_NOT_SAVED, details: [...new Set(Object.values(status.fieldErrors))] };
+  return null;
+}
+
+export interface SaveThenActDeps {
+  ensureDraft(): Promise<string>;
+  /** Sends any waiting event change; resolves to the status it settled on. */
+  flush(): Promise<SaveStatus>;
+  /** Sends any waiting question change; resolves to an error in words, or undefined. */
+  flushQuestions(): Promise<string | undefined>;
+  /** Publish, or leave the builder. Runs only once everything is saved. */
+  act(id: string): Promise<void>;
+}
+
+/**
+ * Saves everything, then acts. If any save did not land, the action does not
+ * run (no publish, no navigation), so nothing on screen is lost or left behind.
+ */
+export async function saveThenAct(deps: SaveThenActDeps): Promise<SaveProblem | null> {
+  const id = await deps.ensureDraft();
+  const problem = flushProblem(await deps.flush());
+  if (problem) return problem;
+  const failure = await deps.flushQuestions();
+  if (failure) return { message: failure, details: [] };
+  await deps.act(id);
+  return null;
 }
 
 export const RSVP_DEBOUNCE_MS = 800;

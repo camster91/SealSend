@@ -37,11 +37,11 @@ export function StepNav({ current, reached, all, locked = false, onSelect }: Ste
                 onClick={() => onSelect(screen)}
                 className={cn(
                   "flex min-h-11 w-full flex-col justify-end gap-1.5 rounded-lg text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2",
-                  isCurrent ? "font-semibold text-ink" : open ? "text-muted-foreground hover:text-ink" : "text-neutral-400",
+                  isCurrent ? "font-semibold text-ink" : open ? "text-muted-foreground hover:text-ink" : "text-ink/40",
                 )}
               >
                 <span className="truncate">{SCREEN_NAMES[screen]}</span>
-                <span className={cn("h-1 rounded-full", isCurrent || i < index ? "bg-ink" : open ? "bg-neutral-300" : "bg-neutral-200")} />
+                <span className={cn("h-1 rounded-full", isCurrent || i < index ? "bg-ink" : open ? "bg-ink/25" : "bg-border")} />
               </button>
             </li>
           );
