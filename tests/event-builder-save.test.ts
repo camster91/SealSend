@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { emptyBuilderData, toPatch } from "../src/lib/event-builder/mapping";
-import { createSaveQueue, createSingleFlight, type SaveStatus } from "../src/lib/event-builder/save-machine";
+import { createDraftCreator, createSaveQueue, createSingleFlight, type SaveStatus } from "../src/lib/event-builder/save-machine";
+import type { BuilderData } from "../src/lib/event-builder/schema";
 
 const base = emptyBuilderData("America/Toronto");
 const A = { ...base, title: "A" };
@@ -181,4 +182,59 @@ test("onStatus returns an unsubscribe function", async () => {
   await h.queue.flush();
   assert.deepEqual(seen, []);
   assert.equal(h.last().kind, "saved");
+});
+
+function draftHarness(initialData: BuilderData, postReply: Promise<Response> | Response) {
+  let data = initialData;
+  const posts: object[] = [];
+  const created: string[] = [];
+  const errors: string[] = [];
+  const h = harness(() => json(200, {}));
+  const ensureDraft = createDraftCreator({
+    post: async (body) => { posts.push(body); return postReply; },
+    getData: () => data,
+    organizationId: undefined,
+    queue: h.queue,
+    onCreated: (id) => created.push(id),
+    onError: (message) => errors.push(message),
+  });
+  return { ...h, ensureDraft, posts, created, errors, setData: (next: BuilderData) => { data = next; } };
+}
+
+test("ensureDraft rejects a blank name without posting or changing status", async () => {
+  const d = draftHarness({ ...base, title: "   " }, json(201, { id: "e1" }));
+  await assert.rejects(d.ensureDraft(), /Add a name first/);
+  assert.deepEqual(d.posts, []);
+  assert.deepEqual(d.statuses, []);
+  assert.deepEqual(d.errors, []);
+  d.setData(A);
+  assert.equal(await d.ensureDraft(), "e1", "a later call with a name still creates the draft");
+});
+
+test("ensureDraft posts the draft body once and omits an undefined organization", async () => {
+  const d = draftHarness(A, json(201, { ...A, id: "e1" }));
+  assert.deepEqual(await Promise.all([d.ensureDraft(), d.ensureDraft()]), ["e1", "e1"]);
+  assert.deepEqual(d.posts, [{ title: "A", status: "draft", event_timezone: "America/Toronto", customization: A.customization }]);
+  assert.deepEqual(d.created, ["e1"]);
+});
+
+test("edits made while createDraft is in flight are sent as a PATCH after it resolves", async () => {
+  const reply = deferred<Response>();
+  const d = draftHarness(A, reply.promise);
+  const pending = d.ensureDraft();
+  const typed = { ...A, title: "A party", description: "Bring snacks" };
+  d.setData(typed);
+  reply.resolve(json(201, { ...A, id: "e1" }));
+  assert.equal(await pending, "e1");
+  await d.queue.flush();
+  assert.deepEqual(d.sent, [{ title: "A party", description: "Bring snacks" }]);
+  assert.deepEqual(d.last(), { kind: "saved", at: 1234 });
+});
+
+test("a refused draft create surfaces the server error and rejects", async () => {
+  const d = draftHarness(A, json(403, { error: "This plan supports one active event." }));
+  await assert.rejects(d.ensureDraft(), /one active event/);
+  assert.deepEqual(d.errors, ["This plan supports one active event."]);
+  assert.deepEqual(d.created, []);
+  assert.deepEqual(d.sent, []);
 });

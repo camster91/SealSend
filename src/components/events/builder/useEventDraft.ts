@@ -1,17 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { fromEvent } from "@/lib/event-builder/mapping";
 import {
+  createDraftCreator,
   createSaveQueue,
-  createSingleFlight,
-  DEFAULT_SAVE_ERROR,
   type SaveQueue,
   type SaveStatus,
 } from "@/lib/event-builder/save-machine";
 import type { BuilderData } from "@/lib/event-builder/schema";
-import type { Event, EventCustomization } from "@/types/database";
+import type { EventCustomization } from "@/types/database";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const UNSAVED_KINDS: ReadonlySet<SaveStatus["kind"]> = new Set(["saving", "retrying", "failed"]);
@@ -40,7 +37,6 @@ function sleep(ms: number) {
 }
 
 export function useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization }: UseEventDraftOptions): EventDraft {
-  const router = useRouter();
   const [data, setData] = useState<BuilderData>(() => (
     !initialEventId && templateCustomization
       ? { ...initial, customization: { ...initial.customization, ...templateCustomization } }
@@ -92,48 +88,28 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
     timerRef.current = setTimeout(enqueueNow, AUTOSAVE_DEBOUNCE_MS);
   }, [enqueueNow]);
 
-  const postDraft = useCallback(async (): Promise<string> => {
-    if (eventIdRef.current) return eventIdRef.current;
-    const current = dataRef.current;
-    let response: Response;
-    try {
-      response = await fetch("/api/events", {
+  const ensureDraft = useCallback((): Promise<string> => {
+    if (eventIdRef.current) return Promise.resolve(eventIdRef.current);
+    createDraftRef.current ??= createDraftCreator({
+      post: (body) => fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: current.title,
-          status: "draft",
-          event_timezone: current.event_timezone,
-          ...(organizationId === undefined ? {} : { organization_id: organizationId }),
-          customization: current.customization,
-        }),
-      });
-    } catch (error) {
-      setStatus({ kind: "failed", message: DEFAULT_SAVE_ERROR });
-      throw error;
-    }
-    const body: unknown = await response.json().catch(() => null);
-    if (!response.ok || !body || typeof (body as { id?: unknown }).id !== "string") {
-      const serverError = (body as { error?: unknown } | null)?.error;
-      const message = typeof serverError === "string" && serverError ? serverError : DEFAULT_SAVE_ERROR;
-      setStatus({ kind: "failed", message });
-      throw new Error(message);
-    }
-    const created = body as Event;
-    eventIdRef.current = created.id;
-    setEventId(created.id);
-    // Diff against what the server now holds, so anything typed before the
-    // draft existed (or while the POST was in flight) is saved next.
-    getQueue().enqueue(fromEvent(created, []), dataRef.current);
-    lastEnqueuedRef.current = dataRef.current;
-    router.replace(`/events/${created.id}/build`);
-    return created.id;
-  }, [getQueue, organizationId, router]);
-
-  const ensureDraft = useCallback(() => {
-    createDraftRef.current ??= createSingleFlight(postDraft);
+        body: JSON.stringify(body),
+      }),
+      getData: () => dataRef.current,
+      organizationId,
+      queue: getQueue(),
+      onCreated: (id) => {
+        eventIdRef.current = id;
+        lastEnqueuedRef.current = dataRef.current;
+        setEventId(id);
+        // Update the URL without a navigation so the builder keeps its state (no remount).
+        window.history.replaceState(null, "", `/events/${id}/build`);
+      },
+      onError: (message) => setStatus({ kind: "failed", message }),
+    });
     return createDraftRef.current();
-  }, [postDraft]);
+  }, [getQueue, organizationId]);
 
   const retry = useCallback(() => {
     if (!eventIdRef.current) {

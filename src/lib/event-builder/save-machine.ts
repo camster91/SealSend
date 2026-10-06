@@ -1,4 +1,5 @@
-import { toPatch } from "./mapping";
+import type { Event } from "@/types/database";
+import { fromEvent, toPatch } from "./mapping";
 import type { BuilderData } from "./schema";
 
 export type SaveStatus =
@@ -22,6 +23,7 @@ export interface SaveQueue {
 }
 
 export const DEFAULT_SAVE_ERROR = "Couldn't save your changes.";
+export const BLANK_NAME_ERROR = "Add a name first";
 export const UNSAVEABLE_DATE_ERROR = "That date and time can't be saved. Check the times you entered.";
 const RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
 
@@ -178,4 +180,51 @@ export function createSingleFlight<T>(fn: () => Promise<T>): () => Promise<T> {
     }
     return inFlight;
   };
+}
+
+export interface DraftCreatorDeps {
+  /** POST /api/events with the given body. */
+  post: (body: object) => Promise<Response>;
+  /** The builder's current data, read at call time. */
+  getData: () => BuilderData;
+  organizationId?: string;
+  queue: Pick<SaveQueue, "enqueue">;
+  /** Called with the new id before any PATCH is queued (the PATCH URL needs it). */
+  onCreated: (id: string) => void;
+  onError: (message: string) => void;
+}
+
+/**
+ * Single-flight draft creation. A blank name rejects without posting. After the
+ * POST, the queue diffs the created event against the current data, so edits made
+ * before or during the POST (fields the POST didn't carry) are PATCHed next.
+ */
+export function createDraftCreator(deps: DraftCreatorDeps): () => Promise<string> {
+  const create = createSingleFlight(async (): Promise<string> => {
+    const posted = deps.getData();
+    let response: Response;
+    try {
+      response = await deps.post({
+        title: posted.title,
+        status: "draft",
+        event_timezone: posted.event_timezone,
+        ...(deps.organizationId === undefined ? {} : { organization_id: deps.organizationId }),
+        customization: posted.customization,
+      });
+    } catch (error) {
+      deps.onError(DEFAULT_SAVE_ERROR);
+      throw error;
+    }
+    const body = await readBody(response);
+    const id = (body as { id?: unknown } | null)?.id;
+    if (!response.ok || typeof id !== "string") {
+      const message = errorMessage(body);
+      deps.onError(message);
+      throw new Error(message);
+    }
+    deps.onCreated(id);
+    deps.queue.enqueue(fromEvent(body as unknown as Event, []), deps.getData());
+    return id;
+  });
+  return () => (deps.getData().title.trim() === "" ? Promise.reject(new Error(BLANK_NAME_ERROR)) : create());
 }
