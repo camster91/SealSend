@@ -65,3 +65,29 @@ test('Look screen files use no banned tokens or phrases', async () => {
     }
   }
 });
+
+test('GuestsScreen has the copy, bulk route and skip button', async () => {
+  const src = await read(`${dir}screens/GuestsScreen.tsx`);
+  for (const needle of [
+    "Who's coming?",
+    'font-display',
+    'Add guests later',
+    'parseGuestCsv',
+    '/guests/bulk',
+    'ensureDraft',
+    'goTo("review")',
+    'Paste a list (one guest per line, or name, email)',
+    'aria-live="polite"',
+    'Manage guests later on the event page',
+  ]) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+});
+
+test('Guests screen files use no banned tokens or phrases', async () => {
+  const src = await read(`${dir}screens/GuestsScreen.tsx`).catch(() => '');
+  assert.ok(src.length > 0, 'GuestsScreen missing');
+  for (const word of [...BANNED, 'publish blocker', 'operations brief', 'explicit decisions', 'communication plan']) {
+    assert.ok(!src.includes(word), `GuestsScreen contains ${word}`);
+  }
+});
