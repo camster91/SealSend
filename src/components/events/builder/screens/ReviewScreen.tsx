@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Toggle } from "@/components/ui/Toggle";
 import { defaultInvitationCopy } from "@/lib/invitation-defaults";
 import { getPublicationReadiness, type PublicationBlocker } from "@/lib/publication-readiness";
 import { builderDataToPreviewEvent } from "@/lib/event-builder/mapping";
-import { buildReadinessCandidate, describePublishError, primaryAction, rsvpFieldsChanged } from "@/lib/event-builder/review";
+import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED } from "@/lib/event-builder/review";
 import type { BuilderRsvpField } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
 import { PublishedCelebration } from "../PublishedCelebration";
@@ -20,7 +20,34 @@ const SAVE_FAILED = "Something went wrong, so your changes were not saved. Pleas
 export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
   const router = useRouter();
   const { data } = ctx;
-  const savedFields = useRef<BuilderRsvpField[]>(data.rsvp_fields);
+  const ctxRef = useRef(ctx);
+  useEffect(() => {
+    ctxRef.current = ctx;
+  });
+  const [rsvpError, setRsvpError] = useState<string>();
+  const [saver] = useState(() =>
+    createRsvpSaver({
+      sleep: (ms) => new Promise<void>((r) => setTimeout(r, ms)),
+      onError: setRsvpError,
+      send: async (fields) => {
+        const prepared = prepareRsvpFields(fields);
+        if (prepared.problem) return prepared.problem;
+        try {
+          const id = await ctxRef.current.ensureDraft();
+          const res = await fetch(`/api/events/${id}/rsvp-fields`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(prepared.fields),
+          });
+          return res.ok ? undefined : RSVP_SAVE_FAILED;
+        } catch {
+          return RSVP_SAVE_FAILED;
+        }
+      },
+    }),
+  );
+  // Leaving the screen sends any edit still waiting.
+  useEffect(() => () => void saver.flush(), [saver]);
   const [busy, setBusy] = useState<"publish" | "draft" | "save" | undefined>();
   const [serverBlockers, setServerBlockers] = useState<PublicationBlocker[]>([]);
   const [error, setError] = useState<string>();
@@ -32,23 +59,17 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
   const placeholders = defaultInvitationCopy(builderDataToPreviewEvent(data));
 
   const setField = (index: number, patch: Partial<BuilderRsvpField>) => {
-    ctx.update({ rsvp_fields: data.rsvp_fields.map((f, i) => (i === index ? { ...f, ...patch } : f)) });
+    const next = data.rsvp_fields.map((f, i) => (i === index ? { ...f, ...patch } : f));
+    ctx.update({ rsvp_fields: next });
+    saver.schedule(next);
   };
 
   /** Saves the draft, then the question list when it changed. Returns the event id. */
   const saveEverything = async (): Promise<string> => {
     await ctx.flush();
+    const failure = await saver.flush();
+    if (failure) throw new Error(failure);
     const id = await ctx.ensureDraft();
-    if (rsvpFieldsChanged(savedFields.current, data.rsvp_fields)) {
-      if (data.rsvp_fields.some((f) => !f.field_label.trim())) throw new Error("Give every question some words, or switch it off.");
-      const res = await fetch(`/api/events/${id}/rsvp-fields`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data.rsvp_fields),
-      });
-      if (!res.ok) throw new Error(SAVE_FAILED);
-      savedFields.current = data.rsvp_fields;
-    }
     return id;
   };
 
@@ -162,6 +183,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
         )}
       </section>
 
+      {rsvpError && <p role="alert" className="text-sm font-medium text-wax">{rsvpError}</p>}
       {error && <p role="alert" className="text-sm font-medium text-wax">{error}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
