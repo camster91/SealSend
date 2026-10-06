@@ -5,7 +5,7 @@ const eventPassGuests = PUBLIC_PRICING_PLANS.find((plan) => plan.id === "event_p
 // Plain product facts, not social proof.
 const facts = [
   `Up to ${eventPassGuests} guests per Event Pass`,
-  "Email and SMS updates",
+  "Email updates",
   "QR check-in from any phone",
   "Guests never need an account",
 ];

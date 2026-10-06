@@ -91,7 +91,7 @@ export function AutoRemindersToggle({
             )}
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            Automatically send reminder emails and SMS to guests 24-48 hours before the event.
+            Automatically send reminder emails to guests 24-48 hours before the event.
           </p>
 
           {showWarning && (

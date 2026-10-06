@@ -8,7 +8,7 @@ import { PRIMARY_CTA_NOTE, PrimaryCta } from "@/components/marketing/Cta";
 export const metadata = createMetadata({
   title: "How SealSend Works: Invitations, RSVPs and Check-in",
   description:
-    "Describe your event, send the invitation by email, text or link, then watch replies arrive and check guests in at the door with a QR scan.",
+    "Describe your event, send the invitation by email or link, then watch replies arrive and check guests in at the door with a QR scan.",
   path: "/how-it-works",
   keywords: [
     "online invitations with RSVP",

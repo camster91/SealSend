@@ -19,7 +19,7 @@ const STEPS = [
     id: "invite",
     icon: MailCheck,
     title: "Invite your guests",
-    description: "Add guests one by one or paste a list. Send invitations by email, or by text on an Event Pass.",
+    description: "Add guests one by one or paste a list. Send invitations by email.",
   },
   {
     id: "track",

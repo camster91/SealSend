@@ -18,9 +18,9 @@ const features = [
   },
   {
     title: "Change of plans? Tell everyone at once.",
-    text: "Send an update by email or text to everyone, or only to guests who said yes.",
+    text: "Send an update by email to everyone, or only to guests who said yes.",
     image: "/brand/photos/guest-updates.webp",
-    alt: "A guest outside a community hall holding a phone with a text from the hosts: doors open at 6:30, parking is behind the hall",
+    alt: "A guest outside a community hall holding a phone with an update from the hosts: doors open at 6:30, parking is behind the hall",
     icon: "/brand/icons/message.svg",
   },
   {

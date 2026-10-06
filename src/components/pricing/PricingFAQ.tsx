@@ -15,7 +15,7 @@ const betaFaqs = [
   {
     question: "Are guest communications sent automatically?",
     answer:
-      "No. The host reviews and deliberately starts external email or SMS communications. Provider delivery is verified with each approved beta host before live use.",
+      "No. The host reviews and deliberately starts every email to guests. Provider delivery is verified with each approved beta host before live use.",
   },
   {
     question: "Do guests need an account or app?",

@@ -28,8 +28,8 @@ const homeFaqs: Faq[] = [
     answer: "Yes. Upload a CSV with names, emails and phone numbers, or add guests one at a time.",
   },
   {
-    question: "How do text messages work?",
-    answer: "Every Event Pass includes 500 SMS segments, and you can buy top-ups. Email is always included.",
+    question: "Can I send text messages?",
+    answer: "Not yet. Invitations, reminders and updates go out by email, and you can share your event link anywhere.",
   },
   {
     question: "Can I export or delete my data?",

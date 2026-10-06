@@ -6,7 +6,7 @@ export const HOW_IT_WORKS_STEPS = [
   },
   {
     title: "Send it your way.",
-    text: "By email, by text, or as a link you share anywhere.",
+    text: "By email, or as a link you share anywhere.",
   },
   {
     title: "Watch replies arrive, then check guests in.",
