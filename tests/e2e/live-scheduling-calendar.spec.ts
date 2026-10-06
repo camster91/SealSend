@@ -36,7 +36,7 @@ test('future announcements remain queued, can be cancelled, and calendars are us
     subject: 'Future QA announcement',
     message: 'This is a queued-only production QA announcement and must not dispatch.',
     audience: { rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false },
-    channels: ['email'], scheduledAt, approved: true,
+    channels: ['email'], scheduledAt, approved: true, contactConfirmed: true,
   }});
   expect(create.status()).toBe(201);
   const created = await create.json();

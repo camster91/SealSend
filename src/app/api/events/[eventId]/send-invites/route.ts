@@ -19,6 +19,7 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
@@ -38,12 +39,17 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const auth = await requireEventPermission(eventId, 'send_messages');
     if (auth.error) return auth.error;
     const user = auth.user;
+
+    // CASL: the host must say these guests expect to hear from them.
+    if (contactConfirmationError(await request.json().catch(() => null))) {
+      return NextResponse.json({ error: CONTACT_CONFIRMATION_MESSAGE }, { status: 400 });
+    }
 
     const { success: rateLimitOk } = await rateLimit(`send-invites:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
@@ -125,6 +131,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         { status: 429 }
       );
     }
+
+    await recordGuestContactConfirmation(eventId, user.id, "invites", sendableGuests.length);
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
     const BATCH_SIZE = 10;

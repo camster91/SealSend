@@ -17,6 +17,8 @@ import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
+import { isReminderTarget } from "@/lib/reminder-targets";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier" | "host_name">;
@@ -24,12 +26,17 @@ type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_sta
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const auth = await requireEventPermission(eventId, 'send_messages');
     if (auth.error) return auth.error;
     const user = auth.user;
+
+    // CASL: the host must say these guests expect to hear from them.
+    if (contactConfirmationError(await request.json().catch(() => null))) {
+      return NextResponse.json({ error: CONTACT_CONFIRMATION_MESSAGE }, { status: 400 });
+    }
 
     const { success: rateLimitOk } = await rateLimit(`send-reminders:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
@@ -54,12 +61,15 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     }
 
     // Fetch guests that have been invited but not reminded
-    const guests = await query<ReminderGuest>(
-      `SELECT id, name, email, phone, invite_status, invite_token, reminder_sent_at, phone_invalid_at
-       FROM guests
-       WHERE event_id = $1 AND invite_status = $2 AND reminder_sent_at IS NULL`,
+    // Only invited guests with no reply yet: declined and replied guests are skipped.
+    const candidates = await query<ReminderGuest & { rsvp_status: string | null }>(
+      `SELECT g.id, g.name, g.email, g.phone, g.invite_status, g.invite_token, g.reminder_sent_at, g.phone_invalid_at,
+              (SELECT r.status FROM rsvp_responses r WHERE r.guest_id = g.id ORDER BY r.updated_at DESC NULLS LAST LIMIT 1) AS rsvp_status
+       FROM guests g
+       WHERE g.event_id = $1 AND g.invite_status = $2 AND g.reminder_sent_at IS NULL`,
       [eventId, 'sent']
     );
+    const guests = candidates.filter((guest) => isReminderTarget(guest, guest.rsvp_status));
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
     // Declared before the guest filter below reads it (it previously threw a
@@ -107,6 +117,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
         { status: 429 }
       );
     }
+
+    await recordGuestContactConfirmation(eventId, user.id, "reminders", sendableGuests.length);
 
     const BATCH_SIZE = 10;
     let sent = 0;

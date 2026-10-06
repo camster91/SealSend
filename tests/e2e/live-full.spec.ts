@@ -292,6 +292,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
       channels: ['email'],
       scheduledAt: announcementScheduledAt,
       approved: true,
+      contactConfirmed: true,
       approvalProof: audienceData.approvalProof,
     }});
     expect(scheduledAnnouncement.status()).toBe(201);

@@ -14,6 +14,7 @@ import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { REMINDER_TARGET_SQL } from "@/lib/reminder-targets";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 /**
@@ -130,17 +131,17 @@ export async function GET(request: NextRequest) {
     for (const event of events) {
       console.log(`[CRON] Processing event ${event.id}`);
 
-      // Fetch guests who:
-      // 1. Haven't received a reminder yet (reminder_sent_at is null)
-      // 2. Have either email or phone
-      // Join with rsvp_responses to check status
+      // Fetch guests who were actually invited (invite_status = 'sent'), have
+      // not been reminded yet, have not declined, and have an email or phone.
+      // Never-invited guests must not get a reminder for an invitation they
+      // never received.
       const rawGuests = await query<GuestWithResponse>(
         `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token, g.reminder_sent_at,
                 r.status as rsvp_status
          FROM guests g
          LEFT JOIN rsvp_responses r ON r.guest_id = g.id
          WHERE g.event_id = $1
-           AND g.reminder_sent_at IS NULL
+           AND ${REMINDER_TARGET_SQL}
            AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
         [event.id]
       );

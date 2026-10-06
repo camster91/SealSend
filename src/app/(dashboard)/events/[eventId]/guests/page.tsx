@@ -12,6 +12,8 @@ import type { Guest } from "@/types/database";
 import { useConfirm } from "@/components/ui/Feedback";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
+const CONTACT_CONFIRMATION_LABEL = "These guests know me and expect to hear from me.";
+
 export default function GuestsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
@@ -69,6 +71,7 @@ export default function GuestsPage() {
       title: `Send invitations to ${pendingCount} guest${pendingCount !== 1 ? "s" : ""}?`,
       description: "Each guest who hasn't been invited yet gets their invitation now.",
       confirmLabel: "Send invitations",
+      checkboxLabel: CONTACT_CONFIRMATION_LABEL,
       tone: "default",
     }))) {
       return;
@@ -78,6 +81,8 @@ export default function GuestsPage() {
     try {
       const res = await fetch(`/api/events/${eventId}/send-invites`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactConfirmed: true }),
       });
       const data = await res.json();
 
@@ -114,6 +119,7 @@ export default function GuestsPage() {
       title: `Send reminders to ${reminderCount} guest${reminderCount !== 1 ? "s" : ""}?`,
       description: "Guests who haven't replied yet get a reminder now.",
       confirmLabel: "Send reminders",
+      checkboxLabel: CONTACT_CONFIRMATION_LABEL,
       tone: "default",
     }))) {
       return;
@@ -123,6 +129,8 @@ export default function GuestsPage() {
     try {
       const res = await fetch(`/api/events/${eventId}/send-reminders`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactConfirmed: true }),
       });
       const data = await res.json();
 
