@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import type { SaveStatus } from "@/lib/event-builder/save-machine";
 import { BUILDER_SCREENS, type BuilderData, type BuilderScreen } from "@/lib/event-builder/schema";
 import type { EventCustomization } from "@/types/database";
 import { InvitePreview } from "./InvitePreview";
@@ -23,7 +24,8 @@ export interface ScreenContext {
   published: boolean;
   /** Called by the Review screen after a successful publish. */
   markPublished(): void;
-  flush(): Promise<void>;
+  /** Sends any waiting change and resolves to the save status it settled on. */
+  flush(): Promise<SaveStatus>;
   retry(): void;
   /** Set when Next was pressed on Basics without a name; Basics shows it under the Name field. */
   nameError?: string;
@@ -44,6 +46,20 @@ export interface BuilderShellProps {
 /** Renders one screen in its own component so the screen function runs as a child render. */
 function ScreenSlot({ render, ctx }: { render: (ctx: ScreenContext) => ReactNode; ctx: ScreenContext }) {
   return <>{render(ctx)}</>;
+}
+
+/**
+ * Scrolls the page back to the top. The dashboard scrolls inside its own
+ * <main> (overflow-y-auto), so window.scrollTo alone does nothing there.
+ */
+function scrollToTop(from: HTMLElement | null) {
+  let node = from?.parentElement ?? null;
+  while (node) {
+    const { overflowY } = window.getComputedStyle(node);
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) node.scrollTop = 0;
+    node = node.parentElement;
+  }
+  window.scrollTo?.({ top: 0 });
 }
 
 const SLIDE_SECONDS = 0.25;
@@ -68,6 +84,7 @@ export function BuilderShell({
   const [nameError, setNameError] = useState<string | undefined>();
   const [blocking, setBlocking] = useState(false);
   const moved = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const index = BUILDER_SCREENS.indexOf(screen);
   const next = BUILDER_SCREENS[index + 1] as BuilderScreen | undefined;
@@ -79,7 +96,7 @@ export function BuilderShell({
     setDirection(to >= index ? 1 : -1);
     setScreen(target);
     setReached((r) => Math.max(r, to));
-    window.scrollTo?.({ top: 0 });
+    scrollToTop(rootRef.current);
   }, [index]);
 
   // Runs when a screen mounts. After the host has moved, focus its h1 so screen readers announce it.
@@ -128,7 +145,7 @@ export function BuilderShell({
   const duration = reduceMotion ? 0 : SLIDE_SECONDS;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-4 pt-6 lg:px-6">
+    <div ref={rootRef} className="mx-auto w-full max-w-6xl px-4 pb-4 pt-6 lg:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p aria-live="polite" className="mb-2 text-sm font-medium text-muted-foreground">{`Step ${index + 1} of ${BUILDER_SCREENS.length}`}</p>

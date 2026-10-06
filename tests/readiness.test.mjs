@@ -379,11 +379,11 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
   const createRoute = await read('src/app/api/events/route.ts');
   const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
   const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
-  const preview = await read('src/components/events/wizard/StepPreview.tsx');
+  const review = await read('src/components/events/builder/screens/ReviewScreen.tsx');
   const eventPage = await read('src/app/(dashboard)/events/[eventId]/page.tsx');
   const publishControl = await read('src/components/dashboard/PublishEventButton.tsx');
 
-  for (const source of [createRoute, updateRoute, publishRoute, preview]) {
+  for (const source of [createRoute, updateRoute, publishRoute, review]) {
     assert.match(source, /getPublicationReadiness/);
   }
   assert.match(createRoute, /status\s*===\s*['"]published['"]/);
@@ -392,7 +392,7 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
   assert.match(updateRoute, /existing\.status\s*===\s*['"]archived['"][\s\S]*targetStatus\s*!==\s*['"]archived['"]/);
   assert.match(publishRoute, /readiness\.ready/);
   assert.match(publishRoute, /event\.status\s*===\s*['"]archived['"]/);
-  assert.match(preview, /Complete before publishing/);
+  assert.match(review, /Must-haves/);
   assert.doesNotMatch(eventPage, /UPDATE events SET status/);
   assert.match(eventPage, /PublishEventButton/);
   assert.match(publishControl, /\/api\/events\/\$\{eventId\}\/publish/);
@@ -402,21 +402,16 @@ test('every publication boundary enforces the shared guest-ready contract', asyn
 });
 
 test('manual event creation exposes every required publication decision', async () => {
-  const details = await read('src/components/events/wizard/StepEventDetails.tsx');
-  const wizard = await read('src/components/events/wizard/WizardContainer.tsx');
+  const review = await read('src/components/events/builder/screens/ReviewScreen.tsx');
+  const mapping = await read('src/lib/event-builder/mapping.ts');
 
-  assert.match(details, /id=["']invitation_headline["']/);
-  assert.match(details, /register\(['"]invitation_headline['"]/);
-  assert.match(details, /id=["']invitation_body["']/);
-  assert.match(details, /register\(['"]invitation_body['"]/);
-  assert.match(wizard, /invitation_headline:\s*formData\.invitation_headline/);
-  assert.match(wizard, /invitation_body:\s*formData\.invitation_body/);
-  assert.match(details, /register\(['"]audience['"]/);
-  assert.match(details, /register\(['"]accessibility_status['"]/);
-  assert.match(details, /register\(['"]communication_preference['"]/);
-  assert.match(wizard, /event_brief:\s*formData\.event_brief/);
-  assert.equal((details.match(/id=["']title-counter["']/g) ?? []).length, 1);
-  assert.equal((details.match(/id=["']description-counter["']/g) ?? []).length, 1);
+  assert.match(review, /id=["']review-headline["']/);
+  assert.match(review, /invitation_headline/);
+  assert.match(review, /id=["']review-body["']/);
+  assert.match(review, /invitation_body/);
+  assert.match(mapping, /invitation_headline:\s*data\.invitation_headline/);
+  assert.match(mapping, /invitation_body:\s*data\.invitation_body/);
+  assert.match(mapping, /event_brief:\s*data\.event_brief/);
 });
 
 test('structured event brief survives generation, storage, editing, and publication checks', async () => {
@@ -426,9 +421,7 @@ test('structured event brief survives generation, storage, editing, and publicat
   const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
   const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
   const aiRoute = await read('src/app/api/ai/event-draft/route.ts');
-  const generator = await read('src/components/events/wizard/PromptToEventGenerator.tsx');
-  const details = await read('src/components/events/wizard/StepEventDetails.tsx');
-  const preview = await read('src/components/events/wizard/StepPreview.tsx');
+  const mapping = await read('src/lib/event-builder/mapping.ts');
 
   assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_brief JSONB/);
   assert.match(validation, /event_brief:\s*eventBriefContextSchema/);
@@ -436,9 +429,8 @@ test('structured event brief survives generation, storage, editing, and publicat
   assert.match(updateRoute, /event_brief/);
   assert.match(publishRoute, /event_brief/);
   assert.match(aiRoute, /brief:\s*eventBriefSchema/);
-  assert.match(generator, /brief:\s*EventBrief/);
-  assert.match(details, /values:\s*data/);
-  assert.match(preview, /event_brief:\s*formData\.event_brief/);
+  assert.match(mapping, /event_brief:\s*event\.event_brief/);
+  assert.match(mapping, /event_brief:\s*data\.event_brief/);
 });
 
 test('database rate limiting serializes attempts for the same key', async () => {
@@ -483,13 +475,13 @@ test('public capacity writes are serialized and RSVP plus-ones are atomic', asyn
 test('event instants preserve the host timezone across browser, database, and invitations', async () => {
   const schema = await read('src/lib/db/schema.sql');
   const migration = await read('apply-security-indexes.sql');
-  const wizard = await read('src/components/events/wizard/WizardContainer.tsx');
+  const mapping = await read('src/lib/event-builder/mapping.ts');
   const invitation = await read('src/lib/email-templates.ts');
 
   assert.match(tableDefinition(schema, 'events'), /event_timezone TEXT NOT NULL DEFAULT 'UTC'/);
   assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_timezone/);
-  assert.match(wizard, /zonedLocalDateTimeToInstant\(formData\.event_date, formData\.event_timezone\)/);
-  assert.doesNotMatch(wizard, /new Date\(formData\.event_date\)\.toISOString\(\)/);
+  assert.match(mapping, /zonedLocalDateTimeToInstant\(/);
+  assert.doesNotMatch(mapping, /new Date\((?:data|value|next|local|formData)[^)]*\)\.toISOString\(\)/);
   assert.match(invitation, /formatDateTime\(eventDate, eventTimezone\)/);
 });
 
@@ -1402,7 +1394,7 @@ test('RSVP intelligence is aggregate, traceable, and permission gated', async ()
 
 test('invitation studio has a launch-sized accessible catalog and non-destructive crop controls', async () => {
   const templates = await read('src/lib/event-templates.ts');
-  const uploader = await read('src/components/events/wizard/StepDesignUpload.tsx');
+  const uploader = await read('src/components/events/builder/screens/LookScreen.tsx');
   const page = await read('src/app/(dashboard)/events/new/page.tsx');
   const count = [...templates.matchAll(/\{ id: "/g)].length;
   assert.ok(count >= 12 && count <= 20, `expected 12-20 templates, found ${count}`);

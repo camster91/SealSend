@@ -46,7 +46,8 @@ test('LookScreen has the copy, upload route and template wiring', async () => {
     'Artwork crop and focus',
     'keeps the uploaded original',
     'max 10 MB for images, 50 MB for video',
-    "That file didn't upload. Try a smaller file (max 10 MB for images, 50 MB for video).",
+    'uploadFailureMessage',
+    'applyStyle(',
     '/api/upload',
     'EVENT_TEMPLATES',
     'ensureDraft',
@@ -54,6 +55,9 @@ test('LookScreen has the copy, upload route and template wiring', async () => {
   ]) {
     assert.ok(src.includes(needle), `missing ${needle}`);
   }
+  const look = await read('src/lib/event-builder/look.ts');
+  assert.ok(look.includes("That file didn't upload. Try a smaller file (max 10 MB for images, 50 MB for video)."));
+  assert.ok(look.includes('Your upload space is full.'));
 });
 
 test('Look screen files use no banned tokens or phrases', async () => {

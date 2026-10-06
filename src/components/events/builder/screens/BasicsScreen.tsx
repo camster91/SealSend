@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { resolveHeld, validateBasics } from "@/lib/event-builder/basics-validation";
+import { basicsErrors, resolveHeld } from "@/lib/event-builder/basics-validation";
+import { TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderData } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
 import { BasicsMoreOptions } from "./BasicsMoreOptions";
@@ -24,17 +25,19 @@ function timezoneOptions(current: string) {
 
 export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
   const { data, published, mode } = ctx;
-  // A published event must stay valid, so a value that fails the checks is kept here and not sent.
+  // A value the server would refuse (or a published event must not have) is kept here and not sent.
   const [held, setHeld] = useState<Partial<BuilderData>>({});
   const view: BuilderData = { ...data, ...held };
-  const errors = validateBasics(view, { published });
+  // Once the draft exists, a cleared name is held here: the server refuses a blank one.
+  const holdBlankName = Boolean(ctx.eventId);
+  const errors = basicsErrors(view, held, { published, holdBlankName });
   const zones = useMemo(() => timezoneOptions(data.event_timezone), [data.event_timezone]);
 
   const errorFor = (field: keyof BuilderData): string | undefined =>
     errors[field] ?? ctx.fieldErrors[field] ?? (field === "title" && !view.title.trim() ? ctx.nameError : undefined);
 
   const set = (patch: Partial<BuilderData>) => {
-    const result = resolveHeld(data, held, patch, published);
+    const result = resolveHeld(data, held, patch, published, { holdBlankName });
     setHeld(result.held);
     if (Object.keys(result.send).length > 0) ctx.update(result.send);
   };
@@ -66,7 +69,7 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
           aside={<span aria-live="polite" className="text-xs text-muted-foreground">{`${view.title.length}/200`}</span>}
         >
           {(aria) => (
-            <Input {...aria} className={CONTROL} maxLength={200} value={view.title} placeholder="For example, Sarah and Tom's wedding"
+            <Input {...aria} className={CONTROL} maxLength={TEXT_LIMITS.title} value={view.title} placeholder="For example, Sarah and Tom's wedding"
               onChange={(e) => set({ title: e.target.value })} onBlur={ensureNamed} />
           )}
         </Field>
@@ -100,13 +103,13 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="location_name" label="Place name" error={errorFor("location_name")}>
               {(aria) => (
-                <Input {...aria} className={CONTROL} value={view.location_name} placeholder="For example, The Grand Hall"
+                <Input {...aria} className={CONTROL} maxLength={TEXT_LIMITS.location_name} value={view.location_name} placeholder="For example, The Grand Hall"
                   onChange={(e) => set({ location_name: e.target.value })} />
               )}
             </Field>
             <Field id="location_address" label="Address" error={errorFor("location_address")}>
               {(aria) => (
-                <Input {...aria} className={CONTROL} value={view.location_address} placeholder="123 Main St, Toronto"
+                <Input {...aria} className={CONTROL} maxLength={TEXT_LIMITS.location_address} value={view.location_address} placeholder="123 Main St, Toronto"
                   onChange={(e) => set({ location_address: e.target.value })} />
               )}
             </Field>

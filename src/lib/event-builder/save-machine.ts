@@ -1,6 +1,6 @@
 import type { Event } from "@/types/database";
 import { fromEvent, toPatch } from "./mapping";
-import type { BuilderData } from "./schema";
+import type { BuilderData, BuilderRsvpField } from "./schema";
 
 export type SaveStatus =
   | { kind: "idle" }
@@ -18,18 +18,20 @@ export interface SaveQueueDeps {
 
 export interface SaveQueue {
   enqueue(prev: BuilderData, next: BuilderData): void;
-  flush(): Promise<void>;
+  /** Waits for every save to settle and resolves to the status it ended on. */
+  flush(): Promise<SaveStatus>;
   onStatus(cb: (s: SaveStatus) => void): () => void;
 }
 
 export const DEFAULT_SAVE_ERROR = "Couldn't save your changes.";
+export const UNSAVED_DETAILS_ERROR = "Some details couldn't be saved. Check the highlighted fields.";
 export const BLANK_NAME_ERROR = "Add a name first";
 export const UNSAVEABLE_DATE_ERROR = "That date and time can't be saved. Check the times you entered.";
 const RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
 
 type Outcome = { kind: "saved" } | { kind: "retry"; message: string } | { kind: "stopped" };
 
-async function readBody(response: Response): Promise<{ error?: unknown; blockers?: unknown } | null> {
+async function readBody(response: Response): Promise<{ error?: unknown; blockers?: unknown; details?: unknown } | null> {
   try {
     const body: unknown = await response.json();
     return body && typeof body === "object" ? body : null;
@@ -38,8 +40,50 @@ async function readBody(response: Response): Promise<{ error?: unknown; blockers
   }
 }
 
-function errorMessage(body: { error?: unknown } | null): string {
-  return typeof body?.error === "string" && body.error ? body.error : DEFAULT_SAVE_ERROR;
+/** Server strings that mean nothing to a host; they are never shown. */
+const RAW_SERVER_ERRORS = new Set(["Validation failed", "Internal server error", "Failed to create event", "Failed to update event"]);
+
+/** Plain words naming the part of the builder that a refused top-level field lives in. */
+const FIELD_WORDS: Record<string, string> = {
+  title: "Check the event name.",
+  description: "Check the event description.",
+  location_name: "Check the place name.",
+  location_address: "Check the address.",
+  host_name: "Check who is hosting.",
+  dress_code: "Check the dress code.",
+  event_date: "Check the dates and times.",
+  event_end_date: "Check the dates and times.",
+  rsvp_deadline: "Check the dates and times.",
+  event_timezone: "Check the dates and times.",
+  registry_links: "Check your gift registry links.",
+  max_attendees: "Check the guest limits.",
+  max_guests_per_rsvp: "Check the guest limits.",
+  allow_plus_ones: "Check the guest limits.",
+  design_url: "Check the image link.",
+  design_type: "Check your artwork.",
+  customization: "Check your colours, logo, background image and music.",
+  invitation_headline: "Check the headline.",
+  invitation_body: "Check the message.",
+};
+
+/**
+ * A failed save in plain words. A 400 with Zod details names the fields; any
+ * other 400 asks the host to check the highlighted fields; a raw server string
+ * such as "Validation failed" is never shown. Other friendly server messages
+ * (such as a rate limit) pass through.
+ */
+export function describeSaveError(status: number, body: unknown): string {
+  const json = (body && typeof body === "object" ? body : {}) as { error?: unknown; details?: unknown };
+  if (status === 400) {
+    const fieldErrors = (json.details as { fieldErrors?: unknown } | undefined)?.fieldErrors;
+    if (fieldErrors && typeof fieldErrors === "object") {
+      const words = [...new Set(Object.keys(fieldErrors).map((key) => FIELD_WORDS[key]).filter(Boolean))];
+      if (words.length > 0) return words.join(" ");
+    }
+    return UNSAVED_DETAILS_ERROR;
+  }
+  if (status >= 500) return DEFAULT_SAVE_ERROR;
+  return typeof json.error === "string" && json.error && !RAW_SERVER_ERRORS.has(json.error) ? json.error : DEFAULT_SAVE_ERROR;
 }
 
 function fieldErrorsFrom(blockers: unknown[]): Partial<Record<keyof BuilderData, string>> {
@@ -81,11 +125,11 @@ export function createSaveQueue(deps: SaveQueueDeps): SaveQueue {
     }
     if (response.ok) return { kind: "saved" };
     const body = await readBody(response);
-    if (response.status >= 500) return { kind: "retry", message: errorMessage(body) };
+    if (response.status >= 500) return { kind: "retry", message: describeSaveError(response.status, body) };
     if (response.status === 400 && Array.isArray(body?.blockers) && body.blockers.length > 0) {
       emit({ kind: "blocked", fieldErrors: fieldErrorsFrom(body.blockers) });
     } else {
-      emit({ kind: "failed", message: errorMessage(body) });
+      emit({ kind: "failed", message: describeSaveError(response.status, body) });
     }
     return { kind: "stopped" };
   }
@@ -157,6 +201,7 @@ export function createSaveQueue(deps: SaveQueueDeps): SaveQueue {
     },
     async flush() {
       while (running) await running;
+      return status;
     },
     onStatus(cb) {
       listeners.add(cb);
@@ -190,8 +235,17 @@ export interface DraftCreatorDeps {
   organizationId?: string;
   queue: Pick<SaveQueue, "enqueue">;
   now: () => number;
-  /** Called with the new id before any PATCH is queued (the PATCH URL needs it). */
-  onCreated: (id: string) => void;
+  /**
+   * The RSVP questions POST /api/events adds to every new event (DEFAULT_RSVP_FIELDS).
+   * They are part of the created event, so they seed the builder without a save.
+   */
+  newDraftRsvpFields?: BuilderRsvpField[];
+  /**
+   * Called with the new id and the questions the server created, before any PATCH
+   * is queued (the PATCH URL needs the id). Put the questions into the builder's
+   * data here, without scheduling a save.
+   */
+  onCreated: (id: string, rsvpFields: BuilderRsvpField[]) => void;
   /**
    * Draft-create statuses: failed on error, saved on success. The queue's own
    * statuses follow, so feed both into the same place.
@@ -223,15 +277,17 @@ export function createDraftCreator(deps: DraftCreatorDeps): () => Promise<string
     const body = await readBody(response);
     const id = (body as { id?: unknown } | null)?.id;
     if (!response.ok || typeof id !== "string") {
-      const message = errorMessage(body);
+      const message = response.ok ? DEFAULT_SAVE_ERROR : describeSaveError(response.status, body);
       deps.report({ kind: "failed", message });
       throw new Error(message);
     }
-    deps.onCreated(id);
+    const rsvpFields = (deps.newDraftRsvpFields ?? []).map((f) => ({ ...f }));
+    deps.onCreated(id, rsvpFields);
     // Clears an earlier create failure; if anything is left to PATCH, the queue's
     // "saving" and "saved" follow straight after.
     deps.report({ kind: "saved", at: deps.now() });
-    deps.queue.enqueue(fromEvent(body as unknown as Event, []), deps.getData());
+    // The baseline carries the server's questions too, so the two sides agree.
+    deps.queue.enqueue({ ...fromEvent(body as unknown as Event, []), rsvp_fields: rsvpFields }, deps.getData());
     return id;
   });
   return () => (deps.getData().title.trim() === "" ? Promise.reject(new Error(BLANK_NAME_ERROR)) : create());

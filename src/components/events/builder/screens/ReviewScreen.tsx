@@ -7,7 +7,8 @@ import { Toggle } from "@/components/ui/Toggle";
 import { defaultInvitationCopy } from "@/lib/invitation-defaults";
 import { getPublicationReadiness, type PublicationBlocker } from "@/lib/publication-readiness";
 import { builderDataToPreviewEvent } from "@/lib/event-builder/mapping";
-import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED } from "@/lib/event-builder/review";
+import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED, saveThenAct } from "@/lib/event-builder/review";
+import { TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderRsvpField } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
 import { PublishedCelebration } from "../PublishedCelebration";
@@ -51,6 +52,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
   const [busy, setBusy] = useState<"publish" | "draft" | "save" | undefined>();
   const [serverBlockers, setServerBlockers] = useState<PublicationBlocker[]>([]);
   const [error, setError] = useState<string>();
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [live, setLive] = useState<{ id: string; slug: string }>();
 
   const action = primaryAction({ published: ctx.published });
@@ -64,20 +66,22 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
     saver.schedule(next);
   };
 
-  /** Saves the draft, then the question list when it changed. Returns the event id. */
-  const saveEverything = async (): Promise<string> => {
-    await ctx.flush();
-    const failure = await saver.flush();
-    if (failure) throw new Error(failure);
-    const id = await ctx.ensureDraft();
-    return id;
-  };
-
   const run = async (kind: "publish" | "draft" | "save", work: (id: string) => Promise<void>) => {
     setBusy(kind);
     setError(undefined);
+    setErrorDetails([]);
     try {
-      await work(await saveEverything());
+      // Nothing is published and nobody is sent away until every change has saved.
+      const problem = await saveThenAct({
+        ensureDraft: ctx.ensureDraft,
+        flush: ctx.flush,
+        flushQuestions: () => saver.flush(),
+        act: work,
+      });
+      if (problem) {
+        setError(problem.message);
+        setErrorDetails(problem.details);
+      }
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : SAVE_FAILED);
     } finally {
@@ -119,7 +123,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
         <h2 id="review-copy" className="text-sm font-semibold text-ink">What your invitation says</h2>
         <Field id="review-headline" label="Headline" hint="Leave it blank to use the one shown.">
           {(aria) => (
-            <Input {...aria} className={CONTROL} value={data.invitation_headline} placeholder={placeholders.headline} onChange={(e) => ctx.update({ invitation_headline: e.target.value })} />
+            <Input {...aria} className={CONTROL} maxLength={TEXT_LIMITS.invitation_headline} value={data.invitation_headline} placeholder={placeholders.headline} onChange={(e) => ctx.update({ invitation_headline: e.target.value })} />
           )}
         </Field>
         <Field id="review-body" label="Message" hint="Leave it blank to use the one shown.">
@@ -127,6 +131,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
             <textarea
               {...aria}
               rows={4}
+              maxLength={TEXT_LIMITS.invitation_body}
               value={data.invitation_body}
               placeholder={placeholders.body}
               onChange={(e) => ctx.update({ invitation_body: e.target.value })}
@@ -184,7 +189,16 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
       </section>
 
       {rsvpError && <p role="alert" className="text-sm font-medium text-wax">{rsvpError}</p>}
-      {error && <p role="alert" className="text-sm font-medium text-wax">{error}</p>}
+      {error && (
+        <div role="alert" className="space-y-1 text-sm font-medium text-wax">
+          <p>{error}</p>
+          {errorDetails.length > 0 && (
+            <ul className="list-disc space-y-1 pl-5">
+              {errorDetails.map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {action.kind === "publish" ? (

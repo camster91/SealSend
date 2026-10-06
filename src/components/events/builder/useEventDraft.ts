@@ -7,11 +7,14 @@ import {
   type SaveQueue,
   type SaveStatus,
 } from "@/lib/event-builder/save-machine";
+import { DEFAULT_RSVP_FIELDS } from "@/lib/constants";
+import { toBuilderRsvpFields } from "@/lib/event-builder/mapping";
 import type { BuilderData } from "@/lib/event-builder/schema";
 import type { EventCustomization } from "@/types/database";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
-const UNSAVED_KINDS: ReadonlySet<SaveStatus["kind"]> = new Set(["saving", "retrying", "failed"]);
+const UNSAVED_KINDS: ReadonlySet<SaveStatus["kind"]> = new Set(["saving", "retrying", "failed", "blocked"]);
+const NEW_DRAFT_RSVP_FIELDS = toBuilderRsvpFields(DEFAULT_RSVP_FIELDS);
 
 export interface UseEventDraftOptions {
   eventId?: string;
@@ -28,8 +31,8 @@ export interface EventDraft {
   status: SaveStatus;
   ensureDraft(): Promise<string>;
   retry(): void;
-  /** Sends any debounced change now and resolves once every save has settled. */
-  flush(): Promise<void>;
+  /** Sends any debounced change now and resolves to the status once every save has settled. */
+  flush(): Promise<SaveStatus>;
 }
 
 function sleep(ms: number) {
@@ -44,6 +47,8 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
   ));
   const [eventId, setEventId] = useState(initialEventId);
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
+  // True while a change waits out the debounce and has not gone to the queue yet.
+  const [waiting, setWaiting] = useState(false);
 
   const dataRef = useRef(data);
   const eventIdRef = useRef(initialEventId);
@@ -82,6 +87,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    if (mountedRef.current) setWaiting(false);
     if (!eventIdRef.current) return;
     getQueue().enqueue(lastEnqueuedRef.current, dataRef.current);
     lastEnqueuedRef.current = dataRef.current;
@@ -94,6 +100,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
     if (!eventIdRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(enqueueNow, AUTOSAVE_DEBOUNCE_MS);
+    setWaiting(true);
   }, [enqueueNow]);
 
   const ensureDraft = useCallback((): Promise<string> => {
@@ -108,9 +115,15 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
       organizationId,
       queue: getQueue(),
       now: () => Date.now(),
-      onCreated: (id) => {
+      newDraftRsvpFields: NEW_DRAFT_RSVP_FIELDS,
+      onCreated: (id, rsvpFields) => {
         // Always keep the id so edits made before the POST still get PATCHed.
         eventIdRef.current = id;
+        // The server added its default questions; show them without scheduling a save.
+        if (dataRef.current.rsvp_fields.length === 0 && rsvpFields.length > 0) {
+          dataRef.current = { ...dataRef.current, rsvp_fields: rsvpFields };
+          if (mountedRef.current) setData(dataRef.current);
+        }
         lastEnqueuedRef.current = dataRef.current;
         // If the host already left, don't rewrite the URL of the page they're on now.
         if (!mountedRef.current) return;
@@ -132,15 +145,15 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
     enqueueNow();
   }, [ensureDraft, enqueueNow]);
 
-  const flush = useCallback(async () => {
+  const flush = useCallback(async (): Promise<SaveStatus> => {
     enqueueNow();
-    await getQueue().flush();
+    return getQueue().flush();
   }, [enqueueNow, getQueue]);
 
   // Never drop a debounced change when the builder unmounts.
   useEffect(() => () => enqueueNow(), [enqueueNow]);
 
-  const unsaved = UNSAVED_KINDS.has(status.kind);
+  const unsaved = waiting || UNSAVED_KINDS.has(status.kind);
   useEffect(() => {
     if (!unsaved) return;
     const warn = (event: BeforeUnloadEvent) => {

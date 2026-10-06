@@ -1,6 +1,6 @@
 import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from "@/lib/datetime";
 import type { Event, EventCustomization, RSVPField } from "@/types/database";
-import type { BuilderData, EventUpdatePayload } from "./schema";
+import type { BuilderData, BuilderRsvpField, EventUpdatePayload } from "./schema";
 
 const DATE_KEYS = ["event_date", "event_end_date", "rsvp_deadline"] as const;
 
@@ -79,6 +79,29 @@ export function fromEvent(event: Event, rsvpFields: RSVPField[]): BuilderData {
       placeholder: f.placeholder ?? null,
     })),
   };
+}
+
+type RsvpFieldLike = {
+  field_name: string;
+  field_type: string;
+  field_label: string;
+  is_required: boolean;
+  is_enabled: boolean;
+  options?: string[] | null;
+  placeholder?: string | null;
+};
+
+/** The builder's copy of a question list such as DEFAULT_RSVP_FIELDS (the ones POST /api/events creates). */
+export function toBuilderRsvpFields(fields: readonly RsvpFieldLike[]): BuilderRsvpField[] {
+  return fields.map((f) => ({
+    field_name: f.field_name,
+    field_type: f.field_type as BuilderRsvpField["field_type"],
+    field_label: f.field_label,
+    is_required: f.is_required,
+    is_enabled: f.is_enabled,
+    options: f.options ?? null,
+    placeholder: f.placeholder ?? null,
+  }));
 }
 
 /**

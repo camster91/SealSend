@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/utils";
+import { checkRegistryLink, REGISTRY_LABEL_MAX, TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderData } from "@/lib/event-builder/schema";
 import { Field } from "./Field";
 
@@ -67,13 +68,9 @@ export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsPr
   const [registryError, setRegistryError] = useState("");
 
   const addRegistry = () => {
-    if (!label.trim()) return setRegistryError("Add a name for the link.");
-    try {
-      const parsed = new URL(url.trim());
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("scheme");
-    } catch {
-      return setRegistryError("Add a full web address, starting with https://");
-    }
+    // The server only takes https links, names up to 100 characters and 10 links.
+    const problem = checkRegistryLink(label, url, view.registry_links.length);
+    if (problem) return setRegistryError(problem);
     setRegistryError("");
     update({ registry_links: [...view.registry_links, { label: label.trim(), url: url.trim() }] });
     setLabel("");
@@ -102,13 +99,13 @@ export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsPr
           aside={<span className="text-xs text-muted-foreground">{`${view.description.length}/2000`}</span>}
         >
           {(aria) => (
-            <Textarea {...aria} rows={3} maxLength={2000} value={view.description} placeholder="Tell guests what to expect."
+            <Textarea {...aria} rows={3} maxLength={TEXT_LIMITS.description} value={view.description} placeholder="Tell guests what to expect."
               onChange={(e) => set({ description: e.target.value })} />
           )}
         </Field>
         <Field id="host_name" label="Hosted by" error={errorFor("host_name")}>
           {(aria) => (
-            <Input {...aria} className={CONTROL} value={view.host_name} placeholder="For example, Sarah and Tom"
+            <Input {...aria} className={CONTROL} maxLength={TEXT_LIMITS.host_name} value={view.host_name} placeholder="For example, Sarah and Tom"
               onChange={(e) => set({ host_name: e.target.value })} />
           )}
         </Field>
@@ -138,7 +135,7 @@ export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsPr
           <div className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
             <div>
               <label htmlFor="registry-label" className="sr-only">Registry name</label>
-              <Input id="registry-label" className={CONTROL} value={label} placeholder="Name, such as Amazon"
+              <Input id="registry-label" className={CONTROL} maxLength={REGISTRY_LABEL_MAX} value={label} placeholder="Name, such as Amazon"
                 onChange={(e) => setLabel(e.target.value)} />
             </div>
             <div>
