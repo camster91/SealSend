@@ -213,7 +213,7 @@ export const CONTROLLED_BETA_PRICING_PLAN = {
   guests: "100",
   features: [
     "Invitation, RSVP, and guest workflow",
-    "Host-approved email and SMS communications",
+    "Host-approved email communications",
     "Guest tags, co-hosts, analytics, and check-in",
   ],
 } as const;

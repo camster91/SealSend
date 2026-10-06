@@ -8,9 +8,10 @@ import { AnnouncementHistory } from '@/components/dashboard/AnnouncementHistory'
 interface AnnouncementSectionProps {
   eventId: string;
   hasAccess: boolean;
+  smsEnabled?: boolean;
 }
 
-export function AnnouncementSection({ eventId, hasAccess }: AnnouncementSectionProps) {
+export function AnnouncementSection({ eventId, hasAccess, smsEnabled = false }: AnnouncementSectionProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -44,6 +45,7 @@ export function AnnouncementSection({ eventId, hasAccess }: AnnouncementSectionP
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           eventId={eventId}
+          smsEnabled={smsEnabled}
           onSuccess={() => {
             setRefreshKey((k) => k + 1);
           }}

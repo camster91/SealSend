@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { queryOne } from '@/lib/db/client';
 import type { Event } from '@/types/database';
 import { AnnouncementSection } from '@/components/dashboard/AnnouncementSection';
+import { isTwilioConfigured } from '@/lib/twilio';
 import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
 import { CopyLinkButton } from '@/components/dashboard/CopyLinkButton';
 import { CloneEventButton } from '@/components/dashboard/CloneEventButton';
@@ -300,7 +301,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         {/* Announcements */}
         {isPublished && roleCan(access.role, 'send_messages') && (
           <div className="mt-6">
-            <AnnouncementSection eventId={eventId} hasAccess={canSendAnnouncements} />
+            <AnnouncementSection eventId={eventId} hasAccess={canSendAnnouncements} smsEnabled={isTwilioConfigured()} />
           </div>
         )}
 
