@@ -63,3 +63,24 @@ test("routes wire the confirmation and targeting rule", async () => {
   const page = await read("src/app/(dashboard)/events/[eventId]/guests/page.tsx");
   assert.equal((page.match(/contactConfirmed: true/g) ?? []).length, 2);
 });
+
+test("fix round: cron uses latest response, trap includes inputs, UI counts with the rule, scripts send the flag", async () => {
+  const read = (p: string) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
+  const cron = await read("src/app/api/cron/send-reminders/route.ts");
+  assert.ok(cron.includes("LEFT JOIN LATERAL") && cron.includes("LIMIT 1"));
+  assert.ok(!cron.includes("LEFT JOIN rsvp_responses"));
+  const feedback = await read("src/components/ui/Feedback.tsx");
+  assert.ok(feedback.includes('"input:not([disabled]), button:not([disabled])"'));
+  assert.ok(feedback.indexOf("<input") < feedback.indexOf("onAnswer(true)"));
+  const page = await read("src/app/(dashboard)/events/[eventId]/guests/page.tsx");
+  assert.ok(page.includes("isReminderTarget(g, g.reply_status)"));
+  assert.ok(page.includes("Everyone has already replied"));
+  const script = await read("scripts/test/test-integration.ts");
+  assert.ok(script.includes("contactConfirmed: true"));
+});
+
+test("latest reply wins: a stale decline must not gate a newer reply (helper takes the latest status)", () => {
+  const sent = { invite_status: "sent", reminder_sent_at: null };
+  assert.equal(isReminderTarget(sent, "attending", { includeReplied: true }), true);
+  assert.equal(isReminderTarget(sent, "not_attending", { includeReplied: true }), false);
+});

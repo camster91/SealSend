@@ -23,7 +23,11 @@ export function isReminderTarget(
   return true;
 }
 
-/** SQL twin of the rule above (guests aliased `g`, rsvp_responses aliased `r`). */
+/**
+ * SQL twin of the rule above. Guests are aliased `g`; `r` must be the guest's
+ * LATEST rsvp response (a LATERAL ... ORDER BY updated_at DESC LIMIT 1), never a
+ * plain join, so an old decline cannot gate a newer reply and rows do not repeat.
+ */
 export const REMINDER_TARGET_SQL = `g.invite_status = 'sent'
            AND g.reminder_sent_at IS NULL
            AND (r.status IS NULL OR r.status <> 'not_attending')`;

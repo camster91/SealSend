@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { UserPlus, ArrowLeft, Mail, Loader2, Upload, Bell, Download } from "lucide-react";
 import Link from "next/link";
 import type { Guest } from "@/types/database";
+import { isReminderTarget } from "@/lib/reminder-targets";
 import { useConfirm } from "@/components/ui/Feedback";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
@@ -17,7 +18,7 @@ const CONTACT_CONFIRMATION_LABEL = "These guests know me and expect to hear from
 export default function GuestsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  const [guests, setGuests] = useState<Guest[]>([]);
+  const [guests, setGuests] = useState<Array<Guest & { reply_status?: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -107,11 +108,11 @@ export default function GuestsPage() {
   async function handleSendReminders() {
     setNotice(null);
     const reminderCount = guests.filter(
-      (g) => (g.email || g.phone) && g.invite_status === "sent" && !g.reminder_sent_at
+      (g) => (g.email || g.phone) && isReminderTarget(g, g.reply_status)
     ).length;
 
     if (reminderCount === 0) {
-      setNotice({ tone: "error", message: "No guests eligible for reminders." });
+      setNotice({ tone: "error", message: "Everyone has already replied — no reminders needed." });
       return;
     }
 
@@ -142,7 +143,7 @@ export default function GuestsPage() {
         if (data.failed > 0) parts.push(`${data.failed} email${data.failed !== 1 ? "s" : ""} failed`);
         if (data.sms_sent > 0) parts.push(`${data.sms_sent} SMS sent`);
         if (data.sms_failed > 0) parts.push(`${data.sms_failed} SMS failed`);
-        setNotice({ tone: data.failed || data.sms_failed ? "error" : "success", message: parts.join(", ") || "No reminders to send." });
+        setNotice({ tone: data.failed || data.sms_failed ? "error" : "success", message: parts.join(", ") || "Everyone has already replied — no reminders needed." });
         fetchGuests();
       }
     } catch {

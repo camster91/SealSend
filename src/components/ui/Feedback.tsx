@@ -139,7 +139,7 @@ function ConfirmDialog({
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
-      const buttons = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled])"));
+      const buttons = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("input:not([disabled]), button:not([disabled])"));
       const first = buttons[0];
       const last = buttons[buttons.length - 1];
       if (event.shiftKey && document.activeElement === first) {

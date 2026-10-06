@@ -139,7 +139,12 @@ export async function GET(request: NextRequest) {
         `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token, g.reminder_sent_at,
                 r.status as rsvp_status
          FROM guests g
-         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
+         LEFT JOIN LATERAL (
+           SELECT status FROM rsvp_responses
+           WHERE guest_id = g.id
+           ORDER BY updated_at DESC NULLS LAST, created_at DESC
+           LIMIT 1
+         ) r ON TRUE
          WHERE g.event_id = $1
            AND ${REMINDER_TARGET_SQL}
            AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
