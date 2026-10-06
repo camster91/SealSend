@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
+import { emailQuotaMessage, reserveEmailQuota } from "@/lib/email-quota";
 import { sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/email-templates";
 import { buildReminderSms } from "@/lib/sms-templates";
@@ -93,6 +94,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       if (!decision.allowed) {
         return NextResponse.json({ error: smsAllowanceMessage(decision), code: "SMS_ALLOWANCE_EXCEEDED" }, { status: 402 });
       }
+    }
+
+    // Count against the owner's daily email allowance before anything is sent.
+    const emailCount = sendableGuests.filter((guest) => guest.email).length;
+    const emailQuota = await reserveEmailQuota(event.user_id, emailCount);
+    if (!emailQuota.success) {
+      return NextResponse.json(
+        { error: emailQuotaMessage(emailCount, emailQuota.remaining, emailQuota.limit), code: "EMAIL_DAILY_LIMIT" },
+        { status: 429 }
+      );
     }
 
     const BATCH_SIZE = 10;

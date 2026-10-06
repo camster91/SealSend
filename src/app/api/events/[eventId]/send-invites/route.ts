@@ -7,6 +7,7 @@ import { buildInviteSms } from "@/lib/sms-templates";
 import { generateInviteToken } from "@/lib/invite-token";
 import { isTwilioConfigured, getTwilioClient, getTwilioSendOptions } from "@/lib/twilio";
 import { rateLimit } from "@/lib/rate-limit";
+import { emailQuotaMessage, reserveEmailQuota } from "@/lib/email-quota";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { logSendSuccess, logSendFailure } from "@/lib/email-logger";
 import type { Event, Guest } from "@/types/database";
@@ -111,6 +112,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       if (!decision.allowed) {
         return NextResponse.json({ error: smsAllowanceMessage(decision), code: "SMS_ALLOWANCE_EXCEEDED" }, { status: 402 });
       }
+    }
+
+    // Count against the owner's daily email allowance before anything is sent.
+    const emailCount = sendableGuests.filter((guest) => guest.email).length;
+    const emailQuota = await reserveEmailQuota(event.user_id, emailCount);
+    if (!emailQuota.success) {
+      return NextResponse.json(
+        { error: emailQuotaMessage(emailCount, emailQuota.remaining, emailQuota.limit), code: "EMAIL_DAILY_LIMIT" },
+        { status: 429 }
+      );
     }
 
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)

@@ -17,6 +17,22 @@ export async function rateLimit(
   key: string,
   options: RateLimitOptions
 ): Promise<RateLimitResult> {
+  return consumeQuota(key, 1, options);
+}
+
+/**
+ * Reserve `units` attempts at once against a sliding window (e.g. one unit per
+ * email in a batch). All-or-nothing: if the batch doesn't fit, nothing is
+ * recorded and `remaining` says how many units are still free.
+ */
+export async function consumeQuota(
+  key: string,
+  units: number,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  if (!Number.isInteger(units) || units < 1) {
+    throw new Error("consumeQuota units must be a positive integer");
+  }
   const now = new Date();
   const windowStart = new Date(now.getTime() - options.windowSeconds * 1000);
   const resetAt = now.getTime() + options.windowSeconds * 1000;
@@ -44,17 +60,20 @@ export async function rateLimit(
 
     const currentCount = parseInt(result.rows[0]?.count ?? '0', 10);
 
-    if (currentCount >= options.max) {
+    if (currentCount + units > options.max) {
       await client.query('COMMIT');
-      return { success: false, remaining: 0, resetAt };
+      return { success: false, remaining: Math.max(0, options.max - currentCount), resetAt };
     }
 
-    await client.query('INSERT INTO rate_limit_attempts (key) VALUES ($1)', [key]);
+    await client.query(
+      'INSERT INTO rate_limit_attempts (key) SELECT $1 FROM generate_series(1, $2::int)',
+      [key, units]
+    );
     await client.query('COMMIT');
 
     return {
       success: true,
-      remaining: options.max - currentCount - 1,
+      remaining: options.max - currentCount - units,
       resetAt,
     };
   } catch (error) {
