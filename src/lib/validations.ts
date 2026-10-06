@@ -97,7 +97,7 @@ export const eventCreateSchema = z.object({
   allow_plus_ones: z.boolean().optional(),
   max_guests_per_rsvp: z.number().int().min(1).max(50).optional(),
   design_url: optionalSafeHttpUrl,
-  design_type: z.enum(["image", "pdf", "upload", "video"]).default("upload"),
+  design_type: z.enum(["image", "pdf", "upload", "video", "url"]).default("upload"),
   customization: z
     .object({
       primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#7c3aed"),
@@ -118,7 +118,7 @@ export const eventCreateSchema = z.object({
 
 export const eventUpdateSchema = eventCreateSchema.extend({
   event_timezone: z.string().min(1).max(100),
-  design_type: z.enum(["image", "pdf", "upload", "video"]),
+  design_type: z.enum(["image", "pdf", "upload", "video", "url"]),
   status: z.enum(["draft", "published", "archived"]),
 }).partial();
 
@@ -133,6 +133,7 @@ export const rsvpFieldSchema = z.object({
     "number",
     "email",
     "phone",
+    "textarea",
   ]),
   options: z.array(z.string()).nullable().optional(),
   placeholder: z.string().nullable().optional(),

@@ -13,6 +13,7 @@ import StepPreview from './StepPreview';
 import { PromptToEventGenerator } from './PromptToEventGenerator';
 import type { AiEventDraft } from '@/lib/ai/event-draft-schema';
 import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from '@/lib/datetime';
+import { aiFieldTypeToRsvpFieldType, wizardSubmitStatus } from '@/lib/wizard-submit';
 import { getEventBriefContext, type EventBrief, type EventBriefContext } from '@/lib/event-brief';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ export default function WizardContainer({
       customization: { ...formData.customization, primaryColor: draft.theme.primaryColor, backgroundColor: draft.theme.backgroundColor },
       rsvp_fields: draft.rsvpFields.map((field) => ({
         field_name: field.key,
-        field_type: field.type === 'phone' ? 'tel' : field.type === 'multiselect' ? 'select' : field.type,
+        field_type: aiFieldTypeToRsvpFieldType(field.type),
         field_label: field.label,
         is_required: field.required,
         is_enabled: true,
@@ -333,7 +334,7 @@ export default function WizardContainer({
         event_brief: formData.event_brief,
         ai_generation_id: formData.ai_generation_id || undefined,
         ai_edit_count: aiBaseline ? Object.entries(aiBaseline).filter(([key, value]) => JSON.stringify(formData[key as keyof WizardFormData]) !== JSON.stringify(value)).length : undefined,
-        status: publishOnCreate ? 'published' : 'draft',
+        status: wizardSubmitStatus(mode, publishOnCreate),
       };
 
       let eventResponse;
