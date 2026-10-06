@@ -69,7 +69,7 @@ export async function dispatchAnnouncement(announcementId: string) {
   let smsBalance = smsMetered ? await getSmsBalance(announcement.event_id) : Number.POSITIVE_INFINITY;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
   const branding = await getEventBranding(announcement.event_id);
-  const sender = await getGuestEmailSender(announcement, branding);
+  const sender = await getGuestEmailSender({ id: announcement.event_id, user_id: announcement.user_id, host_name: announcement.host_name }, branding);
   for (const delivery of deliveries) {
     if (delivery.channel === "email" && isCommunicationSuppressed(suppressions, "email", delivery.recipient)) {
       await query("UPDATE announcement_deliveries SET status = 'opted_out', error = NULL, updated_at = NOW() WHERE id = $1", [delivery.id]);

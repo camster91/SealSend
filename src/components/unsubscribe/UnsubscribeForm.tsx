@@ -5,8 +5,14 @@ import { Button } from "@/components/ui/Button";
 
 type Status = "idle" | "sending" | "done" | "error";
 
-export function UnsubscribeForm({ token, hostName, email }: { token: string; hostName: string; email: string }) {
-  const [status, setStatus] = useState<Status>("idle");
+export function UnsubscribeForm({ token, hostName, email, alreadyUnsubscribed }: {
+  token: string;
+  hostName: string;
+  email: string;
+  /** This address is already suppressed for this host, e.g. on a repeat visit. */
+  alreadyUnsubscribed: boolean;
+}) {
+  const [status, setStatus] = useState<Status>(alreadyUnsubscribed ? "done" : "idle");
 
   async function stopEmails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,7 +30,7 @@ export function UnsubscribeForm({ token, hostName, email }: { token: string; hos
       <div role="status">
         <h1 className="break-words text-2xl font-semibold">Done.</h1>
         <p className="mt-3 text-base">
-          {hostName} won&apos;t email you through SealSend any more.
+          {hostName.charAt(0).toUpperCase() + hostName.slice(1)} won&apos;t email you through SealSend any more.
         </p>
       </div>
     );

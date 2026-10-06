@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe";
-import { getUnsubscribeHostName } from "@/lib/guest-email";
+import { getUnsubscribeHostName, hasEmailSuppression, HOST_NAME_FALLBACK } from "@/lib/guest-email";
 import { SUPPORT_EMAIL } from "@/lib/legal";
 import { UnsubscribeForm } from "@/components/unsubscribe/UnsubscribeForm";
 
@@ -12,6 +12,9 @@ export const metadata: Metadata = {
 export default async function UnsubscribePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const target = verifyUnsubscribeToken(token);
+  const [hostName, alreadyUnsubscribed] = target
+    ? await Promise.all([getUnsubscribeHostName(target), hasEmailSuppression(target.ownerUserId, target.email)])
+    : [null, false];
 
   return (
     <main className="min-h-screen bg-cotton px-4 py-12 text-ink">
@@ -19,8 +22,9 @@ export default async function UnsubscribePage({ params }: { params: Promise<{ to
         {target ? (
           <UnsubscribeForm
             token={token}
-            hostName={(await getUnsubscribeHostName(target.ownerUserId)) ?? "this host"}
+            hostName={hostName === HOST_NAME_FALLBACK ? "your host" : hostName ?? "your host"}
             email={target.email}
+            alreadyUnsubscribed={alreadyUnsubscribed}
           />
         ) : (
           <>

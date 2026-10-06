@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { buildAnnouncementEmail, buildEmailFooter, buildInvitationEmail, buildReminderEmail, type EmailCompliance } from "../src/lib/email-templates";
-import { guestEmailCompliance, guestEmailSendOptions, resolveHostDisplayName, type GuestEmailSender } from "../src/lib/guest-email";
+import { footerHostName, guestEmailCompliance, guestEmailSendOptions, hasEmailSuppression, resolveHostDisplayName, resolveUnsubscribeHostName, type GuestEmailSender } from "../src/lib/guest-email";
+import { communicationSuppressionKey } from "../src/lib/communication-suppressions";
 import { SENDER_LEGAL_NAME, SENDER_POSTAL_ADDRESS, SUPPORT_EMAIL } from "../src/lib/legal";
 import { createUnsubscribeToken } from "../src/lib/unsubscribe";
 import type { EventBranding } from "../src/lib/brands";
@@ -13,6 +14,7 @@ process.env.NEXT_PUBLIC_SITE_URL = "https://sealsend.app";
 process.env.FROM_EMAIL = "SealSend <noreply@sealsend.app>";
 
 const OWNER = "8a6b2c1e-1111-4222-8333-944455556666";
+const EVENT = "e0e0e0e0-2222-4333-8444-955566667777";
 const compliance: EmailCompliance = { hostName: "Jane <Smith> & Co", unsubscribeUrl: "https://sealsend.app/unsubscribe/abc.def" };
 
 const branding: EventBranding = {
@@ -73,9 +75,9 @@ test("host display name: brand display name, then event host name, then account 
 });
 
 test("guestEmailCompliance builds a per-recipient footer link and List-Unsubscribe headers", () => {
-  const sender: GuestEmailSender = { ownerUserId: OWNER, hostName: "Jane", ownerEmail: "jane@example.com" };
+  const sender: GuestEmailSender = { ownerUserId: OWNER, eventId: EVENT, hostName: "Jane", ownerEmail: "jane@example.com" };
   const result = guestEmailCompliance(sender, "Guest@Example.com");
-  const token = createUnsubscribeToken(OWNER, "guest@example.com");
+  const token = createUnsubscribeToken(OWNER, "guest@example.com", EVENT);
   assert.deepEqual(result.compliance, { hostName: "Jane", unsubscribeUrl: `https://sealsend.app/unsubscribe/${token}` });
   assert.deepEqual(result.headers, {
     "List-Unsubscribe": `<https://sealsend.app/api/unsubscribe/${token}>`,
@@ -85,8 +87,45 @@ test("guestEmailCompliance builds a per-recipient footer link and List-Unsubscri
   assert.notEqual(other.compliance.unsubscribeUrl, result.compliance.unsubscribeUrl);
 });
 
+test("the unsubscribe page names the host exactly as that event's footer did", () => {
+  const event = { host_name: "Jane's Party" };
+  // Same inputs the footer used for this event: brand display name first.
+  assert.equal(
+    resolveUnsubscribeHostName({ event, branding, accountName: "Jane S", personalBrandName: "Personal Brand" }),
+    footerHostName(branding, event.host_name, "Jane S"),
+  );
+  assert.equal(resolveUnsubscribeHostName({ event, branding, accountName: "Jane S", personalBrandName: "Personal Brand" }), "Bloom Events");
+  assert.equal(resolveUnsubscribeHostName({ event, branding: { ...branding, senderName: "Bloom" }, accountName: null, personalBrandName: null }), "Bloom");
+  // No team brand: the event's host name, not the owner's personal brand.
+  assert.equal(resolveUnsubscribeHostName({ event, branding: null, accountName: "Jane S", personalBrandName: "Personal Brand" }), "Jane's Party");
+  // Event gone: fall back to the owner's personal brand, then account name, then the generic name.
+  assert.equal(resolveUnsubscribeHostName({ event: null, branding: null, accountName: "Jane S", personalBrandName: "Personal Brand" }), "Personal Brand");
+  assert.equal(resolveUnsubscribeHostName({ event: null, branding: null, accountName: "Jane S", personalBrandName: null }), "Jane S");
+  assert.equal(resolveUnsubscribeHostName({ event: null, branding: null, accountName: null, personalBrandName: null }), "Your host");
+});
+
+test("hasEmailSuppression looks up this host's row for the normalized address", async () => {
+  const calls: Array<{ text: string; values?: unknown[] }> = [];
+  const client = (rows: unknown[]) => ({ async query<T>(text: string, values?: unknown[]) { calls.push({ text, values }); return { rows: rows as T[] }; } });
+  assert.equal(await hasEmailSuppression(OWNER, " Guest@Example.com ", client([{ exists: 1 }])), true);
+  assert.equal(await hasEmailSuppression(OWNER, "guest@example.com", client([])), false);
+  assert.match(calls[0].text, /FROM communication_suppressions/);
+  assert.deepEqual(calls[0].values, [OWNER, "email", communicationSuppressionKey("email", "guest@example.com").split(":")[1]]);
+});
+
+test("the unsubscribe page shows Done for an already-unsubscribed guest and resolves the host per event", async () => {
+  const page = await readFile("src/app/unsubscribe/[token]/page.tsx", "utf8");
+  assert.ok(page.includes("hasEmailSuppression(target.ownerUserId, target.email)"), "checks the suppression on load");
+  assert.ok(page.includes("alreadyUnsubscribed={"), "passes it to the form");
+  assert.ok(page.includes("getUnsubscribeHostName(target)"), "resolves the host for the event in the token");
+  const form = await readFile("src/components/unsubscribe/UnsubscribeForm.tsx", "utf8");
+  assert.ok(form.includes("useState<Status>(alreadyUnsubscribed ? \"done\" : \"idle\")"), "starts in Done");
+  const lib = await readFile("src/lib/guest-email.ts", "utf8");
+  assert.ok(lib.includes("getEventBranding(target.eventId)"), "the page uses the event's own brand, like the footer");
+});
+
 test("replies go to the host: brand reply-to wins, else the owner's account email; From never changes", () => {
-  const sender: GuestEmailSender = { ownerUserId: OWNER, hostName: "Jane", ownerEmail: "jane@example.com" };
+  const sender: GuestEmailSender = { ownerUserId: OWNER, eventId: EVENT, hostName: "Jane", ownerEmail: "jane@example.com" };
   assert.deepEqual(guestEmailSendOptions(null, sender), { replyTo: "jane@example.com" });
   assert.deepEqual(guestEmailSendOptions(branding, sender), {
     from: "\"Bloom Events via SealSend\" <noreply@sealsend.app>",

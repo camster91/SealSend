@@ -11,16 +11,17 @@ type RouteParams = { params: Promise<{ token: string }> };
  * `List-Unsubscribe=One-Click` body with no Origin). The signed token is the
  * only authorization, so the proxy exempts this path from its Origin check.
  * The body is ignored: both callers mean the same thing.
+ *
+ * Valid tokens are never rate-limited (providers share IPs, and a 429 would
+ * lose an opt-out); only invalid tokens are limited, per IP.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { token } = await params;
 
   try {
-    const { success } = await rateLimit(`unsubscribe:${getClientIp(request)}`, { max: 20, windowSeconds: 60 });
-    if (!success) {
-      return NextResponse.json({ ok: false, error: "Too many tries. Please wait a minute and try again." }, { status: 429 });
-    }
-    const result = await handleUnsubscribe(token, getDb());
+    const result = await handleUnsubscribe(token, getDb(), async () =>
+      (await rateLimit(`unsubscribe-invalid:${getClientIp(request)}`, { max: 20, windowSeconds: 60 })).success,
+    );
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("[UNSUBSCRIBE] failed to record opt-out", error);

@@ -49,18 +49,23 @@ export async function recordCommunicationSuppression(
     reason: CommunicationSuppressionReason;
     provider: "mailgun" | "twilio" | "manual";
     sourceEventId?: string | null;
+    /** Leave an existing row (e.g. a bounce or complaint) untouched instead of overwriting its reason. */
+    keepExisting?: boolean;
   },
 ): Promise<void> {
   const [, recipientHash] = communicationSuppressionKey(input.channel, input.recipient).split(":");
+  const onConflict = input.keepExisting
+    ? "ON CONFLICT (user_id, channel, recipient_hash) DO NOTHING"
+    : `ON CONFLICT (user_id, channel, recipient_hash) DO UPDATE SET
+       reason = EXCLUDED.reason,
+       provider = EXCLUDED.provider,
+       source_event_id = EXCLUDED.source_event_id,
+       updated_at = NOW()`;
   await client.query(
     `INSERT INTO communication_suppressions
        (user_id, channel, recipient_hash, reason, provider, source_event_id)
      VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (user_id, channel, recipient_hash) DO UPDATE SET
-       reason = EXCLUDED.reason,
-       provider = EXCLUDED.provider,
-       source_event_id = EXCLUDED.source_event_id,
-       updated_at = NOW()`,
+     ${onConflict}`,
     [input.userId, input.channel, recipientHash, input.reason, input.provider, input.sourceEventId ?? null],
   );
 }
