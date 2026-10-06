@@ -91,3 +91,40 @@ test('Guests screen files use no banned tokens or phrases', async () => {
     assert.ok(!src.includes(word), `GuestsScreen contains ${word}`);
   }
 });
+
+test('ReviewScreen has the copy, readiness check, publish route and draft button', async () => {
+  const src = await read(`${dir}screens/ReviewScreen.tsx`);
+  for (const needle of [
+    'Ready to send?',
+    'font-display',
+    'Questions to ask guests',
+    'getPublicationReadiness',
+    'Publish',
+    'Save as draft',
+    '/publish',
+    '/rsvp-fields',
+    'defaultInvitationCopy',
+    'goTo("basics")',
+    'markPublished',
+    'PublishedCelebration',
+  ]) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+});
+
+test('PublishedCelebration has the copy, copy-link, add-guests and reduced motion', async () => {
+  const src = await read(`${dir}PublishedCelebration.tsx`);
+  for (const needle of ['Your invite is live', 'Copy link', 'Add guests', 'useReducedMotion', 'animate-seal-press', 'aria-live="polite"', 'Link copied']) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+});
+
+test('Review files use no banned tokens or phrases', async () => {
+  for (const file of ['screens/ReviewScreen', 'PublishedCelebration']) {
+    const src = await read(`${dir}${file}.tsx`).catch(() => '');
+    assert.ok(src.length > 0, `${file} missing`);
+    for (const word of [...BANNED, 'publish blocker', 'operations brief', 'explicit decisions', 'communication plan']) {
+      assert.ok(!src.includes(word), `${file} contains ${word}`);
+    }
+  }
+});
