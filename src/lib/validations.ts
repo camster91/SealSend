@@ -118,6 +118,10 @@ export const eventCreateSchema = z.object({
 
 export const eventUpdateSchema = eventCreateSchema.extend({
   event_timezone: z.string().min(1).max(100),
+  // A cleared date is saved as SQL NULL.
+  event_date: z.string().nullable(),
+  event_end_date: z.string().nullable(),
+  rsvp_deadline: z.string().nullable(),
   design_type: z.enum(["image", "pdf", "upload", "video", "url"]),
   status: z.enum(["draft", "published", "archived"]),
 }).partial();

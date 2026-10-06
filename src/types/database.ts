@@ -9,7 +9,8 @@ export type RSVPFieldType =
   | "multiselect"
   | "number"
   | "email"
-  | "phone";
+  | "phone"
+  | "textarea";
 export type RSVPStatus = "attending" | "not_attending" | "maybe" | "pending";
 export type InviteStatus = "not_sent" | "sent" | "failed";
 

@@ -293,6 +293,16 @@ body {
   animation: fadeIn 0.25s ease-out forwards;
 }
 
+/* Bottom sheet (Modal sheet) slides up from the screen edge. */
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-sheet-up {
+  animation: sheetUp 0.25s ease-out both;
+}
+
 /* The one orchestrated moment: the wax seal presses into place on the home hero. */
 @keyframes sealPress {
   0% { opacity: 0; transform: scale(1.08) rotate(-8deg); }
@@ -315,6 +325,7 @@ body {
   }
 
   .animate-fade-in,
+  .animate-sheet-up,
   .animate-seal-press {
     animation: none;
   }

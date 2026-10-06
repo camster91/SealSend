@@ -10,9 +10,11 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  /** Anchors the dialog to the bottom edge and slides it up (small screens). */
+  sheet?: boolean;
 }
 
-function Modal({ open, onClose, title, children, className }: ModalProps) {
+function Modal({ open, onClose, title, children, className, sheet }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +66,10 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className={cn(
+        "fixed inset-0 z-50 flex justify-center bg-black/50",
+        sheet ? "items-end p-0" : "items-center p-4"
+      )}
       role="dialog"
       aria-modal="true"
       aria-label={title || "Dialog"}
@@ -76,6 +81,7 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
         ref={contentRef}
         className={cn(
           "w-full max-w-lg rounded-xl bg-white shadow-xl",
+          sheet && "animate-sheet-up max-w-none rounded-b-none",
           className
         )}
       >
