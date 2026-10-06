@@ -105,3 +105,56 @@ export function toPatch(prev: BuilderData, next: BuilderData): Partial<EventUpda
   }
   return Object.keys(patch).length === 0 ? null : (patch as Partial<EventUpdatePayload>);
 }
+
+/** A blank or half-typed date shows as unset in the preview instead of throwing. */
+function previewInstant(value: string, timeZone: string): string | null {
+  if (!value) return null;
+  try {
+    return zonedLocalDateTimeToInstant(value, timeZone);
+  } catch {
+    return null;
+  }
+}
+
+/** The Event the public invite components render for the live preview. Never throws. */
+export function builderDataToPreviewEvent(data: BuilderData): Event {
+  const zone = data.event_timezone || "UTC";
+  const now = new Date(0).toISOString();
+  return {
+    id: "preview",
+    user_id: "preview",
+    title: data.title,
+    description: data.description || null,
+    invitation_headline: data.invitation_headline || null,
+    invitation_body: data.invitation_body || null,
+    reminder_sequence: [],
+    event_brief: data.event_brief,
+    ai_generation_id: null,
+    repeated_from_event_id: null,
+    event_date: previewInstant(data.event_date, zone),
+    event_end_date: previewInstant(data.event_end_date, zone),
+    event_timezone: zone,
+    location_name: data.location_name || null,
+    location_address: data.location_address || null,
+    host_name: data.host_name || null,
+    dress_code: data.dress_code || null,
+    rsvp_deadline: previewInstant(data.rsvp_deadline, zone),
+    registry_links: data.registry_links,
+    location_lat: null,
+    location_lng: null,
+    design_url: data.design_url || null,
+    design_type: data.design_type,
+    customization: data.customization,
+    slug: "preview",
+    status: "draft",
+    tier: "free",
+    max_responses: 0,
+    max_attendees: data.max_attendees,
+    allow_plus_ones: data.allow_plus_ones,
+    max_guests_per_rsvp: data.max_guests_per_rsvp,
+    auto_reminders: false,
+    payment_id: null,
+    created_at: now,
+    updated_at: now,
+  };
+}

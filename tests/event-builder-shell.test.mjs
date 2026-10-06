@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const dir = 'src/components/events/builder/';
+const BANNED = ['gray-', 'indigo', '#6366f1', 'brand-600'];
+
+test('BuilderShell has motion, live region and step copy', async () => {
+  const src = await read(`${dir}BuilderShell.tsx`);
+  for (const needle of ['useReducedMotion', 'aria-live', 'AnimatePresence', 'Step ${']) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+  assert.ok(src.includes('Next: '), 'Next label');
+  assert.ok(src.includes('lg:'), 'desktop breakpoint');
+});
+
+test('builder shell files use no banned tokens or phrases', async () => {
+  for (const file of ['BuilderShell', 'InvitePreview', 'SaveIndicator', 'StepNav']) {
+    const src = await read(`${dir}${file}.tsx`).catch(() => '');
+    for (const word of [...BANNED, 'publish blocker', 'operations brief', 'explicit decisions', 'communication plan']) {
+      assert.ok(!src.includes(word), `${file} contains ${word}`);
+    }
+  }
+});
+
+test('InvitePreview renders the public components', async () => {
+  const src = await read(`${dir}InvitePreview.tsx`);
+  assert.match(src, /import[^;]*EventHero[^;]*public-event/);
+  assert.match(src, /import[^;]*EventDetails[^;]*public-event/);
+  assert.ok(src.includes('builderDataToPreviewEvent'));
+});
+
+test('SaveIndicator has the status copy', async () => {
+  const src = await read(`${dir}SaveIndicator.tsx`);
+  for (const needle of ['Saving…', 'Saved', 'Not saved, retrying…', 'Try again', 'aria-live']) {
+    assert.ok(src.includes(needle), `missing ${needle}`);
+  }
+});

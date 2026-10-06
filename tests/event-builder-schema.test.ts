@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { eventUpdateSchema } from "../src/lib/validations";
 import { builderDataSchema } from "../src/lib/event-builder/schema";
-import { emptyBuilderData, fromEvent, toPatch } from "../src/lib/event-builder/mapping";
+import { builderDataToPreviewEvent, emptyBuilderData, fromEvent, toPatch } from "../src/lib/event-builder/mapping";
 import type { Event } from "../src/types/database";
 
 const filled = {
@@ -60,4 +60,23 @@ test("a cleared date patch passes eventUpdateSchema", () => {
   const patch = toPatch(filled, { ...filled, event_end_date: "" });
   assert.deepEqual(patch, { event_end_date: null });
   assert.equal(eventUpdateSchema.safeParse(patch).success, true);
+});
+
+test("preview event from blank data does not throw and leaves dates null", () => {
+  const event = builderDataToPreviewEvent(emptyBuilderData("America/Toronto"));
+  assert.equal(event.event_date, null);
+  assert.equal(event.event_end_date, null);
+  assert.equal(event.rsvp_deadline, null);
+  assert.equal(event.title, "");
+});
+
+test("preview event turns a zoned-local date into the right instant", () => {
+  const event = builderDataToPreviewEvent(filled);
+  assert.equal(event.event_date, "2026-07-10T23:00:00.000Z");
+  assert.equal(event.event_timezone, "America/Toronto");
+});
+
+test("preview event tolerates an invalid date", () => {
+  const event = builderDataToPreviewEvent({ ...filled, event_date: "not a date" });
+  assert.equal(event.event_date, null);
 });
