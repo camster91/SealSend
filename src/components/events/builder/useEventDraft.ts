@@ -49,6 +49,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
   const eventIdRef = useRef(initialEventId);
   const lastEnqueuedRef = useRef(data);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
 
   const queueRef = useRef<SaveQueue | null>(null);
   const createDraftRef = useRef<(() => Promise<string>) | null>(null);
@@ -68,6 +69,13 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
   }, []);
 
   useEffect(() => getQueue().onStatus(setStatus), [getQueue]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const enqueueNow = useCallback(() => {
     if (timerRef.current) {
@@ -99,14 +107,18 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
       getData: () => dataRef.current,
       organizationId,
       queue: getQueue(),
+      now: () => Date.now(),
       onCreated: (id) => {
+        // Always keep the id so edits made before the POST still get PATCHed.
         eventIdRef.current = id;
         lastEnqueuedRef.current = dataRef.current;
+        // If the host already left, don't rewrite the URL of the page they're on now.
+        if (!mountedRef.current) return;
         setEventId(id);
         // Update the URL without a navigation so the builder keeps its state (no remount).
         window.history.replaceState(null, "", `/events/${id}/build`);
       },
-      onError: (message) => setStatus({ kind: "failed", message }),
+      report: setStatus,
     });
     return createDraftRef.current();
   }, [getQueue, organizationId]);

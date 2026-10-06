@@ -184,19 +184,26 @@ test("onStatus returns an unsubscribe function", async () => {
   assert.equal(h.last().kind, "saved");
 });
 
-function draftHarness(initialData: BuilderData, postReply: Promise<Response> | Response) {
+type PostReply = Promise<Response> | Response;
+
+function draftHarness(initialData: BuilderData, postReply: PostReply | ((call: number) => PostReply)) {
   let data = initialData;
   const posts: object[] = [];
   const created: string[] = [];
-  const errors: string[] = [];
   const h = harness(() => json(200, {}));
+  const errors = () => h.statuses.flatMap((s) => (s.kind === "failed" ? [s.message] : []));
   const ensureDraft = createDraftCreator({
-    post: async (body) => { posts.push(body); return postReply; },
+    post: async (body) => {
+      posts.push(body);
+      return typeof postReply === "function" ? postReply(posts.length) : postReply;
+    },
     getData: () => data,
     organizationId: undefined,
     queue: h.queue,
+    now: () => 1234,
     onCreated: (id) => created.push(id),
-    onError: (message) => errors.push(message),
+    // The hook feeds the creator's and the queue's statuses into one state.
+    report: (s) => h.statuses.push(s),
   });
   return { ...h, ensureDraft, posts, created, errors, setData: (next: BuilderData) => { data = next; } };
 }
@@ -206,7 +213,6 @@ test("ensureDraft rejects a blank name without posting or changing status", asyn
   await assert.rejects(d.ensureDraft(), /Add a name first/);
   assert.deepEqual(d.posts, []);
   assert.deepEqual(d.statuses, []);
-  assert.deepEqual(d.errors, []);
   d.setData(A);
   assert.equal(await d.ensureDraft(), "e1", "a later call with a name still creates the draft");
 });
@@ -234,7 +240,18 @@ test("edits made while createDraft is in flight are sent as a PATCH after it res
 test("a refused draft create surfaces the server error and rejects", async () => {
   const d = draftHarness(A, json(403, { error: "This plan supports one active event." }));
   await assert.rejects(d.ensureDraft(), /one active event/);
-  assert.deepEqual(d.errors, ["This plan supports one active event."]);
+  assert.deepEqual(d.errors(), ["This plan supports one active event."]);
   assert.deepEqual(d.created, []);
   assert.deepEqual(d.sent, []);
+});
+
+test("a draft create that fails and then succeeds on retry no longer shows failed", async () => {
+  // Only a name is typed, so the created event round-trips equal and no PATCH follows.
+  const d = draftHarness(A, (call) => (call === 1 ? json(503, { error: "Internal server error" }) : json(201, { ...A, id: "e1" })));
+  await assert.rejects(d.ensureDraft(), /Internal server error/);
+  assert.equal(d.last().kind, "failed");
+  assert.equal(await d.ensureDraft(), "e1");
+  await d.queue.flush();
+  assert.deepEqual(d.sent, []);
+  assert.deepEqual(d.last(), { kind: "saved", at: 1234 });
 });

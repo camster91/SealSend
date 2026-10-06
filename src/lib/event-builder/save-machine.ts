@@ -189,9 +189,14 @@ export interface DraftCreatorDeps {
   getData: () => BuilderData;
   organizationId?: string;
   queue: Pick<SaveQueue, "enqueue">;
+  now: () => number;
   /** Called with the new id before any PATCH is queued (the PATCH URL needs it). */
   onCreated: (id: string) => void;
-  onError: (message: string) => void;
+  /**
+   * Draft-create statuses: failed on error, saved on success. The queue's own
+   * statuses follow, so feed both into the same place.
+   */
+  report: (s: SaveStatus) => void;
 }
 
 /**
@@ -212,17 +217,20 @@ export function createDraftCreator(deps: DraftCreatorDeps): () => Promise<string
         customization: posted.customization,
       });
     } catch (error) {
-      deps.onError(DEFAULT_SAVE_ERROR);
+      deps.report({ kind: "failed", message: DEFAULT_SAVE_ERROR });
       throw error;
     }
     const body = await readBody(response);
     const id = (body as { id?: unknown } | null)?.id;
     if (!response.ok || typeof id !== "string") {
       const message = errorMessage(body);
-      deps.onError(message);
+      deps.report({ kind: "failed", message });
       throw new Error(message);
     }
     deps.onCreated(id);
+    // Clears an earlier create failure; if anything is left to PATCH, the queue's
+    // "saving" and "saved" follow straight after.
+    deps.report({ kind: "saved", at: deps.now() });
     deps.queue.enqueue(fromEvent(body as unknown as Event, []), deps.getData());
     return id;
   });
