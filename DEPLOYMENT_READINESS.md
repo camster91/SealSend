@@ -4,6 +4,7 @@ Date: 2026-08-28
 
 ## Release decision
 
+- **Free email-only sign-ups:** open since 2026-10-06 by owner decision (see below). Payments stay test-only and SMS is off.
 - **Controlled AI beta:** deployed and verified for test-only operation.
 - **Paid beta:** not cleared. Stripe's complete test lifecycle and controlled Mailgun/Twilio delivery/callback tests still require verified provider configuration.
 - **Public paid launch:** not cleared. It additionally requires five real hosts to complete workflows, professional legal/accounting review, and observed conversion/cost evidence.
@@ -90,6 +91,18 @@ For a real deployment, the Stripe webhook endpoint must send `checkout.session.c
 - [ ] A self-serve cancellation path for annual Pro. Workspace plans have one now, but Pro still needs the Stripe dashboard or a billing portal. Decide on the refund/cancellation policy before building it.
 
 ## Current production
+
+> **2026-10-06 free email-only sign-ups (owner decision).** Cameron chose to open free sign-ups to anyone, by email only, ahead of the remaining paid-launch gates. Production now runs `main` at `6d52d01` (#212) with:
+>
+> - `COMMUNICATIONS_TEST_ONLY=false`. Any visitor can get an email sign-in code, and hosts can email their guests. This deliberately overrides the configuration gate below for **email**.
+> - `PAYMENTS_TEST_ONLY=true` (unchanged). `BETA_MODE` stays on, so checkout is hidden and every account gets the beta plan.
+> - **SMS off.** `TWILIO_ACCOUNT_SID` was renamed to `DISABLED_TWILIO_ACCOUNT_SID` in Coolify, so `isTwilioConfigured()` is false. Every SMS send path skips SMS, `send-code` refuses phone codes with HTTP 400, and `/login` hides the SMS option (#212). Rename the variable back to re-enable SMS.
+> - **Mailgun working.** A new `MAILGUN_API_KEY` was installed on 2026-10-05 after a pre-save check against the Mailgun API (US region; `src/lib/mailgun.ts` hardcodes the US endpoint and does not read `MAILGUN_URL`). A real sign-in code was delivered to the owner's inbox. `MAILGUN_WEBHOOK_SIGNING_KEY` is set, Mailgun webhooks for delivered, permanent/temporary failure, complaints and unsubscribes point at `https://sealsend.app/api/webhooks/mailgun`, and a forged event is rejected with HTTP 401.
+> - **Email abuse cap.** Each account can send at most `EMAIL_DAILY_LIMIT_PER_ACCOUNT` (default 300) guest-facing emails per rolling 24 hours, counted against the event owner. Invites and manual reminders reserve the whole batch up front, all-or-nothing, with HTTP 429 `EMAIL_DAILY_LIMIT`. Announcement and cron-reminder emails reserve one at a time and fail individually once the cap is reached. Before this, one account could send about 24,000 emails a day by repeating announcements or cycling guests.
+> - Public event pages show the venue as an address card with directions (#210). The OpenStreetMap iframe was blocked by CSP and could not geocode.
+> - CI: `pull_request` runs `Build` for every PR, including docs-only (#209); the `source-map-js` advisory GHSA-68fv-2mgg-jv7q is fixed (#211).
+>
+> Still open before any wider promotion: qualified privacy/terms and CASL/CAN-SPAM review, alerting (`ERROR_ALERT_WEBHOOK_URL`), and the five-host acceptance evidence. Paid launch still requires the Stripe and legal gates.
 
 > **2026-10-04 domain cutover.** SealSend now runs as Coolify application `zysawgfigxocm1s6qbgttk5y` (resource `sealsend`, container `zysawgfigxocm1s6qbgttk5y-<n>`), built from `main` by the Coolify push webhook. The VPS edge is the standalone Traefik on `vps.ashbi.ca`: `/opt/coolify-route-sync` generates the `sealsend.apps.ashbi.ca` route, and `/opt/traefik/dynamic/sealsend-public.yml` routes `sealsend.app` (and 301s `www.sealsend.app`) to that same generated service. `APP_URL` and `NEXT_PUBLIC_SITE_URL` are `https://sealsend.app`. The `organization_subscriptions` table was applied after a pre-change backup in `/opt/sealsend/backups/20261004T213703Z/` (UTC). The ops scripts now find the container under either resource name (`sealsend` or the older `seal-send`). Sign-in still can't send codes: `COMMUNICATIONS_TEST_ONLY=true` with no approved recipients, and Mailgun returns 401.
 
@@ -191,7 +204,7 @@ The application and PostgreSQL containers are healthy and `/api/health` returns 
 ## Production configuration gates
 
 - `PAYMENTS_TEST_ONLY=true` must remain set.
-- `COMMUNICATIONS_TEST_ONLY=true` must remain set.
+- `COMMUNICATIONS_TEST_ONLY=true` must remain set for **SMS** if Twilio is re-enabled before its delivery/callback tests pass. Email was opened by owner decision on 2026-10-06 (see Current production).
 - Use a Stripe **test-mode** secret, recurring annual Pro price, organizer Solo/Studio/Agency monthly prices, and webhook secret before payment QA. Verify success, cancellation, failure, delayed payment, renewal/update, plan change, cancellation, and webhook replay; `npm run stripe:test-e2e` runs most of this in one command (see the monetization update above).
 - Verify Mailgun/Twilio credentials and allowlists before sending only to approved recipients. Confirm queued, accepted, delivered, failed, bounced, and opted-out states where supported.
 - Configure `ERROR_ALERT_WEBHOOK_URL`, then call the secret-protected monitoring test route and verify receipt. The health cron alone does not prove alert delivery.
