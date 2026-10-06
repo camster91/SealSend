@@ -1,73 +1,64 @@
 # SealSend
 
-**Digital Invitations & RSVP Platform**
+Digital invitations with RSVP tracking, guest messaging and check-in, for one-off hosts and event planners.
 
-SealSend is a modern, high-performance SaaS platform for creating, sending, and tracking digital invitations with robust RSVP management. Built for event organizers who need reliability, elegance, and powerful automation.
+SealSend lets a host design an invitation, send it by email or SMS, and watch responses come in. Guests RSVP from a public event page without creating an account. Planners who run events for clients get team workspaces, their own branding, client review links and webhooks into their other tools. It is a full-stack Next.js app backed by PostgreSQL, with Stripe billing and Mailgun/Twilio delivery.
 
 ## Features
 
-### Authentication
-- **Passwordless Login:** 6-digit SMS or Email OTP authentication
-- **Secure Sessions:** JWT-based session management
-- **Multi-device Support:** Seamless login across devices
+**Events and invitations**
+- Step-by-step event wizard: details, design upload, customization, custom RSVP fields, guest list and preview
+- Optional AI draft: describe the event and get a structured draft for the host to review; the model is told not to invent venues, prices or dates, and every assumption is flagged for confirmation (OpenAI, with a non-AI fallback)
+- Event templates, one-click clone for repeat events, and a publish readiness check before invitations go out
+- Public event page with add-to-calendar (Google, Apple, Outlook / `.ics`), comments and a sign-up board
 
-### Event Management
-- **Dynamic Dashboards:** Dedicated views for event hosts and guests
-- **Custom Invitations:** Beautiful, customizable digital invitations
-- **Guest Lists:** Manage guests, plus-ones, and dietary restrictions
-- **QR Codes:** Automatic QR code generation for event entry
+**Guests and RSVPs**
+- Guest list with CSV import (partial imports and duplicate detection), tags, plus-ones and custom questions
+- Response table, RSVP summary and analytics, CSV export
+- Email and SMS invitations, reminders (manual or automatic) and announcements with audience selection and SMS cost preview
+- Per-guest magic links and QR codes, plus a check-in screen for the door
 
-### RSVP Tracking
-- **Real-time Metrics:** Track attendance, plus-ones, and responses
-- **Automated Reminders:** Scheduled dispatch of event updates
-- **Guest Communication:** SMS and email notifications via Twilio/Mailgun
+**For event organizers**
+- Workspaces with owner, admin, planner and check-in roles
+- Brand kit: logo, colours, email sender name and SMS signature on every event
+- Clients: client records, read-only review links with live RSVP totals, recorded approvals and per-client history
+- Signed webhooks for RSVPs, check-ins, publishing and client approvals, for Zapier, Make or your own CRM ([docs](docs/webhooks.md))
 
-### For Event Organizers
-- **Workspaces:** Team workspaces with owner, admin, planner and check-in roles
-- **Brand Kit:** Your logo, colours, email sender name and text signature on every event
-- **Clients:** Client records, read-only review links with live RSVP totals, recorded approvals, and per-client event history with CSV export
-- **Webhooks:** Signed webhooks for RSVPs, check-ins, publishing and client approvals, for Zapier, Make or your own CRM ([docs](docs/webhooks.md))
+**Accounts, billing and safety**
+- Passwordless sign-in with 6-digit email or SMS codes (password sign-in also supported), database-backed sessions
+- Stripe billing for a free tier, one-time Event Pass, annual Pro and SMS top-ups. During the controlled beta (`BETA_MODE` in `src/lib/constants.ts`) paid checkout is turned off and every account gets the beta plan
+- Test-only switches for payments and outbound messages, plus opt-out and suppression handling for SMS and email
+- Account data export and deletion, rate limiting, upload quotas, and a Content Security Policy with HSTS and `frame-ancestors 'none'`
+- Web app manifest, so it can be added to a home screen
 
-### Pricing Model
-- **Free:** One event for up to 50 guests with email invitations
-- **Event Pass:** A one-time upgrade for one bigger event (250 guests, SMS allowance, every feature)
-- **Annual Pro:** Unlimited events for repeat hosts and planners
+## Tech stack
 
-### Integrations
-- **Payment Processing:** Stripe integration for premium features
-- **Calendar Export:** Add events to Google, Apple, or Outlook calendars
-
-## Tech Stack
-
-| Category | Technology |
-|----------|------------|
+| Area | Technology |
+|------|------------|
 | Framework | Next.js 16 (App Router), React 19, TypeScript |
-| Database | PostgreSQL 16 (raw SQL via `pg`) |
-| Authentication | Custom database-backed sessions, email/SMS OTP |
-| Styling | Tailwind CSS 4 + Radix UI primitives |
-| SMS | Twilio |
-| Email | Mailgun |
+| Database | PostgreSQL 16 with raw SQL via `pg` |
+| Styling and UI | Tailwind CSS 4, Radix UI Tooltip, Framer Motion, Lucide icons |
+| Forms and validation | React Hook Form, Zod |
+| Email / SMS | Mailgun, Twilio |
 | Payments | Stripe |
-| Deployment | Docker / Coolify |
+| AI drafts | OpenAI Responses API (structured JSON output) |
+| Testing | Node test runner with `tsx`, Playwright, axe-core |
+| Packaging | Docker (multi-stage `Dockerfile`) |
 
-## Prerequisites
+## Getting started
 
-- Node.js 20+
-- PostgreSQL 16
-- Twilio, Mailgun and Stripe accounts (test credentials are fine for local work)
-
-## Installation
+Prerequisites: Node.js 20+, PostgreSQL 16, and Mailgun, Twilio and Stripe accounts (test credentials are fine for local work).
 
 ```bash
 git clone https://github.com/camster91/SealSend.git
 cd SealSend
 npm install
-cp .env.example .env.local   # then fill in values; see comments in .env.example
+cp .env.example .env.local   # fill in values; see comments in .env.example
 ```
 
 Keep `PAYMENTS_TEST_ONLY=true` and `COMMUNICATIONS_TEST_ONLY=true` outside production.
 
-### Database Setup
+Set up the database:
 
 ```bash
 # Fresh database
@@ -77,7 +68,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/lib/db/schema.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apply-security-indexes.sql
 ```
 
-## Usage
+Run it:
 
 ```bash
 npm run dev      # http://localhost:3000
@@ -85,46 +76,43 @@ npm run build
 npm run start
 ```
 
+`docker-compose.yml` builds and runs the web container (point `DATABASE_URL` at your PostgreSQL instance).
+
 ## Testing
 
 ```bash
 npm run typecheck
-npm run lint        # zero warnings allowed
-npm test            # unit and readiness tests
-npm run test:e2e    # Playwright
-npm run test:config # check provider configuration
-npm run test:email  # send a test email
-npm run test:sms    # send a test SMS
+npm run lint          # zero warnings allowed
+npm test              # unit and readiness tests
+npm run test:e2e      # Playwright end-to-end, accessibility and visual tests
+npm run test:config   # check provider configuration
+npm run test:email    # send a test email
+npm run test:sms      # send a test SMS
 ```
 
-## Deployment
+## Project structure
 
-SealSend ships as a Docker image (`Dockerfile`) and runs on a VPS under Coolify with PostgreSQL in a separate container. `docker-compose.yml` runs the stack locally.
-
-Release steps, current production state and rollback targets are in `DEPLOYMENT_READINESS.md`. Backup, health-check, maintenance and release-rehearsal scripts are in `ops/`.
+```
+src/
+  app/
+    (marketing)/   public site: home, pricing, use cases, legal
+    (auth)/        sign-in, sign-up, password reset
+    (dashboard)/   events, guests, responses, check-in, settings
+    e/[slug]/      public event and RSVP page
+    client/        client review links
+    api/           route handlers (events, RSVPs, billing, webhooks, cron)
+  components/      UI, wizard, dashboard and public-event components
+  lib/             auth, db, email/SMS, billing, AI, webhooks, validation
+tests/             unit tests and Playwright specs (tests/e2e)
+scripts/           admin, beta and test utilities
+docs/              feature and operations docs
+```
 
 ## Documentation
 
-- `CLAUDE.md` - Codebase guide (architecture, auth, database, conventions)
-- `DEPLOYMENT_READINESS.md` - Release status and production runbook
-- `docs/launch-operations.md` - Beta and launch operations
-- `docs/paid-beta-evidence-register.md` - Launch evidence
-- `docs/AUTOMATIC_REMINDERS.md` - Reminder scheduling
-- `docs/product-strategy-organizer-platform.md` - Draft product strategy: one-off hosts and the organizer platform
-
-## Roadmap
-
-- [ ] GlowOS integration for AI-generated event descriptions
-- [ ] Premium tiers with 24-hour token reset model
-- [ ] Advanced automated follow-ups
-- [ ] Calendar integration improvements
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push and open a Pull Request
+- [docs/webhooks.md](docs/webhooks.md): webhook events and signature verification
+- [docs/AUTOMATIC_REMINDERS.md](docs/AUTOMATIC_REMINDERS.md): reminder scheduling
+- [docs/product-strategy-organizer-platform.md](docs/product-strategy-organizer-platform.md): product direction for one-off hosts and organizers
 
 ## License
 
@@ -135,4 +123,5 @@ You can use, modify and self-host SealSend. If you run a modified version as a n
 Code published before the switch to AGPL on 2026-09-26 (up to commit `7361786`) was released under MIT, and copies obtained under that licence keep it.
 
 ---
-Developed by Cameron Ashley / Nexus AI.
+
+Built by Cameron Ashley ([Ashbi Design](https://ashbi.ca)).
