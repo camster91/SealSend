@@ -19,6 +19,8 @@ interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  /** Extra MIME headers, e.g. List-Unsubscribe. */
+  headers?: Record<string, string>;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ id: string }> {
@@ -44,6 +46,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ id: string }
     html: params.html,
     text: params.text,
     replyTo: params.replyTo,
+    headers: params.headers,
   });
   
   return {

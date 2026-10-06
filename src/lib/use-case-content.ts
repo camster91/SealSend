@@ -18,7 +18,7 @@ export interface UseCaseData {
 }
 
 const betaCapacityAnswer =
-  "The controlled beta supports one active event with up to 100 guests. Paid checkout is disabled while SealSend completes provider, compliance, accessibility, and real-event launch evidence.";
+  "SealSend is a free beta. Each account can run one active event with up to 100 guests. Paid plans are not available yet.";
 
 export const USE_CASES: Record<string, UseCaseData> = {
   "community-events": {
@@ -29,7 +29,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     indexDescription: "Keep invitations, RSVPs, guest segments, approved updates, and arrival status connected for a real community gathering.",
     indexFeatures: ["Guest tags", "Co-host roles", "Mobile check-in", "Approved updates"],
     metaTitle: "Community Event Invitations and RSVP Workflow",
-    metaDescription: "Run a community event from an editable invitation and RSVP through guest updates and check-in in SealSend's controlled beta.",
+    metaDescription: "Run a community event from an editable invitation and RSVP through guest updates and check-in in SealSend's free beta.",
     heroHeadline: "Run the monthly potluck without the spreadsheet.",
     heroSubtext: "For creative communities, alumni groups, neighborhood organizers, and recurring gatherings that need more than a link and a spreadsheet.",
     benefits: [
@@ -41,8 +41,8 @@ export const USE_CASES: Record<string, UseCaseData> = {
     faqs: [
       { question: "What size community event fits the beta?", answer: betaCapacityAnswer },
       { question: "Do guests need a SealSend account?", answer: "No. Guests open the published event link in a browser and submit the RSVP form without creating an account or installing an app." },
-      { question: "Can several organizers help?", answer: "Yes. The controlled beta allows up to three team members including the owner, with manager, check-in, and viewer roles." },
-      { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Live email and SMS are enabled only after provider readiness is confirmed for the consented beta host." },
+      { question: "Can several organizers help?", answer: "Yes. The free beta allows up to three team members including the owner, with manager, check-in, and viewer roles." },
+      { question: "Does SealSend send messages without approval?", answer: "No. The host must approve an external send or schedule. Email invitations work today. SMS is turned off for now." },
     ],
     ctaText: "Start a community event",
     keywords: ["community event RSVP", "community event invitations", "event guest list", "community event check in"],
@@ -61,14 +61,14 @@ export const USE_CASES: Record<string, UseCaseData> = {
     benefits: [
       { icon: "ClipboardList", title: "Ask the questions that affect delivery", description: "Add custom RSVP fields for accessibility needs, dietary requirements, roles, or other event-specific planning details." },
       { icon: "Calendar", title: "Coordinate sign-up needs", description: "Use the event sign-up board for bounded roles or items, with availability kept alongside the event." },
-      { icon: "Mail", title: "Keep communication deliberate", description: "Resolve the intended audience and require host approval before email or SMS communication leaves SealSend." },
+      { icon: "Mail", title: "Keep communication deliberate", description: "Resolve the intended audience and require host approval before any email leaves SealSend." },
       { icon: "BarChart3", title: "Retain a usable record", description: "Review aggregate response status and export guest information for an authorized operational follow-up or event-day fallback." },
     ],
     faqs: [
-      { question: "What is included during the controlled beta?", answer: betaCapacityAnswer },
-      { question: "Can SealSend collect donations or sell tickets?", answer: "No. SealSend does not currently process donations or ticket sales. You can place an approved external link on the event page when another service owns that transaction." },
+      { question: "What is included during the free beta?", answer: betaCapacityAnswer },
+      { question: "Can SealSend collect donations or sell tickets?", answer: "No. SealSend does not currently process donations or ticket sales. You can place an external link on the event page when another service owns that transaction." },
       { question: "Can we collect accessibility or volunteer details?", answer: "Yes. Organizers can configure custom RSVP questions and use a sign-up board for event-specific roles or items." },
-      { question: "How is guest communication controlled?", answer: "The organizer reviews recipients, channels, schedule, and the available cost estimate before approving an external send. Provider readiness remains a separate beta gate." },
+      { question: "How is guest communication controlled?", answer: "The organizer reviews recipients, channels, schedule, and the available cost estimate before approving an external send." },
     ],
     ctaText: "Start a nonprofit event",
     keywords: ["nonprofit event RSVP", "volunteer event invitations", "nonprofit guest management", "community nonprofit events"],
@@ -143,7 +143,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
       { icon: "Plug", title: "Connect the tools you already use", description: "Signed webhooks send each RSVP, check-in, publish and client approval to Zapier, Make or your own CRM, with retries if your endpoint is down." },
     ],
     faqs: [
-      { question: "What is included during the controlled beta?", answer: `${betaCapacityAnswer} Workspaces, the brand kit, client records, review links and webhooks are all available to beta organizers at no cost.` },
+      { question: "What is included during the free beta?", answer: `${betaCapacityAnswer} Workspaces, the brand kit, client records, review links and webhooks are all available to beta organizers at no cost.` },
       { question: "Can I remove SealSend's name completely?", answer: "Not yet. During the beta, emails and texts show your brand followed by \"via SealSend\". Full white-label is planned for the paid organizer plans." },
       { question: "Do my clients need an account?", answer: "No. A client opens the review link in a browser, sees the invitation and RSVP totals, and can approve it by typing their name. Links expire after 30 days and can be revoked at any time." },
       { question: "Does SealSend handle contracts, invoices or payments from clients?", answer: "No. SealSend covers the guest side of the event: invitations, RSVPs, updates and check-in. Use webhooks to send that data into the CRM or invoicing tool you already use." },

@@ -62,6 +62,8 @@ interface SendEmailParams {
   bcc?: string | string[];
   cc?: string | string[];
   replyTo?: string;
+  /** Extra MIME headers, sent to Mailgun as h:<Name> fields. */
+  headers?: Record<string, string>;
   attachments?: Array<{
     filename: string;
     data: Buffer | string;
@@ -99,6 +101,14 @@ export async function sendEmail(params: SendEmailParams): Promise<MailgunRespons
 
   if (params.replyTo) {
     messageData['h:Reply-To'] = params.replyTo;
+  }
+
+  for (const [name, value] of Object.entries(params.headers ?? {})) {
+    // Refuse header injection: names are tokens, values are single lines.
+    if (!/^[A-Za-z0-9-]+$/.test(name) || /[\r\n]/.test(value)) {
+      throw new Error(`Invalid email header: ${name}`);
+    }
+    messageData[`h:${name}`] = value;
   }
 
   if (params.attachments && params.attachments.length > 0) {

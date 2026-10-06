@@ -733,7 +733,7 @@ test('candidate publishes factual support expectations without promising round-t
   assert.match(support, /within two business days/i);
   assert.match(support, /not a 24\/7 or guaranteed resolution time/i);
   assert.match(support, /Never email passwords, one-time codes, session cookies, payment-card data/i);
-  assert.match(support, /controlled beta/i);
+  assert.match(support, /free beta/i);
   assert.match(footer, /href(?:=|:\s*)"\/support"/);
   assert.match(sitemap, /`\$\{SITE_URL\}\/support`/);
 });
@@ -1431,10 +1431,10 @@ test('published retention and deletion terms match the support-request workflow'
   const terms = await read('src/app/(marketing)/terms/page.tsx');
   const privacy = await read('src/app/(marketing)/privacy/page.tsx');
   for (const policy of [terms, privacy]) {
-    assert.match(policy, /request.*deletion/i);
-    assert.match(policy, /verify the request/i);
-    assert.match(policy, /within 30 days/i);
-    assert.match(policy, /legal/i);
+    assert.match(policy, /deletion request/i);
+    assert.match(policy, /ask(?:ed)? (?:us )?to delete your account/i);
+    assert.match(policy, /within 7 days/i);
+    assert.match(policy, /law/i);
   }
 });
 

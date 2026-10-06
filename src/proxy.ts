@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 /**
  * CSRF: for browser state-changing API calls require Origin or Referer
- * matching this host. Missing both is rejected (except webhooks/cron).
+ * matching this host. Missing both is rejected (except webhooks/cron and
+ * one-click unsubscribe, whose signed token is the only authorization and
+ * which mail providers POST to without an Origin, per RFC 8058).
  */
 function isValidOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
@@ -43,7 +45,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/api/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
     !pathname.startsWith('/api/webhooks/') && // Webhooks use signature verification
-    !pathname.startsWith('/api/cron/') // Cron uses Bearer secret
+    !pathname.startsWith('/api/cron/') && // Cron uses Bearer secret
+    !pathname.startsWith('/api/unsubscribe/') // Signed token; RFC 8058 one-click POSTs carry no Origin
   ) {
     if (!isValidOrigin(request)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -67,6 +70,7 @@ export async function proxy(request: NextRequest) {
     '/invite/accept',
     '/client',
     '/guest/update',
+    '/unsubscribe',
   ];
 
   const isPublicRoute =

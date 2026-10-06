@@ -87,7 +87,9 @@ export async function GET(
     // Exclude sensitive token/error fields from list payloads
     const guests = await query(
       `SELECT id, event_id, name, email, phone, notes, invite_status, invite_sent_at,
-              reminder_sent_at, tags, created_at, updated_at
+              reminder_sent_at, tags, created_at, updated_at,
+              (SELECT r.status FROM rsvp_responses r WHERE r.guest_id = guests.id
+               ORDER BY r.updated_at DESC NULLS LAST, r.created_at DESC LIMIT 1) AS reply_status
        FROM guests
        WHERE event_id = $1
        ORDER BY created_at DESC

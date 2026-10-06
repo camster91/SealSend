@@ -13,7 +13,9 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
-import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
+import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { REMINDER_TARGET_SQL } from "@/lib/reminder-targets";
+import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -49,6 +51,7 @@ interface EventRow {
   slug: string;
   tier: string;
   user_id: string;
+  host_name: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -88,7 +91,7 @@ export async function GET(request: NextRequest) {
 
     // Find published events with auto_reminders enabled happening in the window
     const events = await query<EventRow>(
-      `SELECT id, title, event_date, location_name, slug, tier, user_id
+      `SELECT id, title, event_date, location_name, slug, tier, user_id, host_name
        FROM events
        WHERE status = $1 AND auto_reminders = true
          AND event_date >= $2 AND event_date <= $3
@@ -128,22 +131,28 @@ export async function GET(request: NextRequest) {
     for (const event of events) {
       console.log(`[CRON] Processing event ${event.id}`);
 
-      // Fetch guests who:
-      // 1. Haven't received a reminder yet (reminder_sent_at is null)
-      // 2. Have either email or phone
-      // Join with rsvp_responses to check status
+      // Fetch guests who were actually invited (invite_status = 'sent'), have
+      // not been reminded yet, have not declined, and have an email or phone.
+      // Never-invited guests must not get a reminder for an invitation they
+      // never received.
       const rawGuests = await query<GuestWithResponse>(
         `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token, g.reminder_sent_at,
                 r.status as rsvp_status
          FROM guests g
-         LEFT JOIN rsvp_responses r ON r.guest_id = g.id
+         LEFT JOIN LATERAL (
+           SELECT status FROM rsvp_responses
+           WHERE guest_id = g.id
+           ORDER BY updated_at DESC NULLS LAST, created_at DESC
+           LIMIT 1
+         ) r ON TRUE
          WHERE g.event_id = $1
-           AND g.reminder_sent_at IS NULL
+           AND ${REMINDER_TARGET_SQL}
            AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
         [event.id]
       );
       const suppressions = await getCommunicationSuppressions(event.user_id);
       const branding = await getEventBranding(event.id);
+      const sender = await getGuestEmailSender(event, branding);
       // Event Pass events have a finite SMS allowance. Segments are reserved
       // synchronously before each send so parallel batches cannot overspend.
       const smsMetered = smsEnabled && isSmsMetered(await getUserTier(event.user_id), event.tier);
@@ -229,7 +238,8 @@ export async function GET(request: NextRequest) {
 
             // Send email reminder
             if (guest.email) {
-              const { subject, html } = buildReminderEmail({ brand: emailBrand(branding),
+              const { compliance, headers } = guestEmailCompliance(sender, guest.email);
+              const { subject, html } = buildReminderEmail({ brand: emailBrand(branding), compliance,
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
@@ -239,7 +249,7 @@ export async function GET(request: NextRequest) {
 
               try {
                 if (!(await reserveEmailQuota(event.user_id, 1)).success) throw new Error("Daily email limit reached for this account");
-                const result = await sendEmail({ ...emailSendOptions(branding),
+                const result = await sendEmail({ ...guestEmailSendOptions(branding, sender), headers,
                   to: guest.email,
                   subject,
                   html,

@@ -18,7 +18,9 @@ import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
-import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
+import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
+import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 type InviteEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "design_url" | "host_name" | "dress_code" | "rsvp_deadline" | "tier">;
 type InviteGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "phone_invalid_at">;
@@ -37,12 +39,17 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { eventId } = await params;
     const auth = await requireEventPermission(eventId, 'send_messages');
     if (auth.error) return auth.error;
     const user = auth.user;
+
+    // CASL: the host must say these guests expect to hear from them.
+    if (contactConfirmationError(await request.json().catch(() => null))) {
+      return NextResponse.json({ error: CONTACT_CONFIRMATION_MESSAGE }, { status: 400 });
+    }
 
     const { success: rateLimitOk } = await rateLimit(`send-invites:${user.id}`, { max: 5, windowSeconds: 3600 });
     if (!rateLimitOk) {
@@ -79,6 +86,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
     const suppressions = await getCommunicationSuppressions(event.user_id);
     const branding = await getEventBranding(eventId);
+    const sender = await getGuestEmailSender(event, branding);
     const sendableGuests = guests.map((guest) => {
       const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
         ? guest.email
@@ -124,6 +132,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    await recordGuestContactConfirmation(eventId, user.id, "invites", sendableGuests.length);
+
     // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
     const BATCH_SIZE = 10;
     let sent = 0;
@@ -158,7 +168,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           // Send email if guest has email
           if (guest.email) {
             const guestEmail = guest.email;
-            const { subject, html } = buildInvitationEmail({ brand: emailBrand(branding),
+            const { compliance, headers } = guestEmailCompliance(sender, guestEmail);
+            const { subject, html } = buildInvitationEmail({ brand: emailBrand(branding), compliance,
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
@@ -173,7 +184,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              const result = await withRetry(() => sendEmail({ ...emailSendOptions(branding),
+              const result = await withRetry(() => sendEmail({ ...guestEmailSendOptions(branding, sender), headers,
                 to: guestEmail,
                 subject,
                 html,

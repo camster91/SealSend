@@ -334,7 +334,7 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
               Current plan: <span className="font-semibold">{PLAN_LABELS[data.organization?.plan ?? "personal"] ?? data.organization?.plan}</span> · {data.seatLimit} seats
             </p>
             {BETA_MODE ? (
-              <p className="text-sm text-gray-500">Paid workspace plans aren&apos;t available during the controlled beta.</p>
+              <p className="text-sm text-gray-500">Paid workspace plans aren&apos;t available during the free beta.</p>
             ) : viewerRole === "owner" ? (
               <>
                 {subscription && subscription.status !== "canceled" && subscriptionSummary(subscription) && (

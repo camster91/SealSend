@@ -12,7 +12,7 @@ import { softwareApplicationJsonLd } from '@/lib/structured-data';
 
 const title = "Pricing: Free, Event Pass and Pro";
 const description = BETA_MODE
-  ? "SealSend is free during the controlled beta: one active event with up to 100 guests. One flat price per event after the beta, never per guest."
+  ? "SealSend is free during the beta: one active event with up to 100 guests. One flat price per event after the beta, never per guest."
   : "Start free for one event, add an Event Pass for up to 250 guests, or choose annual Pro. One flat price per event, never per guest.";
 
 export const metadata: Metadata = {
@@ -34,7 +34,7 @@ export default function PricingPage() {
         <div className="mx-auto max-w-7xl">
           <PricingCards annualCheckoutAvailable={isAnnualProCheckoutAvailable()} />
           <p className="mt-6 text-center text-sm text-neutral-600">
-            {BETA_MODE ? "The controlled beta is free and paid checkout remains disabled." : "All prices are in USD. Applicable taxes are calculated at checkout."}
+            {BETA_MODE ? "Paid checkout is turned off during the beta." : "All prices are in USD. Applicable taxes are calculated at checkout."}
           </p>
         </div>
       </section>

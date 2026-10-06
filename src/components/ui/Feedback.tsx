@@ -28,6 +28,8 @@ export type ConfirmOptions = {
   cancelLabel?: string;
   /** "danger" for deletes and anything that can't be undone. */
   tone?: "danger" | "default";
+  /** When set, an unchecked checkbox with this label must be ticked before Confirm is enabled. */
+  checkboxLabel?: string;
 };
 
 type ToastTone = "success" | "error" | "info";
@@ -117,12 +119,14 @@ function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   tone = "danger",
+  checkboxLabel,
   onAnswer,
 }: ConfirmOptions & { onAnswer: (value: boolean) => void }) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -135,7 +139,7 @@ function ConfirmDialog({
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
-      const buttons = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled])"));
+      const buttons = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("input:not([disabled]), button:not([disabled])"));
       const first = buttons[0];
       const last = buttons[buttons.length - 1];
       if (event.shiftKey && document.activeElement === first) {
@@ -180,9 +184,20 @@ function ConfirmDialog({
             {description && <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-neutral-600">{description}</p>}
           </div>
         </div>
+        {checkboxLabel && (
+          <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-neutral-200 p-3 text-sm text-neutral-800">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => setChecked(event.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-brand-600"
+            />
+            <span>{checkboxLabel}</span>
+          </label>
+        )}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button ref={cancelRef} type="button" variant="outline" className="min-h-11" onClick={() => onAnswer(false)}>{cancelLabel}</Button>
-          <Button type="button" variant={tone === "danger" ? "destructive" : "default"} className="min-h-11" onClick={() => onAnswer(true)}>{confirmLabel}</Button>
+          <Button type="button" variant={tone === "danger" ? "destructive" : "default"} className="min-h-11" disabled={Boolean(checkboxLabel) && !checked} onClick={() => onAnswer(true)}>{confirmLabel}</Button>
         </div>
       </div>
     </div>
@@ -195,7 +210,7 @@ function ConfirmDialog({
  */
 export function useConfirm(): FeedbackContextValue["confirm"] {
   const context = useContext(FeedbackContext);
-  return context?.confirm ?? (async (options) => window.confirm(options.description ? `${options.title}\n\n${options.description}` : options.title));
+  return context?.confirm ?? (async (options) => window.confirm([options.title, options.description, options.checkboxLabel].filter(Boolean).join("\n\n")));
 }
 
 export function useToast(): FeedbackContextValue["toast"] {

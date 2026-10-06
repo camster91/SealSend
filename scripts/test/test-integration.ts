@@ -228,7 +228,9 @@ async function runIntegrationTests(): Promise<void> {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const response = await fetch(`${baseUrl}/api/events/${context.eventId}/send-invites`, {
       method: 'POST',
+      body: JSON.stringify({ contactConfirmed: true }),
       headers: {
+        'Content-Type': 'application/json',
         'Cookie': `sealsend_session=${sessionToken}; sealsend_user=${JSON.stringify({
           id: context.userId,
           email: `test-${Date.now()}@sealsend.test`,

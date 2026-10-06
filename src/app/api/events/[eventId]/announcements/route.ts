@@ -7,6 +7,8 @@ import { announcementSchema } from "@/lib/validations";
 import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { getEventAccess, roleCan } from "@/lib/auth/event-access";
+import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
+import { buildAudienceQuery } from "@/lib/messages/audience";
 import { dispatchAnnouncement } from "@/lib/messages/dispatch-announcement";
 import { verifyAnnouncementApprovalProof } from "@/lib/messages/approval-proof";
 
@@ -35,7 +37,12 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!access || !roleCan(access.role, "send_messages")) return NextResponse.json({ error: "Event not found" }, { status: 404 });
   const { success: rateLimitOk } = await rateLimit(`announcements:${auth.user.id}`, { max: 10, windowSeconds: 3600 });
   if (!rateLimitOk) return NextResponse.json({ error: "Too many requests. Please wait before scheduling another message." }, { status: 429 });
-  const parsed = announcementSchema.safeParse(await request.json());
+  // CASL: the host must say these guests expect to hear from them.
+  const body = await request.json().catch(() => null);
+  if (contactConfirmationError(body)) return NextResponse.json({ error: CONTACT_CONFIRMATION_MESSAGE }, { status: 400 });
+  const { contactConfirmed: _confirmed, ...announcementBody } = body as Record<string, unknown>;
+  void _confirmed;
+  const parsed = announcementSchema.safeParse(announcementBody);
   if (!parsed.success) return NextResponse.json({ error: "Review and explicitly approve the complete message, audience, channels, and schedule.", details: parsed.error.flatten() }, { status: 400 });
   const approvedInput = {
     eventId,
@@ -70,6 +77,10 @@ export async function POST(request: Request, { params }: RouteParams) {
      VALUES ($1, $2, 'announcement_approved', $3::jsonb)`,
     [eventId, auth.user.id, JSON.stringify({ announcementId: announcement.id, scheduledAt: scheduledAt.toISOString(), channels: parsed.data.channels })],
   );
+  const audienceQuery = buildAudienceQuery(eventId, parsed.data.audience);
+  const audienceRows = await query<{ email: string | null; phone: string | null }>(audienceQuery.sql, audienceQuery.params);
+  const audienceCount = audienceRows.filter((row) => (parsed.data.channels.includes("email") && row.email) || (parsed.data.channels.includes("sms") && row.phone)).length;
+  await recordGuestContactConfirmation(eventId, auth.user.id, "announcement", audienceCount);
   await recordActivationEventSafely({
     name: "announcement_approved",
     userId: event.user_id,

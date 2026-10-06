@@ -9,8 +9,8 @@
 
 ## Refunds and cancellations
 
-- Annual subscriptions: honour the published 14-day money-back guarantee. Confirm Stripe subscription state, refund identifier, amount, and entitlement end date.
-- Per-event purchases: refundable before invitations are sent. After sending begins, apply the published non-refundable rule unless a duplicate charge or service failure requires correction.
+- Annual subscriptions: paid plans and refund terms are not published yet (the Terms say paid plans are not available). Do not promise or apply a refund policy until one is published. Confirm Stripe subscription state, refund identifier, amount, and entitlement end date.
+- Per-event purchases: no published refund rule yet; handle any duplicate charge or service failure case by case.
 - Never promise a refund until the Stripe object, charge state, and policy eligibility are verified.
 - Cancellation must stop future renewals without deleting event data. Account deletion is a separate workflow.
 

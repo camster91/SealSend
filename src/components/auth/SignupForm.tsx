@@ -173,6 +173,13 @@ export function SignupForm() {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
+        By creating an account you agree to the{" "}
+        <Link href="/terms" className="font-medium text-ink underline underline-offset-2">Terms</Link>
+        {" "}and{" "}
+        <Link href="/privacy" className="font-medium text-ink underline underline-offset-2">Privacy Policy</Link>.
+      </p>
+
+      <p className="text-center text-xs text-muted-foreground">
         No password needed. We&apos;ll email you a secure code to sign in.
       </p>
 

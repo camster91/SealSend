@@ -15,6 +15,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
   const [scheduledAt, setScheduledAt] = useState('');
   const [preview, setPreview] = useState<{ count: number; emailCount: number; smsCount: number; smsSegmentCount: number; approvalProof: string; recipients: Array<{ id: string; name: string; channels: string[] }>; truncated: boolean; estimatedCostMicros: number | null; costConfigured: boolean } | null>(null);
   const [approved, setApproved] = useState(false);
+  const [contactConfirmed, setContactConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ status: string; sent_to_count: number; scheduled_at: string } | null>(null);
@@ -33,7 +34,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
       .then((data) => setTags(data.tags ?? []));
   }, [open, eventId]);
 
-  function reset() { setSubject(''); setMessage(''); setDraftIntent(''); setAiDraft(null); setAudience({ rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false }); setChannels(['email']); setScheduledAt(''); setPreview(null); setApproved(false); setBusy(false); setError(null); setResult(null); }
+  function reset() { setSubject(''); setMessage(''); setDraftIntent(''); setAiDraft(null); setAudience({ rsvpStatuses: [], invitationStatuses: [], tagIds: [], unansweredOnly: false }); setChannels(['email']); setScheduledAt(''); setPreview(null); setApproved(false); setContactConfirmed(false); setBusy(false); setError(null); setResult(null); }
   function handleClose() { reset(); onClose(); }
   function toggleFilter(key: 'rsvpStatuses' | 'invitationStatuses', value: string) {
     setAudience((current) => ({ ...current, [key]: current[key].includes(value) ? current[key].filter((item) => item !== value) : [...current[key], value] }));
@@ -61,10 +62,10 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!preview || !approved) return;
+    if (!preview || !approved || !contactConfirmed) return;
     setBusy(true); setError(null);
     const when = scheduledAt ? new Date(scheduledAt).toISOString() : 'now';
-    const response = await fetch(`/api/events/${eventId}/announcements`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: subject.trim(), message: message.trim(), audience, channels, scheduledAt: when, approved: true, approvalProof: preview?.approvalProof }) });
+    const response = await fetch(`/api/events/${eventId}/announcements`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: subject.trim(), message: message.trim(), audience, channels, scheduledAt: when, approved: true, contactConfirmed: true, approvalProof: preview?.approvalProof }) });
     const data = await response.json();
     if (!response.ok) setError(data.error || 'Could not queue announcement.');
     else { setResult(data); onSuccess(); }
@@ -94,9 +95,9 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
         <fieldset><legend className="text-sm font-semibold">Channels</legend><div className="mt-2 flex gap-5">{(smsEnabled ? (['email','sms'] as const) : (['email'] as const)).map((channel) => <label key={channel} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={channels.includes(channel)} onChange={(e) => { setChannels(e.target.checked ? [...channels, channel] : channels.filter((item) => item !== channel)); setPreview(null); setApproved(false); }} />{channel.toUpperCase()}</label>)}</div></fieldset>
         <div><label htmlFor="ann-schedule" className="text-sm font-medium">Schedule (leave empty to send now)</label><input id="ann-schedule" type="datetime-local" value={scheduledAt} onChange={(e) => { setScheduledAt(e.target.value); setPreview(null); setApproved(false); }} className="mt-1 h-11 w-full rounded-lg border px-3" /></div>
         <Button type="button" variant="outline" onClick={previewAudience} loading={busy} disabled={!subject.trim() || !message.trim()}>Preview audience</Button>
-        {preview && <div className="rounded-xl bg-brand-50 p-4"><p className="font-semibold">Resolved audience: {preview.count} guests</p><p className="text-sm text-gray-600">{preview.emailCount} with email{smsEnabled ? ` · ${preview.smsCount} with SMS` : ''}{smsEnabled && preview.smsCount > 0 ? ` · ${preview.smsSegmentCount} billed SMS segment${preview.smsSegmentCount === 1 ? '' : 's'}` : ''}</p><p className="mt-1 text-sm font-medium">Estimated provider charge: {preview.costConfigured && preview.estimatedCostMicros !== null ? `$${(preview.estimatedCostMicros / 1_000_000).toFixed(4)} USD` : 'Unavailable — confirm current provider pricing before approval'}</p><details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Review resolved recipients</summary><ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white p-2 text-sm">{preview.recipients.map((recipient) => <li key={recipient.id} className="border-b px-2 py-2 last:border-0">{recipient.name || 'Unnamed guest'} — {recipient.channels.join(' + ')}</li>)}</ul>{preview.truncated && <p className="mt-1 text-xs text-gray-600">Showing the first 100 recipients.</p>}</details><label className="mt-3 flex items-start gap-2"><input className="mt-1" type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span className="text-sm">I reviewed the final content, resolved recipients, estimated cost status, channels, and schedule and approve this external send.</span></label></div>}
+        {preview && <div className="rounded-xl bg-brand-50 p-4"><p className="font-semibold">Resolved audience: {preview.count} guests</p><p className="text-sm text-gray-600">{preview.emailCount} with email{smsEnabled ? ` · ${preview.smsCount} with SMS` : ''}{smsEnabled && preview.smsCount > 0 ? ` · ${preview.smsSegmentCount} billed SMS segment${preview.smsSegmentCount === 1 ? '' : 's'}` : ''}</p><p className="mt-1 text-sm font-medium">Estimated provider charge: {preview.costConfigured && preview.estimatedCostMicros !== null ? `$${(preview.estimatedCostMicros / 1_000_000).toFixed(4)} USD` : 'Unavailable — confirm current provider pricing before approval'}</p><details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Review resolved recipients</summary><ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white p-2 text-sm">{preview.recipients.map((recipient) => <li key={recipient.id} className="border-b px-2 py-2 last:border-0">{recipient.name || 'Unnamed guest'} — {recipient.channels.join(' + ')}</li>)}</ul>{preview.truncated && <p className="mt-1 text-xs text-gray-600">Showing the first 100 recipients.</p>}</details><label className="mt-3 flex items-start gap-2"><input className="mt-1" type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span className="text-sm">I reviewed the final content, resolved recipients, estimated cost status, channels, and schedule and approve this external send.</span></label><label className="mt-3 flex items-start gap-2"><input className="mt-1 h-5 w-5" type="checkbox" checked={contactConfirmed} onChange={(e) => setContactConfirmed(e.target.checked)} /><span className="text-sm">These guests know me and expect to hear from me.</span></label></div>}
         {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={handleClose}>Cancel</Button><Button type="submit" loading={busy} disabled={!approved || !preview || channels.length === 0 || preview.count === 0}>{scheduledAt ? 'Schedule approved message' : 'Send approved message'}</Button></div>
+        <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={handleClose}>Cancel</Button><Button type="submit" loading={busy} disabled={!approved || !contactConfirmed || !preview || channels.length === 0 || preview.count === 0}>{scheduledAt ? 'Schedule approved message' : 'Send approved message'}</Button></div>
       </form>}</div>
     </div>
   </div>;
