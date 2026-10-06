@@ -1,5 +1,6 @@
 import { formatDateTime, escapeHtml } from "@/lib/utils";
 import { sanitizeUrl } from "@/lib/sanitize";
+import { SENDER_LEGAL_NAME, SENDER_POSTAL_ADDRESS, SUPPORT_EMAIL } from "@/lib/legal";
 
 /** Workspace brand shown in the email footer. White-labelled brands hide SealSend. */
 export interface EmailBrand {
@@ -13,7 +14,29 @@ const SEALSEND_FOOTER = `<p style="margin:0 0 4px;font-size:12px;color:#9ca3af;"
                 <span style="color:#374151;">Seal</span><span style="color:#7c3aed;">Send</span>
               </p>`;
 
-export function buildEmailFooter(brand?: EmailBrand | null): string {
+/**
+ * Anti-spam (CASL / CAN-SPAM) details every guest email must carry: who sent
+ * it, SealSend's postal address and contact, and a working unsubscribe link
+ * for this recipient.
+ */
+export interface EmailCompliance {
+  hostName: string;
+  unsubscribeUrl: string;
+}
+
+function buildComplianceFooter(compliance: EmailCompliance): string {
+  const host = escapeHtml(compliance.hostName);
+  const link = escapeHtml(compliance.unsubscribeUrl);
+  return `
+              <p style="margin:12px 0 0;font-size:11px;line-height:1.6;color:#4b5563;">Sent by ${host} using SealSend &middot; ${escapeHtml(SENDER_LEGAL_NAME)}, ${escapeHtml(SENDER_POSTAL_ADDRESS)} &middot; <a href="mailto:${SUPPORT_EMAIL}" style="color:#4b5563;">${SUPPORT_EMAIL}</a> &middot; <a href="${link}" style="color:#1b2a4a;text-decoration:underline;">Unsubscribe</a></p>`;
+}
+
+export function buildEmailFooter(brand?: EmailBrand | null, compliance?: EmailCompliance): string {
+  const complianceHtml = compliance ? buildComplianceFooter(compliance) : "";
+  return buildBrandFooter(brand) + complianceHtml;
+}
+
+function buildBrandFooter(brand?: EmailBrand | null): string {
   if (!brand) return SEALSEND_FOOTER;
   const logo = brand.logoUrl ? sanitizeUrl(brand.logoUrl) : null;
   const logoHtml = logo ? `<img src="${escapeHtml(logo)}" alt="" height="32" style="display:inline-block;max-height:32px;border:0;margin:0 0 6px;" /><br />` : "";
@@ -35,6 +58,7 @@ interface InvitationEmailParams {
   eventTimezone?: string;
   qrCodeUrl?: string;
   brand?: EmailBrand | null;
+  compliance: EmailCompliance;
 }
 
 export function buildInvitationEmail(params: InvitationEmailParams): {
@@ -209,7 +233,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              ${buildEmailFooter(params.brand)}
+              ${buildEmailFooter(params.brand, params.compliance)}
             </td>
           </tr>
         </table>
@@ -229,6 +253,7 @@ interface ReminderEmailParams {
   locationName: string | null;
   rsvpUrl: string;
   brand?: EmailBrand | null;
+  compliance: EmailCompliance;
 }
 
 export function buildReminderEmail(params: ReminderEmailParams): {
@@ -327,7 +352,7 @@ export function buildReminderEmail(params: ReminderEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              ${buildEmailFooter(params.brand)}
+              ${buildEmailFooter(params.brand, params.compliance)}
             </td>
           </tr>
         </table>
@@ -347,6 +372,7 @@ interface AnnouncementEmailParams {
   announcementMessage: string;
   rsvpUrl: string;
   brand?: EmailBrand | null;
+  compliance: EmailCompliance;
 }
 
 export function buildAnnouncementEmail(params: AnnouncementEmailParams): {
@@ -406,7 +432,7 @@ export function buildAnnouncementEmail(params: AnnouncementEmailParams): {
           <!-- Footer -->
           <tr>
             <td style="padding:20px 24px;border-top:1px solid #f3f4f6;text-align:center;background:#fafafa;">
-              ${buildEmailFooter(params.brand)}
+              ${buildEmailFooter(params.brand, params.compliance)}
             </td>
           </tr>
         </table>

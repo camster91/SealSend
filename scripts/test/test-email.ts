@@ -21,6 +21,9 @@ dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 import { sendEmail, isEmailConfigured } from '../../src/lib/email';
 import { buildInvitationEmail, buildReminderEmail, buildAnnouncementEmail } from '../../src/lib/email-templates';
 
+// Sample footer details; real sends use a signed per-recipient link.
+const TEST_COMPLIANCE = { hostName: 'Test Host', unsubscribeUrl: 'https://sealsend.app/unsubscribe/test' };
+
 type TestResult = {
   name: string;
   success: boolean;
@@ -86,6 +89,7 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
       eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       locationName: '123 Test Street, Test City',
       rsvpUrl: 'https://sealsend.app/e/test-event?t=testtoken123',
+      compliance: TEST_COMPLIANCE,
       designUrl: null,
       hostName: 'Test Host',
       dressCode: 'Casual',
@@ -122,6 +126,7 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
       eventDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
       locationName: '123 Test Street, Test City',
       rsvpUrl: 'https://sealsend.app/e/test-event?t=testtoken123',
+      compliance: TEST_COMPLIANCE,
     });
 
     const result = await sendEmail({
@@ -154,6 +159,7 @@ async function runEmailTests(recipientEmail: string): Promise<void> {
       announcementSubject: 'Venue Change',
       announcementMessage: 'The party has been moved to a new location. Please check the updated details on the event page.',
       rsvpUrl: 'https://sealsend.app/e/test-event?t=testtoken123',
+      compliance: TEST_COMPLIANCE,
     });
 
     const result = await sendEmail({

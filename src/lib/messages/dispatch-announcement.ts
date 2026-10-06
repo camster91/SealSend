@@ -11,11 +11,12 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
 import { getUserTier } from "@/lib/subscription";
-import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
+import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 type Announcement = {
   id: string; event_id: string; subject: string; message: string; audience: unknown; channels: string[];
-  title: string; slug: string; user_id: string; tier: string;
+  title: string; slug: string; user_id: string; tier: string; host_name: string | null;
 };
 type Recipient = { id: string; name: string; email: string | null; phone: string | null; phone_invalid_at: string | null; invite_token: string | null };
 type Delivery = { id: string; guest_id: string; channel: "email" | "sms"; recipient: string; name: string; invite_token: string | null };
@@ -27,7 +28,7 @@ export async function dispatchAnnouncement(announcementId: string) {
   try {
     await client.query("BEGIN");
     const claimed = await client.query<Announcement>(
-      `SELECT a.id, a.event_id, a.subject, a.message, a.audience, a.channels, e.title, e.slug, e.user_id, e.tier
+      `SELECT a.id, a.event_id, a.subject, a.message, a.audience, a.channels, e.title, e.slug, e.user_id, e.tier, e.host_name
        FROM event_announcements a JOIN events e ON e.id = a.event_id
        WHERE a.id = $1 AND a.status = 'queued' AND a.approved_at IS NOT NULL AND a.scheduled_at <= NOW()
        FOR UPDATE`, [announcementId],
@@ -68,6 +69,7 @@ export async function dispatchAnnouncement(announcementId: string) {
   let smsBalance = smsMetered ? await getSmsBalance(announcement.event_id) : Number.POSITIVE_INFINITY;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
   const branding = await getEventBranding(announcement.event_id);
+  const sender = await getGuestEmailSender(announcement, branding);
   for (const delivery of deliveries) {
     if (delivery.channel === "email" && isCommunicationSuppressed(suppressions, "email", delivery.recipient)) {
       await query("UPDATE announcement_deliveries SET status = 'opted_out', error = NULL, updated_at = NOW() WHERE id = $1", [delivery.id]);
@@ -82,8 +84,9 @@ export async function dispatchAnnouncement(announcementId: string) {
       let providerMessageId: string;
       if (delivery.channel === "email") {
         if (!(await reserveEmailQuota(announcement.user_id, 1)).success) throw new Error("Daily email limit reached for this account");
-        const content = buildAnnouncementEmail({ brand: emailBrand(branding), guestName: delivery.name, eventTitle: announcement.title, announcementSubject: announcement.subject, announcementMessage: announcement.message, rsvpUrl });
-        providerMessageId = (await sendEmail({ ...emailSendOptions(branding), to: delivery.recipient, subject: content.subject, html: content.html })).id;
+        const { compliance, headers } = guestEmailCompliance(sender, delivery.recipient);
+        const content = buildAnnouncementEmail({ brand: emailBrand(branding), compliance, guestName: delivery.name, eventTitle: announcement.title, announcementSubject: announcement.subject, announcementMessage: announcement.message, rsvpUrl });
+        providerMessageId = (await sendEmail({ ...guestEmailSendOptions(branding, sender), headers, to: delivery.recipient, subject: content.subject, html: content.html })).id;
       } else {
         if (!isTwilioConfigured()) throw new Error("Twilio is not configured");
         const phone = validateAndFormatPhone(delivery.recipient);

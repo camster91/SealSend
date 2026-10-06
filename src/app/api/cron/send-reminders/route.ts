@@ -13,7 +13,8 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
-import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
+import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
 /**
  * Cron job endpoint for sending automatic reminders
@@ -49,6 +50,7 @@ interface EventRow {
   slug: string;
   tier: string;
   user_id: string;
+  host_name: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -88,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     // Find published events with auto_reminders enabled happening in the window
     const events = await query<EventRow>(
-      `SELECT id, title, event_date, location_name, slug, tier, user_id
+      `SELECT id, title, event_date, location_name, slug, tier, user_id, host_name
        FROM events
        WHERE status = $1 AND auto_reminders = true
          AND event_date >= $2 AND event_date <= $3
@@ -144,6 +146,7 @@ export async function GET(request: NextRequest) {
       );
       const suppressions = await getCommunicationSuppressions(event.user_id);
       const branding = await getEventBranding(event.id);
+      const sender = await getGuestEmailSender(event, branding);
       // Event Pass events have a finite SMS allowance. Segments are reserved
       // synchronously before each send so parallel batches cannot overspend.
       const smsMetered = smsEnabled && isSmsMetered(await getUserTier(event.user_id), event.tier);
@@ -229,7 +232,8 @@ export async function GET(request: NextRequest) {
 
             // Send email reminder
             if (guest.email) {
-              const { subject, html } = buildReminderEmail({ brand: emailBrand(branding),
+              const { compliance, headers } = guestEmailCompliance(sender, guest.email);
+              const { subject, html } = buildReminderEmail({ brand: emailBrand(branding), compliance,
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
@@ -239,7 +243,7 @@ export async function GET(request: NextRequest) {
 
               try {
                 if (!(await reserveEmailQuota(event.user_id, 1)).success) throw new Error("Daily email limit reached for this account");
-                const result = await sendEmail({ ...emailSendOptions(branding),
+                const result = await sendEmail({ ...guestEmailSendOptions(branding, sender), headers,
                   to: guest.email,
                   subject,
                   html,

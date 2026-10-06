@@ -16,9 +16,10 @@ import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
 import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
-import { emailBrand, emailSendOptions, getEventBranding, smsSignature } from "@/lib/brands";
+import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
+import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
-type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier">;
+type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier" | "host_name">;
 type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at" | "phone_invalid_at">;
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -37,7 +38,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     // Ownership + status check
     const event = await queryOne<ReminderEvent & { user_id: string }>(
-      'SELECT id, user_id, title, event_date, location_name, slug, status, tier FROM events WHERE id = $1',
+      'SELECT id, user_id, title, event_date, location_name, slug, status, tier, host_name FROM events WHERE id = $1',
       [eventId]
     );
 
@@ -67,6 +68,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const smsEnabled = isTwilioConfigured() && canUseFeature(accountPlan, event.tier as EventTier, "smsInvites");
     const suppressions = await getCommunicationSuppressions(event.user_id);
     const branding = await getEventBranding(eventId);
+    const sender = await getGuestEmailSender(event, branding);
     const sendableGuests = guests.map((guest) => {
       const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
         ? guest.email
@@ -125,7 +127,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
           const errors: Array<{ type: 'email' | 'sms'; message: string }> = [];
 
           if (guest.email) {
-            const { subject, html } = buildReminderEmail({ brand: emailBrand(branding),
+            const { compliance, headers } = guestEmailCompliance(sender, guest.email);
+            const { subject, html } = buildReminderEmail({ brand: emailBrand(branding), compliance,
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
@@ -134,7 +137,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
             });
 
             try {
-              const result = await sendEmail({ ...emailSendOptions(branding),
+              const result = await sendEmail({ ...guestEmailSendOptions(branding, sender), headers,
                 to: guest.email,
                 subject,
                 html,
