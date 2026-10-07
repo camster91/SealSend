@@ -12,6 +12,6 @@ Owner approval: Cameron, 2026-10-07. This plan builds on the approved manual bui
 
 ## Release safety
 
-The social bootstrap acquires a transaction advisory lock and runs additive tables/indexes and a deletion trigger that preserves private file paths for retry. Existing data is not rewritten. Fresh schema and upgrade SQL contain the same definitions. Rollback uses the prior application image; additive tables can remain. Do not delete tables or restore older database contents to roll back code. The existing persistent /app/uploads volume also holds social-private files; retain it across rebuilds.
+Server startup completes the social bootstrap before health checks succeed; authorized routes can retry it if needed. The bootstrap acquires a transaction advisory lock and runs additive tables/indexes and a deletion trigger that preserves private file paths for retry. Existing data is not rewritten. Fresh schema and upgrade SQL contain the same definitions. Rollback uses the prior application image; additive tables can remain. Do not delete tables or restore older database contents to roll back code. The existing persistent /app/uploads volume also holds social-private files; retain it across rebuilds.
 
 Payment/SMS gates and real-host/device review remain evidence-dependent. Approval to ship does not manufacture provider delivery or native store approval. Native iOS/Android implementation was requested as planning, not an already-built signed application.
