@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runChatTurn } from "../src/lib/ai/chat-turn";
+import { AI_UNAVAILABLE_RESPONSE, getChatEventId, runChatTurn } from "../src/lib/ai/chat-turn";
 import { chatRequestSchema } from "../src/lib/ai/chat-schema";
 import { isAiChatConfigured } from "../src/lib/ai/provider";
 import { buildChatInstructions } from "../src/lib/ai/chat-prompt";
@@ -113,5 +113,24 @@ test("another host's event is refused before quota is consumed", () => {
   assert.ok(src.indexOf("requireApiHost(") > -1 && src.indexOf("requireApiHost(") < perm);
   assert.ok(perm < src.indexOf("consumeQuota("));
   assert.ok(perm < src.indexOf("runChatTurn("));
-  assert.doesNotMatch(src, /console\.\w+\([^)]*(messages|body|text)/);
+  assert.match(src, /getChatEventId\(json\)/);
+  for (const file of ["src/app/api/ai/chat/route.ts", "src/lib/ai/chat-turn.ts"]) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), /console\./);
+  }
+});
+
+test("a non-uuid eventId is not permission-checked and fails validation with 400", () => {
+  assert.equal(getChatEventId({ eventId: "not-a-uuid" }), null);
+  assert.equal(getChatEventId({}), null);
+  assert.equal(getChatEventId(null), null);
+  assert.equal(getChatEventId({ eventId: "123e4567-e89b-42d3-a456-426614174000" }), "123e4567-e89b-42d3-a456-426614174000");
+  assert.equal(chatRequestSchema.safeParse({ ...body, eventId: "not-a-uuid" }).success, false);
+});
+
+test("the unconfigured branch is AI_UNAVAILABLE 503 and the route uses it", () => {
+  assert.equal(AI_UNAVAILABLE_RESPONSE.status, 503);
+  assert.equal((AI_UNAVAILABLE_RESPONSE.json as { code: string }).code, "AI_UNAVAILABLE");
+  const src = readFileSync("src/app/api/ai/chat/route.ts", "utf8");
+  assert.match(src, /isAiChatConfigured\(\)/);
+  assert.match(src, /AI_UNAVAILABLE_RESPONSE/);
 });

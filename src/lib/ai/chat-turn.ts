@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { buildChatInstructions } from "@/lib/ai/chat-prompt";
 import { sanitizeChatTurn, type ChatRequest } from "@/lib/ai/chat-schema";
 import type { ChatProvider } from "@/lib/ai/provider";
@@ -39,4 +40,18 @@ export async function runChatTurn(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export const AI_UNAVAILABLE_RESPONSE = {
+  status: 503,
+  json: { error: "The assistant isn't available right now.", code: "AI_UNAVAILABLE" },
+};
+
+/**
+ * The eventId to permission-check, or null when absent or not a UUID. A
+ * non-UUID must fall through to Zod (400), not reach a UUID column (500).
+ */
+export function getChatEventId(json: unknown): string | null {
+  const value = typeof json === "object" && json !== null ? (json as { eventId?: unknown }).eventId : undefined;
+  return z.string().uuid().safeParse(value).success ? (value as string) : null;
 }

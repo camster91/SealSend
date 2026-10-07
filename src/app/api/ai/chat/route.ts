@@ -8,6 +8,8 @@ import {
   AI_CHAT_DAILY_LIMIT,
   AI_CHAT_TIMEOUT_MS,
   AI_CHAT_WINDOW_SECONDS,
+  AI_UNAVAILABLE_RESPONSE,
+  getChatEventId,
   runChatTurn,
 } from "@/lib/ai/chat-turn";
 
@@ -22,17 +24,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const eventId = (json as { eventId?: unknown } | null)?.eventId;
-  if (typeof eventId === "string") {
+  const eventId = getChatEventId(json);
+  if (eventId) {
     const access = await requireEventPermission(eventId, "edit_event");
     if (access.error) return access.error;
   }
 
   if (!isAiChatConfigured()) {
-    return NextResponse.json(
-      { error: "The assistant isn't available right now.", code: "AI_UNAVAILABLE" },
-      { status: 503 },
-    );
+    return NextResponse.json(AI_UNAVAILABLE_RESPONSE.json, { status: AI_UNAVAILABLE_RESPONSE.status });
   }
 
   const parsed = chatRequestSchema.safeParse(json);
