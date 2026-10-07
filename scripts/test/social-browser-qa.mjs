@@ -96,7 +96,7 @@ try {
   assert.equal((await other.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`,{headers:{'X-Guest-Token':otherToken}})).status(),200);
   await otherPage.locator(`img[src$="/${photo.id}"]`).evaluate(img => { if (!img.complete || !img.naturalWidth) throw new Error('Approved album image did not load with the guest cookie'); });
   await page.getByRole('button',{ name:'Remove my photo',exact:true }).click();
-  await page.getByRole('dialog').getByRole('button',{name:'Remove photo',exact:true}).click();
+  await page.getByRole('alertdialog').getByRole('button',{name:'Remove photo',exact:true}).click();
   await page.getByText('Photo removed.',{ exact:true }).waitFor();
   assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,0);
   console.log('PASS guest opt-in, reactions, changeable single vote, private upload, moderation and removal');
@@ -122,7 +122,7 @@ try {
     assert.equal(code,0,`Authenticated ${suite} browser checks`);
     }
   }
-} finally { await browser.close(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
+} finally { await browser.close(); secureServer.closeAllConnections(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
 process.exit(0);
 
 }
