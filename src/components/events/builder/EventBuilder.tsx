@@ -16,6 +16,8 @@ export interface EventBuilderProps {
   templateCustomization?: Partial<EventCustomization>;
   initialStatus?: "draft" | "published";
   initialScreen?: BuilderScreen;
+  /** Server-computed: true when the AI chat is configured. Shows "Switch to chat" on a saved draft. */
+  aiChatEnabled?: boolean;
 }
 
 /** Client wrapper: server pages can't pass the screens function map, so it lives here. */
