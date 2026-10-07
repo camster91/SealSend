@@ -170,5 +170,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
 
-  return { data, update, eventId, status, ensureDraft, retry, flush };
+  // A debounce is still an unsaved edit; never show the previous Saved label.
+  const visibleStatus: SaveStatus = waiting ? { kind: "saving" } : status;
+  return { data, update, eventId, status: visibleStatus, ensureDraft, retry, flush };
 }
