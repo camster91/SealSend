@@ -40,7 +40,7 @@ test("a missing reply returns null", () => {
 });
 
 test("request schema rejects 13 messages and 1001-char messages", () => {
-  const msg = (content: string) => ({ role: "user", content });
+  const msg = (text: string) => ({ role: "user", text });
   const ok = { messages: [msg("hi")], data: {}, today: "2026-10-07", timezone: "America/Toronto" };
   assert.equal(chatRequestSchema.safeParse(ok).success, true);
   assert.equal(
@@ -65,7 +65,7 @@ test("request data accepts null max_attendees and empty strings", () => {
     invitation_body: "",
   };
   const res = chatRequestSchema.safeParse({
-    messages: [{ role: "user", content: "hi" }],
+    messages: [{ role: "user", text: "hi" }],
     data,
     today: "2026-10-07",
     timezone: "America/Toronto",

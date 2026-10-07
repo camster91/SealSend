@@ -75,7 +75,7 @@ export const chatRequestSchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().max(CHAT_MAX_MESSAGE_CHARS),
+        text: z.string().max(CHAT_MAX_MESSAGE_CHARS),
       }),
     )
     .min(1)
