@@ -32,10 +32,14 @@ Task 4: fix round 1/5 (event_date regex escape-collapse fixed + verified 0 backs
 - Ruling R3: overwrite keywords must clearly name the field — dropped "at the", "from", "by" — cost if wrong: host must use clearer words to make the AI change those fields
 Task 4: complete (commits 307cc58..32e15e8)
 Task 5: dispatched (base 32e15e8, opus)
-
-## Resume point (saved 2026-10-07)
-- PR1 (#224) merged: schemas, prompt, provider, /api/ai/chat.
-- Branch feat/ai-chat-p2 (this branch, not yet a PR): Task 4 done (chat-apply), Task 5 done + fix round 1 (73a223c) — scoped re-review was in progress.
-- Next: finish Task 5 re-review → Task 6 (start-screen "Chat with AI" card behind aiChatEnabled, /events/[eventId]/chat page, "Switch to chat" link, privacy wording "AI drafting or chat", tests/e2e/live-ai-chat.spec.ts) → final whole-branch review → PR2 → merge.
-- Prod: OPENAI_API_KEY + AI_MODEL=gpt-6-luna set; UNSUBSCRIBE_SECRET set.
-- After project 2: project 3 = AI cover images (OpenAI gpt-image-2.5-flare likely; needs per-account image limit).
+Task 5: fix round 1/5 (late reply after leaving ignored; whole-turn announcements; stay in chat on failed draft; DST note filter; 73a223c) — re-review all addressed
+Task 5: minor (deferred): an in-flight reply dropped silently when host leaves then stays (can resend)
+Task 5: complete (commits 32e15e8..73a223c)
+Task 6: dispatched (base fb5ba02)
+Task 6: implementer DONE (3bb936b); concern: ChatBuilder has no templateCustomization prop
+Task 6: minor (deferred → final fix): e2e preview assertion vacuous (scope to Invite preview aside at desktop width)
+Task 6: minor (deferred): Switch to chat shows for published events in edit mode; AI_PROVIDER=fake has no NODE_ENV guard
+Task 6: complete (commits fb5ba02..3bb936b, review clean)
+Final review: package 9acabfb..3bb936b (whole project incl. merged #224)
+Final review: with fixes (I1 chat off published events + leaveTo blocked; I2 e2e; I3 real OpenAI unproven). Real probe from prod container: key valid but account has NO CREDITS (429 insufficient_quota) — go-live of PR2 held until Cameron adds credits and a real turn returns 200.
+Final fix wave: fa5c5c8
