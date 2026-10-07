@@ -69,6 +69,15 @@ const chatDataSchema = z.object({
   invitation_body: z.string().max(2000).nullable().optional(),
 });
 
+function isIanaTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const chatRequestSchema = z.object({
   eventId: z.string().uuid().optional(),
   messages: z
@@ -82,7 +91,7 @@ export const chatRequestSchema = z.object({
     .max(CHAT_MAX_MESSAGES),
   data: chatDataSchema,
   today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  timezone: z.string().min(1).max(100),
+  timezone: z.string().min(1).max(100).refine(isIanaTimeZone, "Invalid timezone"),
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;

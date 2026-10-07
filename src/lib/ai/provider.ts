@@ -101,7 +101,9 @@ class FakeChatProvider implements ChatProvider {
 }
 
 export function isAiChatConfigured(): boolean {
-  if (process.env.AI_PROVIDER === "fake") return true;
+  const provider = process.env.AI_PROVIDER || "openai";
+  if (provider === "fake") return true;
+  if (provider !== "openai") return false;
   return Boolean(process.env.OPENAI_API_KEY && process.env.AI_MODEL);
 }
 
