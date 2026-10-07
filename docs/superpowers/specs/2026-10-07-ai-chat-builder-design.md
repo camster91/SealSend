@@ -78,6 +78,7 @@ The route checks, in this order:
 { reply: string (≤ 400),
   chips: string[] (≤ 4, each ≤ 40),
   updates: Partial<ChatEventFields>,
+  overwrite: (keyof ChatEventFields)[],  // fields the host's latest message asked to change
   ready: boolean }   // true when the model judges name, start and place are set
 ```
 
@@ -100,11 +101,12 @@ The model is called with a JSON schema (strict) built from these Zod schemas. Th
 
 ### Applying updates (client, `src/lib/event-builder/chat-apply.ts`, pure)
 
-- `applyChatUpdates(data, updates, aiOwned: Set<field>, explicitlyRequested: Set<field>)` returns `{ data, aiOwned }`.
-- A field is written only if one of these is true:
+- `applyChatUpdates(data, updates, { aiOwned, overwrite, latestUserText })` returns `{ data, aiOwned }`. A field is written only if one of these is true:
   - it is blank;
   - it is in `aiOwned` (the AI set it earlier and the host hasn't edited it since);
-  - the host's latest message named it. The model flags this per field via `updates`; the client trusts an overwrite of a host-edited field only when the user message mentions it, using a simple keyword map per field.
+  - it is in `overwrite` **and** `latestUserText` mentions it, per a small keyword map (`fieldMentioned(field, text)`, e.g. event_date ↔ "date", "day", "time", "pm", weekday names).
+- Every written field is added to `aiOwned`.
+
 - A host edit in manual mode removes that field from `aiOwned`.
 - Dates are converted with `zonedLocalDateTimeToInstant` at save time (as in project 1). An impossible local time (DST gap) is dropped and the assistant is told on the next turn.
 - The update goes through `useEventDraft.update()`. When a title first appears, `ensureDraft()` creates the draft (single-flight), so chat and manual share one draft and one autosave.
