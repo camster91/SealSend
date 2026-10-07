@@ -89,6 +89,8 @@ try {
   await otherPage.goto(`${origin}/e/social-qa?t=${otherToken}`);
   await otherPage.getByRole('heading',{ name:'Join in',exact:true }).waitFor();
   assert.equal(await otherPage.getByText('Synthetic QA photo',{ exact:true }).count(),0);
+  await host.addCookies([{name:`sealsend_social_${eventId}`,value:otherToken,domain:'localhost',path:'/api/social/social-qa',httpOnly:true,secure:true,sameSite:'Strict'}]);
+  assert.equal((await host.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`)).status(),200);
   await hostPage.reload();
   await hostPage.getByRole('button',{ name:'Approve photo',exact:true }).click();
   await hostPage.getByText('Synthetic QA photo · Shared',{ exact:true }).waitFor();

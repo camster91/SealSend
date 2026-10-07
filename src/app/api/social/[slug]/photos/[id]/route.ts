@@ -9,14 +9,17 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 type Context = { params: Promise<{ slug: string; id: string }> };
 async function viewer(request: Request, slug: string) {
-  const access = await resolveSocialAccess(request,slug);
-  if (access) return { eventId:access.event.id,guestId:access.guest.id,host:false };
+  // A host who also opened a guest invitation retains moderation access.
   const user = await getCurrentUser();
-  if (user?.role !== 'admin') return null;
-  const event = await queryOne<{ id:string }>('SELECT id FROM events WHERE slug=$1',[slug]);
-  if (!event) return null;
-  const host = await getEventAccess(user.id,event.id);
-  return host && roleCan(host.role,'edit_event') ? { eventId:event.id,guestId:null,host:true } : null;
+  if (user?.role === 'admin') {
+    const event = await queryOne<{ id:string }>('SELECT id FROM events WHERE slug=$1',[slug]);
+    if (event) {
+      const host = await getEventAccess(user.id,event.id);
+      if (host && roleCan(host.role,'edit_event')) return { eventId:event.id,guestId:null,host:true };
+    }
+  }
+  const access = await resolveSocialAccess(request,slug);
+  return access ? { eventId:access.event.id,guestId:access.guest.id,host:false } : null;
 }
 const missing = () => NextResponse.json({ error:'Not found' },{ status:404,headers:{ 'Cache-Control':'private, no-store' } });
 export async function GET(request: Request, { params }: Context) {

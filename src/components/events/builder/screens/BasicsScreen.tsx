@@ -31,7 +31,11 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
   // Once the draft exists, a cleared name is held here: the server refuses a blank one.
   const holdBlankName = Boolean(ctx.eventId);
   const errors = basicsErrors(view, held, { published, holdBlankName });
-  const zones = useMemo(() => timezoneOptions(data.event_timezone), [data.event_timezone]);
+  // ICU timezone aliases differ across Node and browsers. Hydrate the saved
+  // timezone first, then discover this browser's supported choices after mount.
+  const [zonesReady, setZonesReady] = useState(false);
+  useEffect(() => { setZonesReady(true); }, []);
+  const zones = useMemo(() => zonesReady ? timezoneOptions(data.event_timezone) : [{ value:data.event_timezone,label:data.event_timezone.replace(/_/g," ") }], [data.event_timezone,zonesReady]);
 
   const errorFor = (field: keyof BuilderData): string | undefined =>
     errors[field] ?? ctx.fieldErrors[field] ?? (field === "title" && !view.title.trim() ? ctx.nameError : undefined);
