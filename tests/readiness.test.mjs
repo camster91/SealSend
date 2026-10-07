@@ -1457,12 +1457,14 @@ test('verified account deletion is cancellable, subscription-safe, and executed 
 
 test('storage is quota-backed and destructive retention jobs default off', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const upload = await read('src/app/api/upload/route.ts');
+  const upload = await read('src/lib/upload-store.ts');
+  const uploadRoute = await read('src/app/api/upload/route.ts');
   const drafts = await read('src/app/api/cron/cleanup-drafts/route.ts');
   const uploads = await read('src/app/api/cron/cleanup-uploads/route.ts');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS upload_assets/);
   assert.match(upload, /pg_advisory_xact_lock/);
-  assert.match(upload, /Storage quota exceeded/);
+  assert.match(upload, /canReserveStorage/);
+  assert.match(uploadRoute, /Storage quota exceeded/);
   assert.match(drafts, /ENABLE_STALE_DRAFT_CLEANUP/);
   assert.match(drafts, /updated_at < \$2/);
   assert.match(uploads, /ENABLE_ORPHAN_UPLOAD_CLEANUP/);
