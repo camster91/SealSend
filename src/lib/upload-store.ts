@@ -102,7 +102,7 @@ export type StoreResult =
   | { url: string; usedBytes: number; quotaBytes: number }
   | { error: "quota"; usedBytes: number; quotaBytes: number };
 
-export interface StoreDeps { db?: UploadStoreDb; uploadsDir?: string }
+export interface StoreDeps { db?: UploadStoreDb; uploadsDir?: string; privateFolder?: "social-private" }
 
 /** Reserve quota and persist already-final bytes (used directly for video/audio). */
 export async function storeBufferForUser(
@@ -114,13 +114,13 @@ export async function storeBufferForUser(
 ): Promise<StoreResult> {
   const finalFileName = fileName;
   const uploadsDir = deps.uploadsDir ?? path.join(process.cwd(), "uploads");
-  const userDir = path.join(uploadsDir, userId);
+  const userDir = path.join(uploadsDir, userId, deps.privateFolder ?? "");
   const filePath = path.join(userDir, finalFileName);
 
   // Ensure the user's upload directory exists
   await mkdir(userDir, { recursive: true });
 
-  const urlPath = `/uploads/${userId}/${finalFileName}`;
+  const urlPath = `/uploads/${userId}/${deps.privateFolder ? deps.privateFolder + "/" : ""}${finalFileName}`;
 
   const db: UploadStoreDb = deps.db ?? (getDb() as unknown as UploadStoreDb);
   const client = await db.connect();

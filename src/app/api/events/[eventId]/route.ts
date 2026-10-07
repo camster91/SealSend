@@ -1,3 +1,4 @@
+import { captureSocialPhotoPaths, purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
@@ -184,10 +185,12 @@ export async function DELETE(
       );
     }
 
+    const photoPaths = await captureSocialPhotoPaths(eventId);
     await query(
       'DELETE FROM events WHERE id = $1',
       [eventId]
     );
+    await purgeQueuedSocialPhotos(photoPaths).catch(()=>undefined);
 
     return NextResponse.json({ success: true });
   } catch {

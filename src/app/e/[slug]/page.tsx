@@ -5,6 +5,7 @@ import { EventDetails } from "@/components/public-event/EventDetails";
 import { RSVPForm } from "@/components/public-event/RSVPForm";
 import { LocationMap } from "@/components/public-event/LocationMap";
 import { CommentsSection } from "@/components/public-event/CommentsSection";
+import { GuestSocial } from '@/components/social/GuestSocial';
 import { SignupBoard } from "@/components/public-event/SignupBoard";
 import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
@@ -148,6 +149,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
               <AnimatedSection>
                 <SignupBoard eventSlug={slug} />
               </AnimatedSection>
+
+              <AnimatedSection><GuestSocial slug={slug} token={inviteGuest && token ? token : undefined} /></AnimatedSection>
 
               {/* Comments / Message Board */}
               <AnimatedSection>

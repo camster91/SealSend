@@ -19,6 +19,7 @@ import { getUserTier } from '@/lib/subscription';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 import { EventTeamPanel } from '@/components/dashboard/EventTeamPanel';
 import { EventClientPanel } from '@/components/events/EventClientPanel';
+import { HostSocial } from '@/components/social/HostSocial';
 import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
 
 interface EventDetailPageProps {
@@ -286,6 +287,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
             )}
           </div>
         </div>
+
+        {canEdit && !isArchived && <div className="mt-6"><HostSocial eventId={eventId} slug={event.slug as string} /></div>}
 
         {/* Marketing Tools */}
         {canExport && <div className="mt-6">

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { COVER_STYLES, COVER_FAILED, coverFailureMessage, type CoverStyle } from "@/lib/event-builder/ai-cover";
+import { COVER_STYLES, COVER_FAILED, coverFailureMessage, prepareCoverDraft, type CoverStyle } from "@/lib/event-builder/ai-cover";
 import type { ScreenContext } from "../BuilderShell";
 
 const BUTTON = "min-h-11 rounded-[10px] px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-60";
@@ -50,7 +50,7 @@ export function AiCoverPanel({ ctx, onAccepted }: { ctx: ScreenContext; onAccept
     setFailed(undefined);
     setWorking(true);
     try {
-      const eventId = await ctx.ensureDraft();
+      const eventId = await prepareCoverDraft(ctx);
       const res = await fetch("/api/ai/cover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,7 +120,7 @@ export function AiCoverPanel({ ctx, onAccepted }: { ctx: ScreenContext; onAccept
                 className={cn(BUTTON, "bg-ink text-white")}>
                 Generate
               </button>
-              <button type="button" onClick={() => setOpen(false)} disabled={working}
+              <button type="button" onClick={() => { setOpen(false); setReturnFocus(true); }} disabled={working}
                 className={cn(BUTTON, "text-ink underline underline-offset-4")}>
                 Cancel
               </button>

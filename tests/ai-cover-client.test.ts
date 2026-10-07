@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { coverFailureMessage, COVER_STYLES } from '../src/lib/event-builder/ai-cover';
+import { coverFailureMessage, COVER_STYLES, prepareCoverDraft } from '../src/lib/event-builder/ai-cover';
+
+test('generation waits for persisted event details', async () => {
+  const steps: string[] = [];
+  const id = await prepareCoverDraft({
+    ensureDraft: async () => { steps.push('draft'); return 'event'; },
+    flush: async () => { steps.push('saved'); return { kind: 'saved', at: 1 }; },
+  });
+  assert.equal(id, 'event');
+  assert.deepEqual(steps, ['draft', 'saved']);
+});
+
+test('generation stops on failed or blocked saves without using a daily attempt', async () => {
+  for (const kind of ['failed', 'blocked'] as const) {
+    await assert.rejects(prepareCoverDraft({
+      ensureDraft: async () => 'event',
+      flush: async () => kind === 'failed'
+        ? { kind, message: 'failed' }
+        : { kind, fieldErrors: { title: 'name' } },
+    }));
+  }
+});
 
 test('maps each response to its copy', () => {
   assert.equal(coverFailureMessage(429, 'AI_COVER_LIMIT'), "You've used today's 3 AI covers. Upload your own, or try again tomorrow.");

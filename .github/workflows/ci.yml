@@ -72,6 +72,12 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
 
+      - name: Verified guest and authenticated builder QA
+        if: github.actor != 'dependabot[bot]'
+        run: npm run test:social:browser
+        env:
+          SEALSEND_QA_BUILDER: 'true'
+
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e

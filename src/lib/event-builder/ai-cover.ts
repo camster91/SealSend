@@ -1,3 +1,18 @@
+import type { SaveStatus } from "./save-machine";
+
+/** Wait for persisted details before spending a generation attempt. */
+export async function prepareCoverDraft(ctx: {
+  ensureDraft(): Promise<string>;
+  flush(): Promise<SaveStatus>;
+}): Promise<string> {
+  const id = await ctx.ensureDraft();
+  const status = await ctx.flush();
+  if (status.kind !== "idle" && status.kind !== "saved") {
+    throw new Error("Save your event details before making a cover.");
+  }
+  return id;
+}
+
 export type CoverStyle = "elegant" | "playful" | "watercolor" | "photo" | "minimal";
 
 export const COVER_STYLES: ReadonlyArray<{ value: CoverStyle; label: string }> = [

@@ -11,7 +11,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], launchOptions: process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath: process.env.SEALSEND_BROWSER_EXECUTABLE } : undefined } },
     { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
