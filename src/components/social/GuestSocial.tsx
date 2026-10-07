@@ -1,10 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 import { GuestAlbum } from './GuestAlbum';
 import type { SocialState } from '@/lib/social/contracts';
 const BUTTON = 'min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-50';
 const REACTIONS = [{ value: 'excited', label: "I'm excited" }, { value: 'love', label: 'Love this' }, { value: 'celebrate', label: 'Celebrate' }];
-export function GuestSocial({ slug, token }: { slug: string; token?: string }) {
+export function GuestSocial(props: { slug: string; token?: string }) {
+  return <FeedbackProvider><GuestActivities {...props} /></FeedbackProvider>;
+}
+function GuestActivities({ slug, token }: { slug: string; token?: string }) {
   const [state, setState] = useState<SocialState>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);

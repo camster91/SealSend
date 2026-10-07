@@ -57,7 +57,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       const pad = (n: number) => String(n).padStart(2, '0');
       await page.getByLabel('Starts').fill(`${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}T18:00`);
       await page.getByLabel('Place name').fill('QA Hall');
-      await page.getByLabel('Address').fill('123 Main St, Toronto');
+      await page.getByLabel('Address', { exact: true }).fill('123 Main St, Toronto');
       await expect(page.getByText('Saved', { exact: true })).toBeVisible();
       await expectAccessibleAndContained(page, 'basics');
       await page.screenshot({ path: path.join(output, `basics-${viewport.width}.png`), fullPage: true });
@@ -117,11 +117,12 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       const event = await (await page.request.get(`/api/events/${eventId}`)).json();
       expect(event.status).toBe('published');
       expect(event.title).toBe(`QA builder ${viewport.width} edited`);
+      await expect(page.getByLabel('Name of your event')).toHaveValue(`QA builder ${viewport.width} edited`);
       await expectAccessibleAndContained(page, 'edit');
     } finally {
       // Free the account's one-event limit for the next viewport.
       if (eventId) {
-        const del = await page.request.delete(`/api/events/${eventId}`);
+        const del = await page.request.delete(`/api/events/${eventId}`, { headers: { Origin: new URL(page.url()).origin } });
         expect(del.ok()).toBe(true);
       }
     }

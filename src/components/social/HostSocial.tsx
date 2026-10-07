@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useConfirm } from '@/components/ui/Feedback';
 import type { SocialState, SocialSettings } from '@/lib/social/contracts';
 const BUTTON = 'min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-50';
 const FEATURES: { key:keyof SocialSettings; label:string }[] = [
@@ -9,6 +10,7 @@ const FEATURES: { key:keyof SocialSettings; label:string }[] = [
   { key:'countdown_enabled',label:'Event countdown' }, { key:'photo_approval',label:'Review guest photos before sharing' },
 ];
 export function HostSocial({ eventId, slug }: { eventId:string; slug:string }) {
+  const confirm = useConfirm();
   const [state,setState] = useState<SocialState>();
   const [message,setMessage] = useState('');
   const [busy,setBusy] = useState(false);
@@ -51,7 +53,7 @@ export function HostSocial({ eventId, slug }: { eventId:string; slug:string }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/api/social/${slug}/photos/${p.id}`} alt={p.caption || 'Guest photo awaiting review'} loading="lazy" className="aspect-square w-full rounded-lg object-cover" />
         <figcaption className="break-words text-sm">{p.caption || 'Guest photo'} · {p.approved ? 'Shared' : 'Awaiting review'}</figcaption>
-        <div className="flex flex-wrap gap-2">{!p.approved && <button className={BUTTON} disabled={busy} type="button" onClick={()=>void act({ action:'approve_photo',id:p.id })}>Approve photo</button>}<button className={BUTTON} disabled={busy} type="button" onClick={()=>{ if(window.confirm('Remove this photo from the album?')) void act({ action:'delete_photo',id:p.id }); }}>Remove photo</button></div>
+        <div className="flex flex-wrap gap-2">{!p.approved && <button className={BUTTON} disabled={busy} type="button" onClick={()=>void act({ action:'approve_photo',id:p.id })}>Approve photo</button>}<button className={BUTTON} disabled={busy} type="button" onClick={()=>void confirm({ title:'Remove this photo?',description:'This removes the photo from the shared album.',confirmLabel:'Remove photo',tone:'danger' }).then(yes=>{ if(yes) void act({ action:'delete_photo',id:p.id }); })}>Remove photo</button></div>
       </figure>)}</div>}
     </div>}
     <p role="status" className="mt-3 text-sm">{message || (!state ? 'Loading activities…' : '')}</p>

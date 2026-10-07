@@ -63,7 +63,7 @@ test('all launch templates populate isolated editable drafts at mobile and deskt
       } finally {
         // Free the account's one-event limit for the next template.
         if (eventId) {
-          const del = await page.request.delete(`/api/events/${eventId}`);
+          const del = await page.request.delete(`/api/events/${eventId}`, { headers: { Origin: new URL(page.url()).origin } });
           expect(del.ok()).toBe(true);
         }
       }

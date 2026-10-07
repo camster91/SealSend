@@ -1,8 +1,10 @@
 "use client";
 import { useRef, useState } from 'react';
+import { useConfirm } from '@/components/ui/Feedback';
 import type { SocialState } from '@/lib/social/contracts';
 const BUTTON = 'min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-50';
 export function GuestAlbum({ slug, state, headers, reload }: { slug: string; state: SocialState; headers: Record<string,string>; reload(): Promise<void> }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [message, setMessage] = useState('');
@@ -18,7 +20,7 @@ export function GuestAlbum({ slug, state, headers, reload }: { slug: string; sta
     finally { pending.current = false; setBusy(false); }
   };
   const remove = async (id: string) => {
-    if (pending.current || !window.confirm('Remove this photo from the album?')) return;
+    if (pending.current || !await confirm({ title:'Remove this photo?', description:'This removes the photo from the shared album.',confirmLabel:'Remove photo',tone:'danger' })) return;
     pending.current = true; setBusy(true);
     try {
       const response = await fetch(`/api/social/${slug}/photos/${id}`, { method: 'DELETE', headers });

@@ -38,7 +38,7 @@ for (let i=0;i<80;i++) {
 }
 const probe = await fetch(`${localApi}/api/social/social-qa`,{ headers:{ 'X-Guest-Token':'a'.repeat(24) } });
 assert.equal(probe.status,200);
-const browser = await chromium.launch({ headless:true,...(process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath:process.env.SEALSEND_BROWSER_EXECUTABLE } : {}),args:['--no-sandbox'] });
+const browser = await chromium.launch({ headless:true,...(process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath:process.env.SEALSEND_BROWSER_EXECUTABLE } : {}),args:['--no-sandbox','--ignore-certificate-errors'] });
 const eventId = '00000000-0000-4000-8000-000000000011';
 const errors = [];
 try {
@@ -95,14 +95,14 @@ try {
   await otherPage.reload(); await otherPage.getByText('Synthetic QA photo',{ exact:true }).waitFor();
   assert.equal((await other.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`,{headers:{'X-Guest-Token':otherToken}})).status(),200);
   await otherPage.locator(`img[src$="/${photo.id}"]`).evaluate(img => { if (!img.complete || !img.naturalWidth) throw new Error('Approved album image did not load with the guest cookie'); });
-  page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{ name:'Remove my photo',exact:true }).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Remove photo',exact:true}).click();
   await page.getByText('Photo removed.',{ exact:true }).waitFor();
   assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,0);
   console.log('PASS guest opt-in, reactions, changeable single vote, private upload, moderation and removal');
   await page.goto(`${origin}/install`);
   await page.getByRole('heading',{ name:'SealSend on your phone',exact:true }).waitFor();
-  await page.evaluate(async()=>{ await navigator.serviceWorker.ready; });
+  await page.evaluate(async()=>{ await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Service worker did not become ready')),15000))]); });
   await ctx.setOffline(true);
   await page.goto(`${origin}/events/offline-check`);
   await page.getByRole('heading',{ name:'You’re offline',exact:true }).waitFor();
@@ -111,13 +111,16 @@ try {
   console.log('PASS installation guide and generic offline fallback; no browser runtime errors');
   process.chdir(cwd);
   if (process.env.SEALSEND_QA_BUILDER === 'true') {
+    for (const suite of ['live-builder.spec.ts','live-templates.spec.ts']) {
+    await db.query("DELETE FROM rate_limit_attempts WHERE key LIKE 'login-password:%'");
     const code = await new Promise(resolve => {
-      const child = spawn(process.execPath,['node_modules/@playwright/test/cli.js','test','live-builder.spec.ts','live-templates.spec.ts','--project=chromium','--workers=1'],{
+      const child = spawn(process.execPath,['node_modules/@playwright/test/cli.js','test',suite,'--project=chromium','--workers=1'],{
         cwd,stdio:'inherit',env:{ ...process.env,NEXT_PUBLIC_SITE_URL:origin,SEALSEND_E2E_IGNORE_HTTPS_ERRORS:'true',SEALSEND_TEMPLATE_EMAIL:'builder-qa@example.test',SEALSEND_TEMPLATE_PASSWORD:'Local-QA-only-Password-42' }
       });
       child.on('error',()=>resolve(1)); child.on('exit',resolve);
     });
-    assert.equal(code,0,'Authenticated builder/template browser checks');
+    assert.equal(code,0,`Authenticated ${suite} browser checks`);
+    }
   }
 } finally { await browser.close(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
 process.exit(0);
