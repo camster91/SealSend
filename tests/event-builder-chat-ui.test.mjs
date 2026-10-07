@@ -101,3 +101,20 @@ test('the builder can open straight on Review from ?step=review', async () => {
   assert.ok(page.includes('searchParams'));
   assert.ok(page.includes("'review'"));
 });
+
+test('a reply that lands after the host left is ignored, and Switch to manual stays usable while waiting', async () => {
+  const src = await read(`${dir}ChatBuilder.tsx`);
+  assert.ok(src.includes('shouldApplyReply(sentIn, session.current)'));
+  const guard = src.indexOf('if (!shouldApplyReply(sentIn, session.current)) return;');
+  assert.ok(guard > 0 && guard < src.indexOf('applyChatUpdates(draft.data'), 'guard runs before any update');
+  assert.ok(src.includes('droppedDate(dropped)'), 'DST note only for date fields');
+  for (const m of src.matchAll(/disabled=\{([^}]*)\} onClick=\{switchToManual\}/g)) {
+    assert.ok(!m[1].includes('waiting'), 'Switch to manual is not held while waiting');
+  }
+  assert.ok(src.includes('id === "failed"'), 'a failed draft creation stays in the chat');
+});
+
+test('ChatMessages announces every assistant message of the turn', async () => {
+  const src = await read(`${dir}ChatMessages.tsx`);
+  assert.ok(src.includes('latestAssistantGroup(messages)'));
+});

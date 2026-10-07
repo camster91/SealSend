@@ -13,11 +13,13 @@ import {
   chatErrorFor,
   chipsForTurn,
   DST_GAP_MESSAGE,
+  droppedDate,
   isChatTurn,
   localToday,
   openingState,
   READY_MESSAGE,
   REVIEW_CHIP,
+  shouldApplyReply,
   shouldCreateDraft,
   type ChatError,
   type ChatMessage,
@@ -58,6 +60,8 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   const wasReady = useRef(false);
   // The conversation as last sent, so Retry can send it again unchanged.
   const lastSent = useRef<ChatMessage[]>([]);
+  // Bumped when the host leaves the chat, so a reply still in flight is ignored instead of creating or saving anything.
+  const session = useRef(0);
 
   const append = (role: ChatMessage["role"], text: string) => {
     const message = { id: nextId.current++, role, text };
@@ -66,6 +70,7 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
 
   async function request(conversation: ChatMessage[]) {
     lastSent.current = conversation;
+    const sentIn = session.current;
     setWaiting(true);
     setError(null);
     try {
@@ -84,10 +89,11 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
           body: JSON.stringify(body),
         });
       } catch {
-        setError(chatErrorFor(0, null));
+        if (shouldApplyReply(sentIn, session.current)) setError(chatErrorFor(0, null));
         return;
       }
       const json: unknown = await response.json().catch(() => null);
+      if (!shouldApplyReply(sentIn, session.current)) return;
       if (!response.ok || !isChatTurn(json)) {
         setError(chatErrorFor(response.ok ? 502 : response.status, json));
         return;
@@ -108,7 +114,7 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
 
       append("assistant", json.reply);
       // Kept in the transcript so the assistant hears about it on the next turn.
-      if (dropped.length > 0) append("assistant", DST_GAP_MESSAGE);
+      if (droppedDate(dropped)) append("assistant", DST_GAP_MESSAGE);
       if (json.ready && !wasReady.current && json.reply.trim() !== READY_MESSAGE) append("assistant", READY_MESSAGE);
       wasReady.current = json.ready;
       setChips(chipsForTurn(json));
@@ -125,11 +131,20 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
     void request(conversation);
   }
 
-  /** Resolves to the draft id, creating the draft if there's a name for it; undefined when there's no draft yet. */
-  async function draftId(): Promise<string | undefined> {
+  /**
+   * The draft id, creating the draft if there's a name for it. "none" means there's no name yet;
+   * "failed" means creating it failed (the save indicator shows why and offers Try again).
+   */
+  async function draftId(): Promise<string | "none" | "failed"> {
     if (draft.eventId) return draft.eventId;
-    if (!shouldCreateDraft(undefined, draft.data)) return undefined;
-    return draft.ensureDraft().catch(() => undefined);
+    if (!shouldCreateDraft(undefined, draft.data)) return "none";
+    return draft.ensureDraft().catch(() => "failed" as const);
+  }
+
+  /** Stops applying any reply still in flight: the host is moving on. */
+  function leave() {
+    session.current += 1;
+    setLeaving(true);
   }
 
   /** Saves everything, then opens the builder. Stays put when the save failed (the save indicator offers Try again). */
@@ -143,9 +158,9 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   }
 
   async function reviewAndPublish() {
-    setLeaving(true);
+    leave();
     const id = await draftId();
-    if (!id) {
+    if (id === "none" || id === "failed") {
       setLeaving(false);
       return;
     }
@@ -153,11 +168,16 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   }
 
   async function switchToManual() {
-    setLeaving(true);
+    leave();
     const id = await draftId();
-    if (!id) {
-      // No draft yet: carry on in the manual builder right here, with everything filled in so far.
+    if (id === "none") {
+      // No name yet, so no draft: carry on in the manual builder right here, with everything filled in so far.
       setManual(true);
+      return;
+    }
+    if (id === "failed") {
+      // Stay: switching in place would leave this draft's save problem behind unseen.
+      setLeaving(false);
       return;
     }
     await leaveTo(`/events/${id}/build`);

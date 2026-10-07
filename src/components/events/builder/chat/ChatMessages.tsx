@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { ChatMessage } from "@/lib/event-builder/chat-client";
+import { latestAssistantGroup, type ChatMessage } from "@/lib/event-builder/chat-client";
 
 export interface ChatLogMessage extends ChatMessage {
   id: number;
@@ -13,11 +13,11 @@ interface ChatMessagesProps {
   messages: ChatLogMessage[];
 }
 
-/** The conversation log. Only the newest assistant message is announced, so the host's own words aren't read back. */
+/** The conversation log. Each turn's assistant messages are announced (all of them), never the host's own words. */
 export function ChatMessages({ messages }: ChatMessagesProps) {
   const reduceMotion = useReducedMotion();
   const endRef = useRef<HTMLLIElement>(null);
-  const latestAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const announce = latestAssistantGroup(messages);
   const lastId = messages.at(-1)?.id;
 
   useEffect(() => {
@@ -47,9 +47,12 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
           </li>
         ))}
       </ol>
-      <p aria-live="polite" className="sr-only">
-        {latestAssistant?.text ?? ""}
-      </p>
+      {/* Each message is its own keyed node, so a new turn is announced even when its words repeat the last one. */}
+      <div aria-live="polite" className="sr-only">
+        {announce.map((m) => (
+          <p key={m.id}>{m.text}</p>
+        ))}
+      </div>
     </div>
   );
 }

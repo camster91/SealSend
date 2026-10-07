@@ -132,3 +132,20 @@ export function isChatTurn(value: unknown): value is ChatTurn {
     typeof v.ready === "boolean"
   );
 }
+
+/** A reply is applied only if the host is still in the same chat session it was sent from (they haven't left since). */
+export function shouldApplyReply(sentInSession: number, currentSession: number): boolean {
+  return sentInSession === currentSession;
+}
+
+/** True when a date the AI sent fell in a clock-change gap (other dropped fields aren't the host's concern). */
+export function droppedDate(dropped: readonly string[]): boolean {
+  return dropped.some((f) => f === "event_date" || f === "event_end_date");
+}
+
+/** Assistant messages since the host last spoke: everything one turn added, so a screen reader hears all of it. */
+export function latestAssistantGroup<T extends ChatMessage>(messages: readonly T[]): T[] {
+  let start = messages.length;
+  while (start > 0 && messages[start - 1].role === "assistant") start--;
+  return messages.slice(start);
+}

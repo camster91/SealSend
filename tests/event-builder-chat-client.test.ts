@@ -5,6 +5,9 @@ import {
   buildChatRequest,
   chatErrorFor,
   chipsForTurn,
+  droppedDate,
+  latestAssistantGroup,
+  shouldApplyReply,
   FAILED_MESSAGE,
   LIMIT_MESSAGE,
   localToday,
@@ -84,4 +87,28 @@ test("shouldCreateDraft only once a title exists and no draft yet", () => {
   assert.equal(shouldCreateDraft(undefined, { title: "  " }), false);
   assert.equal(shouldCreateDraft(undefined, { title: "Party" }), true);
   assert.equal(shouldCreateDraft("id", { title: "Party" }), false);
+});
+
+test("shouldApplyReply drops a reply that lands after the host left", () => {
+  assert.equal(shouldApplyReply(0, 0), true);
+  assert.equal(shouldApplyReply(0, 1), false);
+});
+
+test("droppedDate only counts the two date fields", () => {
+  assert.equal(droppedDate(["event_date"]), true);
+  assert.equal(droppedDate(["event_end_date", "max_attendees"]), true);
+  assert.equal(droppedDate(["max_attendees"]), false);
+  assert.equal(droppedDate([]), false);
+});
+
+test("latestAssistantGroup returns every assistant message since the last user message", () => {
+  const log = [
+    { id: 0, role: "assistant" as const, text: "Hi" },
+    { id: 1, role: "user" as const, text: "Party" },
+    { id: 2, role: "assistant" as const, text: "Great" },
+    { id: 3, role: "assistant" as const, text: "Looks ready! Review and publish?" },
+  ];
+  assert.deepEqual(latestAssistantGroup(log).map((m) => m.id), [2, 3]);
+  assert.deepEqual(latestAssistantGroup(log.slice(0, 2)), []);
+  assert.deepEqual(latestAssistantGroup(log.slice(0, 1)).map((m) => m.id), [0]);
 });
