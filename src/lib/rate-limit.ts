@@ -121,3 +121,19 @@ export function getClientIp(request: Request): string {
 
   return "unknown";
 }
+
+/** Units still free in the window. Read-only: never records an attempt. */
+export async function remainingQuota(
+  key: string,
+  max: number,
+  windowSeconds: number,
+  db: { query: (text: string, params?: unknown[]) => Promise<{ rows: Array<{ count: string }> }> } = getDb(),
+): Promise<number> {
+  const windowStart = new Date(Date.now() - windowSeconds * 1000);
+  const result = await db.query(
+    'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
+    [key, windowStart.toISOString()],
+  );
+  const used = parseInt(result.rows[0]?.count ?? '0', 10);
+  return Math.max(0, max - used);
+}
