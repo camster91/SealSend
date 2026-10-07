@@ -49,3 +49,26 @@ test("request schema rejects 13 messages and 1001-char messages", () => {
   );
   assert.equal(chatRequestSchema.safeParse({ ...ok, messages: [msg("x".repeat(1001))] }).success, false);
 });
+
+test("request data accepts null max_attendees and empty strings", () => {
+  const data = {
+    title: "",
+    description: "",
+    host_name: null,
+    dress_code: "",
+    event_date: "",
+    event_end_date: null,
+    location_name: "",
+    location_address: "",
+    max_attendees: null,
+    invitation_headline: "",
+    invitation_body: "",
+  };
+  const res = chatRequestSchema.safeParse({
+    messages: [{ role: "user", content: "hi" }],
+    data,
+    today: "2026-10-07",
+    timezone: "America/Toronto",
+  });
+  assert.equal(res.success, true);
+});

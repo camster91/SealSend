@@ -53,20 +53,20 @@ export const CHAT_MAX_REPLY_CHARS = 400;
 export const CHAT_MAX_CHIPS = 4;
 export const CHAT_MAX_CHIP_CHARS = 40;
 
-// The form's current values. Dates are kept loose here (they may arrive in any
+// The form's current values; BuilderData sends null for "no limit" and "" for blanks. Dates are kept loose here (they may arrive in any
 // stored shape); only length caps apply.
 const chatDataSchema = z.object({
-  title: z.string().max(200).optional(),
-  description: z.string().max(2000).optional(),
-  host_name: z.string().max(200).optional(),
-  dress_code: z.string().max(100).optional(),
-  event_date: z.string().max(40).optional(),
-  event_end_date: z.string().max(40).optional(),
-  location_name: z.string().max(200).optional(),
-  location_address: z.string().max(500).optional(),
-  max_attendees: z.number().int().min(1).max(10000).optional(),
-  invitation_headline: z.string().max(200).optional(),
-  invitation_body: z.string().max(2000).optional(),
+  title: z.string().max(200).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  host_name: z.string().max(200).nullable().optional(),
+  dress_code: z.string().max(100).nullable().optional(),
+  event_date: z.string().max(40).nullable().optional(),
+  event_end_date: z.string().max(40).nullable().optional(),
+  location_name: z.string().max(200).nullable().optional(),
+  location_address: z.string().max(500).nullable().optional(),
+  max_attendees: z.number().int().min(1).max(10000).nullable().optional(),
+  invitation_headline: z.string().max(200).nullable().optional(),
+  invitation_body: z.string().max(2000).nullable().optional(),
 });
 
 export const chatRequestSchema = z.object({
@@ -87,6 +87,7 @@ export const chatRequestSchema = z.object({
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
+// Caps are enforced by sanitizeChatTurn, not in this schema (OpenAI strict mode).
 // Sent to OpenAI as a strict JSON schema: every property is required and
 // nullable, and unknown keys are disallowed.
 const nullableUpdates = z.strictObject({
