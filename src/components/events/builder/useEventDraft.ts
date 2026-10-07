@@ -22,6 +22,8 @@ export interface UseEventDraftOptions {
   organizationId?: string;
   /** Applied over `initial.customization` before a new draft exists. */
   templateCustomization?: Partial<EventCustomization>;
+  /** Where the URL points once the draft exists (default: the builder at /events/{id}/build). */
+  draftPath?: (id: string) => string;
 }
 
 export interface EventDraft {
@@ -39,7 +41,7 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-export function useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization }: UseEventDraftOptions): EventDraft {
+export function useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization, draftPath }: UseEventDraftOptions): EventDraft {
   const [data, setData] = useState<BuilderData>(() => (
     !initialEventId && templateCustomization
       ? { ...initial, customization: { ...initial.customization, ...templateCustomization } }
@@ -58,6 +60,10 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
 
   const queueRef = useRef<SaveQueue | null>(null);
   const createDraftRef = useRef<(() => Promise<string>) | null>(null);
+  const draftPathRef = useRef(draftPath);
+  useEffect(() => {
+    draftPathRef.current = draftPath;
+  }, [draftPath]);
 
   // Created on first use (never during render) so the PATCH URL reads the current id.
   const getQueue = useCallback(() => {
@@ -129,7 +135,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
         if (!mountedRef.current) return;
         setEventId(id);
         // Update the URL without a navigation so the builder keeps its state (no remount).
-        window.history.replaceState(null, "", `/events/${id}/build`);
+        window.history.replaceState(null, "", draftPathRef.current?.(id) ?? `/events/${id}/build`);
       },
       report: setStatus,
     });

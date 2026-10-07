@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/session';
 import { query, queryOne } from '@/lib/db/client';
 import { EventBuilder } from '@/components/events/builder/EventBuilder';
+import { isAiChatConfigured } from '@/lib/ai/provider';
 import { fromEvent } from '@/lib/event-builder/mapping';
 import type { Event, RSVPField } from '@/types/database';
 import type { Metadata } from 'next';
@@ -46,6 +47,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
         <EventBuilder
           mode="edit"
           eventId={eventId}
+          aiChatEnabled={isAiChatConfigured()}
           initial={fromEvent(event, rsvpFields)}
           initialStatus={event.status === 'published' ? 'published' : 'draft'}
         />

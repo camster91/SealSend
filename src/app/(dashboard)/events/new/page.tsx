@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { StartScreen } from '@/components/events/builder/StartScreen';
+import { isAiChatConfigured } from '@/lib/ai/provider';
 import { getEventTemplate } from '@/lib/event-templates';
 import { getCurrentUser } from '@/lib/auth/session';
 import { query, queryOne } from '@/lib/db/client';
@@ -37,7 +38,7 @@ export default async function NewEventPage({ searchParams }: { searchParams: Pro
   return (
     <div className="py-8">
       <div className="mx-auto max-w-6xl">
-        <StartScreen decision={decision} template={template} organization={organization ?? undefined} />
+        <StartScreen aiChatEnabled={isAiChatConfigured()} decision={decision} template={template} organization={organization ?? undefined} />
       </div>
     </div>
   );

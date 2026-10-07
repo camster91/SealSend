@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -40,6 +41,10 @@ export interface BuilderShellProps {
   organizationId?: string;
   templateCustomization?: Partial<EventCustomization>;
   initialStatus?: "draft" | "published";
+  /** The screen to open on (e.g. "review" when the chat hands over); earlier screens count as reached. */
+  initialScreen?: BuilderScreen;
+  /** Server-computed: true when the AI chat is configured. */
+  aiChatEnabled?: boolean;
   screens: Record<BuilderScreen, (ctx: ScreenContext) => ReactNode>;
 }
 
@@ -72,17 +77,21 @@ export function BuilderShell({
   organizationId,
   templateCustomization,
   initialStatus = "draft",
+  initialScreen = "basics",
+  aiChatEnabled = false,
   screens,
 }: BuilderShellProps) {
   const draft = useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization });
   const reduceMotion = useReducedMotion();
-  const [screen, setScreen] = useState<BuilderScreen>("basics");
-  const [reached, setReached] = useState(0);
+  const [screen, setScreen] = useState<BuilderScreen>(initialScreen);
+  const [reached, setReached] = useState(() => BUILDER_SCREENS.indexOf(initialScreen));
   const [direction, setDirection] = useState(1);
   const [published, setPublished] = useState(initialStatus === "published");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [nameError, setNameError] = useState<string | undefined>();
   const [blocking, setBlocking] = useState(false);
+  const router = useRouter();
+  const [switching, setSwitching] = useState(false);
   const moved = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +150,18 @@ export function BuilderShell({
     goTo(next);
   };
 
+  // Saves any waiting change first, so the chat opens on what the host has already filled in.
+  const switchToChat = async () => {
+    if (!draft.eventId || switching) return;
+    setSwitching(true);
+    const settled = await draft.flush();
+    if (settled.kind === "failed" || settled.kind === "blocked") {
+      setSwitching(false);
+      return;
+    }
+    router.push(`/events/${draft.eventId}/chat`);
+  };
+
   const slide = reduceMotion ? 0 : SLIDE_DISTANCE;
   const duration = reduceMotion ? 0 : SLIDE_SECONDS;
 
@@ -151,7 +172,15 @@ export function BuilderShell({
           <p aria-live="polite" className="mb-2 text-sm font-medium text-muted-foreground">{`Step ${index + 1} of ${BUILDER_SCREENS.length}`}</p>
           <StepNav current={screen} reached={reached} all={mode === "edit"} locked={blocking} onSelect={goTo} />
         </div>
-        <SaveIndicator status={draft.status} onRetry={draft.retry} />
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Not on a published event: the chat can't fix what a live invite's checks block, so an edit could be lost. */}
+          {aiChatEnabled && draft.eventId && !published && (
+            <Button type="button" variant="outline" size="lg" disabled={switching} onClick={() => void switchToChat()}>
+              Switch to chat
+            </Button>
+          )}
+          <SaveIndicator status={draft.status} onRetry={draft.retry} />
+        </div>
       </header>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">

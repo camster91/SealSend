@@ -7,11 +7,14 @@ import { EVENT_TEMPLATES, type EventTemplate } from "@/lib/event-templates";
 import { emptyBuilderData } from "@/lib/event-builder/mapping";
 import type { StartDecision } from "@/lib/event-builder/start-decision";
 import { EventBuilder } from "./EventBuilder";
+import { ChatBuilder } from "./chat/ChatBuilder";
 
 interface StartScreenProps {
   decision: StartDecision;
   template?: EventTemplate;
   organization?: { id: string; name: string };
+  /** Server-computed: true when the AI chat is configured. */
+  aiChatEnabled?: boolean;
 }
 
 const CARD = "flex min-h-11 w-full flex-col items-start gap-1 rounded-2xl border border-ink/15 bg-white p-5 text-left transition hover:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2";
@@ -25,17 +28,17 @@ function browserTimezone(): string {
   }
 }
 
-export function StartScreen({ decision: initialDecision, template, organization }: StartScreenProps) {
+export function StartScreen({ decision: initialDecision, template, organization, aiChatEnabled = false }: StartScreenProps) {
   const confirm = useConfirm();
   const [decision, setDecision] = useState<StartDecision>(initialDecision);
   const [chosen, setChosen] = useState<EventTemplate | undefined>(template);
-  const [building, setBuilding] = useState<{ timezone: string; template?: EventTemplate } | null>(null);
+  const [building, setBuilding] = useState<{ timezone: string; template?: EventTemplate; chat?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  function begin(picked?: EventTemplate) {
+  function begin(picked?: EventTemplate, chat = false) {
     setChosen(picked);
-    setBuilding({ timezone: browserTimezone(), template: picked });
+    setBuilding({ timezone: browserTimezone(), template: picked, chat });
   }
 
   async function startOver(eventId: string) {
@@ -70,12 +73,19 @@ export function StartScreen({ decision: initialDecision, template, organization 
     return (
       <>
         <div className="mx-auto w-full max-w-6xl px-4 lg:px-6 empty:hidden">{intro}</div>
+        {building.chat ? (
+          <ChatBuilder
+            initial={emptyBuilderData(building.timezone, building.template?.customization)}
+            organizationId={organization?.id}
+          />
+        ) : (
         <EventBuilder
           mode="create"
           initial={emptyBuilderData(building.timezone, building.template?.customization)}
           templateCustomization={building.template?.customization}
           organizationId={organization?.id}
         />
+        )}
       </>
     );
   }
@@ -112,6 +122,12 @@ export function StartScreen({ decision: initialDecision, template, organization 
       {intro}
       <h1 id="start-heading" className="font-display text-3xl text-ink">What are you planning?</h1>
       <div className="mt-6 grid gap-4">
+        {aiChatEnabled && (
+          <button type="button" onClick={() => begin(chosen, true)} className={CARD}>
+            <span className="text-base font-semibold text-ink">Chat with AI</span>
+            <span className="text-sm text-ink/80">Tell me about your event and I&apos;ll build it.</span>
+          </button>
+        )}
         <button type="button" onClick={() => begin(chosen)} className={CARD}>
           <span className="text-base font-semibold text-ink">Build it yourself</span>
           <span className="text-sm text-ink/80">Answer a few questions. We save as you go.</span>
