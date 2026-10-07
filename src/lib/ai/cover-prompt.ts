@@ -20,8 +20,23 @@ export const coverRequestSchema = z.object({
 });
 
 // Host text is data, not instructions: it is capped, quoted and placed before the fixed rules.
+// Whitespace and control characters collapse to single spaces so host text cannot forge prompt lines.
+// Written without regex escapes on purpose: checked per character.
+function oneLine(text: string): string {
+  let out = "";
+  let gap = false;
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code <= 31 || code === 127 || ch.trim() === "") { gap = true; continue; }
+    if (gap && out) out += " ";
+    gap = false;
+    out += ch === "“" || ch === "”" || ch === '"' ? "'" : ch;
+  }
+  return out;
+}
+
 function quoted(text: string, max: number): string {
-  return `"${text.trim().slice(0, max).replaceAll('"', "'")}"`;
+  return `"${oneLine(text).slice(0, max).trim()}"`;
 }
 
 export function buildCoverPrompt(input: { title: string; description?: string | null; style: CoverStyle; note?: string }): string {

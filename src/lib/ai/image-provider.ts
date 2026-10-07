@@ -10,13 +10,29 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const REFUSAL = /moderation|content_policy|safety/i;
 
 async function fetchCapped(url: string, signal: AbortSignal): Promise<Buffer> {
-  const response = await fetch(url, { signal });
+  let protocol = "";
+  try { protocol = new URL(url).protocol; } catch { /* fall through */ }
+  if (protocol !== "https:") throw new Error("AI image url is not https");
+  const response = await fetch(url, { signal, redirect: "error" });
   if (!response.ok) throw new Error(`AI image download returned ${response.status}`);
   const declared = Number(response.headers.get("content-length"));
   if (declared > MAX_IMAGE_BYTES) throw new Error("AI image is too large");
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length > MAX_IMAGE_BYTES) throw new Error("AI image is too large");
-  return bytes;
+  if (!response.body) throw new Error("AI image download had no body");
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > MAX_IMAGE_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error("AI image is too large");
+    }
+    chunks.push(Buffer.from(value));
+  }
+  if (total === 0) throw new Error("AI image download was empty");
+  return Buffer.concat(chunks);
 }
 
 class OpenAiCoverImageProvider implements CoverImageProvider {
@@ -39,10 +55,13 @@ class OpenAiCoverImageProvider implements CoverImageProvider {
       // Status only: provider error text can echo the prompt, which is never logged.
       throw new Error(`AI image provider returned ${response.status}`);
     }
-    const payload = await response.json() as { data?: Array<{ b64_json?: string; url?: string }> };
+    const payload = await response.json().catch(() => {
+      throw new Error("AI image provider returned an unreadable response");
+    }) as { data?: Array<{ b64_json?: string; url?: string }> };
     const item = payload.data?.[0];
     if (item?.b64_json) {
       const bytes = Buffer.from(item.b64_json, "base64");
+      if (bytes.length === 0) throw new Error("AI image provider returned an empty image");
       if (bytes.length > MAX_IMAGE_BYTES) throw new Error("AI image is too large");
       return { bytes };
     }
