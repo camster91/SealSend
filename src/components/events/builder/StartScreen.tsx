@@ -15,6 +15,7 @@ interface StartScreenProps {
   organization?: { id: string; name: string };
   /** Server-computed: true when the AI chat is configured. */
   aiChatEnabled?: boolean;
+  aiCoverEnabled?: boolean;
 }
 
 const CARD = "flex min-h-11 w-full flex-col items-start gap-1 rounded-2xl border border-ink/15 bg-white p-5 text-left transition hover:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2";
@@ -28,7 +29,7 @@ function browserTimezone(): string {
   }
 }
 
-export function StartScreen({ decision: initialDecision, template, organization, aiChatEnabled = false }: StartScreenProps) {
+export function StartScreen({ decision: initialDecision, template, organization, aiChatEnabled = false, aiCoverEnabled = false }: StartScreenProps) {
   const confirm = useConfirm();
   const [decision, setDecision] = useState<StartDecision>(initialDecision);
   const [chosen, setChosen] = useState<EventTemplate | undefined>(template);
@@ -77,6 +78,7 @@ export function StartScreen({ decision: initialDecision, template, organization,
           <ChatBuilder
             initial={emptyBuilderData(building.timezone, building.template?.customization)}
             organizationId={organization?.id}
+            aiCoverEnabled={aiCoverEnabled}
           />
         ) : (
         <EventBuilder
@@ -84,6 +86,7 @@ export function StartScreen({ decision: initialDecision, template, organization,
           initial={emptyBuilderData(building.timezone, building.template?.customization)}
           templateCustomization={building.template?.customization}
           organizationId={organization?.id}
+          aiCoverEnabled={aiCoverEnabled}
         />
         )}
       </>

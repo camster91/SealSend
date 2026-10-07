@@ -10,6 +10,7 @@ import { checkLink, normalizeLink, storedLinkProblem } from "@/lib/event-builder
 import { applyStyle, uploadFailureMessage } from "@/lib/event-builder/look";
 import type { EventCustomization } from "@/types/database";
 import type { ScreenContext } from "../BuilderShell";
+import { AiCoverPanel } from "./AiCoverPanel";
 import { Field } from "./Field";
 import { LookMoreOptions } from "./LookMoreOptions";
 
@@ -187,6 +188,8 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
             </button>
           </div>
         )}
+
+        {ctx.aiCoverEnabled && <AiCoverPanel ctx={ctx} />}
 
         {!showVideo && (
           <fieldset className="rounded-2xl border border-border p-4">

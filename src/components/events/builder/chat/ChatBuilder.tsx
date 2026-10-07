@@ -41,11 +41,13 @@ export interface ChatBuilderProps {
   organizationId?: string;
   /** Reopening the chat on an existing draft: there is no transcript, so it greets the host again. */
   resumed?: boolean;
+  /** Server-computed: passed on when the chat hands over to the manual builder. */
+  aiCoverEnabled?: boolean;
 }
 
 const chatPath = (id: string) => `/events/${id}/chat`;
 
-export function ChatBuilder({ eventId: initialEventId, initial, organizationId, resumed = false }: ChatBuilderProps) {
+export function ChatBuilder({ eventId: initialEventId, initial, organizationId, resumed = false, aiCoverEnabled = false }: ChatBuilderProps) {
   const router = useRouter();
   const draft = useEventDraft({ eventId: initialEventId, initial, organizationId, draftPath: chatPath });
   const [opening] = useState(() => openingState(resumed));
@@ -207,7 +209,7 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   }
 
   if (manual) {
-    return <EventBuilder mode="create" initial={draft.data} organizationId={organizationId} />;
+    return <EventBuilder mode="create" initial={draft.data} organizationId={organizationId} aiCoverEnabled={aiCoverEnabled} />;
   }
 
   const blocked = error?.blocked ?? false;

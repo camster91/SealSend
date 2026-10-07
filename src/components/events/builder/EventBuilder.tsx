@@ -18,6 +18,8 @@ export interface EventBuilderProps {
   initialScreen?: BuilderScreen;
   /** Server-computed: true when the AI chat is configured. Shows "Switch to chat" on a saved draft. */
   aiChatEnabled?: boolean;
+  /** Server-computed: true when AI cover images are configured. Shows "Generate with AI" on the Look screen. */
+  aiCoverEnabled?: boolean;
 }
 
 /** Client wrapper: server pages can't pass the screens function map, so it lives here. */

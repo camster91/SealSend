@@ -32,6 +32,8 @@ export interface ScreenContext {
   nameError?: string;
   /** Basics sets this while a published event holds values that are not valid yet; the shell then blocks leaving. */
   setBlocking(blocking: boolean): void;
+  /** Server-computed: true when AI cover images are configured. */
+  aiCoverEnabled: boolean;
 }
 
 export interface BuilderShellProps {
@@ -45,6 +47,8 @@ export interface BuilderShellProps {
   initialScreen?: BuilderScreen;
   /** Server-computed: true when the AI chat is configured. */
   aiChatEnabled?: boolean;
+  /** Server-computed: true when AI cover images are configured. */
+  aiCoverEnabled?: boolean;
   screens: Record<BuilderScreen, (ctx: ScreenContext) => ReactNode>;
 }
 
@@ -79,6 +83,7 @@ export function BuilderShell({
   initialStatus = "draft",
   initialScreen = "basics",
   aiChatEnabled = false,
+  aiCoverEnabled = false,
   screens,
 }: BuilderShellProps) {
   const draft = useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization });
@@ -132,6 +137,7 @@ export function BuilderShell({
     retry: draft.retry,
     nameError,
     setBlocking,
+    aiCoverEnabled,
   };
 
   // Next from Basics must not leave a create flow without a server draft.
