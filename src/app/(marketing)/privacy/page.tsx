@@ -38,6 +38,7 @@ export default function PrivacyPage() {
             <li>Names, emails, phone numbers, notes, tags and plus-ones.</li>
             <li>RSVP answers, including dietary and accessibility notes. These can be sensitive, so please only share what you are comfortable with.</li>
             <li>Comments, sign-up board claims and check-in times.</li>
+            <li>Optional guest-name sharing, reactions, poll votes, photos and photo captions. Event activities and albums are available only to verified invited guests and authorised hosts. Names appear only if the guest chooses to share them. Photos require host approval unless the host turns that review off. Image metadata is removed when photos are uploaded.</li>
           </ul>
           <p><strong>Technical records:</strong></p>
           <ul className={listClass}>

@@ -2,11 +2,11 @@
   "name": "SealSend",
   "short_name": "SealSend",
   "description": "Online invitations with RSVP tracking, guest updates by email or text, and check-in at the door.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f5f8",
-  "theme_color": "#1b2a4a",
+  "background_color": "#f5f1e8",
+  "theme_color": "#202326",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -22,5 +22,9 @@
       "purpose": "any"
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "id": "/"
 }

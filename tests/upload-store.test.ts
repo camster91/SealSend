@@ -77,3 +77,17 @@ test("rejects bytes that are not an image", async () => {
   assert.deepEqual(result, { error: "invalid" });
   assert.equal(calls.length, 0);
 });
+
+test('private album files use a separate directory and the same owner quota', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'private-upload-'));
+  try {
+    const { db, calls } = fakeDb();
+    const result = await saveImageForUser('user-1', await tinyPng(),
+      { mediaType: 'image', originalName: 'guest-photo.png', contentType: 'image/png' },
+      { db, uploadsDir: dir, privateFolder: 'social-private' });
+    assert.ok('url' in result);
+    assert.match(result.url, /^\/uploads\/user-1\/social-private\//);
+    assert.equal((await readdir(path.join(dir, 'user-1', 'social-private'))).length, 1);
+    assert.ok(calls.some(c => c.text.includes('SUM(byte_size)')));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

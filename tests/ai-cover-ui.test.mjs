@@ -40,7 +40,7 @@ test('only Use this updates the draft, and the host is never changed by a failur
   const calls = src.match(/ctx\.update\(|\bupdate\(/g) ?? [];
   assert.equal(calls.length, 1);
   assert.match(src, /ctx\.update\(\{ design_url: [^}]*design_type: "image" \}\)/);
-  assert.match(src, /ctx\.ensureDraft\(\)/);
+  assert.match(src, /prepareCoverDraft\(ctx\)/);
 });
 
 test('panel: in-flight guard, kept preview, Generate label, focus back, link cleared', async () => {

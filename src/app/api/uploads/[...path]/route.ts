@@ -26,7 +26,7 @@ export async function GET(
   try {
     const { path: segments } = await params;
 
-    if (!segments || segments.length === 0) {
+    if (!segments || segments.length === 0 || segments.includes('social-private')) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

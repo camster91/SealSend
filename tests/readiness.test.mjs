@@ -742,9 +742,9 @@ test('the optional service worker never caches authenticated or API responses', 
   const worker = await read('public/sw.js');
   assert.doesNotMatch(worker, /PRECACHE_URLS\s*=\s*\[[^\]]*['"]\/dashboard['"]/);
   assert.match(worker, /pathname\.startsWith\(['"]\/api\/['"]\)/);
-  assert.match(worker, /pathname\.startsWith\(['"]\/dashboard['"]\)/);
-  assert.match(worker, /cache-control/i);
-  assert.match(worker, /no-store/i);
+  assert.match(worker, /cache\.addAll\(\[OFFLINE\]\)/);
+  assert.doesNotMatch(worker, /cache\.put\(/);
+  assert.match(worker, /event\.request\.mode !== 'navigate'/);
 });
 
 test('organizer use cases and comparison stay inside the shipped product scope', async () => {

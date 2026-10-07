@@ -1,50 +1,18 @@
-const CACHE_NAME = 'sealsend-v2';
-const PRECACHE_URLS = ['/'];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
-  self.skipWaiting();
+/* No guest content, authenticated pages, tokens or API responses are cached. */
+const CACHE = 'sealsend-offline-v1';
+const OFFLINE = '/offline.html';
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([OFFLINE])).then(() => self.skipWaiting()));
 });
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => (key.startsWith('sealsend-offline-') || key === 'sealsend-v2' || key === 'sealsend-v1') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
+self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
-  if (
-    url.pathname.startsWith('/api/') ||
-    url.pathname.startsWith('/dashboard') ||
-    url.pathname.startsWith('/events/') ||
-    url.pathname.startsWith('/settings') ||
-    url.pathname.startsWith('/guest') ||
-    url.pathname.startsWith('/callback') ||
-    url.pathname.startsWith('/login') ||
-    url.pathname.startsWith('/signup')
-  ) return;
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const cacheControl = response.headers.get('cache-control') || '';
-        if (response.ok && response.type === 'basic' && !cacheControl.includes('no-store')) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
+  if (url.pathname.startsWith('/api/')) return;
+  if (event.request.method !== 'GET' || event.request.mode !== 'navigate' || new URL(event.request.url).origin !== self.location.origin) return;
+  event.respondWith(fetch(event.request).catch(async () => {
+    const offline = await caches.match(OFFLINE);
+    return offline || new Response('You are offline. Reconnect to use SealSend.', { status:503,headers:{ 'Content-Type':'text/plain' } });
+  }));
 });
