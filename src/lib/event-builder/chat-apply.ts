@@ -7,7 +7,8 @@ import type { BuilderData } from "./schema";
 const KEYWORDS: Record<ChatEventField, RegExp> = {
   title: /\b(name|title|call)\b/i,
   event_date:
-    /\b(date|day|time|am|pm|tomorrow|tonight|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(r|rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?)\b|\b\d{1,2}(:\d{2})?\s?(am|pm)\b/i,
+    // Full weekday names only ("sat"/"sun"/"wed" are ordinary words) and am/pm only after a clock time ("I am…").
+    /\b(date|day|time|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b|\b\d{1,2}(:\d{2})?\s?(am|pm)\b/i,
   event_end_date: /\b(end|ends|until|finish|finishes)\b/i,
   location_name: /\b(where|place|venue|address|location)\b/i,
   location_address: /\b(where|place|venue|address|location)\b/i,

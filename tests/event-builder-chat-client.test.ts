@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { chatRequestSchema } from "../src/lib/ai/chat-schema";
 import {
+  blockedSaveDetails,
   buildChatRequest,
   chatErrorFor,
+  chatTimezone,
   chipsForTurn,
   droppedDate,
   latestAssistantGroup,
@@ -15,6 +17,7 @@ import {
   READY_MESSAGE,
   REVIEW_CHIP,
   shouldCreateDraft,
+  todayIn,
 } from "../src/lib/event-builder/chat-client";
 import { emptyBuilderData } from "../src/lib/event-builder/mapping";
 
@@ -111,4 +114,28 @@ test("latestAssistantGroup returns every assistant message since the last user m
   assert.deepEqual(latestAssistantGroup(log).map((m) => m.id), [2, 3]);
   assert.deepEqual(latestAssistantGroup(log.slice(0, 2)), []);
   assert.deepEqual(latestAssistantGroup(log.slice(0, 1)).map((m) => m.id), [0]);
+});
+
+test("todayIn gives the calendar date in the event's zone, not the browser's", () => {
+  const instant = new Date("2026-10-07T03:30:00Z");
+  assert.equal(todayIn("America/Toronto", instant), "2026-10-06");
+  assert.equal(todayIn("UTC", instant), "2026-10-07");
+  assert.equal(todayIn("Asia/Tokyo", new Date("2026-10-06T16:00:00Z")), "2026-10-07");
+  assert.equal(todayIn("Not/AZone", instant), localToday(instant), "an unknown zone falls back to the local date");
+});
+
+test("chatTimezone prefers the event's zone, then the browser's", () => {
+  assert.equal(chatTimezone({ event_timezone: "America/Vancouver" }), "America/Vancouver");
+  const fallback = chatTimezone({ event_timezone: "" });
+  assert.ok(fallback.length > 0);
+  assert.equal(fallback, Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+});
+
+test("blockedSaveDetails spells out a blocked save and ignores other outcomes", () => {
+  assert.deepEqual(
+    blockedSaveDetails({ kind: "blocked", fieldErrors: { event_date: "Starts after it ends", event_end_date: "Starts after it ends", rsvp_deadline: "Deadline after start" } }),
+    ["Starts after it ends", "Deadline after start"],
+  );
+  assert.equal(blockedSaveDetails({ kind: "failed", message: "x" }), null);
+  assert.equal(blockedSaveDetails({ kind: "saved", at: 0 }), null);
 });

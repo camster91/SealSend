@@ -173,7 +173,8 @@ export function BuilderShell({
           <StepNav current={screen} reached={reached} all={mode === "edit"} locked={blocking} onSelect={goTo} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {aiChatEnabled && draft.eventId && (
+          {/* Not on a published event: the chat can't fix what a live invite's checks block, so an edit could be lost. */}
+          {aiChatEnabled && draft.eventId && !published && (
             <Button type="button" variant="outline" size="lg" disabled={switching} onClick={() => void switchToChat()}>
               Switch to chat
             </Button>

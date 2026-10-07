@@ -26,6 +26,8 @@ export default async function ChatEventPage({ params }: { params: Promise<{ even
   const event = await queryOne<Event>('SELECT * FROM events WHERE id = $1', [eventId]);
   if (!event) notFound();
   if (event.status === 'archived') redirect(`/events/${eventId}`);
+  // A live invite is edited in the manual editor, where its publication checks can be fixed.
+  if (event.status === 'published') redirect(`/events/${eventId}/edit`);
 
   const rsvpFields = await query<RSVPField>(
     'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',

@@ -62,6 +62,8 @@ class OpenAiChatProvider implements ChatProvider {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model, store: false,
+        // A chat turn is a short reply plus a few fields; this caps cost if the model runs on.
+        max_output_tokens: 1500,
         instructions: input.instructions,
         input: input.messages.map((m) => ({ role: m.role, content: m.text })),
         text: { format: { type: "json_schema", name: "sealsend_chat_turn", strict: true, schema: z.toJSONSchema(chatModelOutputSchema) } },

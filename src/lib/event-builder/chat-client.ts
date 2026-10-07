@@ -6,6 +6,7 @@ import {
   type ChatRequest,
   type ChatTurn,
 } from "@/lib/ai/chat-schema";
+import type { SaveStatus } from "./save-machine";
 import type { BuilderData } from "./schema";
 
 /** Client-side helpers for the chat builder (pure; no React, no fetch). */
@@ -55,6 +56,30 @@ export function browserTimezone(): string {
   } catch {
     return "UTC";
   }
+}
+
+/** The zone the chat talks in: the event's own (dates are validated and saved there), else the browser's, else UTC. */
+export function chatTimezone(data: Pick<BuilderData, "event_timezone">): string {
+  return data.event_timezone?.trim() || browserTimezone() || "UTC";
+}
+
+/** "YYYY-MM-DD" on the calendar of `timeZone`; the browser's local date if the zone is unknown. */
+export function todayIn(timeZone: string, now: Date = new Date()): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  } catch {
+    return localToday(now);
+  }
+}
+
+export const SAVE_BLOCKED_MESSAGE = "Your latest change can't be saved yet, so you're still here. Tell me a different value to fix it:";
+
+/** What a blocked save needs fixed, one plain line each; null when the save wasn't blocked. */
+export function blockedSaveDetails(status: SaveStatus): string[] | null {
+  if (status.kind !== "blocked") return null;
+  return [...new Set(Object.values(status.fieldErrors).filter((m): m is string => Boolean(m)))];
 }
 
 function snapshot(data: BuilderData): ChatRequest["data"] {

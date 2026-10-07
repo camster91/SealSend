@@ -81,6 +81,17 @@ test("fieldMentioned recognises date wording", () => {
   assert.equal(fieldMentioned("event_date", "sounds great"), false);
 });
 
+test("fieldMentioned ignores am/pm and short weekday names inside ordinary words", () => {
+  assert.equal(fieldMentioned("event_date", "I am excited"), false);
+  assert.equal(fieldMentioned("event_date", "the sun is out"), false);
+  assert.equal(fieldMentioned("event_date", "we sat down"), false);
+  assert.equal(fieldMentioned("event_date", "pm me the details"), false);
+  assert.equal(fieldMentioned("event_date", "make it 7pm"), true);
+  assert.equal(fieldMentioned("event_date", "7:30 am works"), true);
+  assert.equal(fieldMentioned("event_date", "Saturday"), true);
+  assert.equal(fieldMentioned("event_date", "move it to friday"), true);
+});
+
 test("fieldMentioned is not triggered by loose phrasing", () => {
   assert.equal(fieldMentioned("location_name", "at the party we'll dance"), false);
   assert.equal(fieldMentioned("host_name", "a gift from Sam"), false);

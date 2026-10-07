@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useState, type FormEvent, type KeyboardEvent, type Ref } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CHAT_MAX_MESSAGE_CHARS } from "@/lib/ai/chat-schema";
@@ -11,9 +11,11 @@ interface ChatComposerProps {
   /** True when sending can't help (for example, today's AI help is used up). */
   disabled?: boolean;
   onSend: (text: string) => void;
+  /** The message box, so the chat can return focus to it (for example after a quick answer is tapped). */
+  ref?: Ref<HTMLTextAreaElement>;
 }
 
-export function ChatComposer({ waiting, disabled = false, onSend }: ChatComposerProps) {
+export function ChatComposer({ waiting, disabled = false, onSend, ref }: ChatComposerProps) {
   const id = useId();
   const [text, setText] = useState("");
   const blocked = waiting || disabled;
@@ -57,6 +59,7 @@ export function ChatComposer({ waiting, disabled = false, onSend }: ChatComposer
       </label>
       <div className="flex items-end gap-2">
         <textarea
+          ref={ref}
           id={id}
           value={text}
           onChange={(e) => setText(e.target.value)}

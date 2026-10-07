@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { AI_UNAVAILABLE_RESPONSE, getChatEventId, runChatTurn } from "../src/lib/ai/chat-turn";
 import { chatRequestSchema } from "../src/lib/ai/chat-schema";
-import { isAiChatConfigured } from "../src/lib/ai/provider";
+import { getChatProvider, isAiChatConfigured } from "../src/lib/ai/provider";
 import { buildChatInstructions } from "../src/lib/ai/chat-prompt";
 import type { ChatProvider } from "../src/lib/ai/provider";
 
@@ -133,4 +133,27 @@ test("the unconfigured branch is AI_UNAVAILABLE 503 and the route uses it", () =
   const src = readFileSync("src/app/api/ai/chat/route.ts", "utf8");
   assert.match(src, /isAiChatConfigured\(\)/);
   assert.match(src, /AI_UNAVAILABLE_RESPONSE/);
+});
+
+test("the OpenAI chat request caps output tokens", async () => {
+  const saved = { p: process.env.AI_PROVIDER, k: process.env.OPENAI_API_KEY, m: process.env.AI_MODEL };
+  const realFetch = globalThis.fetch;
+  let sent: Record<string, unknown> | undefined;
+  try {
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.AI_MODEL = "some-model";
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body));
+      return new Response(JSON.stringify({ output: [{ content: [{ type: "output_text", text: JSON.stringify(goodRaw) }] }] }), { status: 200 });
+    }) as typeof fetch;
+    await getChatProvider().respond({ instructions: "i", messages: [{ role: "user", text: "hi" }], signal: new AbortController().signal });
+    assert.equal(sent?.max_output_tokens, 1500);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [name, value] of [["AI_PROVIDER", saved.p], ["OPENAI_API_KEY", saved.k], ["AI_MODEL", saved.m]] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
 });

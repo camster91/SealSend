@@ -8,20 +8,22 @@ import { Modal } from "@/components/ui/Modal";
 import type { ChatEventField } from "@/lib/ai/chat-schema";
 import { applyChatUpdates } from "@/lib/event-builder/chat-apply";
 import {
-  browserTimezone,
+  blockedSaveDetails,
   buildChatRequest,
   chatErrorFor,
   chipsForTurn,
   DST_GAP_MESSAGE,
   droppedDate,
   isChatTurn,
-  localToday,
+  chatTimezone,
   openingState,
   READY_MESSAGE,
   REVIEW_CHIP,
+  SAVE_BLOCKED_MESSAGE,
   shouldApplyReply,
   shouldCreateDraft,
   type ChatError,
+  todayIn,
   type ChatMessage,
 } from "@/lib/event-builder/chat-client";
 import type { BuilderData } from "@/lib/event-builder/schema";
@@ -55,6 +57,9 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   const [error, setError] = useState<ChatError | null>(null);
   const [manual, setManual] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Set when leaving stopped on a blocked save: what the host needs to change before it can save.
+  const [saveBlocked, setSaveBlocked] = useState<string[] | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   // Fields the AI filled and the host hasn't touched since (ruling R2: memory only, never stored).
   const aiOwned = useRef<Set<ChatEventField>>(new Set());
   const wasReady = useRef(false);
@@ -74,12 +79,14 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
     setWaiting(true);
     setError(null);
     try {
+      // Dates are validated and saved in the event's zone, so "today" and the zone the assistant hears match it.
+      const timezone = chatTimezone(draft.data);
       const body = buildChatRequest({
         eventId: draft.eventId,
         messages: conversation,
         data: draft.data,
-        today: localToday(),
-        timezone: browserTimezone(),
+        today: todayIn(timezone),
+        timezone,
       });
       let response: Response;
       try {
@@ -128,6 +135,7 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
     const conversation: ChatMessage[] = [...messages.map(({ role, text: t }) => ({ role, text: t })), { role: "user", text }];
     append("user", text);
     setChips([]);
+    setSaveBlocked(null);
     void request(conversation);
   }
 
@@ -147,10 +155,15 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
     setLeaving(true);
   }
 
-  /** Saves everything, then opens the builder. Stays put when the save failed (the save indicator offers Try again). */
+  /**
+   * Saves everything, then opens the builder. Stays put when the save failed or was blocked
+   * (the save indicator shows why): the builder reloads from the database, so leaving would drop the edit.
+   */
   async function leaveTo(path: string) {
     const settled = await draft.flush();
-    if (settled.kind === "failed") {
+    if (settled.kind === "failed" || settled.kind === "blocked") {
+      // "failed" shows in the save indicator with Try again; "blocked" is spelled out in the chat.
+      setSaveBlocked(blockedSaveDetails(settled));
       setLeaving(false);
       return;
     }
@@ -184,8 +197,13 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
   }
 
   function pick(chip: string) {
-    if (chip === REVIEW_CHIP && wasReady.current) void reviewAndPublish();
-    else send(chip);
+    if (chip === REVIEW_CHIP && wasReady.current) {
+      void reviewAndPublish();
+      return;
+    }
+    send(chip);
+    // The tapped chip is gone with the rest, so focus would fall to the page: keep it in the conversation.
+    composerRef.current?.focus();
   }
 
   if (manual) {
@@ -226,10 +244,23 @@ export function ChatBuilder({ eventId: initialEventId, initial, organizationId, 
             </div>
           )}
 
+          {saveBlocked && (
+            <div role="alert" className="rounded-2xl border border-wax/30 bg-white p-4 text-ink">
+              <p className="text-base">{SAVE_BLOCKED_MESSAGE}</p>
+              {saveBlocked.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-base">
+                  {saveBlocked.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <ChatChips chips={chips} disabled={waiting || leaving || blocked} onPick={pick} />
 
           <div className="sticky bottom-0 z-20 -mx-4 border-t border-border bg-cotton px-4 py-3 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0">
-            <ChatComposer waiting={waiting} disabled={blocked || leaving} onSend={send} />
+            <ChatComposer ref={composerRef} waiting={waiting} disabled={blocked || leaving} onSend={send} />
             <Button type="button" variant="outline" size="lg" className="mt-3 w-full lg:hidden" onClick={() => setPreviewOpen(true)}>
               <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
               Preview
