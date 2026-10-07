@@ -102,6 +102,20 @@ try {
   await page.getByText('Photo removed.',{ exact:true }).waitFor();
   assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,0);
   console.log('PASS guest opt-in, reactions, changeable single vote, private upload, moderation and removal');
+  for (const deletingEvent of [false,true]) {
+    const invite = deletingEvent ? otherToken : token;
+    const uploaded = await ctx.request.post(`${origin}/api/social/social-qa/photos`,{headers:{Origin:origin,'X-Guest-Token':invite},multipart:{file:{name:'cascade.png',mimeType:'image/png',buffer:png},permission:'yes',caption:'Cascade QA'}});
+    assert.equal(uploaded.status(),201,await uploaded.text());
+    const asset = (await db.query('SELECT storage_path FROM event_social_photos')).rows[0].storage_path;
+    const file = join(process.cwd(),asset.slice(1));
+    await readFile(file);
+    const endpoint = deletingEvent ? `/api/events/${eventId}` : `/api/events/${eventId}/guests/00000000-0000-4000-8000-000000000012`;
+    assert.equal((await host.request.delete(`${origin}${endpoint}`,{headers:{Origin:origin}})).status(),200);
+    await assert.rejects(readFile(file),{code:'ENOENT'});
+    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM upload_assets')).rows[0].count,0);
+    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_file_cleanup')).rows[0].count,0);
+  }
+  console.log('PASS guest/event deletion erases private files and releases quota with orphan cleanup disabled');
   await page.goto(`${origin}/install`);
   await page.getByRole('heading',{ name:'SealSend on your phone',exact:true }).waitFor();
   await page.evaluate(async()=>{ await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Service worker did not become ready')),15000))]); });

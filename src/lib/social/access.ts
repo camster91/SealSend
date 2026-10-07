@@ -37,7 +37,7 @@ export async function resolveSocialAccess(request: Request, slug: string, deps: 
 }
 
 let ready: Promise<void> | undefined;
-/** Only additive CREATE IF NOT EXISTS statements; old versions can still run. */
+/** Additive tables and deletion cleanup trigger; old versions can still run. */
 export function ensureSocialSchema(): Promise<void> {
   if (!ready) {
     ready = (async () => {

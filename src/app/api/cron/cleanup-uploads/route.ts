@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "fs/promises";
 import path from "path";
 import { query } from "@/lib/db/client";
+import { purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { ensureSocialSchema } from '@/lib/social/access';
 import { resolveUploadPath } from "@/lib/upload-path";
 
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   await ensureSocialSchema();
+  const socialPhotosDeleted = await purgeQueuedSocialPhotos();
   const enabled = process.env.ENABLE_ORPHAN_UPLOAD_CLEANUP === "true";
   const assets = await query<Asset>(
     `SELECT a.id, a.path FROM upload_assets a
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
         AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path = a.path)
       ORDER BY a.created_at LIMIT 100`,
   );
-  if (!enabled) return NextResponse.json({ enabled: false, candidates: assets.length, deleted: 0 });
+  if (!enabled) return NextResponse.json({ enabled: false, candidates: assets.length, deleted: 0, socialPhotosDeleted });
 
   let deleted = 0;
   const uploadsDir = path.join(process.cwd(), "uploads");
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
     await query("DELETE FROM upload_assets WHERE id = $1", [asset.id]);
     deleted += 1;
   }
-  return NextResponse.json({ enabled: true, candidates: assets.length, deleted });
+  return NextResponse.json({ enabled: true, candidates: assets.length, deleted, socialPhotosDeleted });
 }
 
 export const POST = GET;

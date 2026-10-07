@@ -730,3 +730,22 @@ CREATE TABLE IF NOT EXISTS event_social_photos (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_social_photos_event ON event_social_photos(event_id);
+
+-- Keep deleted file paths through cascades and retry explicit photo erasure.
+CREATE TABLE IF NOT EXISTS event_social_file_cleanup (
+  storage_path TEXT PRIMARY KEY,
+  queued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE OR REPLACE FUNCTION queue_deleted_social_photo() RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO event_social_file_cleanup(storage_path) VALUES (OLD.storage_path)
+  ON CONFLICT(storage_path) DO NOTHING;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'queue_deleted_social_photo' AND tgrelid = 'event_social_photos'::regclass) THEN
+    CREATE TRIGGER queue_deleted_social_photo AFTER DELETE ON event_social_photos
+      FOR EACH ROW EXECUTE FUNCTION queue_deleted_social_photo();
+  END IF;
+END $$;

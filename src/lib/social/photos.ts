@@ -5,6 +5,7 @@ import { query } from '@/lib/db/client';
 import { saveImageForUser, validateMagicBytes } from '@/lib/upload-store';
 import { resolveUploadPath } from '@/lib/upload-path';
 import { socialTransaction } from './actions';
+import { ensureSocialSchema } from './access';
 import type { SocialAccess } from './access';
 import { getSocialSettings } from './store';
 export const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -65,6 +66,7 @@ export async function removePrivateFile(storagePath: string): Promise<void> {
   if (!file) return;
   await unlink(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
   await query('DELETE FROM upload_assets WHERE path=$1',[storagePath]);
+  await query('DELETE FROM event_social_file_cleanup WHERE storage_path=$1',[storagePath]);
 }
 export async function deleteSocialPhoto(eventId: string, id: string, guestId: string | null, host: boolean): Promise<boolean> {
   const deleted = await socialTransaction(eventId, async db => {
@@ -75,4 +77,24 @@ export async function deleteSocialPhoto(eventId: string, id: string, guestId: st
   // An interrupted unlink leaves a quota-accounted orphan for the existing cleanup job.
   await removePrivateFile(deleted.storage_path).catch(() => undefined);
   return true;
+}
+
+/** Snapshot only authorized scope; database triggers preserve any concurrent deletes. */
+export async function captureSocialPhotoPaths(eventId: string, guestId?: string): Promise<string[]> {
+  await ensureSocialSchema();
+  const rows = await query<{ storage_path:string }>('SELECT storage_path FROM event_social_photos WHERE event_id=$1 AND ($2::uuid IS NULL OR guest_id=$2)',[eventId,guestId ?? null]);
+  return rows.map(row=>row.storage_path);
+}
+/** Explicit deletion retries run independently of optional orphan garbage collection. */
+export async function purgeQueuedSocialPhotos(paths?: string[]): Promise<number> {
+  const rows = await query<{ storage_path:string }>(`SELECT q.storage_path FROM event_social_file_cleanup q
+    WHERE ($1::text[] IS NULL OR q.storage_path=ANY($1))
+      AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path=q.storage_path)
+    ORDER BY queued_at LIMIT 200`,[paths ?? null]);
+  let deleted = 0;
+  for (const row of rows) {
+    if (!privatePhotoPath(row.storage_path)) continue;
+    try { await removePrivateFile(row.storage_path); deleted++; } catch { /* Keep queued for retry. */ }
+  }
+  return deleted;
 }

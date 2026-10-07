@@ -63,11 +63,23 @@ test('changing votes and reactions keeps one record per guest; closed and foreig
   } finally { await db.close(); }
 });
 
-test('event deletion cascades through all social records', async () => {
+test('guest and event cascades durably queue photo paths, only after commit', async () => {
   const { db, event, guest } = await socialFixture();
   try {
     await db.query('INSERT INTO event_social_guests(event_id,guest_id) VALUES ($1,$2)',[event,guest]);
+    await db.query("INSERT INTO event_social_photos(event_id,guest_id,storage_path) VALUES ($1,$2,'/uploads/owner/social-private/guest.webp')",[event,guest]);
+    await db.exec('BEGIN');
+    await db.query('DELETE FROM guests WHERE id=$1',[guest]);
+    await db.exec('ROLLBACK');
+    assert.equal((await db.query('SELECT * FROM event_social_photos')).rows.length,1);
+    assert.equal((await db.query('SELECT * FROM event_social_file_cleanup')).rows.length,0);
+    await db.query('DELETE FROM guests WHERE id=$1',[guest]);
+    assert.deepEqual((await db.query('SELECT storage_path FROM event_social_file_cleanup')).rows,[{storage_path:'/uploads/owner/social-private/guest.webp'}]);
+    await db.query("INSERT INTO guests(id,event_id,name) VALUES ($1,$2,'Guest')",[guest,event]);
+    await db.query("INSERT INTO event_social_photos(event_id,guest_id,storage_path) VALUES ($1,$2,'/uploads/owner/social-private/event.webp')",[event,guest]);
     await db.query('DELETE FROM events WHERE id=$1',[event]);
     assert.deepEqual((await db.query('SELECT * FROM event_social_guests')).rows,[]);
+    assert.deepEqual((await db.query('SELECT * FROM event_social_photos')).rows,[]);
+    assert.equal((await db.query('SELECT * FROM event_social_file_cleanup')).rows.length,2);
   } finally { await db.close(); }
 });

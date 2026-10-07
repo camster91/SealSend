@@ -75,10 +75,11 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className={h2Class}>5. Cookies</h2>
-          <p>We use two cookies, both to make the site work. We do not use advertising cookies.</p>
+          <p>We use essential cookies to make the site work. We do not use advertising cookies.</p>
           <ul className={listClass}>
             <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days. Guests who use their invite or access link also get it.</li>
             <li><code>sealsend_user</code> lets the page show who you are. Scripts on the page can read it. It can include your email, phone, role and event id.</li>
+            <li><code>sealsend_social_&lt;eventId&gt;</code> keeps invited guests verified for an event’s private activities and photos. It contains the invitation access token, is not readable by page scripts (httpOnly), is sent over HTTPS and lasts up to 7 days.</li>
           </ul>
         </section>
 
@@ -86,7 +87,7 @@ export default function PrivacyPage() {
           <h2 className={h2Class}>6. How long we keep it</h2>
           <p>We keep your data while your account is active. When you ask to delete your account, we treat it as a deletion request: it is scheduled and finished within 7 days. Backups are kept for up to 30 days, so deleted data can stay in backups for up to about 37 days in total.</p>
           <p>We keep opt-out lists so we can keep honouring them.</p>
-          <p>Automatic cleanup is currently disabled. If cleanup is later turned on, a draft event becomes eligible 90 days after its last update, with a 14-day warning first, and an unreferenced upload that is not attached to an event becomes eligible after 7 days.</p>
+          <p>Deleting an event, guest or album photo also deletes its private album files; interrupted file deletion is queued for retry. Optional automatic cleanup is currently disabled. If cleanup is later turned on, a draft event becomes eligible 90 days after its last update, with a 14-day warning first, and an unreferenced upload that is not attached to an event becomes eligible after 7 days.</p>
         </section>
 
         <section>
