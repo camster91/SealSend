@@ -189,7 +189,7 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
           </div>
         )}
 
-        {ctx.aiCoverEnabled && <AiCoverPanel ctx={ctx} />}
+        {ctx.aiCoverEnabled && <AiCoverPanel ctx={ctx} onAccepted={() => setTypedLink(undefined)} />}
 
         {!showVideo && (
           <fieldset className="rounded-2xl border border-border p-4">

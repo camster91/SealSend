@@ -34,9 +34,9 @@ test('chat page checks edit access, handles archived and unconfigured chat', asy
   assert.ok(src.includes('resumed'));
 });
 
-test('privacy page names AI drafting, chat or cover images', async () => {
+test('privacy page names AI drafting, chat and cover images', async () => {
   const src = await read('src/app/(marketing)/privacy/page.tsx');
-  assert.ok(src.includes('AI drafting, chat or cover images'));
+  assert.ok(src.includes('AI drafting or chat, and AI cover images'));
 });
 
 test('a published event is never edited through the chat', async () => {

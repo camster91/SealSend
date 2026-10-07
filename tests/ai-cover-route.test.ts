@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runCoverTurn } from "../src/lib/ai/cover-turn";
+import { detectImageType, runCoverTurn } from "../src/lib/ai/cover-turn";
 import { remainingQuota } from "../src/lib/rate-limit";
 import type { CoverImageProvider } from "../src/lib/ai/image-provider";
 
 const input = { title: "Secret Gala", description: "hush hush", style: "elegant" as const, note: "purple unicorns" };
-const png = Buffer.from("png");
+const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function provider(fn: CoverImageProvider["generate"]): CoverImageProvider & { calls: number } {
   const p = { calls: 0, generate: (i: Parameters<CoverImageProvider["generate"]>[0]) => { p.calls += 1; return fn(i); } };
@@ -61,6 +61,56 @@ test("storage full -> 413 with upload copy", async () => {
   const r = await runCoverTurn({ provider: p, consume: allow, save: async () => ({ error: "quota" as const }), timeoutMs: 1000 }, input);
   assert.equal(r.status, 413);
   assert.equal((r.json as { error: string }).error, "Your upload space is full.");
+});
+
+test("failures after the quota is spent carry remaining", async () => {
+  const ok = provider(async () => ({ bytes: png }));
+  const cases = [
+    await runCoverTurn({ provider: provider(async () => { throw new Error("x"); }), consume: allow, save: saveOk, timeoutMs: 1000 }, input),
+    await runCoverTurn({ provider: provider(async () => ({ refused: true as const })), consume: allow, save: saveOk, timeoutMs: 1000 }, input),
+    await runCoverTurn({ provider: ok, consume: allow, save: async () => ({ error: "quota" as const }), timeoutMs: 1000 }, input),
+    await runCoverTurn({ provider: ok, consume: allow, save: async () => ({ error: "invalid" as const }), timeoutMs: 1000 }, input),
+  ];
+  for (const r of cases) assert.equal((r.json as { remaining: number }).remaining, 2);
+});
+
+test("detectImageType reads PNG, JPEG and WebP, and nothing else", () => {
+  assert.equal(detectImageType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0])), "image/png");
+  assert.equal(detectImageType(Buffer.from([0xff, 0xd8, 0xff, 0xe0])), "image/jpeg");
+  assert.equal(detectImageType(Buffer.concat([Buffer.from("RIFF"), Buffer.from([1, 2, 3, 4]), Buffer.from("WEBP")])), "image/webp");
+  assert.equal(detectImageType(Buffer.concat([Buffer.from("RIFF"), Buffer.from([1, 2, 3, 4]), Buffer.from("WAVE")])), null);
+  assert.equal(detectImageType(Buffer.from("GIF89a")), null);
+  assert.equal(detectImageType(Buffer.alloc(0)), null);
+});
+
+test("the detected type is passed to save; unknown bytes -> 502 without saving", async () => {
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+  let seen = "";
+  const r = await runCoverTurn({ provider: provider(async () => ({ bytes: jpeg })), consume: allow, save: async (_b, t) => { seen = t; return { url: "/u.jpg" }; }, timeoutMs: 1000 }, input);
+  assert.equal(r.status, 200);
+  assert.equal(seen, "image/jpeg");
+  let saved = false;
+  const bad = await runCoverTurn({ provider: provider(async () => ({ bytes: Buffer.from("not an image") })), consume: allow, save: async () => { saved = true; return { url: "/u" }; }, timeoutMs: 1000 }, input);
+  assert.equal(bad.status, 502);
+  assert.equal((bad.json as { code: string }).code, "AI_FAILED");
+  assert.equal(saved, false);
+});
+
+test("a client disconnect aborts the provider call", async () => {
+  const gone = new AbortController();
+  const p = provider(({ signal }) => new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(new Error("aborted")));
+  }));
+  const pending = runCoverTurn({ provider: p, consume: allow, save: saveOk, timeoutMs: 10_000, signal: gone.signal }, input);
+  setTimeout(() => gone.abort(), 10);
+  const r = await pending;
+  assert.equal(r.status, 502);
+});
+
+test("route passes the request signal and the detected type", () => {
+  const route = readFileSync("src/app/api/ai/cover/route.ts", "utf8");
+  assert.ok(route.includes("signal: request.signal"));
+  assert.ok(!route.includes('contentType: "image/png"'));
 });
 
 test("invalid image -> 502 AI_FAILED", async () => {

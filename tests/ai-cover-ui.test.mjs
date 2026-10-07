@@ -28,7 +28,9 @@ test('panel is accessible and on-token', async () => {
   assert.match(src, /aria-live="polite"/);
   assert.match(src, /<label[^>]*htmlFor=/);
   assert.match(src, /maxLength=\{300\}/);
-  assert.match(src, /role="radiogroup"/);
+  assert.match(src, /role="group" aria-label="Style"/);
+  assert.ok(!src.includes('role="radio'));
+  assert.match(src, /aria-pressed=\{style === s\.value\}/);
   assert.match(src, /motion-reduce/);
   for (const b of BANNED) assert.ok(!src.includes(b), `banned: ${b}`);
 });
@@ -39,6 +41,21 @@ test('only Use this updates the draft, and the host is never changed by a failur
   assert.equal(calls.length, 1);
   assert.match(src, /ctx\.update\(\{ design_url: [^}]*design_type: "image" \}\)/);
   assert.match(src, /ctx\.ensureDraft\(\)/);
+});
+
+test('panel: in-flight guard, kept preview, Generate label, focus back, link cleared', async () => {
+  const src = await read(PANEL);
+  assert.match(src, /inFlight = useRef\(false\)/);
+  assert.match(src, /if \(inFlight\.current\) return;/);
+  assert.match(src, /openerRef\.current\?\.focus\(\)/);
+  assert.match(src, />\s+Generate\s+<\/button>/);
+  // a failure never clears the previous preview
+  assert.equal((src.match(/setPreview\(/g) ?? []).length, 2);
+  assert.ok(src.includes('setPreview(json.url)') && src.includes('setPreview(undefined)'));
+  assert.match(src, /typeof json\.remaining === "number"\) setRemaining/);
+  const look = await read('src/components/events/builder/screens/LookScreen.tsx');
+  assert.match(look, /onAccepted=\{\(\) => setTypedLink\(undefined\)\}/);
+  assert.match(src, /onAccepted\?\.\(\)/);
 });
 
 test('the panel is only rendered behind aiCoverEnabled, threaded from every page', async () => {
@@ -65,5 +82,5 @@ test('the panel is only rendered behind aiCoverEnabled, threaded from every page
 
 test('privacy page names cover images', async () => {
   const src = await read('src/app/(marketing)/privacy/page.tsx');
-  assert.ok(src.includes('AI drafting, chat or cover images (event title, description, chosen style and your note)'));
+  assert.ok(src.includes('AI drafting or chat, and AI cover images (event title, description, chosen style and your note)'));
 });

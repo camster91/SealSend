@@ -52,13 +52,14 @@ export async function POST(request: Request) {
           max: AI_COVER_DAILY_LIMIT,
           windowSeconds: AI_COVER_WINDOW_SECONDS,
         }),
-      save: (bytes) =>
+      save: (bytes, contentType) =>
         saveImageForUser(auth.user.id, bytes, {
           mediaType: "image",
-          originalName: "ai-cover.png",
-          contentType: "image/png",
+          originalName: `ai-cover.${contentType === "image/jpeg" ? "jpg" : contentType.slice(6)}`,
+          contentType,
         }),
       timeoutMs: AI_COVER_TIMEOUT_MS,
+      signal: request.signal,
     },
     { title: event.title, description: event.description, style: parsed.data.style, note: parsed.data.note },
   );
