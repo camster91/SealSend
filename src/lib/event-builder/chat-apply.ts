@@ -2,20 +2,17 @@ import type { ChatEventField, ChatTurn } from "@/lib/ai/chat-schema";
 import { zonedLocalDateTimeToInstant } from "@/lib/datetime";
 import type { BuilderData } from "./schema";
 
-const WEEKDAYS = "mon(day)?|tue(s|sday)?|wed(nesday)?|thu(r|rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?";
-const CLOCK = "\d{1,2}(:\d{2})?\s?(am|pm)";
-
+// Keywords only fire when the host clearly names the field; loose words like
+// "from"/"by"/"at the" would let ordinary phrasing overwrite host-typed data.
 const KEYWORDS: Record<ChatEventField, RegExp> = {
   title: /\b(name|title|call)\b/i,
-  event_date: new RegExp(
-    `\b(date|day|time|am|pm|tomorrow|tonight|${WEEKDAYS})\b|\b${CLOCK}\b`,
-    "i",
-  ),
+  event_date:
+    /\b(date|day|time|am|pm|tomorrow|tonight|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(r|rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?)\b|\b\d{1,2}(:\d{2})?\s?(am|pm)\b/i,
   event_end_date: /\b(end|ends|until|finish|finishes)\b/i,
-  location_name: /\b(where|place|venue|address)\b|\bat the\b/i,
-  location_address: /\b(where|place|venue|address)\b|\bat the\b/i,
+  location_name: /\b(where|place|venue|address|location)\b/i,
+  location_address: /\b(where|place|venue|address|location)\b/i,
   max_attendees: /\b(people|guests|how many|capacity)\b/i,
-  host_name: /\b(host|from|by)\b/i,
+  host_name: /\b(host|hosted)\b/i,
   dress_code: /\b(dress|wear|attire)\b/i,
   invitation_headline: /\b(invite|invitation|message|wording|headline|fun|formal)\b/i,
   invitation_body: /\b(invite|invitation|message|wording|headline|fun|formal)\b/i,
@@ -27,7 +24,7 @@ export function fieldMentioned(field: ChatEventField, text: string): boolean {
 }
 
 function isBlank(value: unknown): boolean {
-  return value === "" || value === null || value === undefined;
+  return value === null || value === undefined || (typeof value === "string" && value.trim() === "");
 }
 
 export function applyChatUpdates(
@@ -58,7 +55,10 @@ export function applyChatUpdates(
       patch[field] = String(value);
     } else if (field === "max_attendees") {
       const n = Number(value);
-      if (!Number.isFinite(n)) continue;
+      if (!Number.isFinite(n)) {
+        dropped.push(field);
+        continue;
+      }
       patch[field] = n;
     } else {
       patch[field] = String(value);

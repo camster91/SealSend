@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyChatUpdates, markHostEdited } from "../src/lib/event-builder/chat-apply";
+import { applyChatUpdates, fieldMentioned, markHostEdited } from "../src/lib/event-builder/chat-apply";
 import { emptyBuilderData } from "../src/lib/event-builder/mapping";
 import type { ChatEventField, ChatTurn } from "../src/lib/ai/chat-schema";
 
@@ -72,4 +72,28 @@ test("markHostEdited removes fields", () => {
   const next = markHostEdited(owned, ["title", "bogus"]);
   assert.deepEqual([...next], ["event_date"]);
   assert.equal(owned.has("title"), true);
+});
+
+test("fieldMentioned recognises date wording", () => {
+  for (const t of ["make it 7pm", "change the date", "tomorrow", "Saturday"]) {
+    assert.equal(fieldMentioned("event_date", t), true, t);
+  }
+  assert.equal(fieldMentioned("event_date", "sounds great"), false);
+});
+
+test("fieldMentioned is not triggered by loose phrasing", () => {
+  assert.equal(fieldMentioned("location_name", "at the party we'll dance"), false);
+  assert.equal(fieldMentioned("host_name", "a gift from Sam"), false);
+  assert.equal(fieldMentioned("location_name", "change the venue"), true);
+  assert.equal(fieldMentioned("host_name", "hosted by me"), true);
+});
+
+test("whitespace-only fields count as blank and bad numbers are dropped", () => {
+  const data = { ...emptyBuilderData("America/Toronto"), title: "   " };
+  const r = applyChatUpdates(data, turn({ title: "Party", max_attendees: Number.NaN }), {
+    aiOwned: new Set(),
+    latestUserText: "x",
+  });
+  assert.equal(r.patch.title, "Party");
+  assert.deepEqual(r.dropped, ["max_attendees"]);
 });
