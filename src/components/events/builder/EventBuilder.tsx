@@ -1,6 +1,6 @@
 "use client";
 
-import type { BuilderData } from "@/lib/event-builder/schema";
+import type { BuilderData, BuilderScreen } from "@/lib/event-builder/schema";
 import type { EventCustomization } from "@/types/database";
 import { BuilderShell } from "./BuilderShell";
 import { BasicsScreen } from "./screens/BasicsScreen";
@@ -15,6 +15,7 @@ export interface EventBuilderProps {
   organizationId?: string;
   templateCustomization?: Partial<EventCustomization>;
   initialStatus?: "draft" | "published";
+  initialScreen?: BuilderScreen;
 }
 
 /** Client wrapper: server pages can't pass the screens function map, so it lives here. */

@@ -40,6 +40,8 @@ export interface BuilderShellProps {
   organizationId?: string;
   templateCustomization?: Partial<EventCustomization>;
   initialStatus?: "draft" | "published";
+  /** The screen to open on (e.g. "review" when the chat hands over); earlier screens count as reached. */
+  initialScreen?: BuilderScreen;
   screens: Record<BuilderScreen, (ctx: ScreenContext) => ReactNode>;
 }
 
@@ -72,12 +74,13 @@ export function BuilderShell({
   organizationId,
   templateCustomization,
   initialStatus = "draft",
+  initialScreen = "basics",
   screens,
 }: BuilderShellProps) {
   const draft = useEventDraft({ eventId: initialEventId, initial, organizationId, templateCustomization });
   const reduceMotion = useReducedMotion();
-  const [screen, setScreen] = useState<BuilderScreen>("basics");
-  const [reached, setReached] = useState(0);
+  const [screen, setScreen] = useState<BuilderScreen>(initialScreen);
+  const [reached, setReached] = useState(() => BUILDER_SCREENS.indexOf(initialScreen));
   const [direction, setDirection] = useState(1);
   const [published, setPublished] = useState(initialStatus === "published");
   const [previewOpen, setPreviewOpen] = useState(false);

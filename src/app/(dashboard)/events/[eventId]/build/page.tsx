@@ -11,8 +11,17 @@ export const metadata: Metadata = {
   title: 'Build Event',
 };
 
-export default async function BuildEventPage({ params }: { params: Promise<{ eventId: string }> }) {
+export default async function BuildEventPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ eventId: string }>;
+  searchParams: Promise<{ step?: string | string[] }>;
+}) {
   const { eventId } = await params;
+  // The chat's "Review & publish" lands here with ?step=review.
+  const { step } = await searchParams;
+  const initialScreen = step === 'review' ? 'review' : undefined;
 
   const user = await getCurrentUser();
   if (!user) redirect('/login');
@@ -36,6 +45,7 @@ export default async function BuildEventPage({ params }: { params: Promise<{ eve
           eventId={eventId}
           initial={fromEvent(event, rsvpFields)}
           initialStatus={event.status === 'published' ? 'published' : 'draft'}
+          initialScreen={initialScreen}
         />
       </div>
     </div>
