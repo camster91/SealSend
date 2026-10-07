@@ -5,6 +5,7 @@ import { query, queryOne } from '@/lib/db/client';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 import { EventBuilder } from '@/components/events/builder/EventBuilder';
 import { isAiChatConfigured } from '@/lib/ai/provider';
+import { isAiCoverConfigured } from '@/lib/ai/image-provider';
 import { fromEvent } from '@/lib/event-builder/mapping';
 import type { Event, RSVPField } from '@/types/database';
 
@@ -45,6 +46,7 @@ export default async function BuildEventPage({
           mode="create"
           eventId={eventId}
           aiChatEnabled={isAiChatConfigured()}
+          aiCoverEnabled={isAiCoverConfigured()}
           initial={fromEvent(event, rsvpFields)}
           initialStatus={event.status === 'published' ? 'published' : 'draft'}
           initialScreen={initialScreen}

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { query, queryOne } from '@/lib/db/client';
 import { EventBuilder } from '@/components/events/builder/EventBuilder';
 import { isAiChatConfigured } from '@/lib/ai/provider';
+import { isAiCoverConfigured } from '@/lib/ai/image-provider';
 import { fromEvent } from '@/lib/event-builder/mapping';
 import type { Event, RSVPField } from '@/types/database';
 import type { Metadata } from 'next';
@@ -48,6 +49,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
           mode="edit"
           eventId={eventId}
           aiChatEnabled={isAiChatConfigured()}
+          aiCoverEnabled={isAiCoverConfigured()}
           initial={fromEvent(event, rsvpFields)}
           initialStatus={event.status === 'published' ? 'published' : 'draft'}
         />
