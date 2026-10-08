@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { openReadyPage } from './page-ready';
 
 import { hashAuthCode } from '../../src/lib/auth/code-hash';
 
@@ -393,14 +394,14 @@ test('public navigation and responsive layouts', async ({ page }, testInfo) => {
   page.on('pageerror', error => errors.push(error.message));
 
   for (const route of ['/', '/pricing', '/how-it-works', '/use-cases', '/privacy', '/terms', '/login', '/signup']) {
-    const response = await page.goto(route, { waitUntil: 'networkidle' });
+    const response = await openReadyPage(page, route);
     expect(response?.status(), route).toBeLessThan(400);
     await expect(page.locator('body')).not.toContainText('Internal server error');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `${route} horizontal overflow`).toBeLessThanOrEqual(1);
   }
 
-  await page.goto('/pricing', { waitUntil: 'networkidle' });
+  await openReadyPage(page, '/pricing');
   await page.screenshot({ path: path.join(output, `pricing-${testInfo.project.name}.png`), fullPage: true });
   expect(errors).toEqual([]);
 });

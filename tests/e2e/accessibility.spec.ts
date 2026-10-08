@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { openReadyPage } from './page-ready';
 
 for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 }, { width: 1440, height: 1000 }]) {
   test(`public release pages have no serious accessibility violations at ${viewport.width}px`, async ({ page }) => {
@@ -22,7 +23,7 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       "/privacy",
       "/support",
     ]) {
-      await page.goto(route, { waitUntil: "networkidle" });
+      await openReadyPage(page, route);
       const results = await new AxeBuilder({ page }).analyze();
       const blocking = results.violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious");
       expect(blocking, `${route}: ${blocking.map((item) => `${item.id} (${item.nodes.length})`).join(", ")}`).toEqual([]);
