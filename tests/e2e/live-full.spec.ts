@@ -388,7 +388,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
   }
 });
 
-test('public pages load and stay within the viewport', async ({ context }, testInfo) => {
+test('public navigation and responsive layouts', async ({ context }, testInfo) => {
   await mkdir(output, { recursive: true });
   const errors: string[] = [];
 
