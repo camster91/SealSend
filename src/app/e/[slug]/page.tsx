@@ -169,6 +169,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
                   allowPlusOnes={event.allow_plus_ones !== undefined ? (event.allow_plus_ones as boolean) : true}
                   maxGuestsPerRsvp={(event.max_guests_per_rsvp as number) || 10}
                   spotsRemaining={spotsRemaining}
+                  inviteToken={inviteGuest && token ? token : undefined}
                   inviteGuestId={inviteGuest?.id}
                   inviteGuestName={inviteGuest?.name}
                   inviteGuestEmail={inviteGuest?.email}

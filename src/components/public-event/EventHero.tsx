@@ -4,6 +4,7 @@ import { Share2, Check } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import type { Event } from "@/types/database";
 import { isValidHexColor } from "@/lib/utils";
+import { publicInviteUrl } from "@/lib/public-invite-url";
 import { sanitizeUrl } from "@/lib/sanitize";
 
 interface EventHeroProps {
@@ -34,7 +35,7 @@ export function EventHero({ event }: EventHeroProps) {
   const designUrl = sanitizeUrl(event.design_url);
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = publicInviteUrl(window.location.origin, event.slug);
     const title = event.title;
     const text = event.description || `You are invited to ${event.title}!`;
 

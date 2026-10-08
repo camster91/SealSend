@@ -282,6 +282,7 @@ CREATE TABLE IF NOT EXISTS rsvp_responses (
   headcount INTEGER DEFAULT 1,
   response_data JSONB DEFAULT '{}',
   plus_ones_data JSONB DEFAULT '[]',
+  edit_token_hash TEXT CHECK (edit_token_hash ~ '^[a-f0-9]{64}$'),
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -289,6 +290,7 @@ CREATE TABLE IF NOT EXISTS rsvp_responses (
 
 CREATE INDEX IF NOT EXISTS idx_rsvp_responses_event ON rsvp_responses(event_id);
 CREATE INDEX IF NOT EXISTS idx_rsvp_responses_guest ON rsvp_responses(guest_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvp_edit_token ON rsvp_responses(edit_token_hash) WHERE edit_token_hash IS NOT NULL;
 
 -- =====================
 -- PLUS ONES
