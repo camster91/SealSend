@@ -9,9 +9,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:https';
 import { request as proxyRequest } from 'node:http';
+import { reviewBrowserChecks } from './review-browser-checks.mjs';
 import { startSocialQa } from './start-social-qa.ts';
 async function main() {
 const cwd = process.cwd();
+// Concurrent RSVP transactions require native PostgreSQL, not the socket emulator.
+process.env.SEALSEND_QA_USE_POSTGRES ??= 'true';
 const { db,server } = await startSocialQa();
 process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:55432/postgres';
 process.env.AI_PROVIDER = 'fake';
@@ -38,13 +41,14 @@ for (let i=0;i<80;i++) {
 }
 const probe = await fetch(`${localApi}/api/social/social-qa`,{ headers:{ 'X-Guest-Token':'a'.repeat(24) } });
 assert.equal(probe.status,200);
-const browser = await chromium.launch({ headless:true,...(process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath:process.env.SEALSEND_BROWSER_EXECUTABLE } : {}),args:['--no-sandbox','--ignore-certificate-errors'] });
+const browser = await chromium.launch({ headless:true,...(process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath:process.env.SEALSEND_BROWSER_EXECUTABLE } : {}),args:['--no-sandbox','--ignore-certificate-errors','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream'] });
 const eventId = '00000000-0000-4000-8000-000000000011';
 const errors = [];
 try {
   const host = await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
+  await reviewBrowserChecks({browser,origin,db,host});
   const failNextRead = async (page,url) => {
     const handler = async route => {
       if (route.request().method() !== 'GET') { await route.continue(); return; }
@@ -130,9 +134,12 @@ try {
   await hostPage.reload();
   await hostPage.getByRole('button',{ name:'Approve photo',exact:true }).click();
   await hostPage.getByText('Synthetic QA photo · Shared',{ exact:true }).waitFor();
+  const approvedState = await other.request.get(`${origin}/api/social/social-qa`, { headers: { 'X-Guest-Token': otherToken } });
+  assert.equal(approvedState.status(), 200, await approvedState.text());
+  assert.ok((await approvedState.json()).photos.some(item => item.id === photo.id && item.approved), 'Approved photo must be visible to another invited guest');
   await otherPage.reload(); await otherPage.getByText('Synthetic QA photo',{ exact:true }).waitFor();
   assert.equal((await other.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`,{headers:{'X-Guest-Token':otherToken}})).status(),200);
-  await otherPage.locator(`img[src$="/${photo.id}"]`).evaluate(img => { if (!img.complete || !img.naturalWidth) throw new Error('Approved album image did not load with the guest cookie'); });
+  await otherPage.waitForFunction(id => { const img = document.querySelector(`img[src$="/${id}"]`); return img?.complete && img.naturalWidth > 0; }, photo.id);
   await page.getByRole('button',{ name:'Remove my photo',exact:true }).click();
   await page.getByRole('alertdialog').getByRole('button',{name:'Remove photo',exact:true}).click();
   await page.getByText('Photo removed.',{ exact:true }).waitFor();
@@ -179,7 +186,7 @@ try {
     assert.equal(code,0,`Authenticated ${suite} browser checks`);
     }
   }
-} finally { await browser.close(); secureServer.closeAllConnections(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
+} catch (error) { console.error("Browser QA failure:", error); throw error; } finally { await browser.close(); secureServer.closeAllConnections(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
 process.exit(0);
 
 }

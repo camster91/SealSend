@@ -749,3 +749,7 @@ DO $$ BEGIN
       FOR EACH ROW EXECUTE FUNCTION queue_deleted_social_photo();
   END IF;
 END $$;
+
+-- Private public-RSVP edit credentials; existing responses stay unchanged.
+ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS edit_token_hash TEXT CHECK (edit_token_hash ~ '^[a-f0-9]{64}$');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvp_edit_token ON rsvp_responses(edit_token_hash) WHERE edit_token_hash IS NOT NULL;

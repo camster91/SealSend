@@ -1,0 +1,168 @@
+/** Four-review-finding regressions. Invoked only by the synthetic local QA harness. */
+import assert from 'node:assert/strict';
+import { AxeBuilder } from '@axe-core/playwright';
+import sharp from 'sharp';
+export async function reviewBrowserChecks({ browser, origin, db, host }) {
+  const owner = '00000000-0000-4000-8000-000000000010';
+  const event = '00000000-0000-4000-8000-000000000031';
+  const guest = '00000000-0000-4000-8000-000000000032';
+  const token = 'r'.repeat(24), slug = 'review-qa';
+  await db.query("INSERT INTO events(id,user_id,title,slug,status,max_attendees,event_date) VALUES ($1,$2,'Review QA', $3,'published',2,NOW()+INTERVAL '14 days')",[event,owner,slug]);
+  await db.query("INSERT INTO guests(id,event_id,name,email,invite_token) VALUES ($1,$2,'Review Guest','review-guest@example.test',$3)",[guest,event,token]);
+  await db.query("INSERT INTO rsvp_fields(event_id,field_name,field_label,field_type,is_enabled,is_required,sort_order) VALUES ($1,'attendance','Will you attend?','attendance',true,true,0),($1,'headcount','Guest count','number',true,true,1),($1,'email','Email','email',true,false,2)",[event]);
+  await db.query('INSERT INTO event_social_settings(event_id,guests_enabled) VALUES ($1,true)',[event]);
+  const ctx = await browser.newContext({ignoreHTTPSErrors:true});
+  const page = await ctx.newPage();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const runtimeErrors=[];page.on('pageerror',error=>runtimeErrors.push(error.message));
+  await page.addInitScript(()=>{ window.reviewShare=null;Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.reviewShare=data;}}); });
+  await page.goto(`${origin}/e/${slug}?t=${token}&tracking=discard#guest`);
+  await page.getByRole('button',{name:'Submit RSVP',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Share Invite',exact:true}).click();
+  assert.equal((await page.evaluate(()=>window.reviewShare)).url,`${origin}/e/${slug}`);
+  await page.evaluate(()=>{
+    Object.defineProperty(navigator,'share',{configurable:true,value:undefined});
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.reviewClipboard=value;}}});
+  });
+  await page.getByRole('button',{name:'Share Invite',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.reviewClipboard),`${origin}/e/${slug}`);
+  const stranger=await browser.newContext({ignoreHTTPSErrors:true});
+  assert.equal((await stranger.request.get(`${origin}/api/social/${slug}`)).status(),403);
+  console.log('PASS native/clipboard sharing strips guest credentials; public recipient has no guest access');
+
+  await page.getByRole('button',{name:'Attending',exact:true}).click();
+  await page.getByLabel('Guest count *',{exact:true}).fill('2');
+  await page.getByLabel('Name',{exact:true}).fill('Plus One');
+  await page.getByRole('button',{name:'Submit RSVP',exact:true}).click();
+  await page.getByText('Your response has been recorded.',{exact:true}).waitFor();
+  await page.reload();
+  await page.getByRole('button',{name:'Update your response',exact:true}).click();
+  assert.equal(await page.getByLabel('Guest count *',{exact:true}).inputValue(),'2');
+  assert.equal(await page.getByLabel('Name',{exact:true}).inputValue(),'Plus One');
+  await page.getByRole('button',{name:'Not Attending',exact:true}).click();
+  await page.getByRole('button',{name:'Submit RSVP',exact:true}).click();
+  await page.getByText('Your response has been recorded.',{exact:true}).waitFor();
+  const rows=(await db.query('SELECT status,headcount FROM rsvp_responses WHERE event_id=$1 AND guest_id=$2',[event,guest])).rows;
+  assert.equal(rows.length,1);assert.equal(rows[0].status,'not_attending');
+  assert.equal((await db.query("SELECT COALESCE(SUM(headcount),0)::int AS total FROM rsvp_responses WHERE event_id=$1 AND status='attending'",[event])).rows[0].total,0);
+  const spoof=await stranger.request.post(`${origin}/api/rsvp/${slug}`,{headers:{Origin:origin},data:{respondent_name:'Forged',status:'attending',guest_id:guest}});
+  assert.equal(spoof.status(),403);
+  assert.equal((await stranger.request.get(`${origin}/api/rsvp/${slug}`,{headers:{'X-Guest-Token':'z'.repeat(24)}})).status(),403);
+  assert.equal((await stranger.request.get(`${origin}/api/rsvp/social-qa`,{headers:{'X-Guest-Token':token}})).status(),403);
+  await db.query('INSERT INTO event_social_guests(event_id,guest_id,show_name) VALUES ($1,$2,true)',[event,guest]);
+  const socialAfterDecline = await ctx.request.get(`${origin}/api/social/${slug}`,{headers:{'X-Guest-Token':token}});
+  assert.deepEqual((await socialAfterDecline.json()).guests,[]);
+  console.log('PASS invited reload/edit replaces one RSVP and releases capacity; forged and cross-event guest access denied');
+
+  const publicContext=await browser.newContext({ignoreHTTPSErrors:true});
+  const publicPage=await publicContext.newPage();
+  let failFirst=true;
+  await publicPage.route(`**/api/rsvp/${slug}`,async route=>{
+    if(failFirst&&route.request().method()==='GET'){failFirst=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic load outage'})});return;}
+    await route.continue();
+  });
+  await publicPage.goto(`${origin}/e/${slug}`);
+  await publicPage.getByRole('button',{name:'Retry loading response',exact:true}).click();
+  await publicPage.getByRole('button',{name:'Submit RSVP',exact:true}).waitFor();
+  await publicPage.getByLabel('Your Name *',{exact:true}).fill('Public Guest');
+  await publicPage.getByLabel('Email',{exact:true}).fill('review-guest@example.test');
+  await publicPage.getByRole('button',{name:'Attending',exact:true}).click();
+  await publicPage.getByLabel('Guest count *',{exact:true}).fill('1');
+  await publicPage.getByRole('button',{name:'Submit RSVP',exact:true}).click();
+  await publicPage.getByText('Your response has been recorded.',{exact:true}).waitFor();
+  const editCookie=(await publicContext.cookies()).find(c=>c.name===`sealsend_rsvp_${event}`);
+  assert.ok(editCookie?.httpOnly&&editCookie.secure&&editCookie.sameSite==='Strict');
+  assert.equal(editCookie.path,`/api/rsvp/${slug}`);
+  assert.ok(!(await publicPage.evaluate(()=>document.cookie)).includes('sealsend_rsvp_'));
+  await publicPage.reload();
+  await publicPage.getByRole('button',{name:'Update your response',exact:true}).click();
+  assert.equal(await publicPage.getByLabel('Your Name *',{exact:true}).inputValue(),'Public Guest');
+  await publicPage.getByRole('button',{name:'Not Attending',exact:true}).click();
+  await publicPage.getByRole('button',{name:'Submit RSVP',exact:true}).click();
+  await publicPage.getByText('Your response has been recorded.',{exact:true}).waitFor();
+  const payload={respondent_name:'Public Guest',status:'not_attending',headcount:1};
+  const retries=await Promise.all([0,1,2].map(()=>publicContext.request.post(`${origin}/api/rsvp/${slug}`,{headers:{Origin:origin},data:payload})));
+  for(const retry of retries) assert.equal(retry.status(),200,await retry.text());
+  const publicRows=(await db.query('SELECT id,status FROM rsvp_responses WHERE event_id=$1 AND guest_id IS NULL',[event])).rows;
+  assert.equal(publicRows.length,1);assert.equal(publicRows[0].status,'not_attending');
+  const strangersResponse=await stranger.request.get(`${origin}/api/rsvp/${slug}`);
+  assert.equal((await strangersResponse.json()).response,null);
+  assert.equal((await stranger.request.get(`${origin}/api/rsvp/social-qa`,{headers:{'X-Rsvp-Edit-Token':editCookie.value}})).status(),403);
+  const own=await publicContext.request.get(`${origin}/api/rsvp/${slug}`);
+  assert.ok(own.headers()['cache-control'].includes('no-store'));
+  assert.ok(!JSON.stringify(await own.json()).includes('edit_token_hash'));
+  const summary = await host.request.get(`${origin}/api/events/${event}/responses/summary`);
+  assert.equal(summary.status(),200);
+  const totals = await summary.json();
+  assert.equal(totals.sourceResponseCount,2);assert.equal(totals.attendingHeadcount,0);
+  console.log('PASS public reload/edit and concurrent retries use one response; HttpOnly cookie and event binding protect edits');
+
+  const png=await sharp({create:{width:16,height:16,channels:3,background:'#335577'}}).png().toBuffer();
+  const remote='https://artwork.example.test';
+  await db.query("UPDATE events SET design_url=$1,design_type='url',customization=$2 WHERE id=$3",[`${remote}/design.png`,JSON.stringify({logoUrl:`${remote}/logo.png`,backgroundImage:`${remote}/background.png`}),event]);
+  const fetched=[];await page.route(`${remote}/**`,async route=>{fetched.push(route.request().url());await route.fulfill({contentType:'image/png',body:png});});
+  await page.reload();
+  await page.getByRole('button',{name:'Update your response',exact:true}).waitFor();
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('img')).filter(img=>img.src.includes('artwork.example.test')).every(img=>img.complete&&img.naturalWidth===16));
+  assert.ok(fetched.includes(`${remote}/design.png`));assert.ok(fetched.includes(`${remote}/logo.png`));assert.ok(fetched.includes(`${remote}/background.png`));
+  await page.getByRole('button',{name:'Update your response',exact:true}).click();
+  for(const width of [375,768,1440]) {
+    await page.setViewportSize({width,height:1000});
+    // Measure the visible form after its entrance animation.
+    await page.locator('form[aria-label="RSVP"]').scrollIntoViewIfNeeded();
+    await page.waitForFunction(()=>{
+      let element=document.querySelector('form[aria-label="RSVP"]');
+      if(!element) return false;
+      while(element) {
+        if(Number(getComputedStyle(element).opacity)<0.999) return false;
+        element=element.parentElement;
+      }
+      return true;
+    });
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
+    const axe=await new AxeBuilder({page}).include('[aria-label="RSVP"]').analyze();
+    assert.deepEqual(axe.violations.filter(v=>['serious','critical'].includes(v.impact)),[]);
+  }
+  const builder = await host.newPage();
+  await builder.route(`${remote}/**`,route=>route.fulfill({contentType:'image/png',body:png}));
+  await builder.goto(`${origin}/events/${event}/build`);
+  await builder.getByRole('button',{name:/Next: The look/}).click();
+  const artwork = builder.getByRole('img',{name:'Your artwork',exact:true});
+  await artwork.waitFor();
+  await builder.waitForFunction(()=>{const img=document.querySelector('img[alt="Your artwork"]');return img?.complete&&img.naturalWidth===16;});
+  assert.equal(await builder.getByLabel('Image link',{exact:true}).inputValue(),`${remote}/design.png`);
+  await builder.close();
+  console.log('PASS external HTTPS artwork/logo/background render; RSVP layout/accessibility at 375/768/1440px');
+
+  await db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'guest','review-guest-session',NOW()+INTERVAL '1 day')",[guest]);
+  const guestSession=await browser.newContext({ignoreHTTPSErrors:true});
+  await guestSession.addCookies([{name:'sealsend_session',value:'review-guest-session',url:origin}]);
+  assert.equal((await (await guestSession.request.get(`${origin}/api/rsvp/${slug}`)).json()).response.guest_id,guest);
+  const hp=await host.newPage();
+  await hp.route(`${remote}/**`,route=>route.fulfill({contentType:'image/png',body:png}));
+  await host.grantPermissions(['camera']);
+  await hp.addInitScript(({token,origin,slug})=>{
+    const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia=async options=>{window.reviewStream=await original(options);return window.reviewStream;};
+    window.BarcodeDetector=class { async detect(){return[{rawValue:`${origin}/e/${slug}?t=${token}`}];} };
+  },{token,origin,slug});
+  await hp.goto(`${origin}/events/${event}/check-in`);
+  assert.equal(await hp.evaluate(()=>document.featurePolicy.allowsFeature('camera')),true);
+  await hp.getByRole('button',{name:'Scan QR',exact:true}).click();
+  await hp.waitForFunction(()=>window.reviewStream || document.body.innerText.includes('Camera access was unavailable.'),{},{timeout:10000});
+  assert.ok(await hp.evaluate(()=>Boolean(window.reviewStream)),await hp.locator('body').innerText());
+  await hp.waitForFunction(()=>window.reviewStream.getTracks().every(t=>t.readyState==='ended'),{},{timeout:10000});
+  assert.ok((await db.query('SELECT checked_in_at FROM guests WHERE id=$1',[guest])).rows[0].checked_in_at, 'QR scan must persist a guest check-in');
+  await hp.goto(`${origin}/e/${slug}`);
+  assert.equal(await hp.evaluate(()=>document.featurePolicy.allowsFeature('camera')),false);
+  await host.clearPermissions();await host.grantPermissions([]);
+  // Explicit browser denial exercises the scanner's recovery message.
+  await hp.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('Denied','NotAllowedError');};});
+  await hp.goto(`${origin}/events/${event}/check-in`);
+  await hp.getByRole('button',{name:'Scan QR',exact:true}).click();
+  await hp.getByText('Camera access was unavailable. Use guest search instead.',{exact:true}).waitFor();
+  assert.deepEqual(runtimeErrors,[]);
+  console.log('PASS guest-session authorization, scoped camera startup, QR check-in, track cleanup and permission-denial recovery');
+  await Promise.all([ctx,stranger,publicContext,guestSession].map(c=>c.close()));await hp.close();
+  await db.query('DELETE FROM events WHERE id=$1',[event]);
+}

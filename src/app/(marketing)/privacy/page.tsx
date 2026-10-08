@@ -79,6 +79,7 @@ export default function PrivacyPage() {
           <ul className={listClass}>
             <li><code>sealsend_session</code> keeps you signed in. It is not readable by scripts on the page (httpOnly) and lasts 7 days. Guests who use their invite or access link also get it.</li>
             <li><code>sealsend_user</code> lets the page show who you are. Scripts on the page can read it. It can include your email, phone, role and event id.</li>
+            <li><code>sealsend_rsvp_&lt;eventId&gt;</code> lets public respondents update their own RSVP in the same browser. It is a private, httpOnly edit credential sent over HTTPS, scoped to the event’s RSVP endpoint, and lasts up to one year. Clearing it removes that browser’s ability to edit the response.</li>
             <li><code>sealsend_social_&lt;eventId&gt;</code> keeps invited guests verified for an event’s private activities and photos. It contains the invitation access token, is not readable by page scripts (httpOnly), is sent over HTTPS and lasts up to 7 days.</li>
           </ul>
         </section>

@@ -465,8 +465,10 @@ test('public capacity writes are serialized and RSVP plus-ones are atomic', asyn
   const rsvp = await read('src/app/api/rsvp/[slug]/route.ts');
   const signups = await read('src/app/api/signups/[slug]/route.ts');
 
-  assert.match(rsvp, /pg_advisory_xact_lock/);
-  assert.match(rsvp, /BEGIN[\s\S]*INSERT INTO rsvp_responses[\s\S]*INSERT INTO plus_ones[\s\S]*COMMIT/);
+  const store = await read('src/lib/rsvp-store.ts');
+  assert.match(store, /pg_advisory_xact_lock/);
+  assert.match(rsvp, /BEGIN[\s\S]*saveRsvp[\s\S]*COMMIT/);
+  assert.match(store, /INSERT INTO rsvp_responses[\s\S]*INSERT INTO plus_ones/);
   assert.doesNotMatch(rsvp, /Don't fail the RSVP if plus_ones creation fails/);
   assert.match(signups, /SELECT id, slots[\s\S]*FOR UPDATE/);
   assert.match(signups, /BEGIN[\s\S]*INSERT INTO event_signup_claims[\s\S]*COMMIT/);

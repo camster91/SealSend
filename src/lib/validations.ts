@@ -201,10 +201,11 @@ export const rsvpSubmissionSchema = z.object({
   respondent_name: z.string().min(1, "Your name is required").max(100),
   respondent_email: z.string().email().optional().or(z.literal("")),
   status: z.enum(["attending", "not_attending", "maybe"]),
-  headcount: z.number().min(1).max(50).default(1),
+  headcount: z.number().int().min(1).max(50).default(1),
   response_data: z.record(z.string(), z.unknown()).default({}),
   plus_ones: z.array(plusOneDataSchema).default([]),
   guest_id: z.string().uuid().optional(),
+  edit_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

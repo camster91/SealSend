@@ -1,189 +1,105 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getDb, queryOne } from "@/lib/db/client";
 import { rsvpSubmissionSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/utils";
-import type { Event, RSVPResponse } from "@/types/database";
+import type { Event } from "@/types/database";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { enqueueWebhookEvent } from "@/lib/webhooks";
+import { getApiUser } from "@/lib/auth/api-auth";
+import { generateMagicToken, isValidMagicToken } from "@/lib/magic-token";
+import { findRsvp, saveRsvp, RsvpError, type RsvpQuery } from "@/lib/rsvp-store";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie, X-Guest-Token, X-Rsvp-Edit-Token" };
+type Context = { params: Promise<{ slug: string }> };
+const editCookieName = (event: Event) => `sealsend_rsvp_${event.id}`;
+function setEditCookie(result: NextResponse, event: Event, token: string) {
+  result.cookies.set(editCookieName(event), token, {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict",
+    path: `/api/rsvp/${event.slug}`, maxAge: 365 * 86400,
+  });
+}
+async function publishedEvent(slug: string) {
+  const event = await queryOne<Event>("SELECT * FROM events WHERE slug = $1 AND status = 'published'", [slug]);
+  if (!event) throw new RsvpError("Event not found or not published", 404);
+  return event;
+}
+async function resolveGuest(request: Request, eventId: string, requestedId?: string): Promise<string | null> {
+  const token = request.headers.get("x-guest-token");
+  let guestId: string | null = null;
+  if (token !== null) {
+    if (!/^[A-Za-z0-9_-]{24}$/.test(token)) throw new RsvpError("Invalid guest access.");
+    guestId = (await queryOne<{ id: string }>("SELECT id FROM guests WHERE event_id = $1 AND invite_token = $2", [eventId, token]))?.id ?? null;
+    if (!guestId) throw new RsvpError("Invalid guest access.");
+  } else {
+    const user = await getApiUser();
+    if (user?.role === "guest") {
+      guestId = (await queryOne<{ id: string }>("SELECT id FROM guests WHERE event_id = $1 AND id = $2", [eventId, user.id]))?.id ?? null;
+    }
+  }
+  if (requestedId && requestedId !== guestId) throw new RsvpError("Open your personal invitation to respond as this guest.");
+  return guestId;
+}
+async function resolveEditToken(request: Request, event: Event, supplied?: string) {
+  const token = supplied ?? request.headers.get("x-rsvp-edit-token") ?? (await cookies()).get(editCookieName(event))?.value;
+  if (token && !isValidMagicToken(token)) throw new RsvpError("Invalid response access.");
+  return token || generateMagicToken();
+}
+
+export async function GET(request: Request, { params }: Context) {
   try {
     const { slug } = await params;
-    const ip = getClientIp(request);
-    const { success } = await rateLimit(`rsvp:${slug}:${ip}`, { max: 10, windowSeconds: 300 });
-    if (!success) {
-      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    const limit = await rateLimit(`rsvp-read:${slug}:${getClientIp(request)}`, { max: 60, windowSeconds: 60 });
+    if (!limit.success) return NextResponse.json({ error: "Please try again shortly." }, { status: 429, headers: privateHeaders });
+    const event = await publishedEvent(slug);
+    const guestId = await resolveGuest(request, event.id);
+    const token = await resolveEditToken(request, event);
+    const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await getDb().query(sql, values)).rows as T[] });
+    const response = await findRsvp(db, event.id, guestId, token);
+    let spotsRemaining: number | null = null;
+    if (event.max_attendees) {
+      const total = await queryOne<{ total: number }>("SELECT COALESCE(SUM(headcount), 0)::int AS total FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2::uuid IS NULL OR id <> $2)", [event.id, response?.id ?? null]);
+      spotsRemaining = Math.max(0, event.max_attendees - (total?.total ?? 0));
     }
+    const result = NextResponse.json({ response, spots_remaining: spotsRemaining }, { headers: privateHeaders });
+    if (!guestId) setEditCookie(result, event, token);
+    return result;
+  } catch (error) {
+    if (error instanceof RsvpError) return NextResponse.json({ error: error.message }, { status: error.status, headers: privateHeaders });
+    return NextResponse.json({ error: "Unable to load your response." }, { status: 500, headers: privateHeaders });
+  }
+}
 
-    const body = await request.json();
-
-    // Find the published event by slug
-    const event = await queryOne<Event>(
-      'SELECT * FROM events WHERE slug = $1 AND status = $2',
-      [slug, 'published']
-    );
-
-    if (!event) {
-      return NextResponse.json(
-        { error: "Event not found or not published" },
-        { status: 404 }
-      );
-    }
-
+export async function POST(request: Request, { params }: Context) {
+  try {
+    const { slug } = await params;
+    const limit = await rateLimit(`rsvp:${slug}:${getClientIp(request)}`, { max: 10, windowSeconds: 300 });
+    if (!limit.success) return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429, headers: privateHeaders });
+    const parsed = rsvpSubmissionSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: "Invalid submission" }, { status: 400, headers: privateHeaders });
+    const event = await publishedEvent(slug);
+    const guestId = await resolveGuest(request, event.id, parsed.data.guest_id);
+    const editToken = await resolveEditToken(request, event, parsed.data.edit_token);
     const accountPlan = await getUserTier(event.user_id);
     const effectiveLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).responses;
-
-    // Validate submission
-    const parsed = rsvpSubmissionSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid submission" },
-        { status: 400 }
-      );
-    }
-
-    const { respondent_name, respondent_email, status, response_data, guest_id, plus_ones } = parsed.data;
-    let { headcount } = parsed.data;
-
-    // Enforce +1 restrictions (default: allow)
-    const allowPlusOnes = event.allow_plus_ones !== undefined ? event.allow_plus_ones : true;
-    if (!allowPlusOnes) {
-      headcount = 1;
-    }
-
-    // Enforce minimum headcount
-    if (headcount < 1) {
-      return NextResponse.json(
-        { error: "Headcount must be at least 1." },
-        { status: 400 }
-      );
-    }
-
-    // Enforce per-RSVP guest limit (default: 10)
-    const maxPerRsvp = event.max_guests_per_rsvp || 10;
-    if (headcount > maxPerRsvp) {
-      return NextResponse.json(
-        { error: `Maximum ${maxPerRsvp} guest${maxPerRsvp !== 1 ? "s" : ""} per RSVP.` },
-        { status: 400 }
-      );
-    }
-
-    // Validate plus_ones count matches headcount - 1 (main respondent)
-    const expectedPlusOnes = Math.max(0, headcount - 1);
-    const actualPlusOnes = (plus_ones || []).length;
-    if (actualPlusOnes > expectedPlusOnes) {
-      return NextResponse.json(
-        { error: `You can only add ${expectedPlusOnes} additional guest${expectedPlusOnes !== 1 ? "s" : ""}.` },
-        { status: 400 }
-      );
-    }
-
-    // Serialize capacity checks and all RSVP writes for this event so concurrent
-    // submissions cannot overbook or leave a response without its plus-ones.
-    const maxAttendees = event.max_attendees || null;
     const client = await getDb().connect();
-    let response: RSVPResponse;
+    let saved: Awaited<ReturnType<typeof saveRsvp>>;
     try {
-      await client.query('BEGIN');
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [event.id]);
-
-      const countResult = await client.query<{ count: string }>(
-        'SELECT COUNT(*)::text AS count FROM rsvp_responses WHERE event_id = $1',
-        [event.id]
-      );
-      const count = parseInt(countResult.rows[0]?.count || '0', 10);
-      if (effectiveLimit && count >= effectiveLimit) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: "This event has reached its maximum number of responses. The host may need to upgrade their plan." }, { status: 403 });
-      }
-
-      if (maxAttendees && status === "attending") {
-        const sumResult = await client.query<{ total: string }>(
-        `SELECT COALESCE(SUM(headcount), 0)::text AS total
-         FROM rsvp_responses WHERE event_id = $1 AND status = $2`,
-        [event.id, 'attending']
-      );
-        const currentTotal = parseInt(sumResult.rows[0]?.total || '0', 10);
-
-        if (currentTotal + headcount > maxAttendees) {
-          const spotsLeft = Math.max(0, maxAttendees - currentTotal);
-          await client.query('ROLLBACK');
-          return NextResponse.json({ error: spotsLeft > 0 ? `Only ${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} remaining. Please reduce your guest count.` : "This event has reached its maximum number of attendees." }, { status: 403 });
-        }
-      }
-
-      const insertParams: unknown[] = [
-      event.id,
-      respondent_name,
-      respondent_email || null,
-      status,
-      headcount,
-      response_data ? JSON.stringify(response_data) : null,
-      plus_ones ? JSON.stringify(plus_ones) : JSON.stringify([]),
-    ];
-      let insertSql: string;
-
-    if (guest_id) {
-      // Bind guest_id to this event only — prevent cross-event IDOR
-      const guestResult = await client.query<{ id: string }>(
-        'SELECT id FROM guests WHERE id = $1 AND event_id = $2',
-        [guest_id, event.id]
-      );
-      if (!guestResult.rows[0]) {
-        await client.query('ROLLBACK');
-        return NextResponse.json(
-          { error: "Invalid guest for this event" },
-          { status: 400 }
-        );
-      }
-      insertSql = `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data, guest_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
-      insertParams.push(guest_id);
-    } else {
-      insertSql = `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
-    }
-
-      const responseResult = await client.query<RSVPResponse>(insertSql, insertParams);
-      const insertedResponse = responseResult.rows[0];
-
-      if (!insertedResponse) throw new Error('RSVP insert returned no row');
-      response = insertedResponse;
-
-    // Create plus_ones records if provided
-      if (plus_ones && plus_ones.length > 0) {
-      const valueClauses: string[] = [];
-      const allParams: unknown[] = [];
-      let paramIndex = 1;
-
-      for (const po of plus_ones) {
-        valueClauses.push(
-          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`
-        );
-        allParams.push(event.id, insertedResponse.id, po.name, po.email || null, status);
-        paramIndex += 5;
-      }
-
-        await client.query(
-          `INSERT INTO plus_ones (event_id, rsvp_response_id, name, email, status)
-           VALUES ${valueClauses.join(', ')}`,
-          allParams
-        );
-      }
-      await client.query('COMMIT');
+      await client.query("BEGIN");
+      const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await client.query(sql, values)).rows as T[] });
+      saved = await saveRsvp(db, event.id, guestId, editToken, parsed.data, effectiveLimit);
+      await client.query("COMMIT");
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw error;
-    } finally {
-      client.release();
-    }
+    } finally { client.release(); }
+    const { response, updated } = saved;
+    const { respondent_name, status, plus_ones } = parsed.data;
+    const headcount = response.headcount;
 
     await recordActivationEventSafely({
       name: "first_rsvp_received",
@@ -216,7 +132,7 @@ export async function POST(
         const safeTitle = escapeHtml(event.title);
         await sendEmail({
           to: host.email,
-          subject: `New RSVP: ${respondent_name} (${statusLabel}) - ${event.title}`,
+          subject: `${updated ? "Updated RSVP" : "New RSVP"}: ${respondent_name} (${statusLabel}) - ${event.title}`,
           html: `<p><strong>${safeName}</strong> responded <strong>${statusLabel}</strong> to <strong>${safeTitle}</strong>${headcount > 1 ? ` with ${headcount} guests` : ''}.</p><p><a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app'}/events/${event.id}/responses">View all responses</a></p>`,
         });
       }
@@ -224,11 +140,14 @@ export async function POST(
       // Non-critical, don't fail the RSVP
     }
 
-    return NextResponse.json({ success: true, response });
-  } catch {
+    const result = NextResponse.json({ success: true, response, updated }, { headers: privateHeaders });
+    if (!guestId) setEditCookie(result, event, editToken);
+    return result;
+  } catch (error) {
+    if (error instanceof RsvpError) return NextResponse.json({ error: error.message }, { status: error.status, headers: privateHeaders });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500, headers: privateHeaders }
     );
   }
 }

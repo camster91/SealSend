@@ -86,7 +86,6 @@ export default function CheckInPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = stream; setScanning(true);
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
       const video = videoRef.current;
       if (!video) { stopScanner(); return; }
       video.srcObject = stream; await video.play();
@@ -114,7 +113,7 @@ export default function CheckInPage() {
       <button type="button" onClick={() => window.print()} disabled={guests.length === 0} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">Print loaded guest list</button>
     </div>
     <p className="mt-2 text-xs text-gray-500 print:hidden">Last confirmed: {lastSyncedAt ? <time dateTime={lastSyncedAt}>{lastConfirmedLabel}</time> : lastConfirmedLabel}</p>
-    {scanning && <video ref={videoRef} muted playsInline aria-label="QR code camera preview" className="mt-3 aspect-video w-full rounded-xl bg-black object-cover print:hidden" />}
+    <video hidden={!scanning} ref={videoRef} muted playsInline aria-label="QR code camera preview" className="mt-3 aspect-video w-full rounded-xl bg-black object-cover print:hidden" />
     <input aria-label="Search guests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search guests" className="mt-5 h-12 w-full rounded-xl border border-gray-300 px-4 text-base print:hidden" />
     {syncError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 print:hidden">{syncError}</p>}
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 print:hidden">{error}</p>}

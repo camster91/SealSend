@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { getClientUser } from "@/lib/auth/client-auth";
-import type { RSVPField, PlusOneData } from "@/types/database";
+import type { RSVPField, PlusOneData, RSVPResponse } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
 
@@ -18,51 +18,65 @@ interface RSVPFormProps {
   allowPlusOnes?: boolean;
   maxGuestsPerRsvp?: number;
   spotsRemaining?: number | null;
+  inviteToken?: string;
   inviteGuestId?: string;
   inviteGuestName?: string;
   inviteGuestEmail?: string | null;
 }
 
-export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
+export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteToken, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [plusOnes, setPlusOnes] = useState<PlusOneData[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [availableSpots, setAvailableSpots] = useState(spotsRemaining);
   const [error, setError] = useState<string | null>(null);
 
   // Calculate current headcount
   const headcount = parseInt(formData["headcount"] || "1", 10) || 1;
   const expectedPlusOnes = Math.max(0, headcount - 1);
 
-  // Pre-fill from invite link (magic link) or signed-in user
+  // GET establishes a private edit cookie before the first public submission.
+  // Personal invitations authorize reloads by their event-bound token instead.
   useEffect(() => {
     let cancelled = false;
-
-    // Invite data takes priority
-    if (inviteGuestName) {
-      setFormData((prev) => ({ ...prev, respondent_name: inviteGuestName }));
-    }
-    if (inviteGuestEmail) {
-      setFormData((prev) => ({ ...prev, email: inviteGuestEmail }));
-    }
-
-    // Fall back to session cookie if no invite data
-    if (!inviteGuestName && !cancelled) {
-      const user = getClientUser();
-      if (user) {
-        const name = user.name || user.email?.split("@")[0] || "";
-        if (name) {
-          setFormData((prev) => ({ ...prev, respondent_name: prev.respondent_name || name }));
+    async function loadResponse() {
+      try {
+        const res = await fetch(`/api/rsvp/${eventSlug}`, {
+          headers: inviteToken ? { "X-Guest-Token": inviteToken } : {}, cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unable to load your response.");
+        if (cancelled) return;
+        const saved = data.response as RSVPResponse | null;
+        const user = !inviteGuestName ? getClientUser() : null;
+        const initial: Record<string, string> = {};
+        if (saved) {
+          for (const [key, value] of Object.entries(saved.response_data || {})) {
+            if (typeof value === "string") initial[key] = value;
+          }
+          for (const field of fields) {
+            if (field.field_type === "attendance") initial[field.field_name] = saved.status;
+          }
         }
-        if (user.email) {
-          setFormData((prev) => ({ ...prev, email: prev.email || user.email || "" }));
-        }
+        initial.respondent_name = saved?.respondent_name || inviteGuestName || user?.name || user?.email?.split("@")[0] || "";
+        initial.email = saved?.respondent_email || inviteGuestEmail || user?.email || "";
+        initial.headcount = String(saved?.headcount ?? 1);
+        setFormData(initial);
+        setPlusOnes(saved?.plus_ones_data || []);
+        setAvailableSpots(data.spots_remaining);
+        setSubmitted(Boolean(saved));
+        setError(null);
+        setLoading(false);
+      } catch (error) {
+        if (!cancelled) setError(error instanceof Error ? error.message : "Unable to load your response. Reload to try again.");
       }
     }
-
+    void loadResponse();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [eventSlug, inviteToken, inviteGuestName, inviteGuestEmail, fields, loadAttempt]);
 
   // Sync plusOnes array with headcount
   useEffect(() => {
@@ -132,7 +146,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     try {
       const res = await fetch(`/api/rsvp/${eventSlug}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(inviteToken ? { "X-Guest-Token": inviteToken } : {}) },
         body: JSON.stringify({
           respondent_name: formData["name"] || formData["respondent_name"] || "Guest",
           respondent_email: formData["email"] || "",
@@ -151,6 +165,11 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       }
 
       setSubmitted(true);
+      // A confirmed save stays successful even if the follow-up capacity read fails.
+      try {
+        const current = await fetch(`/api/rsvp/${eventSlug}`, { headers: inviteToken ? { "X-Guest-Token": inviteToken } : {}, cache: "no-store" });
+        if (current.ok) setAvailableSpots((await current.json()).spots_remaining);
+      } catch { /* Keep the last known capacity until the next load. */ }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -174,7 +193,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         </p>
         <button
           type="button"
-          onClick={() => { setSubmitted(false); setFormData({}); setPlusOnes([]); }}
+          onClick={() => { setSubmitted(false); setError(null); }}
           className="mt-4 text-sm font-medium text-green-700 underline underline-offset-2 hover:text-green-800"
         >
           Update your response
@@ -184,19 +203,19 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form aria-label="RSVP" onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">RSVP</h2>
-        {spotsRemaining !== null && (
+        {availableSpots !== null && (
           <span className={cn(
             "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-            spotsRemaining > 10
+            availableSpots > 10
               ? "bg-green-100 text-green-700"
-              : spotsRemaining > 0
+              : availableSpots > 0
                 ? "bg-amber-100 text-amber-700"
                 : "bg-red-100 text-red-700"
           )}>
-            {spotsRemaining > 0 ? `${spotsRemaining} spots left` : "Event full"}
+            {availableSpots > 0 ? `${availableSpots} spots left` : "Event full"}
           </span>
         )}
       </div>
@@ -211,6 +230,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
 
       {/* Always show name field */}
       <Input
+        id="rsvp-name"
         label="Your Name *"
         placeholder="Enter your name"
         value={formData["respondent_name"] || ""}
@@ -266,6 +286,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             return (
               <Input
                 key={field.id}
+                id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 type="email"
                 placeholder={field.placeholder || "your@email.com"}
@@ -282,7 +303,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
               ? allowPlusOnes
                 ? Math.min(
                     maxGuestsPerRsvp,
-                    spotsRemaining !== null ? Math.max(1, spotsRemaining) : maxGuestsPerRsvp
+                    availableSpots !== null ? Math.max(1, availableSpots) : maxGuestsPerRsvp
                   )
                 : 1
               : 50;
@@ -295,6 +316,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             return (
               <div key={field.id}>
                 <Input
+                  id={`rsvp-${field.id}`}
                   label={`${field.field_label}${field.is_required ? " *" : ""}`}
                   type="number"
                   min="1"
@@ -304,9 +326,9 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   onChange={(e) => updateField(field.field_name, e.target.value)}
                   required={field.is_required}
                 />
-                {isHeadcount && spotsRemaining !== null && (
+                {isHeadcount && availableSpots !== null && (
                   <p className="mt-1 text-xs text-gray-500">
-                    {spotsRemaining} spot{spotsRemaining !== 1 ? "s" : ""} remaining
+                    {availableSpots} spot{availableSpots !== 1 ? "s" : ""} remaining
                   </p>
                 )}
               </div>
@@ -316,6 +338,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             return (
               <Select
                 key={field.id}
+                id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 placeholder="Select an option"
                 options={(field.options || []).map((opt) => ({
@@ -342,6 +365,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             return useTextarea ? (
               <Textarea
                 key={field.id}
+                id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 placeholder={field.placeholder || ""}
                 value={formData[field.field_name] || ""}
@@ -351,6 +375,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             ) : (
               <Input
                 key={field.id}
+                id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 placeholder={field.placeholder || ""}
                 value={formData[field.field_name] || ""}
@@ -390,6 +415,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 </button>
               </div>
               <Input
+                id={`rsvp-plus-one-${index}-name`}
                 label="Name"
                 placeholder="Enter guest name"
                 value={plusOne.name}
@@ -398,6 +424,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 className="text-sm"
               />
               <Input
+                id={`rsvp-plus-one-${index}-email`}
                 label="Email (optional)"
                 type="email"
                 placeholder="guest@email.com"
@@ -413,19 +440,21 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       {error && (
         <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-accent-red">
           {error}
+          {loading && <button type="button" onClick={() => { setError(null); setLoadAttempt((value) => value + 1); }} className="ml-2 underline">Retry loading response</button>}
         </div>
       )}
 
       <Button
         type="submit"
         loading={submitting}
+        disabled={loading}
         className="w-full"
         style={{
           backgroundColor: primaryColor,
           borderRadius: buttonStyle === "pill" ? "9999px" : buttonStyle === "square" ? "0px" : "8px",
         }}
       >
-        Submit RSVP
+        {loading ? "Loading your response…" : "Submit RSVP"}
       </Button>
     </form>
   );

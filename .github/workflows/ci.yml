@@ -72,11 +72,16 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
 
+      - name: Make PostgreSQL tools available for isolated transaction QA
+        if: github.actor != 'dependabot[bot]'
+        run: pg_config --bindir >> "$GITHUB_PATH"
+
       - name: Verified guest and authenticated builder QA
         if: github.actor != 'dependabot[bot]'
         run: npm run test:social:browser
         env:
           SEALSEND_QA_BUILDER: 'true'
+          SEALSEND_QA_USE_POSTGRES: 'true'
 
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
