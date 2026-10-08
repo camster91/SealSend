@@ -45,11 +45,36 @@ try {
   const host = await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
+  const failNextRead = async (page,url) => {
+    const handler = async route => {
+      if (route.request().method() !== 'GET') { await route.continue(); return; }
+      await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic refresh outage'})});
+      await page.unroute(url,handler);
+    };
+    await page.route(url,handler);
+  };
+  await failNextRead(hostPage,`**/api/events/${eventId}/social`);
   await hostPage.goto(`${origin}/events/${eventId}`);
   await hostPage.getByRole('heading',{ name:'Guest activities',exact:true }).waitFor();
+  await hostPage.getByRole('button',{name:'Refresh activities',exact:true}).click();
+  await hostPage.getByLabel('Reactions and excitement').waitFor();
+  await hostPage.getByLabel('Question',{exact:true}).fill('Recovery test poll');
+  await hostPage.getByLabel('Options (2–6, one per line)',{exact:true}).fill('Yes\nNo');
+  await failNextRead(hostPage,`**/api/events/${eventId}/social`);
+  await hostPage.getByRole('button',{name:'Add poll',exact:true}).click();
+  await hostPage.getByText('Saved. Refresh activities to see the latest changes.',{exact:true}).waitFor();
+  assert.equal(await hostPage.getByLabel('Question',{exact:true}).inputValue(),'');
+  await hostPage.getByRole('button',{name:'Refresh activities',exact:true}).click();
+  await hostPage.getByRole('heading',{name:'Recovery test poll',exact:true}).waitFor();
+  assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM event_social_polls WHERE question = 'Recovery test poll'")).rows[0].count,1);
   const token = 'a'.repeat(24), otherToken = 'b'.repeat(24);
   const ctx = await browser.newContext({ ignoreHTTPSErrors:true,extraHTTPHeaders:{ Origin:origin } });
   const page = await ctx.newPage(); page.on('pageerror',e=>errors.push(e.message)); 
+  await failNextRead(page,'**/api/social/social-qa');
+  await page.goto(`${origin}/e/social-qa?t=${token}`);
+  await page.getByRole('button',{name:'Refresh activities',exact:true}).click();
+  await page.getByRole('heading',{name:'Join in',exact:true}).waitFor();
+  console.log('PASS initial guest/host loading recovery and saved poll survives failed refresh without duplicate submission');
   for (const width of [375,768,1440]) {
     await page.setViewportSize({ width,height:1000 });
     await page.goto(`${origin}/e/social-qa?t=${token}`);
@@ -65,7 +90,10 @@ try {
   }
   await page.getByLabel(/Show my name/).click();
   await page.getByRole('listitem').filter({ hasText:'Invited Guest' }).waitFor();
+  await failNextRead(page,'**/api/social/social-qa');
   await page.getByRole('button',{ name:/I'm excited/ }).click();
+  await page.getByText('Saved. Refresh activities to see the latest changes.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Refresh activities',exact:true}).click();
   await page.getByRole('button',{ name:/I'm excited · 1/ }).waitFor();
   await page.getByLabel('Fruit').click();
   await page.getByText('1 vote',{ exact:true }).waitFor();
@@ -78,10 +106,18 @@ try {
   await page.getByLabel('Caption (optional)').fill('Synthetic QA photo');
   await page.getByLabel(/I have permission/).check();
   const uploaded = page.waitForResponse(r=>r.url().endsWith('/api/social/social-qa/photos') && r.request().method()==='POST');
+  await failNextRead(page,'**/api/social/social-qa');
   await page.getByRole('button',{ name:'Upload photo',exact:true }).click();
   const uploadResult = await uploaded; assert.equal(uploadResult.status(),201,await uploadResult.text());
+  await page.getByText('Uploaded. Refresh activities to see your photo.',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel(/Photo \(JPEG/).inputValue(),'');
+  assert.equal(await page.getByLabel('Caption (optional)').inputValue(),'');
+  assert.equal(await page.getByLabel(/I have permission/).isChecked(),false);
+  await page.getByRole('button',{name:'Refresh activities',exact:true}).click();
   await page.getByText('Waiting for host approval',{ exact:true }).waitFor();
   const photo = (await db.query('SELECT id,storage_path FROM event_social_photos')).rows[0];
+  assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,1);
+  console.log('PASS confirmed guest save/upload survives failed refresh and upload form resets without a duplicate');
   const publicResponse = await fetch(`${localApi}${photo.storage_path}`); assert.equal(publicResponse.status,404);
   const denied = await fetch(`${localApi}/api/social/social-qa/photos/${photo.id}`); assert.equal(denied.status,404);
   const other = await browser.newContext({ignoreHTTPSErrors:true});
@@ -114,6 +150,11 @@ try {
     await assert.rejects(readFile(file),{code:'ENOENT'});
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM upload_assets')).rows[0].count,0);
     assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_file_cleanup')).rows[0].count,0);
+    if (!deletingEvent) {
+      await page.getByRole('button',{name:/I'm excited/}).click();
+      await page.getByText('Open your personal invitation to join in.',{exact:true}).waitFor();
+      assert.equal(await page.getByRole('heading',{name:'Join in',exact:true}).count(),0);
+    }
   }
   console.log('PASS guest/event deletion erases private files and releases quota with orphan cleanup disabled');
   await page.goto(`${origin}/install`);

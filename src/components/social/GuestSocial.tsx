@@ -12,13 +12,16 @@ function GuestActivities({ slug, token }: { slug: string; token?: string }) {
   const [state, setState] = useState<SocialState>();
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [refreshNeeded, setRefreshNeeded] = useState(false);
   const pending = useRef(false);
   const headers = useCallback((): Record<string,string> => token ? { 'X-Guest-Token': token } : {}, [token]);
   const reload = useCallback(async () => {
-    const response = await fetch(`/api/social/${slug}`, { headers: headers(), cache: 'no-store' });
-    if (response.status === 403) return;
-    if (!response.ok) throw new Error('load');
-    setState(await response.json());
+    try {
+      const response = await fetch(`/api/social/${slug}`, { headers: headers(), cache: 'no-store' });
+      if (response.status === 403) { setState(undefined); setRefreshNeeded(false); return; }
+      if (!response.ok) throw new Error('load');
+      setState(await response.json()); setRefreshNeeded(false);
+    } catch (error) { setRefreshNeeded(true); throw error; }
   }, [slug, headers]);
   useEffect(() => { void reload().catch(() => setMessage('Event activities are unavailable right now.')); }, [reload]);
   const act = async (data: object) => {
@@ -26,12 +29,23 @@ function GuestActivities({ slug, token }: { slug: string; token?: string }) {
     pending.current = true; setBusy(true); setMessage('');
     try {
       const response = await fetch(`/api/social/${slug}`, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-      if (!response.ok) throw new Error('save');
-      await reload(); setMessage('Saved.');
+      if (!response.ok) {
+        if (response.status === 403) { setState(undefined); setRefreshNeeded(false); }
+        const body = await response.json().catch(() => null);
+        setMessage(body?.error || 'Unable to save. Please try again.'); return;
+      }
+      try { await reload(); setMessage('Saved.'); }
+      catch { setMessage('Saved. Refresh activities to see the latest changes.'); }
     } catch { setMessage('Unable to save. Please try again.'); }
     finally { pending.current = false; setBusy(false); }
   };
-  if (!state) return <p className="text-sm text-muted-foreground" aria-live="polite">{message || 'Open your personal invitation to join event activities.'}</p>;
+  const retry = refreshNeeded && <button type="button" className={BUTTON} disabled={busy} onClick={() => {
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    void reload().then(() => setMessage('')).catch(() => setMessage('Event activities are unavailable right now. Please try again.'))
+      .finally(() => { pending.current = false; setBusy(false); });
+  }}>Refresh activities</button>;
+  if (!state) return <div className="space-y-3"><p className="text-sm text-muted-foreground" role="status">{message || 'Open your personal invitation to join event activities.'}</p>{retry}</div>;
   const s = state.settings;
   if (!s.guests_enabled && !s.reactions_enabled && !s.polls_enabled && !s.photos_enabled && !s.countdown_enabled) return null;
   return <section aria-label="Event activities" className="space-y-6 rounded-xl border border-border bg-white p-5 text-ink">
@@ -53,6 +67,7 @@ function GuestActivities({ slug, token }: { slug: string; token?: string }) {
     </fieldset>)}
     {s.photos_enabled && <GuestAlbum slug={slug} state={state} headers={headers()} reload={reload} />}
     <p role="status" aria-live="polite" className="text-sm">{message}</p>
+    {retry}
   </section>;
 }
 function EventCountdown({ date }: { date: string | null }) {
