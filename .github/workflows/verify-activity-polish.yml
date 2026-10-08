@@ -12,12 +12,19 @@ jobs:
       - name: Verify deployed revision and public routes
         run: |
           python - <<'PY'
-          import urllib.request, urllib.error, json
+          import urllib.request, urllib.error, json, socket
           origin = 'https://sealsend.app'
           expected = 'df84c964892b81ccc51dc4a55cc155fb4f12f2fc'
           def read(path):
               with urllib.request.urlopen(urllib.request.Request(origin + path, headers={'Cache-Control':'no-cache'}), timeout=25) as response:
                   return response.status, response.headers, response.read().decode()
+          print('Public DNS:', sorted({item[4][0] for item in socket.getaddrinfo('sealsend.app', 443)}), flush=True)
+          for port in (443, 80):
+              try:
+                  with socket.create_connection(('sealsend.app', port), timeout=5):
+                      print('PASS TCP connection:', port, flush=True)
+              except OSError as error:
+                  print('TCP connection failed:', port, str(error), flush=True)
           status, headers, raw = read('/api/health')
           health = json.loads(raw)
           print('Health:', status, json.dumps(health), flush=True)
