@@ -1,5 +1,7 @@
 "use client";
 
+import { eventFontFamily } from "@/lib/event-font";
+
 import { useState } from "react";
 import Link from "next/link";
 import { useConfirm } from "@/components/ui/Feedback";
@@ -145,7 +147,7 @@ export function StartScreen({ decision: initialDecision, template, organization,
         {EVENT_TEMPLATES.filter((t) => category === 'All' || t.category === category).map((t) => (
           <li key={t.id}>
             <button type="button" aria-label={`Start with ${t.name}`} onClick={() => begin(t)} className={`${CARD} gap-3`}>
-              <span aria-hidden="true" className="flex min-h-36 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border border-black/10 p-4 text-center" style={{ backgroundColor: t.customization.backgroundColor, color: t.customization.primaryColor, fontFamily: t.customization.fontFamily }}>
+              <span aria-hidden="true" className="flex min-h-36 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border border-black/10 p-4 text-center" style={{ backgroundColor: t.customization.backgroundColor, color: t.customization.primaryColor, fontFamily: eventFontFamily(t.customization.fontFamily) }}>
                 <span className="text-xs uppercase tracking-widest">You're invited</span>
                 <span className="text-xl font-semibold">{t.name}</span>
                 <span className="h-px w-10 bg-current opacity-40" />

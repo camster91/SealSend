@@ -36,6 +36,9 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     const ctx=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:375,height:812}});contexts.push(ctx);const guest=await ctx.newPage();await guest.emulateMedia({reducedMotion:'reduce'});
     await guest.goto(`${origin}/e/${slug}`);
     await guest.getByRole('button',{name:'Submit RSVP',exact:true}).waitFor();
+    await guest.evaluate(() => document.fonts.ready);
+    const invitationFont=await guest.locator('form[aria-label="RSVP"]').evaluate(el=>getComputedStyle(el).fontFamily);
+    assert.match(invitationFont,/Inter.*sans-serif/i,'Selected Inter look loads with a sans-serif fallback');
     assert.equal(await guest.getByRole('textbox',{name:'Full Name *',exact:true}).count(),0);
     await guest.getByLabel('Your Name *',{exact:true}).fill('Template Guest');
     await guest.getByLabel('Email Address *',{exact:true}).fill('template-guest@example.test');

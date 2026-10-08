@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, Libre_Caslon_Display } from "next/font/google";
+import { Hanken_Grotesk, Libre_Caslon_Display, Inter, Poppins } from "next/font/google";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, OG_IMAGE } from "@/lib/metadata";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
@@ -17,6 +17,10 @@ const caslon = Libre_Caslon_Display({
   variable: "--font-caslon",
   display: "swap",
 });
+
+// Self-host invitation fonts; load them only when a selected look uses them.
+const eventInter = Inter({ subsets: ["latin"], variable: "--font-event-inter", display: "swap", preload: false });
+const eventPoppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-event-poppins", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   title: DEFAULT_TITLE,
@@ -67,7 +71,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" className={`${hanken.variable} ${caslon.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${hanken.variable} ${caslon.variable} ${eventInter.variable} ${eventPoppins.variable}`}>
       <body className="font-sans min-h-screen"><ServiceWorkerRegistration />{children}</body>
     </html>
   );

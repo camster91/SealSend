@@ -24,7 +24,9 @@ replies. Question-summary details collapse, canonical email answers count correc
 response loading offers retry, and check-in searches explain an empty result.
 Builder looks have palette/font previews and category filters. Mobile pricing puts
 its beta action sooner and the marketing links describe the beta destination.
-Disabled toggle labels retain readable contrast.
+Disabled toggle labels retain readable contrast. Inter and Poppins are self-hosted
+and shared by look cards, builder preview and public invitations, with explicit
+fallbacks instead of accidentally rendering serif text.
 
 ## Migration and recovery
 
