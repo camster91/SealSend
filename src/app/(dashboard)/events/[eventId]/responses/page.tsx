@@ -18,17 +18,19 @@ export default function ResponsesPage() {
   const [responses, setResponses] = useState<RSVPResponseWithPlusOnes[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [error, setError] = useState('');
 
   const fetchResponses = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/events/${eventId}/responses?limit=500`);
-      if (res.ok) {
-        const data = await res.json();
-        setResponses(Array.isArray(data) ? data : []);
-      }
-    } catch (err) {
-      console.error("Failed to load responses:", err);
+      if (!res.ok) throw new Error('Response load failed');
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('Invalid response list');
+      setResponses(data);
+      setError('');
+    } catch {
+      setError('Responses could not be loaded. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -59,6 +61,7 @@ export default function ResponsesPage() {
         </div>
       </div>
 
+      {error && <div role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-red-900"><p>{error}</p><button type="button" onClick={() => void fetchResponses()} className="mt-2 min-h-11 font-semibold underline">Retry loading responses</button></div>}
       {loading ? (
         <TableSkeleton label="Loading responses" columns={4} />
       ) : (

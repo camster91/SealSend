@@ -23,7 +23,7 @@ function Toggle({
     <label
       className={cn(
         "flex cursor-pointer items-center gap-3",
-        disabled && "cursor-not-allowed opacity-50",
+        disabled && "cursor-not-allowed",
         className
       )}
     >
@@ -35,7 +35,8 @@ function Toggle({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          checked ? "bg-brand-600" : "bg-neutral-200"
+          checked ? "bg-brand-600" : "bg-neutral-200",
+          disabled && "opacity-50"
         )}
       >
         <span

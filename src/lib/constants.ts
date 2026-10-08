@@ -341,7 +341,7 @@ export const FEATURES_LIST: Feature[] = [
 
 export const DEFAULT_RSVP_FIELDS = [
   {
-    field_name: "name",
+    field_name: "respondent_name",
     field_type: "text",
     field_label: "Full Name",
     is_required: true,
@@ -358,14 +358,14 @@ export const DEFAULT_RSVP_FIELDS = [
   },
   {
     field_name: "attending",
-    field_type: "select",
+    field_type: "attendance",
     field_label: "Will you be attending?",
     is_required: true,
     is_enabled: true,
-    options: ["Joyfully Accepts", "Regretfully Declines"],
+    options: ["attending", "not_attending", "maybe"],
   },
   {
-    field_name: "guests",
+    field_name: "headcount",
     field_type: "number",
     field_label: "Number of Guests",
     is_required: false,

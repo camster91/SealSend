@@ -875,7 +875,8 @@ test('load and recovery gates are bounded, read-only, and isolated from producti
 test('database backup tooling uses container credentials, retention, and archive verification', async () => {
   const backup = await read('ops/backup-database.sh');
 
-  assert.match(backup, /sealsend-postgres/);
+  assert.match(backup, /test "\$POSTGRES_DB" = "sealsend" && test "\$POSTGRES_USER" = "sealsend"/);
+  assert.doesNotMatch(backup, /container="sealsend-postgres"/);
   assert.match(backup, /pg_dump --format=custom/);
   assert.match(backup, /pg_restore --list/);
   assert.match(backup, /-mtime \+30 -delete/);
@@ -946,7 +947,10 @@ test('mobile check-in is permission-gated, auditable, and reversible', async () 
   assert.match(schema, /checked_in_by UUID REFERENCES admin_users/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ/);
   assert.match(route, /roleCan\([^,]+, ['"]check_in_guests['"]\)/);
-  assert.match(route, /UPDATE guests[\s\S]*checked_in_at[\s\S]*RETURNING/);
+  assert.match(route, /updateCheckInGuest/);
+  const store = await read('src/lib/check-in-store.ts');
+  assert.match(store, /UPDATE \$\{table\}[\s\S]*checked_in_at[\s\S]*RETURNING/);
+  assert.match(store, /publicResponse \? 'rsvp_responses' : 'guests'/);
   assert.match(route, /guest_checked_(?:in|out)/);
   assert.match(page, /aria-label=.*Search guests/);
 });
@@ -1425,8 +1429,8 @@ test('event checkout verifies ownership before exposing billing configuration', 
 });
 
 test('check-in actor IDs are explicitly typed for PostgreSQL CASE assignment', async () => {
-  const route = await read('src/app/api/events/[eventId]/check-in/route.ts');
-  assert.match(route, /checked_in_by = CASE WHEN \$3 THEN \$4::uuid ELSE NULL END/);
+  const store = await read('src/lib/check-in-store.ts');
+  assert.match(store, /checked_in_by = CASE WHEN \$3 THEN \$4::uuid ELSE NULL END/);
 });
 
 test('published retention and deletion terms match the support-request workflow', async () => {

@@ -283,6 +283,8 @@ CREATE TABLE IF NOT EXISTS rsvp_responses (
   response_data JSONB DEFAULT '{}',
   plus_ones_data JSONB DEFAULT '[]',
   edit_token_hash TEXT CHECK (edit_token_hash ~ '^[a-f0-9]{64}$'),
+  checked_in_at TIMESTAMPTZ,
+  checked_in_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

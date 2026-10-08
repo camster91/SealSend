@@ -22,9 +22,10 @@ export async function findRsvp(db: RsvpQuery, eventId: string, guestId: string |
 /** Caller owns BEGIN/COMMIT/ROLLBACK; identity must already be verified. */
 export async function saveRsvp(db: RsvpQuery, eventId: string, guestId: string | null, editToken: string | undefined, input: RSVPSubmissionInput, responseLimit: number | null) {
   await db('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [eventId]);
-  const event = (await db<{ status: string; max_attendees: number | null; allow_plus_ones: boolean; max_guests_per_rsvp: number | null }>('SELECT status, max_attendees, allow_plus_ones, max_guests_per_rsvp FROM events WHERE id = $1 FOR UPDATE', [eventId])).rows[0];
+  const event = (await db<{ status: string; max_attendees: number | null; allow_plus_ones: boolean; max_guests_per_rsvp: number | null; deadline_passed: boolean }>('SELECT status, max_attendees, allow_plus_ones, max_guests_per_rsvp, (rsvp_deadline <= clock_timestamp()) AS deadline_passed FROM events WHERE id = $1 FOR UPDATE', [eventId])).rows[0];
   if (!event || event.status !== 'published') throw new RsvpError('Event not found or not published', 404);
   const previous = await findRsvp(db, eventId, guestId, editToken);
+  if (!previous && event.deadline_passed) throw new RsvpError('The RSVP deadline has passed. New responses are closed.');
   const headcount = event.allow_plus_ones === false ? 1 : input.headcount;
   const maxPerRsvp = event.max_guests_per_rsvp || 10;
   if (headcount > maxPerRsvp) throw new RsvpError(`Maximum ${maxPerRsvp} guests per RSVP.`, 400);

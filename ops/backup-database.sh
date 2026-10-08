@@ -2,7 +2,7 @@
 set -eu
 
 backup_root="/opt/sealsend/backups/automated"
-container="sealsend-postgres"
+container="ke4exa3ryzafpsqxysqvlrty"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 archive="$backup_root/sealsend-$timestamp.dump"
 partial="$archive.partial"
@@ -15,6 +15,10 @@ if ! docker inspect "$container" >/dev/null 2>&1; then
   echo "SealSend PostgreSQL container was not found" >&2
   exit 1
 fi
+
+# Refuse a renamed container that is not the SealSend database.
+docker exec "$container" sh -c \
+  'test "$POSTGRES_DB" = "sealsend" && test "$POSTGRES_USER" = "sealsend"'
 
 docker exec "$container" sh -c \
   'pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' \

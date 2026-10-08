@@ -36,6 +36,7 @@ export function StartScreen({ decision: initialDecision, template, organization,
   const [building, setBuilding] = useState<{ timezone: string; template?: EventTemplate; chat?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [category, setCategory] = useState<'All' | EventTemplate['category']>('All');
 
   function begin(picked?: EventTemplate, chat = false) {
     setChosen(picked);
@@ -137,12 +138,21 @@ export function StartScreen({ decision: initialDecision, template, organization,
         </button>
       </div>
       <h2 className="mt-8 text-sm font-semibold text-ink">Or start from a look</h2>
+      <div role="group" aria-label="Filter invitation looks" className="mt-3 flex flex-wrap gap-2">
+        {(['All', 'Wedding', 'Celebration', 'Business', 'Community'] as const).map((item) => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)} className={`${BUTTON} border border-ink/20 ${category === item ? 'bg-ink text-white' : 'bg-white text-ink'}`}>{item}</button>)}
+      </div>
       <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-        {EVENT_TEMPLATES.map((t) => (
+        {EVENT_TEMPLATES.filter((t) => category === 'All' || t.category === category).map((t) => (
           <li key={t.id}>
-            <button type="button" onClick={() => begin(t)} className={CARD}>
+            <button type="button" aria-label={`Start with ${t.name}`} onClick={() => begin(t)} className={`${CARD} gap-3`}>
+              <span aria-hidden="true" className="flex min-h-36 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border border-black/10 p-4 text-center" style={{ backgroundColor: t.customization.backgroundColor, color: t.customization.primaryColor, fontFamily: t.customization.fontFamily }}>
+                <span className="text-xs uppercase tracking-widest">You're invited</span>
+                <span className="text-xl font-semibold">{t.name}</span>
+                <span className="h-px w-10 bg-current opacity-40" />
+                <span className="text-xs">Date · Time · Place</span>
+                <span className="mt-1 px-5 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: t.customization.primaryColor, borderRadius: t.customization.buttonStyle === 'pill' ? '9999px' : t.customization.buttonStyle === 'square' ? '0' : '8px' }}>RSVP</span>
+              </span>
               <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <span aria-hidden="true" className="inline-block size-4 rounded-full border border-ink/20" style={{ backgroundColor: t.customization.primaryColor }} />
                 {t.name}
               </span>
               <span className="text-xs text-ink/80">{t.description}</span>

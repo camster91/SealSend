@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { SecondaryCta } from "@/components/marketing/Cta";
+import { BETA_MODE } from '@/lib/constants';
 
 const points = [
   "Workspaces with owner, admin, planner and check-in roles.",
@@ -25,7 +26,7 @@ export default function OrganizersSection() {
             For planners, studios, clubs and community groups who run event after event.
           </p>
           <SecondaryCta href="/pricing" className="mt-8">
-            See plans for organizers
+            {BETA_MODE ? 'See what the beta includes' : 'See plans for organizers'}
           </SecondaryCta>
         </div>
         <ul className="divide-y divide-border border-y border-border lg:col-span-7 lg:self-center">

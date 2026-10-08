@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
@@ -9,6 +9,7 @@ import { getClientUser } from "@/lib/auth/client-auth";
 import type { RSVPField, PlusOneData, RSVPResponse } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
+import { normalizeRsvpFields } from "@/lib/rsvp-fields";
 
 interface RSVPFormProps {
   eventSlug: string;
@@ -25,6 +26,7 @@ interface RSVPFormProps {
 }
 
 export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteToken, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
+  const questions = useMemo(() => normalizeRsvpFields(fields), [fields]);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [plusOnes, setPlusOnes] = useState<PlusOneData[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -33,6 +35,8 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   const [loading, setLoading] = useState(true);
   const [availableSpots, setAvailableSpots] = useState(spotsRemaining);
   const [error, setError] = useState<string | null>(null);
+  const [savedResponse, setSavedResponse] = useState<RSVPResponse | null>(null);
+  const [deadlinePassed, setDeadlinePassed] = useState(false);
 
   // Calculate current headcount
   const headcount = parseInt(formData["headcount"] || "1", 10) || 1;
@@ -57,7 +61,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           for (const [key, value] of Object.entries(saved.response_data || {})) {
             if (typeof value === "string") initial[key] = value;
           }
-          for (const field of fields) {
+          for (const field of questions) {
             if (field.field_type === "attendance") initial[field.field_name] = saved.status;
           }
         }
@@ -68,6 +72,8 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         setPlusOnes(saved?.plus_ones_data || []);
         setAvailableSpots(data.spots_remaining);
         setSubmitted(Boolean(saved));
+        setSavedResponse(saved);
+        setDeadlinePassed(Boolean(data.deadline_passed));
         setError(null);
         setLoading(false);
       } catch (error) {
@@ -76,7 +82,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     }
     void loadResponse();
     return () => { cancelled = true; };
-  }, [eventSlug, inviteToken, inviteGuestName, inviteGuestEmail, fields, loadAttempt]);
+  }, [eventSlug, inviteToken, inviteGuestName, inviteGuestEmail, questions, loadAttempt]);
 
   // Sync plusOnes array with headcount
   useEffect(() => {
@@ -94,7 +100,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     });
   }, [expectedPlusOnes]);
 
-  const enabledFields = fields
+  const enabledFields = questions
     .filter((f) => f.is_enabled)
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -128,6 +134,11 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     const status = attendanceField
       ? formData[attendanceField.field_name] || "attending"
       : "attending";
+    if (attendanceField?.is_required && !formData[attendanceField.field_name]) {
+      setError('Please choose whether you will attend.');
+      setSubmitting(false);
+      return;
+    }
 
     const responseData: Record<string, string> = {};
     enabledFields.forEach((field) => {
@@ -148,7 +159,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         method: "POST",
         headers: { "Content-Type": "application/json", ...(inviteToken ? { "X-Guest-Token": inviteToken } : {}) },
         body: JSON.stringify({
-          respondent_name: formData["name"] || formData["respondent_name"] || "Guest",
+          respondent_name: formData["respondent_name"] || "Guest",
           respondent_email: formData["email"] || "",
           status,
           headcount,
@@ -165,6 +176,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       }
 
       setSubmitted(true);
+      setSavedResponse(data.response);
       // A confirmed save stays successful even if the follow-up capacity read fails.
       try {
         const current = await fetch(`/api/rsvp/${eventSlug}`, { headers: inviteToken ? { "X-Guest-Token": inviteToken } : {}, cache: "no-store" });
@@ -191,6 +203,10 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         <p className="mt-1 text-sm text-green-700">
           Your response has been recorded.
         </p>
+        {savedResponse && <p className="mt-3 font-semibold text-green-900">
+          {savedResponse.status === 'attending' ? `Attending · ${savedResponse.headcount} ${savedResponse.headcount === 1 ? 'guest' : 'guests'}` : savedResponse.status === 'not_attending' ? 'Not attending' : 'Maybe attending'}
+        </p>}
+        {!inviteToken && <p className="mt-3 text-xs text-green-900">Return in this browser to update your reply. Clearing your browser cookies removes that access.</p>}
         <button
           type="button"
           onClick={() => { setSubmitted(false); setError(null); }}
@@ -202,8 +218,16 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     );
   }
 
+  if (!loading && deadlinePassed && !savedResponse) {
+    return <section aria-label="RSVP closed" className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+      <h2 className="text-xl font-semibold text-amber-950">RSVPs are closed</h2>
+      <p className="mt-2 text-sm text-amber-950">The RSVP deadline has passed. Contact the host if you need to join.</p>
+    </section>;
+  }
+
   return (
     <form aria-label="RSVP" onSubmit={handleSubmit} className="space-y-4">
+      {deadlinePassed && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">The deadline has passed. You can still update your existing response.</p>}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">RSVP</h2>
         {availableSpots !== null && (
@@ -215,7 +239,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 ? "bg-amber-100 text-amber-700"
                 : "bg-red-100 text-red-700"
           )}>
-            {availableSpots > 0 ? `${availableSpots} spots left` : "Event full"}
+            {availableSpots > 0 ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} left` : "Event full"}
           </span>
         )}
       </div>
@@ -246,17 +270,18 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           case "attendance":
             return (
               <div key={field.id} className="space-y-2">
-                <label className="block text-sm font-medium text-neutral-700">
+                <p id={`rsvp-${field.id}-label`} className="block text-sm font-medium text-neutral-700">
                   {field.field_label}
                   {field.is_required && " *"}
-                </label>
-                <div className="flex gap-2">
+                </p>
+                <div role="group" aria-labelledby={`rsvp-${field.id}-label`} className="flex gap-2">
                   {["attending", "not_attending", "maybe"].map((opt) => {
                     const btnRadius = buttonStyle === "pill" ? "9999px" : buttonStyle === "square" ? "0px" : "8px";
                     return (
                     <button
                       key={opt}
                       type="button"
+                      aria-pressed={formData[field.field_name] === opt}
                       onClick={() => updateField(field.field_name, opt)}
                       className={cn(
                         "flex-1 border px-3 py-2 text-sm font-medium transition-colors",
@@ -303,7 +328,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
               ? allowPlusOnes
                 ? Math.min(
                     maxGuestsPerRsvp,
-                    availableSpots !== null ? Math.max(1, availableSpots) : maxGuestsPerRsvp
+                    availableSpots !== null && enabledFields.some((f) => f.field_type === 'attendance' && formData[f.field_name] === 'attending') ? Math.max(1, availableSpots) : maxGuestsPerRsvp
                   )
                 : 1
               : 50;
