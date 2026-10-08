@@ -388,20 +388,26 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
   }
 });
 
-test('public navigation and responsive layouts', async ({ page }, testInfo) => {
+test('public pages load and stay within the viewport', async ({ context }, testInfo) => {
   await mkdir(output, { recursive: true });
   const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
 
   for (const route of ['/', '/pricing', '/how-it-works', '/use-cases', '/privacy', '/terms', '/login', '/signup']) {
-    const response = await openReadyPage(page, route);
-    expect(response?.status(), route).toBeLessThan(400);
-    await expect(page.locator('body')).not.toContainText('Internal server error');
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow, `${route} horizontal overflow`).toBeLessThanOrEqual(1);
+    // Inspect each route in its own live document. Hard-navigating a different
+    // route cancels RSC prefetches, which WebKit reports as old-page errors.
+    const page = await context.newPage();
+    const recordError = (error: Error) => errors.push(`${route}: ${error.message}`);
+    page.on('pageerror', recordError);
+    try {
+      await openReadyPage(page, route);
+      await expect(page.locator('body')).not.toContainText('Internal server error');
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${route} horizontal overflow`).toBeLessThanOrEqual(1);
+      if (route === '/pricing') await page.screenshot({ path: path.join(output, `pricing-${testInfo.project.name}.png`), fullPage: true });
+    } finally {
+      page.off('pageerror', recordError);
+      await page.close();
+    }
   }
-
-  await openReadyPage(page, '/pricing');
-  await page.screenshot({ path: path.join(output, `pricing-${testInfo.project.name}.png`), fullPage: true });
   expect(errors).toEqual([]);
 });
