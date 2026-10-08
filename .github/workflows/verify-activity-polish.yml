@@ -1,0 +1,43 @@
+name: Verify activity polish release
+on:
+  push:
+    branches: [verify/activity-polish-release]
+permissions:
+  contents: read
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify deployed revision and public routes
+        run: |
+          python - <<'PY'
+          import urllib.request, urllib.error, json
+          origin = 'https://sealsend.app'
+          expected = 'df84c964892b81ccc51dc4a55cc155fb4f12f2fc'
+          def read(path):
+              with urllib.request.urlopen(urllib.request.Request(origin + path, headers={'Cache-Control':'no-cache'}), timeout=25) as response:
+                  return response.status, response.headers, response.read().decode()
+          status, headers, raw = read('/api/health')
+          health = json.loads(raw)
+          print('Health:', status, json.dumps(health), flush=True)
+          assert status == 200 and health['status'] == 'ok'
+          assert health['revision'] == expected, 'Production revision has not reached the merged release'
+          assert health['socialSchema'] == 'ready'
+          assert 'no-store' in headers.get('Cache-Control', '')
+          for path, marker in [('/install','SealSend on your phone'),('/sw.js','sealsend-offline-v1'),('/privacy','sealsend_social_')]:
+              status, headers, body = read(path)
+              assert status == 200 and marker in body, path
+              print('PASS public route:', path, flush=True)
+          status, headers, raw = read('/manifest.json')
+          manifest = json.loads(raw)
+          assert status == 200 and manifest['display'] == 'standalone' and manifest['start_url'] == '/dashboard'
+          print('PASS install manifest', flush=True)
+          try:
+              read('/api/social/release-smoke-no-event')
+              raise AssertionError('Anonymous social request should be denied')
+          except urllib.error.HTTPError as denied:
+              assert denied.code == 403
+              assert 'no-store' in denied.headers.get('Cache-Control', '')
+          print('PASS anonymous guest activities denied; no production records modified', flush=True)
+          PY
