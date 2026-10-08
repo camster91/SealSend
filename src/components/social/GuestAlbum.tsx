@@ -15,7 +15,9 @@ export function GuestAlbum({ slug, state, headers, reload }: { slug: string; sta
       const response = await fetch(`/api/social/${slug}/photos`, { method: 'POST', headers, body: new FormData(form) });
       const body = await response.json();
       if (!response.ok) { setMessage(body.error || 'Unable to upload.'); return; }
-      await reload(); form.reset(); setMessage(state.settings.photo_approval ? 'Uploaded. The host will review your photo.' : 'Your photo is shared.');
+      form.reset();
+      try { await reload(); setMessage(state.settings.photo_approval ? 'Uploaded. The host will review your photo.' : 'Your photo is shared.'); }
+      catch { setMessage('Uploaded. Refresh activities to see your photo.'); }
     } catch { setMessage('Unable to upload. Please try again.'); }
     finally { pending.current = false; setBusy(false); }
   };
@@ -25,7 +27,8 @@ export function GuestAlbum({ slug, state, headers, reload }: { slug: string; sta
     try {
       const response = await fetch(`/api/social/${slug}/photos/${id}`, { method: 'DELETE', headers });
       if (!response.ok) throw new Error('delete');
-      await reload(); setMessage('Photo removed.');
+      try { await reload(); setMessage('Photo removed.'); }
+      catch { setMessage('Photo removed. Refresh activities to see the latest changes.'); }
     } catch { setMessage('Unable to remove the photo. Please try again.'); }
     finally { pending.current = false; setBusy(false); }
   };

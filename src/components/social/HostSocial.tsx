@@ -14,11 +14,17 @@ export function HostSocial({ eventId, slug }: { eventId:string; slug:string }) {
   const [state,setState] = useState<SocialState>();
   const [message,setMessage] = useState('');
   const [busy,setBusy] = useState(false);
+  const [refreshNeeded,setRefreshNeeded] = useState(false);
   const pending = useRef(false);
   const reload = useCallback(async () => {
-    const response = await fetch(`/api/events/${eventId}/social`,{ cache:'no-store' });
-    if (!response.ok) throw new Error('load');
-    setState(await response.json());
+    try {
+      const response = await fetch(`/api/events/${eventId}/social`,{ cache:'no-store' });
+      if (!response.ok) {
+        if (response.status === 403 || response.status === 401) setState(undefined);
+        throw new Error('load');
+      }
+      setState(await response.json()); setRefreshNeeded(false);
+    } catch (error) { setRefreshNeeded(true); throw error; }
   },[eventId]);
   useEffect(() => { void reload().catch(() => setMessage('Event activities are unavailable right now.')); },[reload]);
   const act = async (action:object): Promise<boolean> => {
@@ -27,8 +33,13 @@ export function HostSocial({ eventId, slug }: { eventId:string; slug:string }) {
     try {
       const response = await fetch(`/api/events/${eventId}/social`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(action) });
       const body = await response.json();
-      if (!response.ok) { setMessage(body.error || 'Unable to save.'); return false; }
-      await reload(); setMessage('Saved.'); return true;
+      if (!response.ok) {
+        if (response.status === 403 || response.status === 401) setState(undefined);
+        setMessage(body.error || 'Unable to save.'); return false;
+      }
+      try { await reload(); setMessage('Saved.'); }
+      catch { setMessage('Saved. Refresh activities to see the latest changes.'); }
+      return true;
     } catch { setMessage('Unable to save. Please try again.'); return false; }
     finally { pending.current = false; setBusy(false); }
   };
@@ -57,5 +68,11 @@ export function HostSocial({ eventId, slug }: { eventId:string; slug:string }) {
       </figure>)}</div>}
     </div>}
     <p role="status" className="mt-3 text-sm">{message || (!state ? 'Loading activities…' : '')}</p>
+    {refreshNeeded && <button type="button" className={BUTTON} disabled={busy} onClick={() => {
+      if (pending.current) return;
+      pending.current = true; setBusy(true);
+      void reload().then(() => setMessage('')).catch(() => setMessage('Event activities are unavailable right now. Please try again.'))
+        .finally(() => { pending.current = false; setBusy(false); });
+    }}>Refresh activities</button>}
   </section>;
 }
