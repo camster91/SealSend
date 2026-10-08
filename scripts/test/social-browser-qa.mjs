@@ -48,8 +48,8 @@ try {
   const failNextRead = async (page,url) => {
     const handler = async route => {
       if (route.request().method() !== 'GET') { await route.continue(); return; }
-      await page.unroute(url,handler);
       await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic refresh outage'})});
+      await page.unroute(url,handler);
     };
     await page.route(url,handler);
   };
