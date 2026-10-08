@@ -13,7 +13,8 @@ const token = 'a'.repeat(43);
 const input = (status = 'attending', headcount = 1, names: string[] = []) => rsvpSubmissionSchema.parse({ respondent_name: 'QA Guest', status, headcount, plus_ones: names.map(name => ({ name })) });
 async function fixture() {
   const db = new PGlite();
-  await db.exec(`CREATE TABLE events (id UUID PRIMARY KEY, status TEXT, max_attendees INTEGER, allow_plus_ones BOOLEAN DEFAULT true, max_guests_per_rsvp INTEGER DEFAULT 10);
+  await db.exec(`CREATE TABLE admin_users (id UUID PRIMARY KEY);
+    CREATE TABLE events (id UUID PRIMARY KEY, status TEXT, max_attendees INTEGER, allow_plus_ones BOOLEAN DEFAULT true, max_guests_per_rsvp INTEGER DEFAULT 10, rsvp_deadline TIMESTAMPTZ);
     CREATE TABLE guests (id UUID PRIMARY KEY, event_id UUID, rsvp_status TEXT, updated_at TIMESTAMPTZ);
     CREATE TABLE rsvp_responses (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),event_id UUID,guest_id UUID,respondent_name TEXT,respondent_email TEXT,status TEXT,headcount INTEGER,response_data JSONB,plus_ones_data JSONB,submitted_at TIMESTAMPTZ DEFAULT NOW(),updated_at TIMESTAMPTZ DEFAULT NOW());
     CREATE TABLE plus_ones (id UUID PRIMARY KEY DEFAULT gen_random_uuid(),event_id UUID,rsvp_response_id UUID REFERENCES rsvp_responses(id),name TEXT NOT NULL CHECK(name <> 'fail'),email TEXT,status TEXT);`);
@@ -32,6 +33,19 @@ test('share URLs contain only the public event path, including escaped slugs', (
   const url = publicInviteUrl('https://sealsend.app/e/old?t=secret&edit_token=secret#guest','dinner');
   assert.equal(url,'https://sealsend.app/e/dinner');
   assert.equal(publicInviteUrl('https://sealsend.app','a/b?token=secret'),'https://sealsend.app/e/a%2Fb%3Ftoken%3Dsecret');
+});
+test('deadline closes new responses under the event lock but preserves authorized edits', async () => {
+  const { db, save } = await fixture();
+  try {
+    const before = await save(null, token, input('attending', 1), 100);
+    await db.query("UPDATE events SET rsvp_deadline=NOW()-INTERVAL '1 second' WHERE id=$1", [event]);
+    await assert.rejects(save(guest, undefined, input('attending'), 100), /deadline has passed/);
+    await assert.rejects(save(null, 'b'.repeat(43), input('not_attending'), 100), /deadline has passed/);
+    const after = await save(null, token, input('not_attending'), 100);
+    assert.equal(after.response.id, before.response.id);
+    assert.equal(after.response.status, 'not_attending');
+    assert.equal((await db.query('SELECT * FROM rsvp_responses')).rows.length, 1);
+  } finally { await db.close(); }
 });
 test('public retries and edits keep one response at the plan limit and capacity counts only its new contribution', async () => {
   const { db, execute, save } = await fixture();

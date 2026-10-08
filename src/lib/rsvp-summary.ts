@@ -1,5 +1,6 @@
-export type SummaryResponse = { id: string; status: string; headcount: number; response_data: Record<string, unknown> | null };
-export type SummaryField = { field_name: string; field_label: string; field_type: string; is_required: boolean };
+import { rsvpFieldRole } from './rsvp-fields';
+export type SummaryResponse = { id: string; status: string; headcount: number; response_data: Record<string, unknown> | null; respondent_name?: string; respondent_email?: string | null };
+export type SummaryField = { field_name: string; field_label: string; field_type: string; is_required: boolean; options?: string[] | null };
 
 export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryField[], maxAttendees: number | null) {
   const statusCounts = { attending: 0, not_attending: 0, maybe: 0, pending: 0 };
@@ -9,13 +10,14 @@ export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryFi
     if (response.status === "attending") attendingHeadcount += Math.max(0, Number(response.headcount) || 0);
   }
   const fieldSummaries = fields.map((field) => {
+    const role = rsvpFieldRole(field);
     let answered = 0;
     const counts = new Map<string, number>();
     for (const response of responses) {
-      const value = response.response_data?.[field.field_name];
+      const value = role === 'name' ? response.respondent_name : role === 'email' ? response.respondent_email : role === 'headcount' ? response.headcount : role === 'attendance' ? response.status : response.response_data?.[field.field_name];
       const values = Array.isArray(value) ? value : value === null || value === undefined || value === "" ? [] : [value];
       if (values.length) answered++;
-      if (["select", "multiselect", "number"].includes(field.field_type)) {
+      if (role === 'attendance' || ["select", "multiselect", "number"].includes(field.field_type)) {
         for (const item of values) {
           const normalized = String(item).trim().slice(0, 100);
           if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + 1);

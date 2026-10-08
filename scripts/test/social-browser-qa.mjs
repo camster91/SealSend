@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:https';
 import { request as proxyRequest } from 'node:http';
 import { reviewBrowserChecks } from './review-browser-checks.mjs';
+import { improvementBrowserChecks } from './improvement-browser-checks.mjs';
 import { startSocialQa } from './start-social-qa.ts';
 async function main() {
 const cwd = process.cwd();
@@ -49,6 +50,7 @@ try {
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
   await reviewBrowserChecks({browser,origin,db,host});
+  await improvementBrowserChecks({browser,origin,db});
   const failNextRead = async (page,url) => {
     const handler = async route => {
       if (route.request().method() !== 'GET') { await route.continue(); return; }

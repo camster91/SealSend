@@ -9,10 +9,12 @@ Webhooks are an organizer-plan feature (Solo, Studio, Agency). During the contro
 | Type | Sent when | `data` includes |
 |---|---|---|
 | `rsvp.submitted` | A guest submits an RSVP on the event page | `response`: `id`, `respondent_name`, `respondent_email`, `status` (`attending`, `maybe`, `not_attending`), `headcount`, `guest_id`, `plus_ones[].name` |
-| `guest.checked_in` | A guest is checked in at the door | `guest`: `id`, `name`, `rsvp_status`, `checked_in_at` |
+| `guest.checked_in` | A guest is checked in at the door | `guest`: `id`, `name`, `rsvp_status`, `checked_in_at`, `source`, `headcount` |
 | `event.published` | An event is published | nothing beyond `event` |
 | `client.approved` | A client approves the invitation from their review link | `approval`: `share_id`, `approver_name` |
 | `webhook.test` | You press **Send test** | `message` |
+
+`guest.checked_in` also covers manually checked-in public replies. `source` is `guest` for an invited guest ID or `public_rsvp` for an RSVP response ID. Public respondents keep their private response-edit access; check-in does not create a personal invitation. A check-in entry represents the reply or party, not individually verified arrival of every plus-one.
 
 Every `data` object also includes `event` (`id`, `title`, `slug`, `event_date`), except for `webhook.test`.
 

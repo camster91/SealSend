@@ -47,7 +47,7 @@ export default function PricingTeaser() {
           })}
         </ul>
         <Link href="/pricing" className="mt-8 inline-flex min-h-11 items-center text-base font-semibold text-ink underline underline-offset-4 hover:text-wax">
-          Compare plans
+          {BETA_MODE ? 'See the free beta' : 'Compare plans'}
         </Link>
       </div>
     </section>

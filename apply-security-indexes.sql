@@ -753,3 +753,7 @@ END $$;
 -- Private public-RSVP edit credentials; existing responses stay unchanged.
 ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS edit_token_hash TEXT CHECK (edit_token_hash ~ '^[a-f0-9]{64}$');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvp_edit_token ON rsvp_responses(edit_token_hash) WHERE edit_token_hash IS NOT NULL;
+
+-- Manual host check-in for public RSVP respondents; no guest credentials are granted.
+ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ;
+ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS checked_in_by UUID REFERENCES admin_users(id) ON DELETE SET NULL;

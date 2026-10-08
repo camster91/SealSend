@@ -19,6 +19,7 @@ import { getUserTier } from "@/lib/subscription";
 import { showsPoweredByBadge } from "@/lib/entitlements";
 import { getEventBranding, mergeBrandIntoCustomization } from "@/lib/brands";
 import type { Metadata } from "next";
+import { eventFontFamily } from '@/lib/event-font';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -100,7 +101,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   const customization = sanitizeCustomization(event.customization as unknown as Record<string, unknown>);
   const safeBgColor = customization.backgroundColor;
   const safePrimaryColor = customization.primaryColor;
-  const fontFamily = customization.fontFamily;
+  const fontFamily = eventFontFamily(customization.fontFamily);
   const backgroundImage = customization.backgroundImage;
   const audioUrl = customization.audioUrl;
   const buttonStyle = customization.buttonStyle;

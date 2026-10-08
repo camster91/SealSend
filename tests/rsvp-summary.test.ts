@@ -23,3 +23,8 @@ test("prompt injection in free-text responses is never interpreted or summarized
   assert.deepEqual(summary.fields[0].counts, []);
   assert.equal(JSON.stringify(summary).includes(injection), false);
 });
+
+test('question summaries use canonical saved identity, email, attendance and headcount', () => {
+  const summary=buildRsvpSummary([{id:'r1',respondent_name:'QA Guest',respondent_email:'qa@example.test',status:'not_attending',headcount:2,response_data:{attending:'Joyfully Accepts',guests:'99'}}],[{field_name:'respondent_name',field_label:'Name',field_type:'text',is_required:true},{field_name:'email',field_label:'Email',field_type:'email',is_required:true},{field_name:'attending',field_label:'Attendance',field_type:'select',options:['Joyfully Accepts','Regretfully Declines'],is_required:true},{field_name:'guests',field_label:'Guest count',field_type:'number',is_required:false}],10);
+  assert.equal(summary.fields[0].answered,1);assert.equal(summary.fields[1].answered,1);assert.deepEqual(summary.fields[2].counts,[{value:'not_attending',count:1}]);assert.deepEqual(summary.fields[3].counts,[{value:'2',count:1}]);assert.equal(summary.attendingHeadcount,0);assert.equal(JSON.stringify(summary).includes('qa@example.test'),false);
+});

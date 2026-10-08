@@ -21,6 +21,7 @@ import { EventTeamPanel } from '@/components/dashboard/EventTeamPanel';
 import { EventClientPanel } from '@/components/events/EventClientPanel';
 import { HostSocial } from '@/components/social/HostSocial';
 import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
+import { formatDateTime } from '@/lib/utils';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -49,11 +50,13 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
     maybe_count: number;
     not_going_count: number;
     no_reply_count: number;
+    public_response_count: number;
     repeated_from_title: string | null;
   }>(
     `SELECT *,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id) AS response_count,
       (SELECT COUNT(*)::int FROM guests WHERE event_id = events.id) AS guest_count,
+      (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND guest_id IS NULL) AS public_response_count,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'attending') AS going_count,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'maybe') AS maybe_count,
       (SELECT COUNT(*)::int FROM rsvp_responses WHERE event_id = events.id AND status = 'not_attending') AS not_going_count,
@@ -94,14 +97,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatDateTime(dateStr, event.event_timezone || 'UTC');
   };
 
   return (
@@ -122,7 +118,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         <div className="overflow-hidden rounded-2xl border border-border bg-white">
           {/* Design preview strip */}
           {event.design_url && (
-            <div className="h-40 border-b border-border bg-neutral-50 sm:h-52">
+            <div className="h-24 border-b border-border bg-neutral-50 sm:h-28">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={event.design_url as string}
@@ -131,7 +127,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
               />
             </div>
           )}
-          <div className="p-6 sm:p-8">
+          <div className="p-4 sm:p-6">
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
             >
@@ -179,7 +175,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <StatBlock value={event.no_reply_count ?? 0} label="No reply" marker="bg-neutral-200" />
               </dl>
               <p className="mt-5 border-t border-border pt-4 text-sm text-neutral-600">
-                {responseCount} {responseCount === 1 ? 'response' : 'responses'} from {guestCount} {guestCount === 1 ? 'guest' : 'guests'} on the list
+                {responseCount - (event.public_response_count ?? 0)} invited-list replies · {event.public_response_count ?? 0} public-link replies
               </p>
             </section>
 

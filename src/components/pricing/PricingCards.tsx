@@ -56,7 +56,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
           <p className="mt-1 min-h-10 text-neutral-600">{plan.description}</p>
           <p className="mt-5 text-ink"><span className="font-display text-5xl">${plan.price}</span><span className="ml-1 text-neutral-600">{plan.period}</span></p>
           <div className="mt-6 grid grid-cols-2 divide-x divide-border border-y border-border py-3 text-center">
-            <div><strong className="block font-semibold text-ink">{plan.events}</strong><span className="text-sm text-neutral-600">{plan.events === '1' ? 'event' : 'events'}</span></div>
+            <div><strong className="block font-semibold text-ink">{plan.events}</strong><span className="text-sm text-neutral-600">{/^1(?:\s|$)/.test(plan.events) ? 'event' : 'events'}</span></div>
             <div><strong className="block font-semibold text-ink">{plan.guests}</strong><span className="text-sm text-neutral-600">guests per event</span></div>
           </div>
           <ul className="my-6 flex-1 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex gap-2 text-neutral-700"><Check className="mt-0.5 h-5 w-5 shrink-0 text-sage" aria-hidden="true" />{feature}</li>)}</ul>

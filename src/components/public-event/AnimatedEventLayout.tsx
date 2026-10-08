@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 export function AnimatedEventLayout({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
+      data-event-animation
       initial="hidden"
       animate="visible"
       variants={{
@@ -25,6 +26,7 @@ export function AnimatedEventLayout({ children }: { children: React.ReactNode })
 export function AnimatedSection({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <motion.div
+      data-event-animation
       className={className}
       variants={{
         hidden: { opacity: 0, y: 20 },

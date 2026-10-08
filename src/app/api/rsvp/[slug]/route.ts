@@ -65,7 +65,8 @@ export async function GET(request: Request, { params }: Context) {
       const total = await queryOne<{ total: number }>("SELECT COALESCE(SUM(headcount), 0)::int AS total FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2::uuid IS NULL OR id <> $2)", [event.id, response?.id ?? null]);
       spotsRemaining = Math.max(0, event.max_attendees - (total?.total ?? 0));
     }
-    const result = NextResponse.json({ response, spots_remaining: spotsRemaining }, { headers: privateHeaders });
+    const deadlinePassed = Boolean(event.rsvp_deadline && new Date(event.rsvp_deadline).getTime() <= Date.now());
+    const result = NextResponse.json({ response, spots_remaining: spotsRemaining, deadline_passed: deadlinePassed }, { headers: privateHeaders });
     if (!guestId) setEditCookie(result, event, token);
     return result;
   } catch (error) {

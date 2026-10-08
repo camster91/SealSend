@@ -10,7 +10,7 @@ import { BETA_MODE } from '@/lib/constants';
 import { OG_IMAGE } from '@/lib/metadata';
 import { softwareApplicationJsonLd } from '@/lib/structured-data';
 
-const title = "Pricing: Free, Event Pass and Pro";
+const title = BETA_MODE ? 'Free beta: one complete event' : "Pricing: Free, Event Pass and Pro";
 const description = BETA_MODE
   ? "SealSend is free during the beta: one active event with up to 100 guests. One flat price per event after the beta, never per guest."
   : "Start free for one event, add an Event Pass for up to 250 guests, or choose annual Pro. One flat price per event, never per guest.";

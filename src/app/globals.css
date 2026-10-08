@@ -330,3 +330,11 @@ body {
     animation: none;
   }
 }
+
+/* Invitations stay fully visible and stationary when guests request less motion. */
+@media (prefers-reduced-motion: reduce) {
+  [data-event-animation] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
