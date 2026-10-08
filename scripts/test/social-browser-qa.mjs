@@ -139,7 +139,7 @@ try {
   assert.ok((await approvedState.json()).photos.some(item => item.id === photo.id && item.approved), 'Approved photo must be visible to another invited guest');
   await otherPage.reload(); await otherPage.getByText('Synthetic QA photo',{ exact:true }).waitFor();
   assert.equal((await other.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`,{headers:{'X-Guest-Token':otherToken}})).status(),200);
-  await otherPage.locator(`img[src$="/${photo.id}"]`).evaluate(img => { if (!img.complete || !img.naturalWidth) throw new Error('Approved album image did not load with the guest cookie'); });
+  await otherPage.waitForFunction(id => { const img = document.querySelector(`img[src$="/${id}"]`); return img?.complete && img.naturalWidth > 0; }, photo.id);
   await page.getByRole('button',{ name:'Remove my photo',exact:true }).click();
   await page.getByRole('alertdialog').getByRole('button',{name:'Remove photo',exact:true}).click();
   await page.getByText('Photo removed.',{ exact:true }).waitFor();

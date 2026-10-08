@@ -108,6 +108,17 @@ export async function reviewBrowserChecks({ browser, origin, db, host }) {
   await page.getByRole('button',{name:'Update your response',exact:true}).click();
   for(const width of [375,768,1440]) {
     await page.setViewportSize({width,height:1000});
+    // Measure the visible form after its entrance animation.
+    await page.locator('form[aria-label="RSVP"]').scrollIntoViewIfNeeded();
+    await page.waitForFunction(()=>{
+      let element=document.querySelector('form[aria-label="RSVP"]');
+      if(!element) return false;
+      while(element) {
+        if(Number(getComputedStyle(element).opacity)<0.999) return false;
+        element=element.parentElement;
+      }
+      return true;
+    });
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
     const axe=await new AxeBuilder({page}).include('[aria-label="RSVP"]').analyze();
     assert.deepEqual(axe.violations.filter(v=>['serious','critical'].includes(v.impact)),[]);
