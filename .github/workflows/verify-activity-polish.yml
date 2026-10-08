@@ -12,20 +12,17 @@ jobs:
       - name: Verify deployed revision and public routes
         run: |
           python - <<'PY'
-          import urllib.request, urllib.error, json, socket
+          import urllib.request, urllib.error, json
           origin = 'https://sealsend.app'
           expected = 'df84c964892b81ccc51dc4a55cc155fb4f12f2fc'
           def read(path):
               with urllib.request.urlopen(urllib.request.Request(origin + path, headers={'Cache-Control':'no-cache'}), timeout=25) as response:
                   return response.status, response.headers, response.read().decode()
-          print('Public DNS:', sorted({item[4][0] for item in socket.getaddrinfo('sealsend.app', 443)}), flush=True)
-          for port in (443, 80):
-              try:
-                  with socket.create_connection(('sealsend.app', port), timeout=5):
-                      print('PASS TCP connection:', port, flush=True)
-              except OSError as error:
-                  print('TCP connection failed:', port, str(error), flush=True)
-          status, headers, raw = read('/api/health')
+          try:
+              status, headers, raw = read('/api/health')
+          except urllib.error.HTTPError as error:
+              print('Public health failure:', error.code, error.read(2000).decode(errors='replace'), flush=True)
+              raise
           health = json.loads(raw)
           print('Health:', status, json.dumps(health), flush=True)
           assert status == 200 and health['status'] == 'ok'
@@ -47,4 +44,30 @@ jobs:
               assert denied.code == 403
               assert 'no-store' in denied.headers.get('Cache-Control', '')
           print('PASS anonymous guest activities denied; no production records modified', flush=True)
+          PY
+      - name: Read configured deployment status without changing production
+        if: always()
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          python - <<'PY'
+          import os, urllib.request, urllib.parse, json
+          base, token, app = (os.environ.get(key, '') for key in ('COOLIFY_URL','COOLIFY_TOKEN','COOLIFY_APP_UUID'))
+          if not all((base,token,app)):
+              print('Deployment credentials are not configured for this read-only check.')
+          elif urllib.parse.urlparse(base).scheme != 'https':
+              print('Configured deployment origin is not HTTPS; credentials were not transmitted.')
+          elif app != 'zysawgfigxocm1s6qbgttk5y':
+              print('Configured deployment resource differs from the documented serving application; no production request made.')
+          else:
+              try:
+                  request = urllib.request.Request(base.rstrip('/') + '/api/v1/applications/' + app, headers={'Authorization':'Bearer ' + token})
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      data = json.load(response)
+                  print('Application status:', json.dumps({key:data.get(key) for key in ('name','status','git_branch','git_commit_sha','fqdn')}))
+              except Exception as error:
+                  print('Read-only deployment check failed:', type(error).__name__)
+                  raise SystemExit(1)
           PY
