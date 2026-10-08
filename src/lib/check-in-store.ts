@@ -32,11 +32,12 @@ export async function updateCheckInGuest(db: Query, eventId: string, actorId: st
   const identifierClause = input.inviteToken ? 'invite_token = $1' : 'id = $1';
   const name = publicResponse ? 'respondent_name' : 'name';
   const status = publicResponse ? 'status' : 'rsvp_status';
+  const headcount = publicResponse ? 'headcount' : 'COALESCE((SELECT r.headcount FROM rsvp_responses r WHERE r.event_id = $2 AND r.guest_id = guests.id ORDER BY r.updated_at DESC NULLS LAST, r.id DESC LIMIT 1), 1)';
   return (await db<CheckInGuest>(`UPDATE ${table}
     SET checked_in_at = CASE WHEN $3 THEN NOW() ELSE NULL END,
       checked_in_by = CASE WHEN $3 THEN $4::uuid ELSE NULL END, updated_at = NOW()
     WHERE ${identifierClause} AND event_id = $2 ${publicResponse ? 'AND guest_id IS NULL' : ''}
     RETURNING id, ${name} AS name, ${status} AS rsvp_status, checked_in_at,
-      '${publicResponse ? 'public_rsvp' : 'guest'}'::text AS source, ${publicResponse ? 'headcount' : '1'} AS headcount`,
+      '${publicResponse ? 'public_rsvp' : 'guest'}'::text AS source, ${headcount} AS headcount`,
   [input.rsvpResponseId ?? input.guestId ?? input.inviteToken, eventId, input.checkedIn, actorId])).rows[0] ?? null;
 }
