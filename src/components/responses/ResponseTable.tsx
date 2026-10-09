@@ -251,7 +251,9 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
         columns={columns}
         data={filtered as (RSVPResponseWithPlusOnes & Record<string, unknown>)[]}
         keyExtractor={(item) => item.id as string}
-        emptyMessage="No responses yet"
+        emptyMessage={filtered.length === 0 && responses.length > 0 && filter && filter !== "all"
+          ? "No responses match this filter."
+          : "No responses yet"}
         renderExpandedRow={(item) => renderExpandedRow(item as RSVPResponseWithPlusOnes)}
       />
     </div>

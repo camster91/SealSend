@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
@@ -41,7 +41,11 @@ function DataTable<T extends Record<string, unknown>>({
       const bVal = b[sortKey];
       if (aVal == null) return 1;
       if (bVal == null) return -1;
-      const cmp = String(aVal).localeCompare(String(bVal));
+      // Keep numeric columns numeric ("10" should follow "2"), while the
+      // collator gives text columns stable, case-insensitive ordering.
+      const cmp = typeof aVal === "number" && typeof bVal === "number"
+        ? aVal - bVal
+        : String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: "base" });
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [data, sortKey, sortDir]);
@@ -65,21 +69,30 @@ function DataTable<T extends Record<string, unknown>>({
                 key={col.key}
                 className={cn(
                   "px-4 py-3 text-left font-medium text-muted-foreground",
-                  col.sortable && "cursor-pointer select-none hover:text-foreground",
+                  col.sortable && "select-none hover:text-foreground",
                   col.className
                 )}
-                onClick={() => col.sortable && handleSort(col.key)}
+                aria-sort={col.sortable ? (sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : "none") : undefined}
               >
-                <div className="flex items-center gap-1">
-                  {col.header}
-                  {col.sortable && sortKey === col.key && (
-                    sortDir === "asc" ? (
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    )
-                  )}
-                </div>
+                {col.sortable ? (
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center gap-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                    onClick={() => handleSort(col.key)}
+                    aria-label={`Sort by ${col.header}${sortKey === col.key ? `, currently ${sortDir === "asc" ? "ascending" : "descending"}` : ""}`}
+                  >
+                    {col.header}
+                    {sortKey === col.key && (
+                      sortDir === "asc" ? (
+                        <ChevronUp aria-hidden="true" className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+                      )
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1">{col.header}</div>
+                )}
               </th>
             ))}
           </tr>
@@ -96,9 +109,8 @@ function DataTable<T extends Record<string, unknown>>({
             </tr>
           ) : (
             sortedData.map((item) => (
-              <>
+              <Fragment key={keyExtractor(item)}>
                 <tr
-                  key={keyExtractor(item)}
                   onClick={() => onRowClick?.(item)}
                   onKeyDown={(e: React.KeyboardEvent<HTMLTableRowElement>) => {
                     if (!onRowClick) return;
@@ -126,7 +138,7 @@ function DataTable<T extends Record<string, unknown>>({
                   ))}
                 </tr>
                 {renderExpandedRow?.(item)}
-              </>
+              </Fragment>
             ))
           )}
         </tbody>

@@ -1,4 +1,4 @@
-import { rsvpFieldRole } from './rsvp-fields';
+import { rsvpFieldRole, rsvpResponseValues } from './rsvp-fields';
 export type SummaryResponse = { id: string; status: string; headcount: number; response_data: Record<string, unknown> | null; respondent_name?: string; respondent_email?: string | null };
 export type SummaryField = { field_name: string; field_label: string; field_type: string; is_required: boolean; options?: string[] | null };
 
@@ -15,11 +15,11 @@ export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryFi
     const counts = new Map<string, number>();
     for (const response of responses) {
       const value = role === 'name' ? response.respondent_name : role === 'email' ? response.respondent_email : role === 'headcount' ? response.headcount : role === 'attendance' ? response.status : response.response_data?.[field.field_name];
-      const values = Array.isArray(value) ? value : value === null || value === undefined || value === "" ? [] : [value];
+      const values = rsvpResponseValues(value);
       if (values.length) answered++;
       if (role === 'attendance' || ["select", "multiselect", "number"].includes(field.field_type)) {
         for (const item of values) {
-          const normalized = String(item).trim().slice(0, 100);
+          const normalized = item.trim().slice(0, 100);
           if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
         }
       }

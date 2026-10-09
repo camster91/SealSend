@@ -55,3 +55,35 @@ export async function saveRsvp(db: RsvpQuery, eventId: string, guestId: string |
   if (guestId) await db('UPDATE guests SET rsvp_status = $1, updated_at = NOW() WHERE id = $2 AND event_id = $3', [input.status, guestId, eventId]);
   return { response, updated: Boolean(previous) };
 }
+
+/**
+ * Delete a host-managed response while keeping the invited guest's denormalized
+ * RSVP status in sync. The caller owns the transaction, just like saveRsvp.
+ * Taking the same event lock prevents a concurrent public reply from being
+ * selected as the "remaining" response before the delete commits.
+ */
+export async function deleteRsvp(db: RsvpQuery, eventId: string, responseId: string): Promise<boolean> {
+  await db('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [eventId]);
+  const target = (await db<{ guest_id: string | null }>(
+    'SELECT guest_id FROM rsvp_responses WHERE id = $1 AND event_id = $2 FOR UPDATE',
+    [responseId, eventId]
+  )).rows[0];
+  if (!target) return false;
+
+  await db('DELETE FROM rsvp_responses WHERE id = $1 AND event_id = $2', [responseId, eventId]);
+
+  if (target.guest_id) {
+    const remaining = (await db<{ status: string }>(
+      `SELECT status FROM rsvp_responses
+       WHERE event_id = $1 AND guest_id = $2
+       ORDER BY updated_at DESC NULLS LAST, submitted_at DESC NULLS LAST, id DESC
+       LIMIT 1`,
+      [eventId, target.guest_id]
+    )).rows[0];
+    await db(
+      'UPDATE guests SET rsvp_status = $1, updated_at = NOW() WHERE id = $2 AND event_id = $3',
+      [remaining?.status ?? 'pending', target.guest_id, eventId]
+    );
+  }
+  return true;
+}

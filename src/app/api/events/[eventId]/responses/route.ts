@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query } from "@/lib/db/client";
 import type { PlusOne, RSVPResponse, RSVPResponseWithPlusOnes } from "@/types/database";
+import { serializeRsvpResponseValue } from "@/lib/rsvp-fields";
 
 export async function GET(
   request: Request,
@@ -91,7 +92,7 @@ export async function GET(
           String(plusOnesList.length),
           plusOneNames,
           plusOneEmails,
-          ...dataKeysList.map((k) => String(rd[k] || "")),
+          ...dataKeysList.map((k) => serializeRsvpResponseValue(rd[k])),
         ]
           .map((v) => {
             let s = String(v).replace(/"/g, '""');

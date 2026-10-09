@@ -27,6 +27,7 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
   const { data, published, mode } = ctx;
   // A value the server would refuse (or a published event must not have) is kept here and not sent.
   const [held, setHeld] = useState<Partial<BuilderData>>({});
+  const [numberErrors, setNumberErrors] = useState<Partial<Record<"max_attendees" | "max_guests_per_rsvp", string>>>({});
   const view: BuilderData = { ...data, ...held };
   // Once the draft exists, a cleared name is held here: the server refuses a blank one.
   const holdBlankName = Boolean(ctx.eventId);
@@ -38,7 +39,17 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
   const zones = useMemo(() => zonesReady ? timezoneOptions(data.event_timezone) : [{ value:data.event_timezone,label:data.event_timezone.replace(/_/g," ") }], [data.event_timezone,zonesReady]);
 
   const errorFor = (field: keyof BuilderData): string | undefined =>
-    errors[field] ?? ctx.fieldErrors[field] ?? (field === "title" && !view.title.trim() ? ctx.nameError : undefined);
+    numberErrors[field as keyof typeof numberErrors] ?? errors[field] ?? ctx.fieldErrors[field] ?? (field === "title" && !view.title.trim() ? ctx.nameError : undefined);
+
+  const onNumberValidation = (field: "max_attendees" | "max_guests_per_rsvp", error?: string) => {
+    setNumberErrors((current) => {
+      if (error) return { ...current, [field]: error };
+      if (!(field in current)) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
   const set = (patch: Partial<BuilderData>) => {
     const result = resolveHeld(data, held, patch, published, { holdBlankName });
@@ -47,7 +58,7 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
   };
 
   // Tell the shell to lock navigation while a held value would be lost by leaving.
-  const blocking = Object.keys(held).length > 0;
+  const blocking = Object.keys(held).length > 0 || Object.keys(numberErrors).length > 0;
   const { setBlocking } = ctx;
   useEffect(() => {
     setBlocking(blocking);
@@ -121,7 +132,7 @@ export function BasicsScreen({ ctx }: { ctx: ScreenContext }) {
         </fieldset>
       </div>
 
-      <BasicsMoreOptions view={view} errorFor={errorFor} set={set} update={ctx.update} />
+      <BasicsMoreOptions view={view} errorFor={errorFor} set={set} onNumberValidation={onNumberValidation} update={ctx.update} />
     </div>
   );
 }
