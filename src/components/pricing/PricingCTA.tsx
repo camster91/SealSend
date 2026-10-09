@@ -6,7 +6,7 @@ export function PricingCTA() {
   return (
     <section className="bg-[#e5daf4] px-4 py-20 text-ink sm:px-6 sm:py-24">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
-        <Image src="/brand/illustrations/seal-sidekick.webp" alt="" width={600} height={600} sizes="160px" className="h-40 w-40 rounded-full" />
+        <Image src="/brand/illustrations/seal-digital.webp" alt="" width={600} height={600} sizes="160px" className="h-40 w-40 rounded-full" />
         <h2 className="mt-6 font-display text-4xl sm:text-5xl">
           {BETA_MODE ? "Ready to run one real event?" : "Your next event, sealed and sent."}
         </h2>

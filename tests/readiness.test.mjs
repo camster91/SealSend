@@ -609,7 +609,7 @@ test('public feature marketing stays inside the shipped approval-controlled work
     assert.match(features, new RegExp(shippedClaim, 'i'));
   }
   assert.match(metadata, /SealSend: Online Invitations with RSVP Tracking & Check-in/);
-  assert.match(metadata, /Free for your first event\./);
+  assert.match(metadata, /Free beta: one event, up to 100 guests\./);
   assert.match(metadata, /\/brand\/og\.jpg/);
 });
 
