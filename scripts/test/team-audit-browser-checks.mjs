@@ -111,6 +111,7 @@ export async function teamAuditBrowserChecks({ browser, origin, db }) {
     await page.getByRole("heading", { name: "Collaborating events", exact: true }).waitFor();
     await page.getByRole("link", { name: /Planner Workspace Event/ }).waitFor();
     assert.equal(await page.getByText("Workspace owner", { exact: true }).count(), 1, "workspace role should be visible on shared event");
+    await page.getByRole("heading", { name: "Collaborating events", exact: true }).scrollIntoViewIfNeeded();
     await captureAuditScreenshot(page, "05-dashboard-team.png");
 
     const cloneResponse = await page.request.post(`${origin}/api/events/${IDS.event}/clone`, {
@@ -244,6 +245,7 @@ export async function teamAuditBrowserChecks({ browser, origin, db }) {
       "SELECT COUNT(*)::int AS count FROM organization_invites WHERE organization_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
       [IDS.organization, "workspace-team-audit@example.test"],
     )).rows[0].count, 1);
+    await page.getByRole("button", { name: "Copy invite link", exact: true }).scrollIntoViewIfNeeded();
     await captureAuditScreenshot(page, "06-workspace-invite.png", { redactInviteLink: true });
     console.log("PASS collaborating dashboard, workspace-preserving repeat, role-safe event invite, and failed-email recovery");
   } finally {

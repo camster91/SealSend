@@ -84,6 +84,7 @@ export async function uiAuditBrowserChecks({ browser, origin, db }) {
     const capacity = page.getByLabel("Most guests that can come", { exact: true });
     await capacity.fill("0");
     await page.getByRole("alert").filter({ hasText: "Enter a whole number" }).waitFor();
+    await page.getByRole("alert").filter({ hasText: "Enter a whole number" }).scrollIntoViewIfNeeded();
     await capture("01-builder-invalid.png");
     const nextLook = page.getByRole("button", { name: "Next: The look", exact: true });
     assert.equal(await nextLook.isDisabled(), true, "invalid guest limit must block builder navigation");
@@ -132,7 +133,6 @@ export async function uiAuditBrowserChecks({ browser, origin, db }) {
 
     // A failed history read must leave a visible, retryable state and clear it
     // once the next read succeeds. No send or approval action is touched.
-    await page.goto(`${origin}/events/${IDS.event}`);
     let failed = false;
     const announcementUrl = `**/api/events/${IDS.event}/announcements`;
     await page.route(announcementUrl, async (route) => {
@@ -147,8 +147,9 @@ export async function uiAuditBrowserChecks({ browser, origin, db }) {
       }
       await route.continue();
     });
-    await page.reload();
+    await page.goto(`${origin}/events/${IDS.event}`);
     await page.getByRole("alert").filter({ hasText: "Announcement history could not be loaded" }).waitFor();
+    await page.getByRole("alert").filter({ hasText: "Announcement history could not be loaded" }).scrollIntoViewIfNeeded();
     await capture("04-history-retry.png");
     await page.getByRole("button", { name: "Try again", exact: true }).click();
     await page.getByRole("alert").filter({ hasText: "Announcement history could not be loaded" }).waitFor({ state: "detached" });
