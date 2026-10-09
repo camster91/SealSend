@@ -68,6 +68,9 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
   const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [fallbackInvite, setFallbackInvite] = useState<{ url: string; email: string } | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteCopyError, setInviteCopyError] = useState(false);
 
   const loadOrganizations = useCallback(async (selectId?: string) => {
     const res = await fetch("/api/organizations");
@@ -92,6 +95,13 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
   useEffect(() => { void loadOrganizations(); }, [loadOrganizations]);
   useEffect(() => { if (organizationId) void loadMembers(organizationId); }, [organizationId, loadMembers]);
   useEffect(() => {
+    // A one-time link belongs to exactly one workspace. Never leave it
+    // visible after the user switches the selected workspace.
+    setFallbackInvite(null);
+    setInviteCopied(false);
+    setInviteCopyError(false);
+  }, [organizationId]);
+  useEffect(() => {
     setSubscription(null);
     if (!BETA_MODE && organizationId && data?.viewerRole === "owner" && !data.organization?.is_personal) void loadSubscription(organizationId);
   }, [organizationId, data?.viewerRole, data?.organization?.is_personal, loadSubscription]);
@@ -108,6 +118,8 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
       }
       setMessage({ type: "success", text: success });
       await after?.(body);
+    } catch {
+      setMessage({ type: "error", text: "The request could not be completed. Please try again." });
     } finally {
       setBusy(false);
     }
@@ -140,6 +152,18 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
         }, 2500);
       }),
     );
+  }
+
+  async function copyInviteLink(url: string) {
+    setInviteCopyError(false);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+    } catch {
+      setInviteCopied(false);
+      setInviteCopyError(true);
+    }
   }
 
   const json = (method: string, payload?: unknown): RequestInit => ({
@@ -275,10 +299,24 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
                   className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end"
                   onSubmit={(event) => {
                     event.preventDefault();
+                    setFallbackInvite(null);
+                    setInviteCopied(false);
+                    setInviteCopyError(false);
                     void run(
                       () => fetch(`/api/organizations/${selected.id}/members`, json("POST", { email: inviteEmail, role: inviteRole })),
-                      "Invitation sent. It expires in seven days.",
-                      async () => { setInviteEmail(""); await loadMembers(selected.id); },
+                      "Invitation created.",
+                      async (body) => {
+                        const inviteUrl = typeof body.inviteUrl === "string" ? body.inviteUrl : null;
+                        const delivery = body.delivery === "sent";
+                        if (delivery) {
+                          setMessage({ type: "success", text: "Invitation sent. It expires in seven days." });
+                        } else {
+                          setMessage({ type: "error", text: "The invitation was created, but its email could not be delivered. Copy the link below and share it securely." });
+                          if (inviteUrl) setFallbackInvite({ url: inviteUrl, email: inviteEmail });
+                        }
+                        setInviteEmail("");
+                        await loadMembers(selected.id);
+                      },
                     );
                   }}
                 >
@@ -290,6 +328,28 @@ export function WorkspaceTeamSettings({ currentUserId }: { currentUserId: string
                   </select>
                   <Button type="submit" disabled={busy || !inviteEmail}>Invite</Button>
                 </form>
+                {fallbackInvite && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
+                    <p className="font-medium">Email delivery failed for {fallbackInvite.email}.</p>
+                    <p className="mt-1 text-amber-900">This one-time invitation link expires in seven days. Share it only with the intended teammate.</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <code className="min-w-0 flex-1 break-all rounded border border-amber-300 bg-white px-2 py-1 text-xs">{fallbackInvite.url}</code>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copyInviteLink(fallbackInvite.url)}
+                      >
+                        {inviteCopied ? "Copied" : "Copy invite link"}
+                      </Button>
+                    </div>
+                    {inviteCopyError && (
+                      <p className="mt-2 text-xs text-amber-900" role="status">
+                        Copy was blocked by this browser. Select the link and copy it manually.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-gray-500">{seatsUsed} of {data.seatLimit} seats used, including pending invitations.</p>
 
                 {data.invites.length > 0 && (

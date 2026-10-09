@@ -13,6 +13,8 @@ import { enqueueWebhookEvent } from "@/lib/webhooks";
 import { getApiUser } from "@/lib/auth/api-auth";
 import { generateMagicToken, isValidMagicToken } from "@/lib/magic-token";
 import { findRsvp, saveRsvp, RsvpError, type RsvpQuery } from "@/lib/rsvp-store";
+import { validateRsvpResponseData } from '@/lib/rsvp-fields';
+import type { RSVPField } from '@/types/database';
 
 const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie, X-Guest-Token, X-Rsvp-Edit-Token" };
 type Context = { params: Promise<{ slug: string }> };
@@ -92,6 +94,18 @@ export async function POST(request: Request, { params }: Context) {
     try {
       await client.query("BEGIN");
       const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await client.query(sql, values)).rows as T[] });
+      // Read field definitions under the same event lock as saveRsvp so a
+      // concurrent builder save cannot change validation mid-submission.
+      await db('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [event.id]);
+      const previous = await findRsvp(db, event.id, guestId, editToken);
+      const fields = (await db<RSVPField>(
+        'SELECT id, event_id, field_name, field_label, field_type, options, placeholder, is_required, is_enabled, sort_order, created_at FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+        [event.id],
+      )).rows;
+      const responseDataValidation = validateRsvpResponseData(fields, parsed.data.response_data, previous?.response_data);
+      if (!responseDataValidation.valid) {
+        throw new RsvpError('Please complete the required RSVP fields.', 400);
+      }
       saved = await saveRsvp(db, event.id, guestId, editToken, parsed.data, effectiveLimit);
       await client.query("COMMIT");
     } catch (error) {

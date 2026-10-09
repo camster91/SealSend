@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
+import { resolveEventAccessRole, roleCan } from "@/lib/auth/event-access";
 import { getDb } from "@/lib/db/client";
 import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
 import { buildRepeatedEventBrief, parseRepeatEventRequest } from "@/lib/repeat-event";
@@ -11,6 +12,13 @@ import { generateSlug } from "@/lib/utils";
 type RouteParams = { params: Promise<{ eventId: string }> };
 
 type SourceEvent = {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  client_id: string | null;
+  brand_id: string | null;
+  role: string | null;
+  organization_role: string | null;
   status: "draft" | "published" | "archived";
   description: string | null;
   invitation_headline: string | null;
@@ -59,38 +67,71 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   }
 
-  const accountPlan = await getUserTier(auth.user.id);
   const client = await getDb().connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [auth.user.id]);
 
-    const originalResult = await client.query<SourceEvent>(
-      `SELECT status, description, invitation_headline, invitation_body, reminder_sequence, event_timezone,
-              location_name, location_address, location_lat, location_lng, host_name, dress_code,
-              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
-              design_url, design_type, customization, event_brief
-       FROM events WHERE id = $1 AND user_id = $2`,
-      [eventId, auth.user.id],
-    );
-    const original = originalResult.rows[0];
-    if (!original) {
+    // Event creation serializes the per-owner active-event check with this
+    // advisory key. Acquire it before the source row lock so a repeat cannot
+    // deadlock with a concurrent create (or another repeat for a different
+    // source owned by the same host).
+    const ownerBeforeLock = (await client.query<{ user_id: string }>(
+      "SELECT user_id FROM events WHERE id = $1",
+      [eventId],
+    )).rows[0];
+    if (!ownerBeforeLock) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [ownerBeforeLock.user_id]);
+
+    const originalResult = await client.query<SourceEvent>(
+      `SELECT e.id, e.user_id, e.organization_id, e.client_id, e.brand_id,
+              CASE WHEN e.user_id = $2 THEN 'owner'
+                   ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
+              END AS role,
+              (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) AS organization_role,
+              e.status, e.description, e.invitation_headline, e.invitation_body, e.reminder_sequence, e.event_timezone,
+              location_name, location_address, location_lat, location_lng, host_name, dress_code,
+              registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
+              design_url, design_type, customization, event_brief
+       FROM events e
+       WHERE e.id = $1
+         AND (e.user_id = $2
+              OR EXISTS (SELECT 1 FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2)
+              OR EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2))
+       FOR UPDATE OF e`,
+      [eventId, auth.user.id],
+    );
+    const original = originalResult.rows[0];
+    const transactionRole = original
+      ? resolveEventAccessRole(original.role, original.organization_role)
+      : null;
+    if (!original || !transactionRole || !roleCan(transactionRole, "clone_event")) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    // Account deletion can transfer an event between the two reads above.
+    // Never acquire a second owner lock after locking the event row; retrying
+    // the request is safer than introducing the inverse lock order.
+    if (original.user_id !== ownerBeforeLock.user_id) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "The event owner changed. Please retry." }, { status: 409 });
+    }
+    const accountPlan = await getUserTier(original.user_id);
 
     let sourceArchived = false;
     if (repeatRequest.archiveSource && original.status !== "archived") {
       await client.query(
-        "UPDATE events SET status = 'archived' WHERE id = $1 AND user_id = $2",
-        [eventId, auth.user.id],
+        "UPDATE events SET status = 'archived' WHERE id = $1",
+        [eventId],
       );
       sourceArchived = true;
     }
 
     const activeResult = await client.query<{ count: string }>(
       "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
-      [auth.user.id],
+      [original.user_id],
     );
     if (!canCreateEvent(accountPlan, Number(activeResult.rows[0]?.count ?? 0))) {
       await client.query("ROLLBACK");
@@ -114,13 +155,13 @@ export async function POST(request: Request, { params }: RouteParams) {
          location_lat, location_lng, host_name, dress_code, rsvp_deadline, registry_links,
          max_attendees, allow_plus_ones, max_guests_per_rsvp, design_url, design_type,
          customization, status, tier, max_responses, auto_reminders, reminder_sent_at, payment_id,
-         event_brief, ai_generation_id, repeated_from_event_id
+         event_brief, ai_generation_id, repeated_from_event_id, organization_id, client_id, brand_id
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL, $27
+         $17, $18, $19, $20, $21, $22, $23, $24, 'draft', 'free', $25, FALSE, NULL, NULL, $26, NULL, $27, $28, $29, $30
        ) RETURNING id, title`,
       [
-        auth.user.id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
+        original.user_id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
         original.invitation_headline, original.invitation_body, original.reminder_sequence,
         repeatRequest.eventDate, repeatRequest.eventEndDate, original.event_timezone,
         original.location_name, original.location_address, original.location_lat, original.location_lng,
@@ -129,6 +170,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         original.design_url, original.design_type, original.customization, limits.responses,
         repeatedEventBrief ? JSON.stringify(repeatedEventBrief) : null,
         eventId,
+        original.organization_id, original.client_id, original.brand_id,
       ],
     );
     const newEvent = insertedEvent.rows[0];

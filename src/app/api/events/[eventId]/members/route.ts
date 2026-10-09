@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, query } from "@/lib/db/client";
 import { requireApiHost } from "@/lib/auth/api-auth";
-import { getEventAccess, roleCan } from "@/lib/auth/event-access";
+import { getEventAccess, resolveEventAccessRole, roleCan } from "@/lib/auth/event-access";
 import { eventMemberInviteSchema } from "@/lib/validations";
 import { generateMagicToken, hashMagicToken, previewMagicToken } from "@/lib/magic-token";
 import { getTeamMemberLimit, type EventTier } from "@/lib/entitlements";
@@ -64,18 +64,43 @@ export async function POST(request: Request, { params }: Params) {
   let eventTitle = "your event";
   try {
     await client.query("BEGIN");
-    const eventResult = await client.query<{ id: string; user_id: string; title: string; tier: string }>(
-      "SELECT id, user_id, title, tier FROM events WHERE id = $1 FOR UPDATE",
-      [eventId],
+    // Re-check the resolved permission while the event row is locked. A role
+    // can be removed after the initial lookup but before this transaction
+    // starts; the UI permission must never outlive that membership change.
+    const eventResult = await client.query<{
+      id: string;
+      user_id: string;
+      title: string;
+      tier: string;
+      role: string | null;
+      organization_role: string | null;
+    }>(
+      `SELECT e.id, e.user_id, e.title, e.tier,
+              CASE WHEN e.user_id = $2 THEN 'owner'
+                   ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
+              END AS role,
+              (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) AS organization_role
+         FROM events e
+        WHERE e.id = $1
+          AND (e.user_id = $2
+               OR EXISTS (SELECT 1 FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2)
+               OR EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2))
+        FOR UPDATE OF e`,
+      [eventId, auth.user.id],
     );
     const event = eventResult.rows[0];
-    if (!event || event.user_id !== auth.user.id) {
+    const transactionRole = event
+      ? resolveEventAccessRole(event.role, event.organization_role)
+      : null;
+    if (!event || !transactionRole || !roleCan(transactionRole, "manage_members")) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     eventTitle = event.title;
 
-    const accountPlan = await getUserTier(auth.user.id);
+    // Seat entitlement belongs to the event owner, even when a workspace
+    // owner or admin performs the invite on a planner-created event.
+    const accountPlan = await getUserTier(event.user_id);
     const teamLimit = getTeamMemberLimit(accountPlan, event.tier as EventTier);
     const countResult = await client.query<{ count: string }>(
       `SELECT (

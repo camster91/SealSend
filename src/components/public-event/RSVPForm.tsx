@@ -9,7 +9,19 @@ import { getClientUser } from "@/lib/auth/client-auth";
 import type { RSVPField, PlusOneData, RSVPResponse } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
-import { normalizeRsvpFields } from "@/lib/rsvp-fields";
+import { normalizeRsvpFields, validateRsvpResponseData } from "@/lib/rsvp-fields";
+
+type RsvpFormValue = string | string[];
+type RsvpFormData = Record<string, RsvpFormValue>;
+const scalarValue = (value: RsvpFormValue | undefined) => typeof value === "string" ? value : "";
+function formValue(value: unknown): RsvpFormValue | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value) && value.every((entry) => typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean")) {
+    return value.map(String);
+  }
+  return undefined;
+}
 
 interface RSVPFormProps {
   eventSlug: string;
@@ -27,7 +39,7 @@ interface RSVPFormProps {
 
 export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteToken, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
   const questions = useMemo(() => normalizeRsvpFields(fields), [fields]);
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<RsvpFormData>({});
   const [plusOnes, setPlusOnes] = useState<PlusOneData[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -35,11 +47,12 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   const [loading, setLoading] = useState(true);
   const [availableSpots, setAvailableSpots] = useState(spotsRemaining);
   const [error, setError] = useState<string | null>(null);
+  const [customFieldErrors, setCustomFieldErrors] = useState<Record<string, string>>({});
   const [savedResponse, setSavedResponse] = useState<RSVPResponse | null>(null);
   const [deadlinePassed, setDeadlinePassed] = useState(false);
 
   // Calculate current headcount
-  const headcount = parseInt(formData["headcount"] || "1", 10) || 1;
+  const headcount = parseInt(scalarValue(formData["headcount"]) || "1", 10) || 1;
   const expectedPlusOnes = Math.max(0, headcount - 1);
 
   // GET establishes a private edit cookie before the first public submission.
@@ -56,10 +69,11 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         if (cancelled) return;
         const saved = data.response as RSVPResponse | null;
         const user = !inviteGuestName ? getClientUser() : null;
-        const initial: Record<string, string> = {};
+        const initial: RsvpFormData = {};
         if (saved) {
           for (const [key, value] of Object.entries(saved.response_data || {})) {
-            if (typeof value === "string") initial[key] = value;
+            const loadedValue = formValue(value);
+            if (loadedValue !== undefined) initial[key] = loadedValue;
           }
           for (const field of questions) {
             if (field.field_type === "attendance") initial[field.field_name] = saved.status;
@@ -104,8 +118,14 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     .filter((f) => f.is_enabled)
     .sort((a, b) => a.sort_order - b.sort_order);
 
-  function updateField(name: string, value: string) {
+  function updateField(name: string, value: RsvpFormValue) {
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setCustomFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   }
 
   function updatePlusOne(index: number, field: keyof PlusOneData, value: string) {
@@ -127,6 +147,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setCustomFieldErrors({});
 
     const attendanceField = enabledFields.find(
       (f) => f.field_type === "attendance"
@@ -140,16 +161,27 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       return;
     }
 
-    const responseData: Record<string, string> = {};
+    const responseData: Record<string, unknown> = { ...(savedResponse?.response_data || {}) };
     enabledFields.forEach((field) => {
       if (
         field.field_type !== "attendance" &&
         field.field_name !== "email" &&
         field.field_name !== "headcount"
       ) {
-        responseData[field.field_name] = formData[field.field_name] || "";
+        const value = formData[field.field_name];
+        responseData[field.field_name] = field.field_type === "multiselect"
+          ? (Array.isArray(value) ? value : typeof value === "string" && value ? [value] : [])
+          : (typeof value === "string" ? value : "");
       }
     });
+
+    const responseDataValidation = validateRsvpResponseData(enabledFields, responseData, savedResponse?.response_data);
+    if (!responseDataValidation.valid) {
+      setCustomFieldErrors(responseDataValidation.errors);
+      setError(Object.values(responseDataValidation.errors)[0] || "Please complete the required RSVP fields.");
+      setSubmitting(false);
+      return;
+    }
 
     // Filter out empty plus ones
     const validPlusOnes = plusOnes.filter((po) => po.name.trim() !== "");
@@ -159,9 +191,9 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         method: "POST",
         headers: { "Content-Type": "application/json", ...(inviteToken ? { "X-Guest-Token": inviteToken } : {}) },
         body: JSON.stringify({
-          respondent_name: formData["respondent_name"] || "Guest",
-          respondent_email: formData["email"] || "",
-          status,
+          respondent_name: scalarValue(formData["respondent_name"]) || "Guest",
+          respondent_email: scalarValue(formData["email"]),
+          status: typeof status === "string" ? status : "attending",
           headcount,
           response_data: responseData,
           plus_ones: validPlusOnes,
@@ -257,7 +289,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         id="rsvp-name"
         label="Your Name *"
         placeholder="Enter your name"
-        value={formData["respondent_name"] || ""}
+        value={scalarValue(formData["respondent_name"])}
         onChange={(e) => updateField("respondent_name", e.target.value)}
         required
         autoComplete="name"
@@ -315,7 +347,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 type="email"
                 placeholder={field.placeholder || "your@email.com"}
-                value={formData[field.field_name] || ""}
+                value={scalarValue(formData[field.field_name])}
                 onChange={(e) => updateField(field.field_name, e.target.value)}
                 required={field.is_required}
                 autoComplete="email"
@@ -347,7 +379,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   min="1"
                   max={String(effectiveMax)}
                   placeholder={field.placeholder || "1"}
-                  value={formData[field.field_name] || ""}
+                  value={scalarValue(formData[field.field_name])}
                   onChange={(e) => updateField(field.field_name, e.target.value)}
                   required={field.is_required}
                 />
@@ -360,17 +392,70 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             );
           }
           case "select":
+            {
+              const selectedValue = scalarValue(formData[field.field_name]);
+              const configuredOptions = field.options || [];
+              const options = selectedValue && !configuredOptions.includes(selectedValue)
+                ? [selectedValue, ...configuredOptions]
+                : configuredOptions;
+              return (
+                <Select
+                  key={field.id}
+                  id={`rsvp-${field.id}`}
+                  label={`${field.field_label}${field.is_required ? " *" : ""}`}
+                  placeholder="Select an option"
+                  options={options.map((opt) => ({
+                    value: opt,
+                    label: configuredOptions.includes(opt) ? opt : `${opt} (previously selected)`,
+                  }))}
+                  value={selectedValue}
+                  onChange={(e) => updateField(field.field_name, e.target.value)}
+                  required={field.is_required}
+                />
+              );
+            }
+          case "multiselect": {
+            const fieldValue = formData[field.field_name];
+            const selected: string[] = Array.isArray(fieldValue) ? fieldValue : typeof fieldValue === "string" && fieldValue ? [fieldValue] : [];
+            const configuredOptions = field.options || [];
+            const options = [...new Set([...configuredOptions, ...selected])];
+            const fieldError = customFieldErrors[field.field_name];
+            const fieldErrorId = `rsvp-${field.id}-error`;
             return (
-              <Select
+              <fieldset key={field.id} className="space-y-2" aria-describedby={[`rsvp-${field.id}-hint`, fieldError ? fieldErrorId : ""].filter(Boolean).join(" ")} aria-invalid={fieldError ? true : undefined}>
+                <legend className="block text-sm font-medium text-neutral-700">
+                  {field.field_label}{field.is_required && " *"}
+                </legend>
+                <div id={`rsvp-${field.id}-hint`} className="space-y-2 rounded-lg border border-neutral-200 bg-white p-3">
+                  {options.map((option) => {
+                    const checked = selected.includes(option);
+                    return (
+                      <label key={option} className="flex min-h-10 items-center gap-3 text-sm text-neutral-800">
+                        <input
+                          type="checkbox"
+                          name={`rsvp-${field.field_name}`}
+                          value={option}
+                          checked={checked}
+                          onChange={() => updateField(field.field_name, checked ? selected.filter((value) => value !== option) : [...selected, option])}
+                          className="h-4 w-4 rounded border-neutral-300 text-ink focus:ring-2 focus:ring-ink"
+                        />
+                        <span>{option}{configuredOptions.includes(option) ? "" : " (previously selected)"}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {fieldError && <p id={fieldErrorId} role="alert" className="text-sm text-accent-red">{fieldError}</p>}
+              </fieldset>
+            );
+          }
+          case "textarea":
+            return (
+              <Textarea
                 key={field.id}
                 id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
-                placeholder="Select an option"
-                options={(field.options || []).map((opt) => ({
-                  value: opt,
-                  label: opt,
-                }))}
-                value={formData[field.field_name] || ""}
+                placeholder={field.placeholder || ""}
+                value={typeof formData[field.field_name] === "string" ? formData[field.field_name] : ""}
                 onChange={(e) => updateField(field.field_name, e.target.value)}
                 required={field.is_required}
               />
@@ -379,7 +464,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           default: {
             // Hide plus_one field when headcount is 1 or less
             if (field.field_name === "plus_one") {
-              const currentHeadcount = parseInt(formData["headcount"] || "1", 10) || 1;
+              const currentHeadcount = parseInt(scalarValue(formData["headcount"]) || "1", 10) || 1;
               if (currentHeadcount <= 1) return null;
             }
 
@@ -393,7 +478,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 placeholder={field.placeholder || ""}
-                value={formData[field.field_name] || ""}
+                value={typeof formData[field.field_name] === "string" ? formData[field.field_name] : ""}
                 onChange={(e) => updateField(field.field_name, e.target.value)}
                 required={field.is_required}
               />
@@ -403,7 +488,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 id={`rsvp-${field.id}`}
                 label={`${field.field_label}${field.is_required ? " *" : ""}`}
                 placeholder={field.placeholder || ""}
-                value={formData[field.field_name] || ""}
+                value={typeof formData[field.field_name] === "string" ? formData[field.field_name] : ""}
                 onChange={(e) => updateField(field.field_name, e.target.value)}
                 required={field.is_required}
               />

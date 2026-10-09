@@ -72,6 +72,9 @@ export async function PUT(
     const client = await getDb().connect();
     try {
       await client.query('BEGIN');
+      // Serialize field-definition replacement with public RSVP validation and
+      // saves so a response cannot be checked against a half-replaced form.
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [eventId]);
       await client.query('DELETE FROM rsvp_fields WHERE event_id = $1', [eventId]);
 
       if (fields.length > 0) {

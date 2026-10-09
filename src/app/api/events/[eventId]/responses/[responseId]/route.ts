@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { query } from "@/lib/db/client";
+import { getDb } from "@/lib/db/client";
+import { deleteRsvp, type RsvpQuery } from '@/lib/rsvp-store';
 
 export async function DELETE(
   _request: Request,
@@ -11,10 +12,20 @@ export async function DELETE(
     const auth = await requireEventPermission(eventId, 'edit_event');
     if (auth.error) return auth.error;
 
-    await query(
-      'DELETE FROM rsvp_responses WHERE id = $1 AND event_id = $2',
-      [responseId, eventId]
-    );
+    const client = await getDb().connect();
+    try {
+      await client.query('BEGIN');
+      const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({
+        rows: (await client.query(sql, values)).rows as T[],
+      });
+      await deleteRsvp(db, eventId, responseId);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     return NextResponse.json({ success: true });
   } catch {

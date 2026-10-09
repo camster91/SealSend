@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -17,6 +17,7 @@ const CONTROL = "h-11";
 
 interface NumberFieldProps {
   id: string;
+  field: "max_attendees" | "max_guests_per_rsvp";
   label: string;
   value: number | null;
   placeholder: string;
@@ -24,28 +25,47 @@ interface NumberFieldProps {
   max: number;
   error?: string;
   onValue: (value: number | null) => void;
+  onValidation: (field: NumberFieldProps["field"], error?: string) => void;
 }
 
-/** Keeps what the host typed, so clearing the box does not snap back to a number. */
-function NumberField({ id, label, value, placeholder, min, max, error, onValue }: NumberFieldProps) {
+/** Keeps what the host typed visible while an invalid value is being corrected. */
+function NumberField({ id, field, label, value, placeholder, min, max, error, onValue, onValidation }: NumberFieldProps) {
   const [text, setText] = useState(value === null ? "" : String(value));
+
+  // Keep the displayed value in sync with a confirmed server value without
+  // overwriting an invalid value while the host is correcting it. An invalid
+  // edit never calls onValue, so value only changes after a valid edit or a
+  // successful draft refresh.
+  useEffect(() => {
+    setText(value === null ? "" : String(value));
+  }, [value]);
+
   return (
     <Field id={id} label={label} error={error}>
       {(aria) => (
         <Input
           {...aria}
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={min}
-          max={max}
           className={CONTROL}
           placeholder={placeholder}
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
-            const n = Number.parseInt(e.target.value, 10);
-            if (e.target.value === "") onValue(null);
-            else if (Number.isFinite(n) && n >= min && n <= max) onValue(n);
+            const nextText = e.target.value;
+            setText(nextText);
+            if (nextText === "") {
+              onValidation(field);
+              onValue(null);
+              return;
+            }
+            const n = Number(nextText);
+            const valid = /^\d+$/.test(nextText) && Number.isSafeInteger(n) && n >= min && n <= max;
+            if (!valid) {
+              onValidation(field, `Enter a whole number from ${min.toLocaleString()} to ${max.toLocaleString()}${field === "max_attendees" ? " or leave it blank" : ""}.`);
+              return;
+            }
+            onValidation(field);
+            onValue(n);
           }}
         />
       )}
@@ -57,11 +77,12 @@ interface MoreOptionsProps {
   view: BuilderData;
   errorFor(field: keyof BuilderData): string | undefined;
   set(patch: Partial<BuilderData>): void;
+  onNumberValidation(field: NumberFieldProps["field"], error?: string): void;
   /** Writes straight to the draft; used for fields that Basics never holds back. */
   update(patch: Partial<BuilderData>): void;
 }
 
-export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsProps) {
+export function BasicsMoreOptions({ view, errorFor, set, onNumberValidation, update }: MoreOptionsProps) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
@@ -122,10 +143,10 @@ export function BasicsMoreOptions({ view, errorFor, set, update }: MoreOptionsPr
           )}
         </Field>
         <div className="grid gap-5 sm:grid-cols-2">
-          <NumberField id="max_attendees" label="Most guests that can come" value={view.max_attendees} placeholder="No limit"
-            min={1} max={10000} error={errorFor("max_attendees")} onValue={(n) => set({ max_attendees: n })} />
-          <NumberField id="max_guests_per_rsvp" label="Most people per reply" value={view.max_guests_per_rsvp} placeholder="10"
-            min={1} max={50} error={errorFor("max_guests_per_rsvp")} onValue={(n) => set({ max_guests_per_rsvp: n ?? 10 })} />
+          <NumberField field="max_attendees" id="max_attendees" label="Most guests that can come" value={view.max_attendees} placeholder="No limit"
+            min={1} max={10000} error={errorFor("max_attendees")} onValidation={onNumberValidation} onValue={(n) => set({ max_attendees: n })} />
+          <NumberField field="max_guests_per_rsvp" id="max_guests_per_rsvp" label="Most people per reply" value={view.max_guests_per_rsvp} placeholder="10"
+            min={1} max={50} error={errorFor("max_guests_per_rsvp")} onValidation={onNumberValidation} onValue={(n) => set({ max_guests_per_rsvp: n ?? 10 })} />
         </div>
         <Toggle checked={view.allow_plus_ones} onChange={(v) => set({ allow_plus_ones: v })} label="Guests can bring a plus-one"
           description="Lets guests add other people to their reply." />

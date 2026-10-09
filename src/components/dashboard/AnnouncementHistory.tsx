@@ -16,30 +16,42 @@ export function AnnouncementHistory({ eventId, refreshKey }: AnnouncementHistory
 
   const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/events/${eventId}/announcements`);
-    if (res.ok) {
-      const data = await res.json();
-      setAnnouncements(data);
+    setError('');
+    try {
+      const res = await fetch(`/api/events/${eventId}/announcements`);
+      if (!res.ok) throw new Error('announcement history request failed');
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) throw new Error('announcement history response was invalid');
+      setAnnouncements(data as EventAnnouncement[]);
+    } catch {
+      setError('Announcement history could not be loaded. Try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   async function cancel(announcementId: string) {
-    const response = await fetch(`/api/events/${eventId}/announcements/${announcementId}`, { method: 'DELETE' });
-    if (!response.ok) { setError('The announcement could not be cancelled. It may already be dispatching.'); return; }
-    setError('');
-    await fetchAnnouncements();
+    try {
+      const response = await fetch(`/api/events/${eventId}/announcements/${announcementId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('cancel failed');
+      await fetchAnnouncements();
+    } catch {
+      setError('The announcement could not be cancelled. It may already be dispatching.');
+    }
   }
 
   async function retry(announcementId: string) {
-    const response = await fetch(`/api/events/${eventId}/announcements/${announcementId}/retry`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: true }) });
-    if (!response.ok) { setError('Failed deliveries could not be retried.'); return; }
-    setError('');
-    await fetchAnnouncements();
+    try {
+      const response = await fetch(`/api/events/${eventId}/announcements/${announcementId}/retry`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: true }) });
+      if (!response.ok) throw new Error('retry failed');
+      await fetchAnnouncements();
+    } catch {
+      setError('Failed deliveries could not be retried.');
+    }
   }
 
   useEffect(() => {
-    fetchAnnouncements();
+    void fetchAnnouncements();
   }, [fetchAnnouncements, refreshKey]);
 
   if (loading) {
@@ -50,7 +62,17 @@ export function AnnouncementHistory({ eventId, refreshKey }: AnnouncementHistory
     );
   }
 
-  if (announcements.length === 0) return null;
+  if (announcements.length === 0) {
+    if (!error) return null;
+    return (
+      <div role="alert" className="mt-6 rounded-2xl border border-error-100 bg-error-50 p-4 text-sm text-error-700">
+        <p>{error}</p>
+        <button type="button" onClick={() => void fetchAnnouncements()} className="mt-3 min-h-10 rounded-lg border border-error-200 bg-white px-3 font-medium text-error-800 hover:bg-error-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 rounded-2xl border border-border bg-white">
@@ -60,7 +82,14 @@ export function AnnouncementHistory({ eventId, refreshKey }: AnnouncementHistory
         </h2>
       </div>
       <div className="divide-y divide-border">
-        {error && <p role="alert" className="m-4 rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-error-700">{error}</p>}
+        {error && (
+          <div role="alert" className="m-4 rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-error-700">
+            <p>{error}</p>
+            <button type="button" onClick={() => void fetchAnnouncements()} className="mt-2 min-h-10 rounded-lg px-3 font-medium hover:bg-error-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2">
+              Try again
+            </button>
+          </div>
+        )}
         {announcements.map((ann) => (
           <div key={ann.id} className="px-6 py-4">
             <div className="flex items-center justify-between gap-3">

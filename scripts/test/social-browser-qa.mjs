@@ -11,6 +11,9 @@ import { createServer } from 'node:https';
 import { request as proxyRequest } from 'node:http';
 import { reviewBrowserChecks } from './review-browser-checks.mjs';
 import { improvementBrowserChecks } from './improvement-browser-checks.mjs';
+import { teamAuditBrowserChecks } from './team-audit-browser-checks.mjs';
+import { uiAuditBrowserChecks } from './ui-audit-browser-checks.mjs';
+import { rsvpAuditBrowserChecks } from './rsvp-audit-browser-checks.mjs';
 import { startSocialQa } from './start-social-qa.ts';
 async function main() {
 const cwd = process.cwd();
@@ -49,6 +52,9 @@ try {
   const host = await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
+  await rsvpAuditBrowserChecks({browser,origin,db,host});
+  await teamAuditBrowserChecks({browser,origin,db,host});
+  await uiAuditBrowserChecks({browser,origin,db});
   await reviewBrowserChecks({browser,origin,db,host});
   await improvementBrowserChecks({browser,origin,db});
   const failNextRead = async (page,url) => {

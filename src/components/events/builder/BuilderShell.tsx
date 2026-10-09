@@ -181,7 +181,7 @@ export function BuilderShell({
         <div className="flex flex-wrap items-center gap-3">
           {/* Not on a published event: the chat can't fix what a live invite's checks block, so an edit could be lost. */}
           {aiChatEnabled && draft.eventId && !published && (
-            <Button type="button" variant="outline" size="lg" disabled={switching} onClick={() => void switchToChat()}>
+            <Button type="button" variant="outline" size="lg" disabled={switching || blocking} onClick={() => void switchToChat()}>
               Switch to chat
             </Button>
           )}

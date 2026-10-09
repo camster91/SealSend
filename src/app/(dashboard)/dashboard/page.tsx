@@ -19,6 +19,19 @@ interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
 }
 
+const COLLABORATION_ROLE_LABELS: Record<string, string> = {
+  owner: "Workspace owner",
+  manager: "Manager",
+  check_in: "Check-in staff",
+  viewer: "Viewer",
+};
+const COLLABORATION_ROLE_RANK: Record<string, number> = {
+  owner: 3,
+  manager: 2,
+  check_in: 1,
+  viewer: 0,
+};
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const { upgraded, plan } = await searchParams;
   const user = await getCurrentUser();
@@ -30,12 +43,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   
   // Optimized: Using Promise.all to fetch events in parallel reduces TTFB.
   // Passing both email and phone to getInvitedEvents for accurate guest lookup.
-  const [myEvents, collaboratingEvents, invitedEvents, accountPlan] = await Promise.all([
+  const [myEvents, collaboratingEventsRaw, invitedEvents, accountPlan] = await Promise.all([
     getEventsByUser(user.id),
     getCollaboratingEvents(user.id),
     getInvitedEvents(user.email, user.phone),
     getUserTier(user.id),
   ]);
+
+  // A member can have both a direct event role and a workspace role. The
+  // query intentionally returns both access paths; present one row using the
+  // most privileged role so shared events never appear twice on the dashboard.
+  const collaboratingEvents = Array.from(
+    collaboratingEventsRaw.reduce((events, event) => {
+      const existing = events.get(event.id);
+      if (!existing || (COLLABORATION_ROLE_RANK[event.access_role] ?? -1) > (COLLABORATION_ROLE_RANK[existing.access_role] ?? -1)) {
+        events.set(event.id, event);
+      }
+      return events;
+    }, new Map<string, (typeof collaboratingEventsRaw)[number]>()).values(),
+  );
   
   const allEvents = Array.from(new Map([...myEvents, ...collaboratingEvents, ...invitedEvents].map((event) => [event.id, event])).values());
   const activeOwnedEvents = myEvents.filter((event) => event.status !== 'archived');
@@ -205,6 +231,57 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       canKeepCurrentActive={accountPlan === 'pro_annual'}
                     />
                   </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Collaborating Events Section */}
+        {collaboratingEvents.length > 0 && (
+          <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-white">
+            <div className="border-b border-border px-4 py-5 sm:px-6">
+              <h2 className="text-lg font-semibold text-ink">Collaborating events</h2>
+              <p className="mt-1 max-w-2xl text-sm text-neutral-600">
+                Events shared with you through a workspace or event team
+              </p>
+            </div>
+            <ul className="divide-y divide-border">
+              {collaboratingEvents.map((event) => (
+                <li key={event.id} className="flex items-center justify-between hover:bg-neutral-50">
+                  <Link href={`/events/${event.id}`} className="block min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink">
+                    <div className="px-4 py-4 sm:px-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-ink">{event.title}</p>
+                            <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
+                              {COLLABORATION_ROLE_LABELS[event.access_role] ?? event.access_role}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                            <div className="flex items-center text-sm text-neutral-600">
+                              <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                              <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : "No date set"}</span>
+                            </div>
+                            <div className="flex min-w-0 items-center text-sm text-neutral-600">
+                              <MapPin className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                              <span className="truncate">{event.location_name || "No location"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
+                          event.status === "published"
+                            ? "bg-success-50 text-success-700"
+                            : event.status === "draft"
+                            ? "bg-warning-50 text-neutral-700 ring-1 ring-inset ring-warning-500/40"
+                            : "bg-neutral-100 text-neutral-700"
+                        }`}>
+                          {event.status}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
