@@ -34,10 +34,19 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
   const navRef = useRef<HTMLElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
+
+  // Server HTML keeps the navigation visible while the client hydrates, but
+  // clicks cannot be handled until React has attached the listeners. Keep
+  // controls out of the tab order for that short window so a fast keyboard
+  // user never loses an activation.
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   // Close both menus whenever the route changes (including back/forward), so an open
   // drawer never carries over and covers the next page.
@@ -105,6 +114,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
           <div ref={dropdownRef} className="relative">
             <button
               type="button"
+              disabled={!hydrated}
               aria-expanded={dropdownOpen}
               aria-controls="desktop-use-cases-menu"
               className={cn(navLink, "gap-1")}
@@ -177,6 +187,7 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
           <button
             ref={mobileToggleRef}
             type="button"
+            disabled={!hydrated}
             aria-label="Toggle mobile navigation menu"
             aria-expanded={mobileOpen}
             aria-controls="mobile-navigation"
