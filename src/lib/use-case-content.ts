@@ -138,7 +138,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     heroSubtext: "For independent planners and small studios. Keep every client event in one team workspace, put your brand on invitations, and get sign-off from clients before anything goes out.",
     benefits: [
       { icon: "Users", title: "One workspace for your team", description: "Invite planners and check-in staff to a shared workspace. Roles decide who can edit events, manage clients, or only check guests in at the door." },
-      { icon: "Palette", title: "Your brand on every event", description: "Set your logo, colours, font, email sender name, reply-to address and text-message signature once. Every event in the workspace uses them." },
+      { icon: "Palette", title: "Your brand on every event", description: "Set your logo, colours, font, email sender name and reply-to address once. Every event in the workspace uses them." },
       { icon: "Share2", title: "Client review and approval", description: "Keep a record for each client and send them a read-only review link with live RSVP totals, never guest details. Their approval is recorded on the event." },
       { icon: "Plug", title: "Connect the tools you already use", description: "Signed webhooks send each RSVP, check-in, publish and client approval to Zapier, Make or your own CRM, with retries if your endpoint is down." },
     ],
@@ -165,7 +165,7 @@ export const USE_CASES: Record<string, UseCaseData> = {
     benefits: [
       { icon: "Palette", title: "Start from a wedding design", description: "Choose the Garden, City or Coastal wedding template, or upload your own invitation artwork, then add your photo and colours." },
       { icon: "ClipboardList", title: "Ask what the caterer needs", description: "Collect plus-ones and dietary needs, and add your own RSVP questions such as meal choice or song requests." },
-      { icon: "Mail", title: "Keep guests in the loop", description: "Send a change of venue time or shuttle details by email, or by text with an Event Pass, to everyone or only to guests who said yes." },
+      { icon: "Mail", title: "Keep guests in the loop", description: "Send a change of venue time or shuttle details by email to everyone or only to guests who said yes." },
       { icon: "Users", title: "Hand the door to someone else", description: "Invite a co-host to help with the list and let a friend check guests in from their phone on the day." },
     ],
     faqs: [

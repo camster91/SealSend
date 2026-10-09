@@ -1,10 +1,10 @@
-import { PUBLIC_PRICING_PLANS } from "@/lib/constants";
+import { BETA_MODE, PUBLIC_PRICING_PLANS } from "@/lib/constants";
 
 const eventPassGuests = PUBLIC_PRICING_PLANS.find((plan) => plan.id === "event_pass")?.guests ?? "250";
 
 // Plain product facts, not social proof.
 const facts = [
-  `Up to ${eventPassGuests} guests per Event Pass`,
+  BETA_MODE ? "Free beta: up to 100 guests" : `Up to ${eventPassGuests} guests per Event Pass`,
   "Email updates",
   "QR check-in from any phone",
   "Guests never need an account",

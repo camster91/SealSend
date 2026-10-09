@@ -21,6 +21,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page).toHaveURL(/\/dashboard/);
+  await page.context().setExtraHTTPHeaders({ Origin: new URL(page.url()).origin });
 }
 
 async function say(page: Page, text: string) {
@@ -53,7 +54,7 @@ test('host chats an event into shape, comes back to it, then hands over to revie
     await expect(page).toHaveURL(/\/events\/[^/]+\/chat$/, { timeout: 15_000 });
 
     await page.reload();
-    await expect(page.getByText(RESUME_MESSAGE)).toBeVisible();
+    await expect(page.getByText(RESUME_MESSAGE, { exact: true })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'Invite preview' }).getByText('Dinner').first()).toBeVisible();
 
     await say(page, MESSAGE);

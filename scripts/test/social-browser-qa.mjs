@@ -14,7 +14,11 @@ import { improvementBrowserChecks } from './improvement-browser-checks.mjs';
 import { teamAuditBrowserChecks } from './team-audit-browser-checks.mjs';
 import { uiAuditBrowserChecks } from './ui-audit-browser-checks.mjs';
 import { rsvpAuditBrowserChecks } from './rsvp-audit-browser-checks.mjs';
+import { clientJourneyBrowserChecks } from './client-journey-browser-checks.mjs';
+import { inviteJourneyBrowserChecks } from './invite-journey-browser-checks.mjs';
+import { organizerJourneyBrowserChecks } from './organizer-journey-browser-checks.mjs';
 import { startSocialQa } from './start-social-qa.ts';
+import { hashMagicToken, previewMagicToken } from '../../src/lib/magic-token.ts';
 async function main() {
 const cwd = process.cwd();
 // Concurrent RSVP transactions require native PostgreSQL, not the socket emulator.
@@ -24,6 +28,10 @@ process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:55432/postg
 process.env.AI_PROVIDER = 'fake';
 process.env.PAYMENTS_TEST_ONLY = 'true';
 process.env.COMMUNICATIONS_TEST_ONLY = 'true';
+process.env.SESSION_SECRET = 'isolated-local-journey-approval-proof-secret';
+process.env.NEXT_PUBLIC_SITE_URL = 'https://localhost:3101';
+// Only this isolated local harness may deliver to its synthetic loopback receiver.
+process.env.WEBHOOK_ALLOW_PRIVATE_TARGETS = 'true';
 process.env.PORT = '3100';
 await import('./start-playwright-server.mjs');
 // HTTPS exercises production Secure cookies in both browsers and API clients.
@@ -52,6 +60,27 @@ try {
   const host = await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
+  if (process.env.SEALSEND_QA_BUILDER === 'true') {
+    const betaToken = 'q'.repeat(43);
+    const betaPolicy = JSON.parse(await readFile('config/beta-acceptance-policy.json','utf8'));
+    await db.query(`INSERT INTO beta_enrollment_invites
+      (token_hash,token_preview,participant_label,segment,cohort_version,expires_at)
+      VALUES ($1,$2,'host-abcdef123456','repeat_planner',$3,NOW()+INTERVAL '1 day')`,
+      [hashMagicToken(betaToken),previewMagicToken(betaToken),betaPolicy.cohortVersion]);
+    for (const suite of ['live-full.spec.ts','live-builder.spec.ts','live-templates.spec.ts','live-account-privacy.spec.ts','live-ai-chat.spec.ts']) {
+    await db.query("DELETE FROM rate_limit_attempts WHERE key LIKE 'login-password:%'");
+    const code = await new Promise(resolve => {
+      const child = spawn(process.execPath,['node_modules/@playwright/test/cli.js','test',suite,'--project=chromium','--workers=1'],{
+        cwd,stdio:'inherit',env:{ ...process.env,NEXT_PUBLIC_SITE_URL:origin,SEALSEND_E2E_IGNORE_HTTPS_ERRORS:'true',SEALSEND_TEMPLATE_EMAIL:'builder-qa@example.test',SEALSEND_TEMPLATE_PASSWORD:'Local-QA-only-Password-42',SEALSEND_QA_EMAIL:'builder-qa@example.test',SEALSEND_QA_PASSWORD:'Local-QA-only-Password-42',SEALSEND_QA_BETA_INVITE_TOKEN:betaToken,SEALSEND_ACCOUNT_QA_EMAIL:'builder-qa@example.test',SEALSEND_ACCOUNT_QA_PASSWORD:'Local-QA-only-Password-42',SEALSEND_AI_FAKE:'1' }
+      });
+      child.on('error',()=>resolve(1)); child.on('exit',resolve);
+    });
+    assert.equal(code,0,`Authenticated ${suite} browser checks`);
+    }
+  }
+  await clientJourneyBrowserChecks({browser,origin,db,host});
+  await inviteJourneyBrowserChecks({browser,origin,db});
+  await organizerJourneyBrowserChecks({browser,origin,db});
   await rsvpAuditBrowserChecks({browser,origin,db,host});
   await teamAuditBrowserChecks({browser,origin,db,host});
   await uiAuditBrowserChecks({browser,origin,db});
@@ -182,18 +211,7 @@ try {
   assert.deepEqual(errors,[]);
   console.log('PASS installation guide and generic offline fallback; no browser runtime errors');
   process.chdir(cwd);
-  if (process.env.SEALSEND_QA_BUILDER === 'true') {
-    for (const suite of ['live-builder.spec.ts','live-templates.spec.ts']) {
-    await db.query("DELETE FROM rate_limit_attempts WHERE key LIKE 'login-password:%'");
-    const code = await new Promise(resolve => {
-      const child = spawn(process.execPath,['node_modules/@playwright/test/cli.js','test',suite,'--project=chromium','--workers=1'],{
-        cwd,stdio:'inherit',env:{ ...process.env,NEXT_PUBLIC_SITE_URL:origin,SEALSEND_E2E_IGNORE_HTTPS_ERRORS:'true',SEALSEND_TEMPLATE_EMAIL:'builder-qa@example.test',SEALSEND_TEMPLATE_PASSWORD:'Local-QA-only-Password-42' }
-      });
-      child.on('error',()=>resolve(1)); child.on('exit',resolve);
-    });
-    assert.equal(code,0,`Authenticated ${suite} browser checks`);
-    }
-  }
+
 } catch (error) { console.error("Browser QA failure:", error); throw error; } finally { await browser.close(); secureServer.closeAllConnections(); await server.stop(); await db.close(); await new Promise(resolve=>secureServer.close(resolve)); await rm(certDir,{recursive:true,force:true}); }
 process.exit(0);
 

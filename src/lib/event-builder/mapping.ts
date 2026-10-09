@@ -1,9 +1,34 @@
 import { instantToZonedLocalDateTime, zonedLocalDateTimeToInstant } from "@/lib/datetime";
-import type { Event, EventCustomization, RSVPField } from "@/types/database";
+import type { Event, EventCustomization, RegistryLink, RSVPField } from "@/types/database";
 import { upgradeHttp } from "./field-checks";
 import type { BuilderData, BuilderRsvpField, EventUpdatePayload } from "./schema";
 
 const DATE_KEYS = ["event_date", "event_end_date", "rsvp_deadline"] as const;
+
+/**
+ * JSONB values normally arrive from pg as arrays, but old rows and adapters
+ * can expose the stored value as a JSON string or object. Keep malformed
+ * records out of the builder without allowing one bad row to crash SSR.
+ * Valid link-shaped records retain their original URL so the builder's
+ * existing link checks can explain unsafe values to the host.
+ */
+function registryLinksFrom(value: unknown): RegistryLink[] {
+  let candidate = value;
+  if (typeof candidate === "string") {
+    try {
+      candidate = JSON.parse(candidate) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(candidate)) return [];
+  return candidate.flatMap((link): RegistryLink[] => {
+    if (!link || typeof link !== "object") return [];
+    const record = link as Record<string, unknown>;
+    if (typeof record.label !== "string" || typeof record.url !== "string") return [];
+    return [{ label: record.label, url: upgradeHttp(record.url) }];
+  });
+}
 
 function customizationFrom(source: Partial<EventCustomization> | null | undefined): EventCustomization {
   return {
@@ -60,7 +85,7 @@ export function fromEvent(event: Event, rsvpFields: RSVPField[]): BuilderData {
     host_name: event.host_name ?? "",
     dress_code: event.dress_code ?? "",
     rsvp_deadline: local(event.rsvp_deadline),
-    registry_links: (event.registry_links ?? []).map((l) => ({ ...l, url: upgradeHttp(l.url) })),
+    registry_links: registryLinksFrom(event.registry_links),
     max_attendees: event.max_attendees,
     allow_plus_ones: event.allow_plus_ones,
     max_guests_per_rsvp: event.max_guests_per_rsvp,
