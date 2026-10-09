@@ -4,14 +4,14 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.ap
 export const SITE_NAME = "SealSend";
 export const DEFAULT_TITLE = "SealSend: Online Invitations with RSVP Tracking & Check-in";
 export const DEFAULT_DESCRIPTION =
-  "Send beautiful online invitations, track every RSVP, message guests by email or text, and check them in at the door. Free for your first event.";
+  "Create online invitations, share a link, collect every reply, and check guests in from your phone. Free beta: one event, up to 100 guests.";
 
 // One static Open Graph card for every page (public/brand/og.jpg, 1200x630).
 export const OG_IMAGE = {
   url: "/brand/og.jpg",
   width: 1200,
   height: 630,
-  alt: "A SealSend invitation sealed with a wax S, beside a phone showing who is going",
+  alt: "SealSend online invitations, live replies and easy check-in, with a friendly seal holding a phone",
 };
 
 export function createMetadata({
