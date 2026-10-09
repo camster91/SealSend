@@ -142,6 +142,7 @@ test("marketing navigation reaches the beta entry and organizer pages", async ({
   await openReadyPage(page, "/");
   const nav = page.getByRole("navigation", { name: "Main", exact: true });
   const menu = nav.getByRole("button", { name: "Use cases", exact: true });
+  await expect(menu).toBeEnabled();
   await menu.focus();
   await page.keyboard.press("Enter");
   await expect(menu).toHaveAttribute("aria-expanded", "true");
@@ -152,4 +153,49 @@ test("marketing navigation reaches the beta entry and organizer pages", async ({
   await page.locator("main").getByRole("link", { name: /Join.*beta/i }).first().click();
   await expect(page).toHaveURL(/\/signup$/);
   await expect(page.locator("main")).toContainText(/beta/i);
+});
+
+test("navbar controls wait for hydration before accepting input", async ({ page }) => {
+  test.setTimeout(30_000);
+  await page.setViewportSize({ width: 375, height: 812 });
+
+  let heldScripts = 0;
+  let releaseScripts!: () => void;
+  const scriptsReleased = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  const staticRoute = "**/_next/static/**";
+  await page.route(staticRoute, async (route) => {
+    if (route.request().resourceType() === "script") {
+      heldScripts += 1;
+      await scriptsReleased;
+    }
+    await route.continue();
+  });
+  const navigation = page.goto("/", { waitUntil: "commit" });
+
+  try {
+    const nav = page.getByRole("navigation", { name: "Main", exact: true });
+    const desktopMenu = nav.locator('button').filter({ hasText: "Use cases" });
+    const mobileToggle = nav.locator('button[aria-label="Toggle mobile navigation menu"]');
+
+    await expect.poll(() => heldScripts, { message: "Next client scripts should be held before hydration" }).toBeGreaterThan(0);
+    await expect(mobileToggle).toBeVisible();
+    await expect(desktopMenu).toBeDisabled();
+    await expect(mobileToggle).toBeDisabled();
+
+    releaseScripts();
+    await navigation;
+    await expect(desktopMenu).toBeEnabled();
+    await expect(mobileToggle).toBeEnabled();
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await desktopMenu.focus();
+    await page.keyboard.press("Enter");
+    await expect(desktopMenu).toHaveAttribute("aria-expanded", "true");
+  } finally {
+    releaseScripts();
+    await navigation.catch(() => undefined);
+    await page.unroute(staticRoute);
+  }
 });
