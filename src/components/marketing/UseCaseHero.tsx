@@ -13,7 +13,7 @@ interface UseCaseHeroProps {
 
 export default function UseCaseHero({ name, headline, subtext, ctaText, image, imageAlt }: UseCaseHeroProps) {
   return (
-    <section className="px-4 pb-16 pt-10 sm:px-6 sm:pb-24 lg:px-8">
+    <section className="bg-[#faf7f0] px-4 pb-16 pt-10 sm:px-6 sm:pb-24 lg:px-8">
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-12 lg:gap-16">
         <div className="lg:col-span-6">
           <nav aria-label="Breadcrumb">
@@ -37,7 +37,7 @@ export default function UseCaseHero({ name, headline, subtext, ctaText, image, i
           </div>
           <p className="mt-4 text-sm text-neutral-600">{PRIMARY_CTA_NOTE}</p>
         </div>
-        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border lg:col-span-6 lg:max-h-[38rem]">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] border border-border lg:col-span-6 lg:max-h-[38rem]">
           <Image src={image} alt={imageAlt} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
         </div>
       </div>

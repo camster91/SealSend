@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Share = { id: string; token_preview: string; expires_at: string; approved_at: string | null; approver_name: string | null };
 type PanelData = { clientId: string | null; organizationId: string | null; clients: Array<{ id: string; name: string }>; shares: Share[] };
@@ -11,13 +11,56 @@ export function EventClientPanel({ eventId }: { eventId: string }) {
   const [newLink, setNewLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const loadSequence = useRef(0);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/events/${eventId}/client`);
-    setData(res.ok ? await res.json() : null);
+    const sequence = ++loadSequence.current;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/client`);
+      const body = await res.json().catch(() => ({}));
+      if (sequence !== loadSequence.current) return false;
+      if (!res.ok) {
+        if ([401, 403, 404].includes(res.status)) {
+          setData(null);
+          setNewLink(null);
+          setPermissionDenied(true);
+          setLoadError(null);
+          return false;
+        }
+        setLoadError(body.error || "The client panel could not be loaded. Please try again.");
+        return false;
+      }
+      if (!body || !Array.isArray(body.clients) || !Array.isArray(body.shares)) {
+        setLoadError("The client panel returned an unexpected response. Please try again.");
+        return false;
+      }
+      setPermissionDenied(false);
+      setData(body as PanelData);
+      return true;
+    } catch {
+      if (sequence !== loadSequence.current) return false;
+      setLoadError("The client panel could not be loaded. Please try again.");
+      return false;
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
   }, [eventId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // A panel instance can be reused when navigation changes the event id;
+    // never let a one-time URL from the previous event survive that change.
+    setData(null);
+    setNewLink(null);
+    setError(null);
+    setLoadError(null);
+    setPermissionDenied(false);
+    void load();
+  }, [load]);
 
   async function call(input: RequestInfo, init: RequestInit) {
     setBusy(true);
@@ -30,12 +73,38 @@ export function EventClientPanel({ eventId }: { eventId: string }) {
         return null;
       }
       return body;
+    } catch {
+      setError("The request could not be completed. Please try again.");
+      return null;
     } finally {
       setBusy(false);
     }
   }
 
-  if (!data) return null;
+  if (permissionDenied) return null;
+
+  if (!data) {
+    return (
+      <section aria-labelledby="event-client-heading" className="rounded-xl border border-gray-200 bg-white p-4">
+        <h2 id="event-client-heading" className="text-base font-semibold text-gray-900">Client</h2>
+        {loadError ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2" role="alert">
+            <p className="text-sm text-red-700">{loadError}</p>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void load()}
+              className="text-sm font-medium text-brand-700 underline disabled:opacity-50"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-gray-600">Loading client details…</p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby="event-client-heading" className="rounded-xl border border-gray-200 bg-white p-4">
@@ -63,6 +132,20 @@ export function EventClientPanel({ eventId }: { eventId: string }) {
         </select>
         <Link href="/settings/clients" className="text-sm font-medium text-brand-700 hover:underline">Manage clients</Link>
       </div>
+
+      {loadError && (
+        <div className="mt-3 flex flex-wrap items-center gap-2" role="alert">
+          <p className="text-sm text-red-700">{loadError}</p>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void load()}
+            className="text-sm font-medium text-brand-700 underline disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       <div className="mt-4">
         <button

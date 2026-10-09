@@ -51,7 +51,7 @@ export function Footer() {
           <div className="lg:col-span-4">
             <Logo />
             <p className="mt-4 max-w-xs leading-relaxed text-neutral-600">
-              Send the invitation, know who&apos;s coming, and check guests in at the door, all from one link.
+              A little less planning chaos. A little more time with your people. Invitations, replies, and a warm welcome — all from one link.
             </p>
           </div>
 

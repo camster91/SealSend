@@ -54,7 +54,7 @@ export default function SupportPage() {
         <article className="rounded-2xl border border-border bg-white p-6">
           <h2 className="text-xl font-semibold text-ink">Where things stand</h2>
           <p className="mt-3 text-neutral-600">SealSend is a free beta. Email invitations and reminders work. SMS (text messages) and payments are turned off for now.</p>
-          <p className="mt-4 text-sm text-neutral-500">Support contact does not itself authorize a charge, refund, external send, account change, or production release.</p>
+          <p className="mt-4 text-sm text-neutral-500">Please don’t include passwords, payment details or your guest list in a support message.</p>
         </article>
       </section>
     </div>

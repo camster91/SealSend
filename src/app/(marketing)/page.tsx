@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import InvitationPlayground from "@/components/marketing/InvitationPlayground";
+import GoodCompany from "@/components/marketing/GoodCompany";
 import Hero from "@/components/marketing/Hero";
 import FactStrip from "@/components/marketing/FactStrip";
 import HowItWorks from "@/components/marketing/HowItWorks";
@@ -47,8 +49,10 @@ export default function Home() {
       <JsonLd data={[softwareApplicationJsonLd(), faqJsonLd(homeFaqs)]} />
       <Hero />
       <FactStrip />
+      <InvitationPlayground />
       <HowItWorks />
       <FeatureRows />
+      <GoodCompany />
       <UseCaseGrid />
       <OrganizersSection />
       <PricingTeaser />

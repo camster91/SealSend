@@ -24,6 +24,22 @@ test("fromEvent upgrades http:// to https:// for registry, design and media link
   assert.equal(d.customization.audioUrl, "https://a.example.com/s.mp3");
 });
 
+test("fromEvent accepts legacy JSON text for registry links", () => {
+  const d = load({
+    registry_links: JSON.stringify([{ label: "A", url: "http://shop.example.com/list" }]),
+  });
+  assert.deepEqual(d.registry_links, [{ label: "A", url: "https://shop.example.com/list" }]);
+});
+
+test("fromEvent ignores malformed registry link containers without crashing SSR", () => {
+  assert.deepEqual(load({ registry_links: {} }).registry_links, []);
+  assert.deepEqual(load({ registry_links: "not-json" }).registry_links, []);
+  assert.deepEqual(
+    load({ registry_links: [null, { label: "missing url" }, { label: "A", url: "https://a.example.com" }] }).registry_links,
+    [{ label: "A", url: "https://a.example.com" }],
+  );
+});
+
 test("fromEvent leaves https, /uploads/ and other values alone", () => {
   const d = load({
     registry_links: [{ label: "A", url: "https://a.example.com" }, { label: "B", url: "ftp://x.example.com/http://y" }],

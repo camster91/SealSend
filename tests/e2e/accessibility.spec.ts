@@ -22,6 +22,8 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       "/login",
       "/privacy",
       "/support",
+      "/terms",
+      "/install",
     ]) {
       await openReadyPage(page, route);
       const results = await new AxeBuilder({ page }).analyze();

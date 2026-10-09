@@ -21,8 +21,8 @@ export default function HowItWorks({ title = "How it works" }: { title?: string 
         <h2 className="max-w-2xl font-display text-4xl text-ink sm:text-5xl">{title}</h2>
         <ol className="mt-8 grid gap-8 sm:mt-12 md:grid-cols-3">
           {HOW_IT_WORKS_STEPS.map((step, index) => (
-            <li key={step.title} className="border-t border-foil pt-5 sm:pt-6">
-              <span aria-hidden="true" className="font-display text-4xl text-ink sm:text-5xl">
+            <li key={step.title} className="rounded-3xl border border-ink/10 bg-white p-6 sm:p-8">
+              <span aria-hidden="true" className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#f2d875]/50 font-display text-4xl text-ink">
                 {index + 1}
               </span>
               <h3 className="mt-4 text-xl font-semibold text-ink">

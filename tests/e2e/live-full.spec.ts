@@ -66,7 +66,8 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     await page.goto('/ai-assistant');
     await expect(page).toHaveURL(/\/events\/new$/);
     await page.goto('/settings/team');
-    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page).toHaveURL(/\/settings\/team$/);
+    await expect(page.getByRole('heading', { name: 'Team', exact: true, level: 1 })).toBeVisible();
 
     const aiDraftResponse = await page.context().request.post('/api/ai/event-draft', { data: {
       brief: {
@@ -128,7 +129,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     const defaultFieldData = await defaultFields.json();
     expect(defaultFieldData).toHaveLength(6);
     expect(defaultFieldData.find((field: { field_name: string }) => field.field_name === 'attending')?.options)
-      .toEqual(['Joyfully Accepts', 'Regretfully Declines']);
+      .toEqual(['attending', 'not_attending', 'maybe']);
 
     const secondEvent = await page.context().request.post('/api/events', { data: { title: 'Should Be Blocked' } });
     expect(secondEvent.status()).toBe(403);
@@ -167,6 +168,10 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     const magicUrl = new URL((await magic.json()).magicLink);
     expect(magicUrl.origin).toBe(origin);
     expect(magicUrl.pathname).toMatch(/^\/guest\/update\/[A-Za-z0-9_-]{43}$/);
+
+    const registryLinks = [{ label: 'QA registry', url: 'https://example.test/gifts' }];
+    const registryUpdate = await page.context().request.patch(`/api/events/${eventId}`, { data: { registry_links: registryLinks } });
+    expect(registryUpdate.status()).toBe(200);
 
     const publish = await page.context().request.post(`/api/events/${eventId}/publish`);
     expect(publish.status()).toBe(200);
@@ -330,6 +335,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
     await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);
     await expect(page).toHaveURL(/\/events\/[0-9a-f-]+\/edit$/);
+    await expect(page.getByLabel('Name of your event')).toHaveValue('SealSend Production QA Repeat');
     repeatedEventId = new URL(page.url()).pathname.split('/')[2] || '';
     expect(repeatedEventId).toBeTruthy();
 
@@ -337,6 +343,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect(repeatedEventResponse.status()).toBe(200);
     const repeatedEvent = await repeatedEventResponse.json();
     expect(repeatedEvent.repeated_from_event_id).toBe(eventId);
+    expect(repeatedEvent.registry_links).toEqual(registryLinks);
     expect(repeatedEvent.event_brief).toEqual({
       audience: 'Current clients and their approved guests',
       accessibilityStatus: 'not_reviewed',

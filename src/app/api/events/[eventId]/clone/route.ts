@@ -165,7 +165,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         original.invitation_headline, original.invitation_body, original.reminder_sequence,
         repeatRequest.eventDate, repeatRequest.eventEndDate, original.event_timezone,
         original.location_name, original.location_address, original.location_lat, original.location_lng,
-        original.host_name, original.dress_code, repeatRequest.rsvpDeadline, original.registry_links,
+        original.host_name, original.dress_code, repeatRequest.rsvpDeadline, JSON.stringify(original.registry_links ?? []),
         original.max_attendees, original.allow_plus_ones, original.max_guests_per_rsvp,
         original.design_url, original.design_type, original.customization, limits.responses,
         repeatedEventBrief ? JSON.stringify(repeatedEventBrief) : null,

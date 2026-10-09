@@ -74,7 +74,7 @@ export default async function UseCasePage({
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-neutral-700">
             {BETA_MODE
-              ? "Run one active event with up to 100 guests. Paid checkout remains disabled while mandatory launch evidence is incomplete."
+              ? "Run one active event with up to 100 guests. Paid plans will open after the beta."
               : "Start free, add an Event Pass for a bigger event, or choose Pro if you host all year."}
           </p>
         </div>

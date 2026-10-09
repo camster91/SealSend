@@ -338,3 +338,8 @@ body {
     transform: none !important;
   }
 }
+
+/* Marketing studio palette is scoped; product controls retain their established tokens. */
+.marketing-site { background: #faf7f0; }
+.marketing-site > nav, .marketing-site > footer { background-color: #faf7f0; }
+.marketing-site a:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 4px; }
