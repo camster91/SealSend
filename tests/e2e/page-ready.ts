@@ -5,7 +5,12 @@ export async function openReadyPage(page: Page, route: string) {
   const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
   expect(response?.status(), route).toBeLessThan(400);
   await expect(page.locator('#main-content')).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
+  // Await the readiness promise inside the browser and return a serializable
+  // value instead of transferring the browser-owned FontFaceSet result.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    return true;
+  });
   await expect.poll(() => page.evaluate(() => Array.from(document.images).every(image => {
     const rect = image.getBoundingClientRect();
     const visible = rect.width > 0 && rect.height > 0 && rect.bottom > 0
