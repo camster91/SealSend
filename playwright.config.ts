@@ -9,6 +9,7 @@ export default defineConfig({
     baseURL: process.env.NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:3100',
     ignoreHTTPSErrors: process.env.SEALSEND_E2E_IGNORE_HTTPS_ERRORS === 'true',
     trace: 'on-first-retry',
+    extraHTTPHeaders: { DNT: '1' },
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'], launchOptions: process.env.SEALSEND_BROWSER_EXECUTABLE ? { executablePath: process.env.SEALSEND_BROWSER_EXECUTABLE } : undefined } },

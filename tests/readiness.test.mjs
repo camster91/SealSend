@@ -541,7 +541,7 @@ test('public offer is a bounded controlled beta with BETA_MODE-aware calls to ac
   assert.match(hero, /PRIMARY_CTA_NOTE/);
   assert.match(cta, /BETA_MODE \? "Create a free event" : "Plan your first event free"/);
   assert.match(cta, /Free during the beta: one event, up to 100 guests\./);
-  assert.match(cta, /href="\/signup"/);
+  assert.match(cta, /<MarketingSignupLink/);
   for (const stage of [
     'Describe your event',
     'Send it your way',

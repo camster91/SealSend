@@ -1,3 +1,4 @@
+import { MarketingSignupLink } from "@/components/marketing/MarketingAttribution";
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 import { SourceCodeLink } from "@/components/layout/SourceCodeLink";
@@ -68,6 +69,8 @@ export function Footer() {
                         <a href={link.href} className={linkClass}>
                           {link.label}
                         </a>
+                      ) : link.href === "/signup" ? (
+                        <MarketingSignupLink className={linkClass}>{link.label}</MarketingSignupLink>
                       ) : (
                         <Link href={link.href} className={linkClass}>
                           {link.label}

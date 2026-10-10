@@ -6,6 +6,7 @@ import { AuthService } from "@/lib/auth/auth-service";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { signupSchema } from "@/lib/validations";
+import { normalizeMarketingChannel } from "@/lib/analytics/marketing-attribution";
 import Link from "next/link";
 import { EVENT_PASS } from "@/lib/constants";
 
@@ -64,6 +65,7 @@ export function SignupForm() {
         method: "email",
         email: email.trim(),
         code: code.trim(),
+        channel: normalizeMarketingChannel(searchParams.get("source") ?? "direct"),
       });
 
       if (result.success) {

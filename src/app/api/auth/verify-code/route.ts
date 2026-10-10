@@ -1,3 +1,4 @@
+import { measurementOptedOut, type MarketingChannel } from "@/lib/analytics/marketing-attribution";
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
@@ -9,7 +10,7 @@ import { verifyCodeSchema } from '@/lib/validations';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { hashAuthCode } from '@/lib/auth/code-hash';
 
-async function upsertHostUser(email: string | null, phone: string | null): Promise<string | null> {
+async function upsertHostUser(email: string | null, phone: string | null, channel?: MarketingChannel): Promise<string | null> {
   // Hosts are stored in admin_users. OTP-only accounts get an unusable random password.
   if (email) {
     const existing = await queryOne<{ id: string }>(
@@ -30,7 +31,7 @@ async function upsertHostUser(email: string | null, phone: string | null): Promi
       await recordActivationEventSafely({
         name: 'account_created',
         userId: created.id,
-        metadata: { method: 'email' },
+        metadata: { method: 'email', ...(channel ? { channel } : {}) },
       });
     }
     return created?.id ?? null;
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { method, email, phone, code, eventId } = parsed.data;
+    const { method, email, phone, code, eventId, channel } = parsed.data;
 
     let lookupValue: string | undefined = email?.toLowerCase();
     if (method === 'phone' && phone) {
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Host login/signup — upsert durable admin_users row
       role = 'admin';
-      userId = await upsertHostUser(authCode.email, authCode.phone);
+      userId = await upsertHostUser(authCode.email, authCode.phone, measurementOptedOut(request.headers) ? undefined : channel);
       if (!userId) {
         return NextResponse.json(
           { error: 'Failed to create user account' },

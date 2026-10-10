@@ -23,7 +23,7 @@ test('privacy names providers, cookies, retention and the complaint route', asyn
   const p = await read('src/app/(marketing)/privacy/page.tsx');
   for (const s of ['Mailgun', 'OpenAI', 'Stripe', 'Hostinger', 'Cloudflare', 'Twilio', 'United States',
     'sealsend_session', 'sealsend_user', '30 days', 'Privacy Commissioner', 'Cameron Ashley', 'SENDER_POSTAL_ADDRESS',
-    'Last updated: October 6, 2026']) {
+    'Last updated: October 10, 2026']) {
     assert.ok(p.includes(s), `privacy must mention ${s}`);
   }
   assert.doesNotMatch(p, /encryption[^.]*at rest/i);
