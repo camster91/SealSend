@@ -48,6 +48,12 @@ export function SearchFeaturePage({ eyebrow, title, intro, sections, questions, 
         <ul className="mt-4 space-y-2">
           {related.map(link => <li key={link.href}><Link className="inline-flex min-h-11 items-center text-ink underline underline-offset-4" href={link.href}>{link.title}</Link></li>)}
         </ul>
+        <div className="mt-10 rounded-2xl bg-[#e5daf4] p-6 sm:p-8">
+          <h2 className="font-display text-2xl text-ink">Put it to work for your next gathering.</h2>
+          <p className="mt-3 leading-relaxed text-neutral-700">Start with a digital invitation. Preview it, then share it when you&apos;re ready.</p>
+          <PrimaryCta className="mt-5" />
+          <p className="mt-4 text-sm text-neutral-600">{PRIMARY_CTA_NOTE}</p>
+        </div>
       </section>
     </>
   );

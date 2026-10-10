@@ -3,9 +3,9 @@ import { BETA_MODE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 // The one primary action on every marketing page goes into the app at /signup.
-export const PRIMARY_CTA_LABEL = BETA_MODE ? "Join the free beta" : "Plan your first event free";
+export const PRIMARY_CTA_LABEL = BETA_MODE ? "Create a free event" : "Plan your first event free";
 export const PRIMARY_CTA_NOTE = BETA_MODE
-  ? "Free during the beta: one event, up to 100 guests."
+  ? "Free during the beta: one event, up to 100 guests. No card needed."
   : "Free for one event up to 50 guests. No card needed.";
 
 const base =

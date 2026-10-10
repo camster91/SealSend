@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { BETA_MODE, CONTROLLED_BETA_PRICING_PLAN, PUBLIC_PRICING_PLANS } from "@/lib/constants";
 import { getClientUser } from "@/lib/auth/client-auth";
 import { cn } from "@/lib/utils";
+import { PRIMARY_CTA_LABEL } from "@/components/marketing/Cta";
 import { ProWaitlistForm } from "./ProWaitlistForm";
 
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
@@ -72,7 +73,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
                 plan.id === "pro_annual" || plan.id === "controlled_beta" ? "border-ink bg-ink text-white hover:border-wax hover:bg-wax" : "border-ink/20 text-ink hover:border-ink/40"
               )}
             >
-              {plan.id === "controlled_beta" ? "Join the free beta" : plan.id === "free" ? "Start free" : plan.id === "pro_annual" ? "Sign up for Pro" : plan.id === "event_pass" ? "Get an Event Pass" : "Create an event"}
+              {plan.id === "controlled_beta" ? PRIMARY_CTA_LABEL : plan.id === "free" ? "Start free" : plan.id === "pro_annual" ? "Sign up for Pro" : plan.id === "event_pass" ? "Get an Event Pass" : "Create an event"}
             </Link>
           )}
         </article>

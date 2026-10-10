@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "SealSend",
   "decisionScope": "paid-beta-to-staged-public-launch",
-  "lastReviewed": "2026-10-09",
+  "lastReviewed": "2026-10-10",
   "gates": [
     {
       "id": "production_safety",
@@ -18,8 +18,9 @@
       "id": "repository_quality",
       "kind": "automated",
       "status": "pass",
-      "verifiedSourceDigest": "a9142017f3c870668dd04c1a7fd7d1489cef3b6e7c0d44c79d17dc2ab625ea48",
+      "verifiedSourceDigest": "092c497c3d8c6b261ba5d3a48a102c522008ea458b75811ddb17be2fb0efc609",
       "evidence": [
+        "October 10 conversion polish source digest 092c497c3d8c6b261ba5d3a48a102c522008ea458b75811ddb17be2fb0efc609: clear free-event actions, signup-free invitation sample, consistent one-event/100-guest beta offer, email-code expectations and search landing-page conversion paths. Build/types/lint and all 593 unit checks pass; all 90 affected browser checks pass across five profiles, with responsive rendered review. Existing growth foundation retained. Exact protected CI/deployment remains required; no lead increase or external acceptance is claimed.",
         "October10 organic-growth candidate source digest a9142017f3c870668dd04c1a7fd7d1489cef3b6e7c0d44c79d17dc2ab625ea48: two useful feature pages with explicit public routing, metadata, footer links and sitemap entries; six growth plan documents plus QA index. Build/lint/types and593 unit/readiness tests pass; all50 affected browser checks pass locally across five profiles with new routes included. This is a draft candidate, not protected CI/deployment, search ranking or real-host acquisition evidence. External launch gates remain pending.",
         "October 9 digital marketing readiness digest 3e635c178c00a1b26323b45c5d5dc8c14f711af0113be746a922b5c88b2cc1ae: preserves the recorded digital UI checks; font readiness is awaited inside the browser with a plain boolean result rather than transferring FontFaceSet. All twenty focused public-navigation/accessibility checks pass locally across five profiles. Initial Linux WebKit CI font-evaluate timeouts are retained as failure evidence, not accepted as release proof; new protected CI must pass before release.",
         "October 9 digital-first marketing source digest ab20c8257c608fc3a7050f81c3bea1805b84d640a04b1e1ff4caa823ed6cd957: replaces paper-envelope positioning with online/digital invitation copy, semantic browser/phone illustrations, Higgsfield phone mascot and digital social preview. Unit593, build, lint/types and sixty affected public browser checks pass across five profiles, including corrected low-contrast labels and fifteen accessibility checks over17 public/auth routes at3 widths. Protected CI and exact production verification are tracked in #242; external gates remain pending.",

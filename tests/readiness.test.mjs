@@ -539,7 +539,7 @@ test('public offer is a bounded controlled beta with BETA_MODE-aware calls to ac
   assert.match(constants, /CONTROLLED_BETA_PRICING_PLAN[\s\S]*guests:\s*"100"/);
   assert.match(hero, /Send the invitation\. Know who&apos;s coming\./);
   assert.match(hero, /PRIMARY_CTA_NOTE/);
-  assert.match(cta, /BETA_MODE \? "Join the free beta" : "Plan your first event free"/);
+  assert.match(cta, /BETA_MODE \? "Create a free event" : "Plan your first event free"/);
   assert.match(cta, /Free during the beta: one event, up to 100 guests\./);
   assert.match(cta, /href="\/signup"/);
   for (const stage of [
@@ -552,7 +552,7 @@ test('public offer is a bounded controlled beta with BETA_MODE-aware calls to ac
   // Home page prices come from the billing constants, and the beta keeps its checkout-disabled message.
   assert.match(pricingTeaser, /PUBLIC_PRICING_PLANS\.map/);
   assert.doesNotMatch(pricingTeaser, /\$\d/);
-  assert.match(pricingTeaser, /BETA_MODE && [\s\S]*Paid checkout is disabled during the beta/);
+  assert.match(pricingTeaser, /if \(BETA_MODE\)[\s\S]*Paid checkout is disabled during the beta/);
   assert.match(pricingCards, /BETA_MODE\s*\?\s*\[CONTROLLED_BETA_PRICING_PLAN\]/);
   assert.match(pricingFaq, /one active event for up to 100 guests/i);
   assert.match(pricingFaq, /paid checkout is disabled/i);
