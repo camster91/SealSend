@@ -1,5 +1,5 @@
 import { BETA_MODE } from "@/lib/constants";
-import Link from 'next/link';
+import { PrimaryCta } from "@/components/marketing/Cta";
 
 export function PricingHeader() {
   return (
@@ -13,7 +13,7 @@ export function PricingHeader() {
             ? "Create your invitation, collect replies and check guests in. One complete event, free."
             : "One flat price per event, never per guest. Start free, add an Event Pass for a bigger event, or choose Pro if you host all year."}
         </p>
-        {BETA_MODE && <Link href="/signup" className="mt-6 inline-flex min-h-12 items-center justify-center rounded-lg bg-ink px-6 font-semibold text-white hover:bg-wax focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">Join the free beta</Link>}
+        {BETA_MODE && <PrimaryCta className="mt-6" />}
         <p className="mt-3 text-sm font-medium text-neutral-600">
           {BETA_MODE ? "One active event, up to 100 guests, and no payment card required." : "All prices are in USD. Applicable taxes are shown at checkout."}
         </p>

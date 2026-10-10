@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { Check, ArrowRight, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SecondaryCta } from "./Cta";
+import { PrimaryCta, SecondaryCta } from "./Cta";
 
 const examples = [
   { name: "Birthday", title: "A birthday worth celebrating", detail: "Saturday · 4 pm · The backyard", note: "Cake, good friends, and absolutely no speeches.", colour: "bg-[#e5daf4]" },
@@ -17,17 +17,20 @@ export default function InvitationPlayground() {
   const titleId = useId();
   const current = examples[selected];
   return (
-    <section aria-label="Try an invitation" className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+    <section id="try-invitation" aria-label="Try an invitation" className="scroll-mt-24 px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
       <div className="mx-auto grid max-w-7xl items-center gap-10 rounded-[2rem] border border-ink/10 bg-white p-6 sm:p-10 lg:grid-cols-2 lg:p-14">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-wax">A tiny test drive</p>
           <h2 className="mt-4 font-display text-4xl text-ink sm:text-5xl">An invite with a little more you.</h2>
-          <p className="mt-5 max-w-md text-lg leading-relaxed text-neutral-600">Pick a gathering and try a reply. Your real event can have its own design, questions, and guest list.</p>
+          <p className="mt-5 max-w-md text-lg leading-relaxed text-neutral-600">See how easy it feels to reply. Pick a gathering below, then try an RSVP. No signup needed for this example.</p>
           <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Example gathering">
             {examples.map((example, index) => <button key={example.name} type="button" aria-pressed={selected === index} onClick={() => {setSelected(index); setReplied(false);}} className={cn("min-h-11 rounded-full border px-5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink", selected === index ? "border-ink bg-ink text-white" : "border-ink/25 bg-white text-ink hover:bg-cotton")}>{example.name}</button>)}
           </div>
           <p className="mt-4 text-sm text-neutral-600">An interactive example. Nothing is saved or sent.</p>
-          <SecondaryCta href="/how-it-works" className="mt-6">Explore the real workflow <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></SecondaryCta>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <PrimaryCta label="Make your own invitation" />
+            <SecondaryCta href="/how-it-works">See the full workflow <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></SecondaryCta>
+          </div>
         </div>
         <article aria-labelledby={titleId} className={cn("rounded-[1.75rem] border border-ink/10 p-6 text-center sm:p-10",current.colour)}>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink">You&apos;re invited</p>

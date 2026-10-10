@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('navigation and pricing expose one accessible control per action', async ({ page }) => {
   await page.goto('/pricing');
   await expect(page.locator('a button')).toHaveCount(0);
-  await expect(page.locator('article').getByRole('link', { name: 'Join the free beta' })).toHaveCount(1);
+  await expect(page.locator('article').getByRole('link', { name: 'Create a free event' })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Test billing setup pending' })).toHaveCount(0);
 
   const mobileToggle = page.getByRole('button', { name: 'Toggle mobile navigation menu' });

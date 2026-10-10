@@ -4,6 +4,8 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
+    { url: `${SITE_URL}/rsvp-tracking`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/qr-event-check-in`, changeFrequency: "monthly", priority: 0.7 },
     {
       url: SITE_URL,
       lastModified: new Date(),

@@ -60,6 +60,8 @@ export async function proxy(request: NextRequest) {
     '/forgot-password',
     '/callback',
     '/how-it-works',
+    '/rsvp-tracking',
+    '/qr-event-check-in',
     '/pricing',
     '/use-cases',
     '/terms',

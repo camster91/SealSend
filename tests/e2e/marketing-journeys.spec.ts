@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { openReadyPage } from "./page-ready";
 
 const publicRoutes = [
+  "/rsvp-tracking",
+  "/qr-event-check-in",
   "/",
   "/how-it-works",
   "/pricing",
@@ -150,7 +152,7 @@ test("marketing navigation reaches the beta entry and organizer pages", async ({
   await planner.click();
   await expect(page).toHaveURL(/\/use-cases\/event-planners$/);
   await expect(page.locator("main h1")).toBeVisible();
-  await page.locator("main").getByRole("link", { name: /Join.*beta/i }).first().click();
+  await page.locator("main").getByRole("link", { name: "Create a free event" }).first().click();
   await expect(page).toHaveURL(/\/signup$/);
   await expect(page.locator("main")).toContainText(/beta/i);
 });

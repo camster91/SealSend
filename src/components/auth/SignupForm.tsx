@@ -169,7 +169,7 @@ export function SignupForm() {
       )}
 
       <Button type="submit" disabled={!isEmailValid} loading={loading} className="w-full">
-        Get Started
+        Email my sign-in code
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
