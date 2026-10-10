@@ -1,3 +1,4 @@
+import { MARKETING_CHANNELS } from "@/lib/analytics/marketing-attribution";
 import { z } from "zod";
 import { isSafeRelativeUploadPath } from "@/lib/sanitize";
 import { messageAudienceSchema } from "@/lib/messages/audience";
@@ -63,6 +64,7 @@ export const sendCodeSchema = z
 
 export const verifyCodeSchema = z
   .object({
+    channel: z.enum(MARKETING_CHANNELS).optional().catch(undefined),
     method: z.enum(["email", "phone"]),
     email: z.string().email().optional(),
     phone: z.string().min(7).max(30).optional(),

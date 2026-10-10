@@ -83,6 +83,10 @@ jobs:
           SEALSEND_QA_BUILDER: 'true'
           SEALSEND_QA_USE_POSTGRES: 'true'
 
+      - name: Native marketing measurement QA
+        if: github.actor != 'dependabot[bot]'
+        run: npm run test:marketing:native
+
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e

@@ -1,3 +1,4 @@
+import type { MarketingChannel } from "@/lib/analytics/marketing-attribution";
 export type UserRole = 'admin' | 'guest';
 
 export interface AuthUser {
@@ -25,6 +26,7 @@ export interface LoginRequest {
 }
 
 export interface VerifyRequest {
+  channel?: MarketingChannel;
   method: AuthMethod;
   email?: string;
   phone?: string;

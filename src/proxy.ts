@@ -1,4 +1,6 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
+import { marketingMeasurement } from '@/lib/analytics/marketing-attribution';
+import { recordMarketingViewSafely } from '@/lib/analytics/marketing-views';
 
 /**
  * CSRF: for browser state-changing API calls require Origin or Referer
@@ -106,7 +108,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  const measurement = marketingMeasurement({ url: request.url, method, headers: request.headers, hasSession: isAuthenticated });
+  const forwarded = new Headers(request.headers);
+  // Never trust client-supplied internal attribution headers.
+  forwarded.delete('x-sealsend-marketing-channel');
+  if (measurement) {
+    forwarded.set('x-sealsend-marketing-channel', measurement.channel);
+    after(async () => { await recordMarketingViewSafely(measurement.path, measurement.channel); });
+  }
+  return NextResponse.next({ request: { headers: forwarded } });
 }
 
 export const config = {

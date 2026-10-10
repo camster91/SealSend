@@ -1,3 +1,4 @@
+import type { MarketingChannel } from "@/lib/analytics/marketing-attribution";
 import { LoginRequest, VerifyRequest, AuthUser } from './types';
 
 export class AuthService {
@@ -20,7 +21,7 @@ export class AuthService {
   async verifyCode(request: VerifyRequest): Promise<{ success: boolean; user?: AuthUser; message: string }> {
     try {
       if (request.method === 'email' && request.email) {
-        return await this.verifyEmailCode(request.email, request.code, request.eventId);
+        return await this.verifyEmailCode(request.email, request.code, request.eventId, request.channel);
       } else if (request.method === 'phone' && request.phone) {
         return await this.verifySMSCode(request.phone, request.code, request.eventId);
       }
@@ -103,14 +104,14 @@ export class AuthService {
     }
   }
 
-  private async verifyEmailCode(email: string, code: string, eventId?: string):
+  private async verifyEmailCode(email: string, code: string, eventId?: string, channel?: MarketingChannel):
     Promise<{ success: boolean; user?: AuthUser; message: string }> {
 
     try {
       const response = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'email', email, code, eventId })
+        body: JSON.stringify({ method: 'email', email, code, eventId, channel })
       });
 
       if (!response.ok && response.headers.get('content-type')?.includes('text/html')) {

@@ -15,7 +15,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 leading-relaxed text-neutral-700 sm:px-6 sm:py-24">
       <h1 className="mb-4 font-display text-5xl text-ink sm:text-6xl">Privacy Policy</h1>
-      <p className="mb-10 text-sm text-neutral-600">Last updated: October 6, 2026</p>
+      <p className="mb-10 text-sm text-neutral-600">Last updated: October 10, 2026</p>
 
       <div className="prose prose-neutral max-w-none space-y-6">
         <section>
@@ -40,6 +40,8 @@ export default function PrivacyPage() {
             <li>Comments, sign-up board claims and check-in times.</li>
             <li>Optional guest-name sharing, reactions, poll votes, photos and photo captions. Event activities and albums are available only to verified invited guests and authorised hosts. Names appear only if the guest chooses to share them. Photos require host approval unless the host turns that review off. Image metadata is removed when photos are uploaded.</li>
           </ul>
+          <p><strong>Marketing measurement:</strong> We count requests for public marketing pages by day, page and broad source (such as search, social or email). These totals do not contain visitor identifiers, IP addresses, full referrer URLs or campaign text, and use no tracking cookie. We retain these totals for 180 days and remove older totals when the next eligible visit is recorded. Private invitations and guest pages are excluded. Browser Do Not Track and Global Privacy Control signals prevent this collection.</p>
+          <p>When you create an account through a marketing link, we may attach that broad source to the account-creation milestone to understand signup and first-RSVP progress. Browser privacy opt-outs prevent this source attribution; essential product milestones still apply. This does not subscribe you to marketing emails.</p>
           <p><strong>Technical records:</strong></p>
           <ul className={listClass}>
             <li>Delivery logs of the emails we send, and opt-out (unsubscribe) records.</li>

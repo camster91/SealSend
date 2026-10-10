@@ -1,4 +1,6 @@
 "use client";
+import { useMarketingChannel } from "@/components/marketing/MarketingAttribution";
+import { marketingSignupHref } from "@/lib/analytics/marketing-attribution";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,6 +14,7 @@ import { ProWaitlistForm } from "./ProWaitlistForm";
 
 export function PricingCards({ annualCheckoutAvailable = false }: { annualCheckoutAvailable?: boolean }) {
   const plans = BETA_MODE ? [CONTROLLED_BETA_PRICING_PLAN] : PUBLIC_PRICING_PLANS;
+  const channel = useMarketingChannel();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export function PricingCards({ annualCheckoutAvailable = false }: { annualChecko
             <Button onClick={startAnnualProCheckout} disabled={loading} className="w-full">{loading ? "Opening checkout…" : "Choose annual Pro"}</Button>
           ) : (
             <Link
-              href={isAuthenticated ? "/dashboard" : plan.id === "controlled_beta" ? "/signup" : `/signup${plan.id === "free" ? "" : `?plan=${plan.id}`}`}
+              href={isAuthenticated ? "/dashboard" : plan.id === "controlled_beta" ? marketingSignupHref(channel) : `${marketingSignupHref(channel)}${plan.id === "free" ? "" : `${channel === "direct" ? "?" : "&"}plan=${plan.id}`}`}
               className={cn(
                 "inline-flex min-h-12 w-full items-center justify-center rounded-lg border px-4 text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 plan.id === "pro_annual" || plan.id === "controlled_beta" ? "border-ink bg-ink text-white hover:border-wax hover:bg-wax" : "border-ink/20 text-ink hover:border-ink/40"

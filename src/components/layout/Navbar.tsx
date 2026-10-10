@@ -1,4 +1,5 @@
 "use client";
+import { MarketingSignupLink } from "@/components/marketing/MarketingAttribution";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -169,9 +170,9 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
                 <Link href="/login" className={navLink}>
                   Log in
                 </Link>
-                <Link href="/signup" className={primaryButton}>
+                <MarketingSignupLink className={primaryButton}>
                   {PRIMARY_CTA_LABEL}
-                </Link>
+                </MarketingSignupLink>
               </>
             )}
           </div>
@@ -243,9 +244,9 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
               <Link href="/login" className="inline-flex h-12 flex-1 items-center justify-center rounded-lg border border-ink/20 bg-white text-base font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2">
                 Log in
               </Link>
-              <Link href="/signup" className={cn(primaryButton, "h-12 flex-1 text-base")}>
+              <MarketingSignupLink className={cn(primaryButton, "h-12 flex-1 text-base")}>
                 {PRIMARY_CTA_LABEL}
-              </Link>
+              </MarketingSignupLink>
             </div>
           )}
         </div>

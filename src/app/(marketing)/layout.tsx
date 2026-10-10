@@ -1,6 +1,9 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { getCurrentUser } from "@/lib/auth/session";
+import { headers } from "next/headers";
+import { MarketingAttributionProvider } from "@/components/marketing/MarketingAttribution";
+import { normalizeMarketingChannel } from "@/lib/analytics/marketing-attribution";
 
 export default async function MarketingLayout({
   children,
@@ -9,6 +12,7 @@ export default async function MarketingLayout({
 }) {
   // Get the full user info including role
   const user = await getCurrentUser();
+  const channel = (await headers()).get("x-sealsend-marketing-channel");
 
   // Convert to the format expected by Navbar
   const navbarUser = user
@@ -21,6 +25,7 @@ export default async function MarketingLayout({
     : null;
 
   return (
+    <MarketingAttributionProvider value={channel ? normalizeMarketingChannel(channel) : "direct"}>
     <div className="marketing-site">
       <a
         href="#main-content"
@@ -32,5 +37,6 @@ export default async function MarketingLayout({
       <main id="main-content">{children}</main>
       <Footer />
     </div>
+    </MarketingAttributionProvider>
   );
 }

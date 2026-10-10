@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BETA_MODE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { MarketingSignupLink } from "./MarketingAttribution";
 
 // The one primary action on every marketing page goes into the app at /signup.
 export const PRIMARY_CTA_LABEL = BETA_MODE ? "Create a free event" : "Plan your first event free";
@@ -22,8 +23,7 @@ export function PrimaryCta({
   onInk?: boolean;
 }) {
   return (
-    <Link
-      href="/signup"
+    <MarketingSignupLink
       className={cn(
         base,
         onInk
@@ -33,7 +33,7 @@ export function PrimaryCta({
       )}
     >
       {label}
-    </Link>
+    </MarketingSignupLink>
   );
 }
 
