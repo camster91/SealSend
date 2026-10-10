@@ -7,6 +7,8 @@ const columns = [
     title: "Product",
     links: [
       { label: "How it works", href: "/how-it-works" },
+      { label: "RSVP tracking", href: "/rsvp-tracking" },
+      { label: "Guest check-in", href: "/qr-event-check-in" },
       { label: "Add to your phone", href: "/install" },
       { label: "Pricing", href: "/pricing" },
       { label: "Log in", href: "/login" },

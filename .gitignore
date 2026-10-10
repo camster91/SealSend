@@ -67,3 +67,6 @@ visual-test-screenshots/
 
 fix_*.py
 scripts/archive/
+
+# Local SEO research cache
+.seo-cache/

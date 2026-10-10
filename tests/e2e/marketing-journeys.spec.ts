@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { openReadyPage } from "./page-ready";
 
 const publicRoutes = [
+  "/rsvp-tracking",
+  "/qr-event-check-in",
   "/",
   "/how-it-works",
   "/pricing",

@@ -7,6 +7,8 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const route of [
+      "/rsvp-tracking",
+      "/qr-event-check-in",
       "/",
       "/pricing",
       "/how-it-works",
