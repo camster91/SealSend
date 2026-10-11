@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PRIVATE_SEARCH_HEADER, PRIVATE_SEARCH_ROUTES } from "./src/lib/search-indexing";
 
 const upgradeInsecureRequests = process.env.NEXT_PUBLIC_SITE_URL?.startsWith('https://')
   ? '; upgrade-insecure-requests'
@@ -29,6 +30,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      ...PRIVATE_SEARCH_ROUTES.map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: PRIVATE_SEARCH_HEADER }],
+      })),
       {
         source: '/(.*)',
         headers: [

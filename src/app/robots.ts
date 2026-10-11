@@ -8,16 +8,8 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: [
-          "/dashboard",
-          "/events/",
-          "/api/",
-          "/login",
-          "/signup",
-          "/forgot-password",
-          "/callback",
-          "/settings",
-        ],
+        // Crawlers must be able to read noindex on application pages. A robots.txt
+        // block can still leave the URL in search results without its contents.
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
