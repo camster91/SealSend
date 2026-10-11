@@ -7,7 +7,10 @@ import { normalizeMarketingChannel } from "@/lib/analytics/marketing-attribution
 import type { Metadata } from "next";
 import { MARKETING_PAGE_ROBOTS } from "@/lib/search-indexing";
 
-export const metadata: Metadata = { robots: MARKETING_PAGE_ROBOTS };
+export const metadata: Metadata = {
+  robots: MARKETING_PAGE_ROBOTS,
+  verification: { google: "LwtSwXDkM8rKKR0r3P0e51s4oaV8IsEH-AZ2pGfyJ-Q" },
+};
 
 export default async function MarketingLayout({
   children,
