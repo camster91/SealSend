@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DraftStore, draftForHost } from '../src/draft-store';
+import { DraftStore, draftForHost, readHostRecovery } from '../src/draft-store';
 const key = '00000000-0000-4000-8000-000000000030';
 const body = { title: 'QA gathering', description: '🎉'.repeat(1800), location_name: 'QA Hall', event_date: '2026-11-01T19:00:00Z', event_timezone: 'America/Toronto', status: 'draft' as const };
 function storage() { const rows = new Map<string, string>(); return { rows, get: async (key: string) => rows.get(key) ?? null, set: async (key: string, value: string) => { assert.ok(Buffer.byteLength(value) < 2000); rows.set(key,value); }, remove: async (key: string) => { rows.delete(key); } }; }
@@ -41,4 +41,23 @@ test('pending recovery details are invisible when signed out or using another ac
   assert.equal(draftForHost(pending, 'second-host'), null);
   assert.equal(draftForHost(pending, 'first-host'), pending);
   assert.equal(draftForHost(null, 'first-host'), null);
+});
+
+test('one failed draft deletion does not prevent other fragments being removed', async () => {
+  const io = storage(); await new DraftStore(io, () => key).prepare('host', body);
+  let attempts = 0;
+  const store = new DraftStore({ ...io, remove: async k => { attempts++; if (k.endsWith('-1')) throw new Error('locked item'); await io.remove(k); } }, () => key);
+  await assert.rejects(() => store.clear(), /could not be fully cleared/);
+  assert.equal(attempts, 33); assert.equal(io.rows.size, 1);
+});
+test('corrupt recovery storage does not throw through authentication', async () => {
+  const recovery = await readHostRecovery(async () => { throw new SyntaxError('corrupt metadata'); }, 'host');
+  assert.deepEqual(recovery, { draft: null, unavailable: true });
+  assert.deepEqual(await readHostRecovery(async () => ({ key, hostId: 'other-host', body }), 'host'), { draft: null, unavailable: true });
+});
+test('a synchronous draft-cleanup failure still attempts credential removal', async () => {
+  const { clearLocalIdentity } = await import('../src/sign-out');
+  let credentials = false; let view = false;
+  const result = await clearLocalIdentity(() => { throw new Error('synchronous failure'); }, async () => { credentials = true; }, () => { view = true; });
+  assert.equal(credentials, true); assert.equal(view, true); assert.equal(result.draftCleared, false);
 });

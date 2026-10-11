@@ -42,8 +42,21 @@ export class DraftStore {
     return { key, hostId, body };
   }
   async clear() {
-    await this.storage.remove(manifest);
-    // Also erase uncommitted fragments after a partially failed local write.
-    for (let i = 0; i < 32; i++) await this.storage.remove(part(i));
+    // Attempt every deletion even if one item is unavailable. Never parse a
+    // possibly corrupt manifest while removing private recovery data.
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() => this.storage.remove(manifest)),
+      ...Array.from({ length: 32 }, (_, i) => Promise.resolve().then(() => this.storage.remove(part(i)))),
+    ]);
+    if (results.some(result => result.status === 'rejected')) throw new Error('Device recovery data could not be fully cleared. Unlock your device and retry.');
   }
+}
+/** Recovery storage failure must not prevent authenticated event access. */
+export async function readHostRecovery(read: () => Promise<PendingDraft | null>, hostId: string) {
+  try {
+    const saved = await read();
+    const draft = draftForHost(saved, hostId);
+    return { draft, unavailable: Boolean(saved && !draft) };
+  }
+  catch { return { draft: null, unavailable: true }; }
 }

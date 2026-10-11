@@ -20,7 +20,7 @@ Unknown check-in results block further local changes until a successful refresh.
 | --- | --- |
 | Mobile TypeScript | Pass, independent TS6/React19.2 tree |
 | Mobile lint | Pass, separate TypeScript and hooks rules, zero warnings |
-| Mobile tests | 20 passing: origin/link validation, source-aware arrival commands, fetch failures, no auto retry, credentials/redirect handling, Unicode-safe draft recovery across store re-instantiation and failed local writes, and account-scoped recovery visibility |
+| Mobile tests | 23 passing: origin/link validation, source-aware arrival commands, fetch failures, no auto retry, credentials/redirect handling, Unicode-safe draft recovery across store re-instantiation and failed local writes, account-scoped recovery visibility, corrupt recovery storage and cleanup failure isolation |
 | Gateway unit tests | 3 passing within root suite: allowlist, bearer format, concurrent async identity isolation |
 | Isolated PostgreSQL + actual Next HTTP | 39 assertions pass: native vs cookie auth, OTP single use/concurrent consumption, roles/cross-owner access, expiry/deletion/orphan identity, create retry/conflict/quota, edit/publish/archive, arrival retries, deletion-date stability, logout and CSRF |
 | iOS, Android, web JS exports | Pass; Hermes output for both native platforms. These are bundles, not signed installable apps. |
@@ -39,9 +39,17 @@ The next local polish pass adds a custom digital gathering graphic, a single hos
 
 A discovered privacy issue was repaired: pending recovery state is derived from the active host ID, explicitly replaced at sign-in/restore, and private form/event/guest/account state is cleared on session expiry and sign-out. A regression test proves no draft details are surfaced to a signed-out or different host. Independent review found no material issue in these scoped changes.
 
-Final mobile typecheck, lint, all 20 tests and iOS/Android/web exports pass. Browser rendering was inspected at 320, 390 and 768 pixel widths. Interactive checks verified guest expansion, inline invalid-link feedback, incoming-link expansion, host CTA to login, invalid-email disabled submission and signed-out private-route redirection. No real email, account, guest action or external provider communication was used in these checks. Screenshot: `outputs/sealsend-mobile/polished-welcome-390.png`. These browser checks do not establish native keyboard, large-text or screen-reader behavior; those remain in the device matrix.
+Final mobile typecheck, lint, all 23 tests and iOS/Android/web exports pass. Browser rendering was inspected at 320, 390 and 768 pixel widths. Interactive checks verified guest expansion, inline invalid-link feedback, incoming-link expansion, host CTA to login, invalid-email disabled submission and signed-out private-route redirection. No real email, account, guest action or external provider communication was used in these checks. Screenshot: `outputs/sealsend-mobile/polished-welcome-390.png`. These browser checks do not establish native keyboard, large-text or screen-reader behavior; those remain in the device matrix.
 
 Quality target: clear first action, no known material finding in the reviewed source/surfaces, account-safe recovery and verified failure feedback. A numerical 100/100 release score cannot be evidenced before the remaining binary/device, dependency and human-pilot gates.
+
+## Recovery and build preparation continuation
+
+Corrupt or inaccessible local recovery records no longer abort authenticated event loading. Draft creation stays disabled until the host reviews saved events and explicitly clears device recovery data in Account and privacy. Other-host recovery is hidden and also requires device cleanup before new creation. Clearing removes only local details/retry keys, never server events, and the confirmation explains the loss of interrupted-save replay. All 33 storage deletions are attempted despite individual failures; incomplete cleanup is reported. Sign-out isolates synchronous and asynchronous cleanup failures, and its retry action remains visible after repeated failures independently of notice wording.
+
+Three failure-injection tests were added (23 total pass). Mobile typecheck/lint and final iOS/Android/web exports pass. Independent review found no material auth/recovery issue and the reported retry-affordance caveat was repaired. These storage scenarios are host-level tests, not physical-keychain or rendered signed-device proof.
+
+Local EAS profiles are prepared in `apps/mobile/eas.json`: iOS simulator, internal APK/provisioned iOS preview, and store AAB/iOS builds. Public Expo configuration resolves SDK57 and the initial native version identifiers. No EAS CLI/account setup, source upload/archive inspection, credential creation, cloud job, signed artifact or submission was performed. Profiles still need actual EAS build validation after authorization; the README contains the commands, archive-inspection requirement and current official source links. Local disk remains approximately 160MB free, far below safe native compilation capacity.
 
 ## Outstanding gates and owners
 
