@@ -1008,3 +1008,14 @@ CREATE TABLE IF NOT EXISTS marketing_pageviews (
   views BIGINT NOT NULL CHECK (views > 0),
   PRIMARY KEY (day, path, channel)
 );
+
+-- Native draft retries survive lost responses and process/device restarts.
+-- Keep the key after event deletion to prevent a delayed replay recreating it.
+CREATE TABLE IF NOT EXISTS mobile_event_mutations (
+  user_id UUID NOT NULL REFERENCES admin_users(id) ON DELETE CASCADE,
+  mutation_key UUID NOT NULL,
+  request_hash TEXT NOT NULL,
+  event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, mutation_key)
+);

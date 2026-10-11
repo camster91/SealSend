@@ -28,8 +28,10 @@ export async function POST() {
   const request = await queryOne<DeletionRequest>(
     `INSERT INTO account_deletion_requests (user_id, status, requested_at, scheduled_for, cancelled_at, completed_at)
      VALUES ($1, 'pending', NOW(), NOW() + INTERVAL '7 days', NULL, NULL)
-     ON CONFLICT (user_id) DO UPDATE SET status = 'pending', requested_at = NOW(),
-       scheduled_for = NOW() + INTERVAL '7 days', cancelled_at = NULL, completed_at = NULL
+     ON CONFLICT (user_id) DO UPDATE SET status = 'pending',
+       requested_at = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.requested_at ELSE NOW() END,
+       scheduled_for = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.scheduled_for ELSE NOW() + INTERVAL '7 days' END,
+       cancelled_at = NULL, completed_at = NULL
      RETURNING status, requested_at, scheduled_for`,
     [auth.user.id],
   );

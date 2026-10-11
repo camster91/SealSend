@@ -1,3 +1,4 @@
+import { getMobileContext } from './mobile-context';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db/client';
@@ -9,6 +10,8 @@ export interface AuthenticatedUser {
 }
 
 export async function getApiUser(): Promise<AuthenticatedUser | null> {
+  const mobile = getMobileContext();
+  if (mobile) return mobile.user;
   try {
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('sealsend_session')?.value;

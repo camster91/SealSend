@@ -136,6 +136,9 @@ export async function validateSessionToken(token: string): Promise<{
     const role = session.user_role as 'admin' | 'guest';
     const profile = await loadUserProfile(session.user_id, role);
 
+    if ((role === 'admin' && !profile.email) || (role === 'guest' && !profile.eventId)) {
+      return { valid: false, error: 'Account no longer exists' };
+    }
     const user: AuthUser = {
       id: session.user_id,
       email: profile.email,

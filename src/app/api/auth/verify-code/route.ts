@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { getMobileContext } from '@/lib/auth/mobile-context';
 import { cookies } from 'next/headers';
 import { hashPassword } from '@/lib/password';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
@@ -144,8 +145,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Delete used code
-    await query('DELETE FROM auth_codes WHERE id = $1', [authCode.id]);
+    // Atomically consume the code. Concurrent retries must not mint two sessions.
+    const consumed = await query('DELETE FROM auth_codes WHERE id = $1 RETURNING id', [authCode.id]);
+    if (consumed.length === 0) return NextResponse.json({ error: 'Invalid or expired code' }, { status: 401 });
 
     // Determine durable user_id for the session — never use auth_codes.id for hosts
     let userId: string | null = null;
@@ -194,6 +196,14 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create session' },
         { status: 500 }
       );
+    }
+
+    // The native gateway returns the revocable token only after the same OTP
+    // verification/consumption; no cookie or token is added to web responses.
+    if (getMobileContext()) {
+      return NextResponse.json({ success: true, sessionToken, expiresAt: expiresAt.toISOString(),
+        user: { id: userId, email: authCode.email, phone: authCode.phone, role, eventId: authCode.event_id } },
+        { headers: { 'Cache-Control': 'private, no-store' } });
     }
 
     // Set session cookie

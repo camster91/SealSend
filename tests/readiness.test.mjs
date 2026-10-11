@@ -1430,7 +1430,7 @@ test('event checkout verifies ownership before exposing billing configuration', 
 
 test('check-in actor IDs are explicitly typed for PostgreSQL CASE assignment', async () => {
   const store = await read('src/lib/check-in-store.ts');
-  assert.match(store, /checked_in_by = CASE WHEN \$3 THEN \$4::uuid ELSE NULL END/);
+  assert.match(store, /checked_in_by = CASE WHEN \$3 THEN COALESCE\(checked_in_by, \$4::uuid\) ELSE NULL END/);
 });
 
 test('published retention and deletion terms match the support-request workflow', async () => {

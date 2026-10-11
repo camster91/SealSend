@@ -1,0 +1,48 @@
+{
+  "name": "@sealsend/mobile",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@react-native-community/datetimepicker": "9.1.0",
+    "expo": "~57.0.27",
+    "expo-calendar": "~57.0.5",
+    "expo-camera": "~57.0.6",
+    "expo-constants": "~57.0.21",
+    "expo-crypto": "~57.0.3",
+    "expo-haptics": "~57.0.3",
+    "expo-linking": "~57.0.12",
+    "expo-router": "~57.0.25",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "export": "expo export --platform all",
+    "prebuild": "expo prebuild",
+    "build:ios:local": "expo run:ios --configuration Release",
+    "build:android:local": "expo run:android --variant release",
+    "lint": "../../node_modules/.bin/eslint --max-warnings=0 ."
+  },
+  "private": true,
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
