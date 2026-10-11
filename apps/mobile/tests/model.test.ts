@@ -60,3 +60,15 @@ test('native incoming links are bounded, allowlisted and cannot smuggle arbitrar
   assert.equal(nativeDestination('https://evil.test/e/friday'), '/welcome');
   assert.equal(nativeDestination(`https://sealsend.app/e/friday?t=${token}`), `/welcome?invite=${encodeURIComponent(`https://sealsend.app/e/friday?t=${token}`)}`);
 });
+
+test('default browser fetch keeps its global receiver instead of the Api instance', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = function(this: unknown) {
+      assert.equal(this, globalThis, 'browser fetch must not receive an Api instance');
+      return Promise.resolve(new Response(JSON.stringify({ user: { id: 'fixture' } }), { status: 200 }));
+    };
+    const api = new Api('https://sealsend.app');
+    assert.deepEqual(await api.request('me'), { user: { id: 'fixture' } });
+  } finally { globalThis.fetch = original; }
+});

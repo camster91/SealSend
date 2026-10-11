@@ -32,6 +32,7 @@ function useHostState() {
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [filter, setFilter] = useState('');
@@ -53,7 +54,7 @@ function useHostState() {
 
   const clearHostView = useCallback(() => {
     api.session = null;
-    setRecoveryUnavailable(false); setHost(null); setEvents([]); setAttendees([]); setSelected(null); setPendingDraft(null);
+    setRecoveryUnavailable(false); setHost(null); setEvents([]); setEventsLoaded(false); setAttendees([]); setSelected(null); setPendingDraft(null);
     setEmail(''); setCodeSent(false); setCode(''); setTitle(''); setDescription(''); setLocation('');
     setFilter(''); setDeletion(null); setUncertainCreate(false); setNeedsGuestRefresh(false); setPicker(null); setScan(false);
   }, []);
@@ -70,20 +71,26 @@ function useHostState() {
       setNotice(error instanceof Error ? error.message : 'Please try again.');
     } finally { locked.current = false; setBusy(false); }
   }, [clearHostView, setScreen]);
-  const loadEvents = useCallback(async () => { setEvents(await api.request<Event[]>('events')); }, []);
+  const loadEvents = useCallback(async () => { const saved = await api.request<Event[]>('events'); setEvents(saved); setEventsLoaded(true); }, []);
+  const enterHost = useCallback(async (user: Host) => {
+    setHost(user);
+    const recovery = await readHostRecovery(() => drafts.read(), user.id);
+    setPendingDraft(recovery.draft); setRecoveryUnavailable(recovery.unavailable); setCode('');
+    setScreen('events');
+    await loadEvents();
+  }, [loadEvents, setScreen]);
   const restore = useCallback(async () => {
     try {
       const session = await readSession();
       if (!session) return;
       api.session = session;
       const result = await api.request<{ user: Host }>('me');
-      setHost(result.user); const recovery = await readHostRecovery(() => drafts.read(), result.user.id); setPendingDraft(recovery.draft); setRecoveryUnavailable(recovery.unavailable); await loadEvents(); setScreen('events');
-      if (recovery.unavailable) setNotice('Device draft recovery is unavailable. Check saved events, then use Account and privacy to clear device recovery data.');
+      await enterHost(result.user);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) { clearHostView(); await saveSession(null); }
       setNotice(error instanceof Error ? error.message : 'Could not restore sign-in.');
     } finally { setBooting(false); }
-  }, [clearHostView, loadEvents, setScreen]);
+  }, [clearHostView, enterHost]);
   useEffect(() => { void restore(); }, [restore]);
   useEffect(() => { const safe = typeof linkParams.invite === 'string' ? invitationLink(linkParams.invite) : null; if (safe) { setInvite(safe); setNotice('Your invitation is ready to open. Guests do not need an account.'); } }, [linkParams.invite]);
   useEffect(() => { if (!booting && !host && !['welcome', 'login'].includes(screen)) setScreen('welcome'); }, [booting, host, screen, setScreen]);
@@ -130,7 +137,7 @@ function useHostState() {
     if (!local.credentialsCleared || !local.draftCleared) setNotice('The view is signed out, but device storage could not be fully cleared. Unlock your device and retry cleanup before sharing it.');
     else if (!revoked) setNotice('Signed out on this device. Server revocation could not be confirmed; the session expires automatically within seven days.');
   }
-  return { cleanupNeeded, setCleanupNeeded, recoveryUnavailable, setRecoveryUnavailable, pendingDraft, setPendingDraft, setHost, setNotice, setEvents, setAttendees, screen, host, busy, notice, booting, email, setEmail, code, setCode, codeSent, setCodeSent, events, selected, setSelected, attendees, filter, setFilter, scan, setScan, cameraPermission, requestCameraPermission, invite, setInvite, deletion, setDeletion, uncertainCreate, setUncertainCreate, title, setTitle, description, setDescription, location, setLocation, date, setDate, picker, setPicker, timezone, run, loadEvents, openEvent, refreshGuests, mark, go, leave, signOut, needsGuestRefresh, setNeedsGuestRefresh };
+  return { enterHost, eventsLoaded, cleanupNeeded, setCleanupNeeded, recoveryUnavailable, setRecoveryUnavailable, pendingDraft, setPendingDraft, setHost, setNotice, setEvents, setAttendees, screen, host, busy, notice, booting, email, setEmail, code, setCode, codeSent, setCodeSent, events, selected, setSelected, attendees, filter, setFilter, scan, setScan, cameraPermission, requestCameraPermission, invite, setInvite, deletion, setDeletion, uncertainCreate, setUncertainCreate, title, setTitle, description, setDescription, location, setLocation, date, setDate, picker, setPicker, timezone, run, loadEvents, openEvent, refreshGuests, mark, go, leave, signOut, needsGuestRefresh, setNeedsGuestRefresh };
 }
 const HostContext = createContext<ReturnType<typeof useHostState> | null>(null);
 export function HostProvider({ children }: { children: React.ReactNode }) {
@@ -140,27 +147,30 @@ export function HostProvider({ children }: { children: React.ReactNode }) {
 export function HostScreen() {
   const state = useContext(HostContext);
   if (!state) throw new Error('HostProvider missing');
-  const { cleanupNeeded, setCleanupNeeded, recoveryUnavailable, setRecoveryUnavailable, pendingDraft, setPendingDraft, setHost, setNotice, screen, host, busy, notice, booting, email, setEmail, code, setCode, codeSent, setCodeSent, events, selected, setSelected, attendees, filter, setFilter, scan, setScan, cameraPermission, requestCameraPermission, invite, setInvite, deletion, setDeletion, uncertainCreate, setUncertainCreate, title, setTitle, description, setDescription, location, setLocation, date, setDate, picker, setPicker, timezone, run, loadEvents, openEvent, refreshGuests, mark, go, leave, signOut, needsGuestRefresh, setNeedsGuestRefresh } = state;
+  const { enterHost, eventsLoaded, cleanupNeeded, setCleanupNeeded, recoveryUnavailable, setRecoveryUnavailable, pendingDraft, setPendingDraft, setNotice, screen, host, busy, notice, booting, email, setEmail, code, setCode, codeSent, setCodeSent, events, selected, setSelected, attendees, filter, setFilter, scan, setScan, cameraPermission, requestCameraPermission, invite, setInvite, deletion, setDeletion, uncertainCreate, setUncertainCreate, title, setTitle, description, setDescription, location, setLocation, date, setDate, picker, setPicker, timezone, run, loadEvents, openEvent, refreshGuests, mark, go, leave, signOut, needsGuestRefresh, setNeedsGuestRefresh } = state;
+  const arrivalCount = attendees.filter(a => a.checked_in_at).reduce((n, a) => n + a.headcount, 0);
   if (booting) return <View style={[styles.content, { marginTop: 100 }]}><ActivityIndicator size="large" accessibilityLabel="Restoring your session" /><Text style={styles.body}>Getting things ready…</Text></View>;
   return <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} refreshControl={screen === 'events' ? <RefreshControl refreshing={busy} onRefresh={() => void run(loadEvents)} /> : undefined}>
       <View style={styles.row}><Text style={{ color: colors.ink, fontSize: 23, fontWeight: '800', letterSpacing: -1 }}>SealSend<Text style={{ color: colors.accent }}>●</Text></Text>{screen !== 'welcome' && <Button label={host ? 'My events' : 'Back'} secondary disabled={busy} onPress={leave} />}</View>
-      {notice && <Notice message={notice} />}
+      {Boolean(notice) && <Notice message={notice} />}
       {busy && <ActivityIndicator accessibilityLabel="Working" color={colors.ink} />}
       {screen === 'welcome' && <Welcome busy={busy} invite={invite} setInvite={setInvite} host={() => go('login')} openInvite={() => void run(async () => { const link = invitationLink(invite); if (!link) throw new Error('Paste a valid https://sealsend.app/e/ invitation link.'); await Linking.openURL(link); })}>
         {cleanupNeeded && <Button label="Retry device cleanup" secondary disabled={busy} onPress={() => void run(async () => { await Promise.all([drafts.clear(), saveSession(null)]); setCleanupNeeded(false); setNotice('Device storage cleared.'); })} />}
-        {api.session && <Button label="Retry restoring sign-in" secondary disabled={busy} onPress={() => void run(async () => { const me = await api.request<{ user: Host }>('me'); setHost(me.user); await loadEvents(); go('events'); })} />}
+        {api.session && <Button label="Retry restoring sign-in" secondary disabled={busy} onPress={() => void run(async () => { const me = await api.request<{ user: Host }>('me'); await enterHost(me.user); })} />}
       </Welcome>}
       {screen === 'login' && <>
         <Heading title="Welcome, host." subtitle="Use your email to sign in or create a host account. Your guests won’t need one." />
         <Field label="Email address" value={email} onChangeText={value => { setEmail(value); setCodeSent(false); setCode(''); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!busy} />
-        {!codeSent ? <Button label="Send sign-in code" disabled={busy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCodeSent(true); setNotice('Check your email for the six-digit code. It expires in 15 minutes.'); })} /> : <><Field label="Six-digit code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={6} editable={!busy} /><Button label="Continue" disabled={busy || !/^\d{6}$/.test(code)} onPress={() => void run(async () => { const session = await api.request<Session>('auth/verify', 'POST', { method: 'email', email: email.trim(), code }); await saveSession(session); api.session = session; setHost(session.user); const recovery = await readHostRecovery(() => drafts.read(), session.user.id); setPendingDraft(recovery.draft); setRecoveryUnavailable(recovery.unavailable); setCode(''); await loadEvents(); go('events'); if (recovery.unavailable) setNotice('Device draft recovery is unavailable. Check saved events, then use Account and privacy to clear device recovery data.'); })} /><Button label="Send another code" secondary disabled={busy} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCode(''); setNotice('A new code was sent. Use the latest email.'); })} /></>}
+        {!codeSent ? <Button label="Send sign-in code" disabled={busy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCodeSent(true); setNotice('Check your email for the six-digit code. It expires in 15 minutes.'); })} /> : <><Field label="Six-digit code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={6} editable={!busy} /><Button label="Continue" disabled={busy || !/^\d{6}$/.test(code)} onPress={() => void run(async () => { const session = await api.request<Session>('auth/verify', 'POST', { method: 'email', email: email.trim(), code }); await saveSession(session); api.session = session; await enterHost(session.user); })} /><Button label="Send another code" secondary disabled={busy} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCode(''); setNotice('A new code was sent. Use the latest email.'); })} /></>}
         <Text style={styles.body}>Continuing means you agree to SealSend’s Terms and Privacy Policy.</Text><Button label="Read terms" quiet onPress={() => void Linking.openURL('https://sealsend.app/terms').catch(() => setNotice('Unable to open terms.'))} /><Button label="Read privacy policy" quiet onPress={() => void Linking.openURL('https://sealsend.app/privacy').catch(() => setNotice('Unable to open privacy policy.'))} />
       </>}
       {screen === 'events' && <>
-        <Heading title="Your gatherings" subtitle="A little less organizing. A lot more showing up." />{pendingDraft && <Notice message="A draft save was not confirmed. Recover it safely before starting another event." />}
-        <Button label={pendingDraft ? 'Recover original draft' : 'Create an event'} disabled={busy || recoveryUnavailable} onPress={() => { setTitle(pendingDraft?.body.title || ''); setDescription(pendingDraft?.body.description || ''); setLocation(pendingDraft?.body.location_name || ''); setDate(pendingDraft ? new Date(pendingDraft.body.event_date) : new Date(Date.now() + 7 * 86400000)); setUncertainCreate(false); go('create'); }} />
-        {events.length === 0 && <View style={styles.card}><Heading title="Bring people together." subtitle="Your first invitation starts here. Create a draft before you share anything." /></View>}
+        <Heading title="Your gatherings" subtitle="A little less organizing. A lot more showing up." />{recoveryUnavailable && <Notice message="Device draft recovery is unavailable. Review saved events, then open Account and privacy to clear device recovery data." />}{pendingDraft && <Notice message="A draft save was not confirmed. Recover it safely before starting another event." />}
+        <Button label={pendingDraft ? 'Recover original draft' : 'Create an event'} disabled={busy || recoveryUnavailable || !eventsLoaded} onPress={() => { setTitle(pendingDraft?.body.title || ''); setDescription(pendingDraft?.body.description || ''); setLocation(pendingDraft?.body.location_name || ''); setDate(pendingDraft ? new Date(pendingDraft.body.event_date) : new Date(Date.now() + 7 * 86400000)); setUncertainCreate(false); go('create'); }} />
+        {eventsLoaded && events.length === 0 && <View style={styles.card}><Heading title="Bring people together." subtitle="Your first invitation starts here. Create a draft before you share anything." /></View>}
+        <Button label={eventsLoaded ? 'Refresh events' : 'Retry loading events'} quiet disabled={busy} onPress={() => void run(loadEvents)} />
+        {!eventsLoaded && <Notice message="Your saved events have not loaded yet. Retry before starting a new invitation." />}
         {events.map(event => <View key={event.id} style={styles.card}><View style={styles.tag}><Text style={styles.tagText}>{event.status === 'published' ? 'Ready to share' : event.status === 'archived' ? 'Archived' : 'Draft · just for you'}</Text></View><Text accessibilityRole="header" style={[styles.title, { fontSize: 25 }]}>{event.title}</Text><Text style={styles.body}>{eventTime(event)}{'\n'}{event.location_name || 'Location to be decided'}</Text><Button label={`Manage ${event.title}`} secondary disabled={busy} onPress={() => void run(() => openEvent(event))} /></View>)}
         <Button label="Account and privacy" secondary disabled={busy} onPress={() => void run(async () => { const result = await api.request<{ request: Deletion | null }>('account/deletion'); setDeletion(result.request); go('account'); })} />
       </>}
@@ -205,12 +215,12 @@ export function HostScreen() {
         {selected.status === 'published' && <Button label="Share invitation" disabled={busy} onPress={() => void run(async () => { const url = `https://sealsend.app/e/${selected.slug}`; await Share.share({ title: selected.title, message: `${selected.title}\n${url}`, ...(Platform.OS === 'ios' ? { url } : {}) }); })} />}
         {selected.status !== 'archived' && <Button label="Edit event" secondary disabled={busy} onPress={() => { setTitle(selected.title); setDescription(selected.description || ''); setLocation(selected.location_name || ''); setDate(selected.event_date ? new Date(selected.event_date) : new Date(Date.now() + 7 * 86400000)); go('edit'); }} />}
 
-        <Button label="Guest list and check-in" secondary disabled={busy} onPress={() => void run(async () => { await refreshGuests(); go('check-in'); })} />
+        <Button label="Guest list and check-in" secondary disabled={busy} onPress={() => void run(async () => { setFilter(''); await refreshGuests(); go('check-in'); })} />
         {selected.event_date && (Platform.OS !== 'ios' || Number(Platform.Version) >= 17) && <Button label="Add to my calendar" secondary disabled={busy} onPress={() => void run(async () => { if (Platform.OS === 'web') throw new Error('Calendar integration is available in the native builds.'); const start = new Date(selected.event_date!); await Calendar.createEventInCalendarAsync({ title: selected.title, startDate: start, endDate: selected.event_end_date ? new Date(selected.event_end_date) : new Date(start.getTime() + 2 * 3600000), location: selected.location_name ?? '', timeZone: selected.event_timezone }); })} />}
         {selected.status !== 'archived' && <Button label="Archive event" secondary disabled={busy} onPress={() => Alert.alert('Archive this event?', 'The invitation will close to new replies. You can create a new event afterwards. Archiving cannot be undone.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: () => void run(async () => { setSelected(await api.request<Event>(`events/${selected.id}`, 'PATCH', { status: 'archived' })); await loadEvents(); setNotice('Archived. You can now create your next gathering.'); }) }])} />}
       </>}
       {screen === 'check-in' && selected && <>
-        <Heading title="Hello, everyone." subtitle={`${attendees.filter(a => a.checked_in_at).reduce((n, a) => n + a.headcount, 0)} people checked in. Refresh before making arrival decisions.`} />
+        <Heading title="Hello, everyone." subtitle={`${arrivalCount} ${arrivalCount === 1 ? 'person' : 'people'} checked in. Refresh before making arrival decisions.`} />
         {needsGuestRefresh && <Notice message="A check-in could not be confirmed. Refresh the guest list before changing another arrival." />}
         <Field label="Find a guest" value={filter} onChangeText={setFilter} autoCorrect={false} /><Button label="Refresh guest list" secondary disabled={busy} onPress={() => void run(refreshGuests)} />
         <Button label={scan ? 'Close scanner' : 'Scan guest QR'} secondary disabled={busy || needsGuestRefresh} onPress={() => { if (Platform.OS === 'web') { setNotice('Camera check-in is available in the native builds. Use guest search here.'); return; } setScan(!scan); }} />

@@ -8,7 +8,7 @@ export function apiOrigin(value: string, development: boolean): string {
 }
 export class Api {
   session: Session | null = null;
-  constructor(public origin: string, private fetcher: typeof fetch = fetch) {}
+  constructor(public origin: string, private fetcher: typeof fetch = globalThis.fetch.bind(globalThis)) {}
   async request<T>(path: string, method = 'GET', body?: unknown, mutationKey?: string): Promise<T> {
     if (!/^[a-z0-9/-]+$/.test(path) || path.includes('..')) throw new Error('Invalid API path');
     const controller = new AbortController();
