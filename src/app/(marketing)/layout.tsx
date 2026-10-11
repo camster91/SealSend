@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { headers } from "next/headers";
 import { MarketingAttributionProvider } from "@/components/marketing/MarketingAttribution";
 import { normalizeMarketingChannel } from "@/lib/analytics/marketing-attribution";
+import type { Metadata } from "next";
+import { MARKETING_PAGE_ROBOTS } from "@/lib/search-indexing";
+
+export const metadata: Metadata = { robots: MARKETING_PAGE_ROBOTS };
 
 export default async function MarketingLayout({
   children,

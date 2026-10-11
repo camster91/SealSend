@@ -17,6 +17,7 @@ import { rsvpAuditBrowserChecks } from './rsvp-audit-browser-checks.mjs';
 import { clientJourneyBrowserChecks } from './client-journey-browser-checks.mjs';
 import { inviteJourneyBrowserChecks } from './invite-journey-browser-checks.mjs';
 import { organizerJourneyBrowserChecks } from './organizer-journey-browser-checks.mjs';
+import { searchIndexingBrowserChecks } from './search-indexing-browser-checks.mjs';
 import { startSocialQa } from './start-social-qa.ts';
 import { hashMagicToken, previewMagicToken } from '../../src/lib/magic-token.ts';
 async function main() {
@@ -57,6 +58,7 @@ const browser = await chromium.launch({ headless:true,...(process.env.SEALSEND_B
 const eventId = '00000000-0000-4000-8000-000000000011';
 const errors = [];
 try {
+  await searchIndexingBrowserChecks({browser,origin});
   const host = await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{ name:'sealsend_session',value:'social-local-host-session',url:origin }]);
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));

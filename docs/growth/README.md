@@ -7,6 +7,7 @@ Prepared October 10, 2026; initial audience assumption: small clubs/community or
 - [Implementation checklist and owners](IMPLEMENTATION-ROADMAP.md)
 - [Page architecture](SITE-STRUCTURE.md)
 - [First ten-host pilot and unsent outreach draft](HOST-PILOT.md)
+- [Search indexing and invitation privacy](search-indexing.md)
 
 Candidate routes: /rsvp-tracking and /qr-event-check-in. Both have unique metadata/canonicals, useful visible answers, digital illustration, existing beta CTA, footer/cross-links and sitemap entries. Public routing explicitly permits these two pages; existing protected routes are untouched. No fake reviews or broad unlimited/free-forever claims. No new third-party scripts or graphics purchases.
 

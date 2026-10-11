@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Libre_Caslon_Display, Inter, Poppins } from "next/font/google";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, OG_IMAGE } from "@/lib/metadata";
+import { PRIVATE_PAGE_ROBOTS } from "@/lib/search-indexing";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
@@ -53,10 +54,7 @@ export const metadata: Metadata = {
     description: DEFAULT_DESCRIPTION,
     images: [OG_IMAGE.url],
   },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  robots: PRIVATE_PAGE_ROBOTS,
 };
 
 export const viewport: Viewport = {
