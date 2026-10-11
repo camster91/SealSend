@@ -8,9 +8,10 @@ import { router, usePathname, useGlobalSearchParams } from 'expo-router';
 import { Api, ApiError, apiOrigin } from './api';
 import { clearLocalIdentity } from './sign-out';
 import { drafts } from './pending-draft';
-import type { DraftBody, PendingDraft } from './draft-store';
+import { draftForHost, type DraftBody, type PendingDraft } from './draft-store';
 import { readSession, saveSession } from './session';
 import { checkInBody, eventTime, invitationLink, qrToken, type Attendee, type Deletion, type Event, type Host, type Session } from './model';
+import { Welcome } from './welcome';
 import { Button, Field, Heading, Notice, styles, colors } from './ui';
 
 const api = new Api(apiOrigin(process.env.EXPO_PUBLIC_API_URL || 'https://sealsend.app', __DEV__));
@@ -38,7 +39,8 @@ function useHostState() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [invite, setInvite] = useState('');
   const [deletion, setDeletion] = useState<Deletion | null>(null);
-  const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
+  const [storedPendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
+  const pendingDraft = draftForHost(storedPendingDraft, host?.id);
   const [uncertainCreate, setUncertainCreate] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -47,18 +49,25 @@ function useHostState() {
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+  const clearHostView = useCallback(() => {
+    api.session = null;
+    setHost(null); setEvents([]); setAttendees([]); setSelected(null); setPendingDraft(null);
+    setEmail(''); setCodeSent(false); setCode(''); setTitle(''); setDescription(''); setLocation('');
+    setFilter(''); setDeletion(null); setUncertainCreate(false); setNeedsGuestRefresh(false); setPicker(null); setScan(false);
+  }, []);
+
   const run = useCallback(async (action: () => Promise<void>) => {
     if (locked.current) return;
     locked.current = true; setBusy(true); setNotice('');
     try { await action(); }
     catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        api.session = null; setHost(null); setEvents([]); setAttendees([]); setSelected(null); setScreen('login');
+        clearHostView(); setScreen('login');
         await saveSession(null).catch(() => {});
       }
       setNotice(error instanceof Error ? error.message : 'Please try again.');
     } finally { locked.current = false; setBusy(false); }
-  }, [setScreen]);
+  }, [clearHostView, setScreen]);
   const loadEvents = useCallback(async () => { setEvents(await api.request<Event[]>('events')); }, []);
   const restore = useCallback(async () => {
     try {
@@ -66,12 +75,12 @@ function useHostState() {
       if (!session) return;
       api.session = session;
       const result = await api.request<{ user: Host }>('me');
-      setHost(result.user); const pending = await drafts.read(); if (pending?.hostId === result.user.id) setPendingDraft(pending); await loadEvents(); setScreen('events');
+      setHost(result.user); const pending = await drafts.read(); setPendingDraft(draftForHost(pending, result.user.id)); await loadEvents(); setScreen('events');
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) { api.session = null; await saveSession(null); }
+      if (error instanceof ApiError && error.status === 401) { clearHostView(); await saveSession(null); }
       setNotice(error instanceof Error ? error.message : 'Could not restore sign-in.');
     } finally { setBooting(false); }
-  }, [loadEvents, setScreen]);
+  }, [clearHostView, loadEvents, setScreen]);
   useEffect(() => { void restore(); }, [restore]);
   useEffect(() => { const safe = typeof linkParams.invite === 'string' ? invitationLink(linkParams.invite) : null; if (safe) { setInvite(safe); setNotice('Your invitation is ready to open. Guests do not need an account.'); } }, [linkParams.invite]);
   useEffect(() => { if (!booting && !host && !['welcome', 'login'].includes(screen)) setScreen('welcome'); }, [booting, host, screen, setScreen]);
@@ -112,7 +121,7 @@ function useHostState() {
     let revoked = false;
     try { await api.request('session', 'DELETE'); revoked = true; } catch { /* Local sign-out still works offline. */ }
     const local = await clearLocalIdentity(() => drafts.clear(), () => saveSession(null), () => {
-      setPendingDraft(null); api.session = null; setHost(null); setEvents([]); setAttendees([]); setSelected(null); setCodeSent(false); setCode(''); setTitle(''); setDescription(''); setLocation(''); go('welcome');
+      clearHostView(); go('welcome');
     });
     if (!local.credentialsCleared || !local.draftCleared) setNotice('The view is signed out, but device storage could not be fully cleared. Unlock your device and retry cleanup before sharing it.');
     else if (!revoked) setNotice('Signed out on this device. Server revocation could not be confirmed; the session expires automatically within seven days.');
@@ -134,25 +143,21 @@ export function HostScreen() {
       <View style={styles.row}><Text style={{ color: colors.ink, fontSize: 23, fontWeight: '800', letterSpacing: -1 }}>SealSend<Text style={{ color: colors.accent }}>●</Text></Text>{screen !== 'welcome' && <Button label={host ? 'My events' : 'Back'} secondary disabled={busy} onPress={leave} />}</View>
       {notice && <Notice message={notice} />}
       {busy && <ActivityIndicator accessibilityLabel="Working" color={colors.ink} />}
-      {screen === 'welcome' && <>
-        <View style={{ backgroundColor: '#e5e9f5', borderRadius: 32, padding: 30, gap: 22 }}><View style={{ flexDirection: 'row', gap: 8 }}><Text accessible={false} style={{ fontSize: 44 }}>✦</Text><Text accessible={false} style={{ fontSize: 44, color: colors.accent }}>●</Text><Text accessible={false} style={{ fontSize: 44 }}>✧</Text></View><Heading title="Good plans. Great company." subtitle="Make the invitation. Share the link. Spend more time with your people." /></View>
-        <View style={styles.tag}><Text style={styles.tagText}>FREE HOST BETA · ONE ACTIVE EVENT · UP TO 100 GUESTS</Text></View>
+      {screen === 'welcome' && <Welcome busy={busy} invite={invite} setInvite={setInvite} host={() => go('login')} openInvite={() => void run(async () => { const link = invitationLink(invite); if (!link) throw new Error('Paste a valid https://sealsend.app/e/ invitation link.'); await Linking.openURL(link); })}>
         {notice.includes('device storage could not be fully cleared') && <Button label="Retry device cleanup" secondary disabled={busy} onPress={() => void run(async () => { await Promise.all([drafts.clear(), saveSession(null)]); setNotice('Device storage cleared.'); })} />}
-        <Button label="Host a gathering" disabled={busy} onPress={() => go('login')} />
         {api.session && <Button label="Retry restoring sign-in" secondary disabled={busy} onPress={() => void run(async () => { const me = await api.request<{ user: Host }>('me'); setHost(me.user); await loadEvents(); go('events'); })} />}
-        <View style={styles.card}><Heading title="Got an invite?" subtitle="You can reply in your browser. No app or host account needed." /><Field label="SealSend invitation link" value={invite} onChangeText={setInvite} autoCapitalize="none" keyboardType="url" /><Button label="Open my invitation" secondary disabled={busy} onPress={() => void run(async () => { const link = invitationLink(invite); if (!link) throw new Error('Paste a valid https://sealsend.app/e/ invitation link.'); await Linking.openURL(link); })} /></View>
-      </>}
+      </Welcome>}
       {screen === 'login' && <>
         <Heading title="Welcome, host." subtitle="Use your email to sign in or create a host account. Your guests won’t need one." />
         <Field label="Email address" value={email} onChangeText={value => { setEmail(value); setCodeSent(false); setCode(''); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!busy} />
-        {!codeSent ? <Button label="Send sign-in code" disabled={busy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCodeSent(true); setNotice('Check your email for the six-digit code. It expires in 15 minutes.'); })} /> : <><Field label="Six-digit code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={6} editable={!busy} /><Button label="Continue" disabled={busy || !/^\d{6}$/.test(code)} onPress={() => void run(async () => { const session = await api.request<Session>('auth/verify', 'POST', { method: 'email', email: email.trim(), code }); await saveSession(session); api.session = session; setHost(session.user); const pending = await drafts.read(); if (pending?.hostId === session.user.id) setPendingDraft(pending); setCode(''); await loadEvents(); go('events'); })} /><Button label="Send another code" secondary disabled={busy} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCode(''); setNotice('A new code was sent. Use the latest email.'); })} /></>}
-        <Text style={styles.body}>Continuing means you agree to SealSend’s Terms and Privacy Policy.</Text><Button label="Read terms" secondary onPress={() => void Linking.openURL('https://sealsend.app/terms').catch(() => setNotice('Unable to open terms.'))} /><Button label="Read privacy policy" secondary onPress={() => void Linking.openURL('https://sealsend.app/privacy').catch(() => setNotice('Unable to open privacy policy.'))} />
+        {!codeSent ? <Button label="Send sign-in code" disabled={busy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCodeSent(true); setNotice('Check your email for the six-digit code. It expires in 15 minutes.'); })} /> : <><Field label="Six-digit code" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={6} editable={!busy} /><Button label="Continue" disabled={busy || !/^\d{6}$/.test(code)} onPress={() => void run(async () => { const session = await api.request<Session>('auth/verify', 'POST', { method: 'email', email: email.trim(), code }); await saveSession(session); api.session = session; setHost(session.user); const pending = await drafts.read(); setPendingDraft(draftForHost(pending, session.user.id)); setCode(''); await loadEvents(); go('events'); })} /><Button label="Send another code" secondary disabled={busy} onPress={() => void run(async () => { await api.request('auth/code', 'POST', { method: 'email', email: email.trim() }); setCode(''); setNotice('A new code was sent. Use the latest email.'); })} /></>}
+        <Text style={styles.body}>Continuing means you agree to SealSend’s Terms and Privacy Policy.</Text><Button label="Read terms" quiet onPress={() => void Linking.openURL('https://sealsend.app/terms').catch(() => setNotice('Unable to open terms.'))} /><Button label="Read privacy policy" quiet onPress={() => void Linking.openURL('https://sealsend.app/privacy').catch(() => setNotice('Unable to open privacy policy.'))} />
       </>}
       {screen === 'events' && <>
         <Heading title="Your gatherings" subtitle="A little less organizing. A lot more showing up." />{pendingDraft && <Notice message="A draft save was not confirmed. Recover it safely before starting another event." />}
         <Button label={pendingDraft ? 'Recover original draft' : 'Create an event'} disabled={busy} onPress={() => { setTitle(pendingDraft?.body.title || ''); setDescription(pendingDraft?.body.description || ''); setLocation(pendingDraft?.body.location_name || ''); setDate(pendingDraft ? new Date(pendingDraft.body.event_date) : new Date(Date.now() + 7 * 86400000)); setUncertainCreate(false); go('create'); }} />
         {events.length === 0 && <View style={styles.card}><Heading title="Bring people together." subtitle="Your first invitation starts here. Create a draft before you share anything." /></View>}
-        {events.map(event => <View key={event.id} style={styles.card}><View style={styles.tag}><Text style={styles.tagText}>{event.status.toUpperCase()}</Text></View><Text accessibilityRole="header" style={[styles.title, { fontSize: 25 }]}>{event.title}</Text><Text style={styles.body}>{eventTime(event)}{'\n'}{event.location_name || 'Location to be decided'}</Text><Button label={`Manage ${event.title}`} secondary disabled={busy} onPress={() => void run(() => openEvent(event))} /></View>)}
+        {events.map(event => <View key={event.id} style={styles.card}><View style={styles.tag}><Text style={styles.tagText}>{event.status === 'published' ? 'Ready to share' : event.status === 'archived' ? 'Archived' : 'Draft · just for you'}</Text></View><Text accessibilityRole="header" style={[styles.title, { fontSize: 25 }]}>{event.title}</Text><Text style={styles.body}>{eventTime(event)}{'\n'}{event.location_name || 'Location to be decided'}</Text><Button label={`Manage ${event.title}`} secondary disabled={busy} onPress={() => void run(() => openEvent(event))} /></View>)}
         <Button label="Account and privacy" secondary disabled={busy} onPress={() => void run(async () => { const result = await api.request<{ request: Deletion | null }>('account/deletion'); setDeletion(result.request); go('account'); })} />
       </>}
       {(screen === 'create' || screen === 'edit') && <>
@@ -191,13 +196,14 @@ export function HostScreen() {
         {uncertainCreate && screen === 'create' && <Button label="Check saved events" secondary disabled={busy} onPress={() => void run(async () => { await loadEvents(); setUncertainCreate(false); go('events'); })} />}
       </>}
       {screen === 'event' && selected && <>
-        <Heading title={selected.title} subtitle={`${eventTime(selected)}\n${selected.location_name || 'Location to be decided'}`} /><View style={styles.tag}><Text style={styles.tagText}>{selected.status.toUpperCase()}</Text></View><Text style={styles.body}>{selected.description}</Text>
+        <Heading title={selected.title} subtitle={`${eventTime(selected)}\n${selected.location_name || 'Location to be decided'}`} /><View style={styles.tag}><Text style={styles.tagText}>{selected.status === 'published' ? 'Ready to share' : selected.status === 'archived' ? 'Archived' : 'Draft · just for you'}</Text></View><Text style={styles.body}>{selected.description}</Text>
         {selected.status === 'draft' && <Button label="Publish invitation" disabled={busy} onPress={() => void run(async () => { const event = await api.request<Event>(`events/${selected.id}`, 'PATCH', { status: 'published' }); setSelected(event); await loadEvents(); setNotice('Published. You can now share the link; no invitations were sent automatically.'); })} />}
         {selected.status === 'published' && <Button label="Share invitation" disabled={busy} onPress={() => void run(async () => { const url = `https://sealsend.app/e/${selected.slug}`; await Share.share({ title: selected.title, message: `${selected.title}\n${url}`, ...(Platform.OS === 'ios' ? { url } : {}) }); })} />}
         {selected.status !== 'archived' && <Button label="Edit event" secondary disabled={busy} onPress={() => { setTitle(selected.title); setDescription(selected.description || ''); setLocation(selected.location_name || ''); setDate(selected.event_date ? new Date(selected.event_date) : new Date(Date.now() + 7 * 86400000)); go('edit'); }} />}
-        {selected.status !== 'archived' && <Button label="Archive event" secondary disabled={busy} onPress={() => Alert.alert('Archive this event?', 'The invitation will close to new replies. You can create a new event afterwards. Archiving cannot be undone.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: () => void run(async () => { setSelected(await api.request<Event>(`events/${selected.id}`, 'PATCH', { status: 'archived' })); await loadEvents(); setNotice('Archived. You can now create your next gathering.'); }) }])} />}
+
         <Button label="Guest list and check-in" secondary disabled={busy} onPress={() => void run(async () => { await refreshGuests(); go('check-in'); })} />
         {selected.event_date && (Platform.OS !== 'ios' || Number(Platform.Version) >= 17) && <Button label="Add to my calendar" secondary disabled={busy} onPress={() => void run(async () => { if (Platform.OS === 'web') throw new Error('Calendar integration is available in the native builds.'); const start = new Date(selected.event_date!); await Calendar.createEventInCalendarAsync({ title: selected.title, startDate: start, endDate: selected.event_end_date ? new Date(selected.event_end_date) : new Date(start.getTime() + 2 * 3600000), location: selected.location_name ?? '', timeZone: selected.event_timezone }); })} />}
+        {selected.status !== 'archived' && <Button label="Archive event" secondary disabled={busy} onPress={() => Alert.alert('Archive this event?', 'The invitation will close to new replies. You can create a new event afterwards. Archiving cannot be undone.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: () => void run(async () => { setSelected(await api.request<Event>(`events/${selected.id}`, 'PATCH', { status: 'archived' })); await loadEvents(); setNotice('Archived. You can now create your next gathering.'); }) }])} />}
       </>}
       {screen === 'check-in' && selected && <>
         <Heading title="Hello, everyone." subtitle={`${attendees.filter(a => a.checked_in_at).reduce((n, a) => n + a.headcount, 0)} people checked in. Refresh before making arrival decisions.`} />

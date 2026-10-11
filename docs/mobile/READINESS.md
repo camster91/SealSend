@@ -20,7 +20,7 @@ Unknown check-in results block further local changes until a successful refresh.
 | --- | --- |
 | Mobile TypeScript | Pass, independent TS6/React19.2 tree |
 | Mobile lint | Pass, separate TypeScript and hooks rules, zero warnings |
-| Mobile tests | 19 passing: origin/link validation, source-aware arrival commands, fetch failures, no auto retry, credentials/redirect handling, Unicode-safe draft recovery across store re-instantiation and failed local writes |
+| Mobile tests | 20 passing: origin/link validation, source-aware arrival commands, fetch failures, no auto retry, credentials/redirect handling, Unicode-safe draft recovery across store re-instantiation and failed local writes, and account-scoped recovery visibility |
 | Gateway unit tests | 3 passing within root suite: allowlist, bearer format, concurrent async identity isolation |
 | Isolated PostgreSQL + actual Next HTTP | 39 assertions pass: native vs cookie auth, OTP single use/concurrent consumption, roles/cross-owner access, expiry/deletion/orphan identity, create retry/conflict/quota, edit/publish/archive, arrival retries, deletion-date stability, logout and CSRF |
 | iOS, Android, web JS exports | Pass; Hermes output for both native platforms. These are bundles, not signed installable apps. |
@@ -32,6 +32,16 @@ Unknown check-in results block further local changes until a successful refresh.
 | CI definition | New independent Node22 native source/bundle job prepared. Remote CI not run until branch is pushed. Audit artifact is informational; a green job does not mean release approval. |
 
 Final command logs and the dependency audit are preserved in the task output folder `/Users/Cameron/Documents/Codex/2026-10-08/re/outputs/sealsend-mobile/`. HTTP tests use an isolated loopback PostgreSQL cluster and fabricated `.example.test` accounts. They do not send emails, access production data or accept store terms.
+
+## Welcome and host-journey polish
+
+The next local polish pass adds a custom digital gathering graphic, a single host CTA, a compact expandable guest fallback, quiet legal actions, readable event statuses and wrapping header/action rows. Native iOS/Android accessibility hiding and web aria-hidden suppress the decorative graphic. Invalid invitation feedback stays beside its input; archive is placed after everyday event actions.
+
+A discovered privacy issue was repaired: pending recovery state is derived from the active host ID, explicitly replaced at sign-in/restore, and private form/event/guest/account state is cleared on session expiry and sign-out. A regression test proves no draft details are surfaced to a signed-out or different host. Independent review found no material issue in these scoped changes.
+
+Final mobile typecheck, lint, all 20 tests and iOS/Android/web exports pass. Browser rendering was inspected at 320, 390 and 768 pixel widths. Interactive checks verified guest expansion, inline invalid-link feedback, incoming-link expansion, host CTA to login, invalid-email disabled submission and signed-out private-route redirection. No real email, account, guest action or external provider communication was used in these checks. Screenshot: `outputs/sealsend-mobile/polished-welcome-390.png`. These browser checks do not establish native keyboard, large-text or screen-reader behavior; those remain in the device matrix.
+
+Quality target: clear first action, no known material finding in the reviewed source/surfaces, account-safe recovery and verified failure feedback. A numerical 100/100 release score cannot be evidenced before the remaining binary/device, dependency and human-pilot gates.
 
 ## Outstanding gates and owners
 

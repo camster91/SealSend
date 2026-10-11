@@ -1,5 +1,9 @@
 export type DraftBody = { title: string; description: string; location_name: string; event_date: string; event_timezone: string; status: 'draft' };
 export type PendingDraft = { key: string; hostId: string; body: DraftBody };
+/** Never surface recovery details from another account, including stale memory. */
+export function draftForHost(draft: PendingDraft | null, hostId: string | null | undefined): PendingDraft | null {
+  return hostId && draft?.hostId === hostId ? draft : null;
+}
 export type PrivateStore = { get: (key: string) => Promise<string | null>; set: (key: string, value: string) => Promise<void>; remove: (key: string) => Promise<void> };
 const manifest = 'sealsend-pending-draft-v1';
 const part = (index: number) => `${manifest}-${index}`;

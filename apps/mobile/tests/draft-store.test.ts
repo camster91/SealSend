@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DraftStore } from '../src/draft-store';
+import { DraftStore, draftForHost } from '../src/draft-store';
 const key = '00000000-0000-4000-8000-000000000030';
 const body = { title: 'QA gathering', description: '🎉'.repeat(1800), location_name: 'QA Hall', event_date: '2026-11-01T19:00:00Z', event_timezone: 'America/Toronto', status: 'draft' as const };
 function storage() { const rows = new Map<string, string>(); return { rows, get: async (key: string) => rows.get(key) ?? null, set: async (key: string, value: string) => { assert.ok(Buffer.byteLength(value) < 2000); rows.set(key,value); }, remove: async (key: string) => { rows.delete(key); } }; }
@@ -33,4 +33,12 @@ test('sign-out reports credential storage failures but always clears private UI'
   let viewCleared = false;
   const result = await clearLocalIdentity(async () => {}, async () => { throw new Error('locked keychain'); }, () => { viewCleared = true; });
   assert.equal(viewCleared, true); assert.equal(result.credentialsCleared, false);
+});
+
+test('pending recovery details are invisible when signed out or using another account', () => {
+  const pending = { key, hostId: 'first-host', body };
+  assert.equal(draftForHost(pending, null), null);
+  assert.equal(draftForHost(pending, 'second-host'), null);
+  assert.equal(draftForHost(pending, 'first-host'), pending);
+  assert.equal(draftForHost(null, 'first-host'), null);
 });
