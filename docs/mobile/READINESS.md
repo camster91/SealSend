@@ -61,11 +61,21 @@ Final TypeScript, zero-warning lint, 24 mobile tests and iOS/Android/web JavaScr
 
 Screenshots: `host-dashboard-390.png` and `guest-check-in-390.png` in the task output folder. Final command logs use the `journey-` prefix; the isolated Python fixture is preserved there for reproduction. Production-origin exports were generated without the local fixture API override. Full Next production build passed separately with root source unchanged.
 
+## Native build environment and dependency continuation
+
+Fresh 11 October audit still reports 22 affected package entries (19 high, 3 moderate), aggregating three underlying advisories. Current registry versions and paths were checked; no compatible validated automatic fix was found. See [DEPENDENCY_REVIEW.md](DEPENDENCY_REVIEW.md) and `dependency-audit-2026-10-11.json` / `dependency-paths-2026-10-11.log` in the task output folder. No forced dependency downgrade or audit suppression was applied.
+
+Available disk temporarily increased to 9.6GB. Xcode27 and CocoaPods are installed; an iOS26.5 simulator runtime is available. Local `pod install` advanced through native module, React Native, Hermes and framework staging, but disk dropped below 2GB during the attempt. It was explicitly cancelled before Xcode compilation to avoid another storage-full failure. Its log is `ios-pods-attempt.log`; there is no completed CocoaPods installation/workspace or native binary. The incomplete task-created Pods directory was removed after preserving the log, leaving roughly 1.9GB free. No unrelated checkout, cache, simulator or user file was deleted. Do not infer all observed disk changes came from this process.
+
+Android readiness is independently blocked: `/usr/libexec/java_home -V` reports no Java runtime, and the standard `~/Library/Android/sdk` is absent. The `/usr/bin/java` launcher alone does not provide a JDK. No Android tools or cloud build were installed/started. Resume native compilation with materially more disk headroom (target at least 15–20GB before dependencies and derived data), a working platform toolchain, or explicit cloud build/account/cost authorization. Store signing and physical-device QA remain separate gates.
+
+Historical web findings were reconciled against current source: `b7ac828` already repairs private sharing, authorized transactional RSVP edits, scoped check-in camera policy and HTTPS artwork CSP. Current `tests/rsvp-edit.test.ts` passes all six tests, including persisted edit identity, capacity, rollback and guest status synchronization. Log: `web-findings-recheck.log`. This is a local regression/source recheck, not a new deployment or current production-policy verification.
+
 ## Outstanding gates and owners
 
 | Priority / gate | Owner | Resume condition |
 | --- | --- | --- |
-| Native binary builds | Cameron / build environment | Free approximately 10GB for a safe local build, or explicitly select/authorize Expo cloud build/account/cost. Earlier compilation attempts ran out of disk. The full Next production build has since passed; native compilation remains unperformed. No unrelated files were removed. |
+| Native binary builds | Cameron / build environment | Provide at least 15–20GB local headroom plus the required platform toolchain, or explicitly select/authorize Expo cloud build/account/cost. Earlier compilation attempts ran out of disk. The full Next production build has since passed; native compilation remains unperformed. No unrelated files were removed. |
 | Upstream dependency advisories | Engineering / dependency maintainers | Review current npm audit. At research time braces and node-forge had no published patched registry version; decode-uri-component0.5 fixes its advisory but is ESM and breaks the current query-string7 consumer when overridden directly. Do not force a downgrade to an incompatible Expo SDK or claim audit clean. Native intent filtering reduces arbitrary input but is not proof that the upstream advisory is fixed. Resolve/assess before external beta. |
 | Reviewed backend beta release | Cameron / engineering | Green full web build/CI and reviewed additive migration; approve enabling `ENABLE_NATIVE_MOBILE_API=true` only after native testing. Gateway remains off by default. |
 | Native platform QA | Engineering + Cameron/devices | Install compiled app on simulator/emulator and physical iOS/Android; inspect real keyboard, font scaling, VoiceOver/TalkBack, permissions, share/calendar cancel, rotations, cold starts, offline recovery and repeated actions. |
