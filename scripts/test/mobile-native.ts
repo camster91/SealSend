@@ -110,6 +110,16 @@ try {
   }
   await qa.db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'admin',$2,NOW()+INTERVAL '1 day')", [deletionUser, deletionToken]);
   const deletionEvent = await (await request('events', 201, deletionToken, 'POST', { ...draft, title: 'Disposable deletion QA' }, false, randomUUID())).json();
+  const inheritedOrg = randomUUID(), coownedOrg = randomUUID(), orphanOrg = randomUUID();
+  const inheritedEvent = randomUUID(), coownedEvent = randomUUID(), survivingEvent = randomUUID();
+  for (const orgId of [inheritedOrg, coownedOrg, orphanOrg]) {
+    await qa.db.query("INSERT INTO organizations(id,name,slug,is_personal,created_by) VALUES ($1,'Deletion workspace QA',$2,false,$3)", [orgId, `deletion-${orgId}`, deletionUser]);
+    await qa.db.query("INSERT INTO organization_members(organization_id,user_id,role) VALUES ($1,$2,'owner')", [orgId, deletionUser]);
+  }
+  await qa.db.query("INSERT INTO organization_members(organization_id,user_id,role) VALUES ($1,$2,'admin'),($3,$4,'owner'),($5,$2,'check_in')", [inheritedOrg, futureUser, coownedOrg, cancelledUser, orphanOrg]);
+  for (const [id, userId, orgId] of [[inheritedEvent, deletionUser, inheritedOrg], [coownedEvent, deletionUser, coownedOrg], [survivingEvent, futureUser, orphanOrg]]) {
+    await qa.db.query("INSERT INTO events(id,user_id,organization_id,title,slug,status) VALUES ($1,$2,$3,'Shared deletion QA',$4,'draft')", [id, userId, orgId, `deletion-${id}`]);
+  }
   await request('account/deletion', 202, deletionToken, 'POST');
   await qa.db.query("UPDATE account_deletion_requests SET scheduled_for=NOW()-INTERVAL '1 minute' WHERE user_id=$1", [deletionUser]);
   await qa.db.query("INSERT INTO account_deletion_requests(user_id,status,scheduled_for) VALUES ($1,'pending',NOW()+INTERVAL '1 day'),($2,'cancelled',NOW()-INTERVAL '1 day'),($3,'pending',NOW()-INTERVAL '1 day')", [futureUser, cancelledUser, paidUser]);
@@ -124,6 +134,12 @@ try {
   assert.deepEqual(await processed.json(), { examined: 2, deleted: 1, blocked: 1, uploadsDeleted: 1, uploadCleanupPending: 0 }); checks++;
   assert.equal((await qa.db.query('SELECT id FROM admin_users WHERE id=$1', [deletionUser])).rows.length, 0); checks++;
   assert.equal((await qa.db.query('SELECT id FROM events WHERE id=$1', [deletionEvent.id])).rows.length, 0); checks++;
+  assert.deepEqual((await qa.db.query('SELECT user_id,organization_id FROM events WHERE id=$1', [inheritedEvent])).rows[0], { user_id: futureUser, organization_id: inheritedOrg }); checks++;
+  assert.equal((await qa.db.query<{ role: string }>('SELECT role FROM organization_members WHERE organization_id=$1 AND user_id=$2', [inheritedOrg, futureUser])).rows[0].role, 'owner'); checks++;
+  assert.deepEqual((await qa.db.query('SELECT user_id,organization_id FROM events WHERE id=$1', [coownedEvent])).rows[0], { user_id: cancelledUser, organization_id: coownedOrg }); checks++;
+  assert.equal((await qa.db.query('SELECT id FROM organizations WHERE id=$1', [orphanOrg])).rows.length, 0); checks++;
+  const rehomed = (await qa.db.query<{ user_id: string; created_by: string; is_personal: boolean }>('SELECT e.user_id,o.created_by,o.is_personal FROM events e JOIN organizations o ON o.id=e.organization_id WHERE e.id=$1', [survivingEvent])).rows[0];
+  assert.deepEqual(rehomed, { user_id: futureUser, created_by: futureUser, is_personal: true }); checks++;
   assert.equal((await qa.db.query('SELECT id FROM user_sessions WHERE user_id=$1', [deletionUser])).rows.length, 0); checks++;
   assert.equal((await qa.db.query('SELECT mutation_key FROM mobile_event_mutations WHERE user_id=$1', [deletionUser])).rows.length, 0); checks++;
   assert.equal((await qa.db.query('SELECT id FROM admin_users WHERE id=ANY($1::uuid[])', [[futureUser, cancelledUser, paidUser]])).rows.length, 3); checks++;
