@@ -1,6 +1,6 @@
 # Android testing and TestFlight release packet
 
-12 October 2026. Cameron selected Android testing and Apple TestFlight. This packet prepares those beta channels; Android assembly has completed on a hosted runner with a development key, but repaired evidence verification is pending. No store-signed binary has been uploaded and no tester has been invited.
+12 October 2026. Cameron selected Android testing and Apple TestFlight. This packet prepares those beta channels; Android assembly and compiled permission verification passed on a hosted runner with a development key. No store-signed binary has been uploaded and no tester has been invited.
 
 ## Candidate and authority
 
@@ -10,7 +10,9 @@ Required owner inputs: Expo account/project and build spending limit; Apple Deve
 
 ## Build and beta distribution
 
-A separate `Android native compilation` workflow uses a standard Ubuntu24.04 runner for this public repository, Node22 and Java21. It generates Android from the checked-in Expo configuration, assembles an ARM64 release-mode APK with the generated development key and records source/hash/bundle evidence. No store credentials, caches or APK artifacts are uploaded by this workflow. Compilation proof does not supply an installable download or Play-signed build; signed distribution and device testing retain their gates. The first execution assembled an APK, then failed its ripgrep-based evidence step. The repaired standard-library verifier also checks compiled permission declarations; its rerun is pending.
+A separate `Android native compilation` workflow uses a standard Ubuntu24.04 runner for this public repository, Node22 and Java21. It generates Android from the checked-in Expo configuration, assembles an ARM64 release-mode APK with the generated development key and records source/hash/bundle evidence. No store credentials, caches or APK artifacts are uploaded by this workflow. Compilation proof does not supply an installable download or Play-signed build; signed distribution and device testing retain their gates. The first execution assembled an APK, then failed its ripgrep-based evidence step. The repaired standard-library verifier passed at `20456b8` in run `38282440886`, including compiled permission declarations and ARM64 bundle checks. Full source/bundle CI passed in run `38282448228`.
+
+A separate `iOS native compilation` workflow uses the standard ARM64 macOS26 runner to generate the project, install CocoaPods dependencies and assemble an unsigned Release simulator app. It checks ARM64 architecture, embedded JavaScript, app identity, permission descriptions and packaged privacy manifests. It retains no app artifact and uses no signing credentials. Its first execution is pending; simulator compilation cannot supply a TestFlight package or physical-device proof.
 
 Run from `apps/mobile` after account setup, archive inspection and clean-commit verification. The existing production build profile produces store-distribution iOS output and Android AAB, suitable for the selected beta channels. The preview APK profile remains available for direct Android device installation. The simulator profile cannot be used for TestFlight.
 

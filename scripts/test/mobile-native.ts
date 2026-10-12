@@ -24,6 +24,7 @@ const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '
 let checks = 0;
 const deletionUser = randomUUID();
 const deletionDirectory = join(process.cwd(), 'uploads', deletionUser);
+let ownsDeletionDirectory = false;
 async function request(path: string, status: number, token?: string, method = 'GET', body?: unknown, web = false, mutationKey?: string) {
   const response = await fetch(`${origin}/api/${web ? '' : 'mobile/v1/'}${path}`, { method, headers: { Origin: origin, 'Content-Type': 'application/json', DNT: '1', ...(!web && path === 'events' && method === 'POST' ? { 'Idempotency-Key': mutationKey || randomUUID() } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
   assert.equal(response.status, status, `${method} ${path}`);
@@ -126,6 +127,7 @@ try {
   await qa.db.query("INSERT INTO user_subscriptions(user_id,tier,status) VALUES ($1,'pro_annual','active')", [paidUser]);
   await mkdir(join(process.cwd(), 'uploads'), { recursive: true });
   await mkdir(deletionDirectory, { recursive: false });
+  ownsDeletionDirectory = true;
   await writeFile(join(deletionDirectory, 'deletion-proof.txt'), 'Fabricated local deletion QA only.');
   const unauthorizedCron = await fetch(`${origin}/api/cron/delete-accounts`, { headers: { DNT: '1' } });
   assert.equal(unauthorizedCron.status, 401); await unauthorizedCron.arrayBuffer(); checks++;
@@ -154,7 +156,7 @@ try {
 } finally {
   app.kill('SIGTERM'); await new Promise(resolve => app.once('exit', resolve));
   await log.close(); await qa.server.stop(); await qa.db.close();
-  await rm(deletionDirectory, { recursive: true, force: true });
+  if (ownsDeletionDirectory) await rm(deletionDirectory, { recursive: true, force: true });
 }
 
 }
