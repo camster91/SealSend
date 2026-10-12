@@ -10,6 +10,8 @@ Required owner inputs: Expo account/project and build spending limit; Apple Deve
 
 ## Build and beta distribution
 
+A separate `Android native compilation` workflow uses a standard Ubuntu24.04 runner for this public repository, Node22 and Java21. It generates Android from the checked-in Expo configuration, assembles an ARM64 release-mode APK with the generated development key and records source/hash/bundle evidence. No store credentials, caches or APK artifacts are uploaded by this workflow. Compilation proof does not supply an installable download or Play-signed build; signed distribution and device testing retain their gates. First execution is pending.
+
 Run from `apps/mobile` after account setup, archive inspection and clean-commit verification. The existing production build profile produces store-distribution iOS output and Android AAB, suitable for the selected beta channels. The preview APK profile remains available for direct Android device installation. The simulator profile cannot be used for TestFlight.
 
 ```sh

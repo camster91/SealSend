@@ -1,0 +1,65 @@
+name: Android native compilation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/native-mobile-apps]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/android-native.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android native APK assembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - name: Generate Android project from checked-in Expo configuration
+        working-directory: apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform android --no-install
+      - name: Compile release-mode ARM64 device candidate
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+      - name: Record assembly evidence
+        shell: bash
+        run: |
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          sha256sum "$apk"
+          unzip -l "$apk" > /tmp/sealsend-apk-entries.txt
+          rg 'assets/index.android.bundle' /tmp/sealsend-apk-entries.txt
+          rg 'lib/arm64-v8a/libhermes' /tmp/sealsend-apk-entries.txt
+          if rg 'lib/(armeabi-v7a|x86|x86_64)/' /tmp/sealsend-apk-entries.txt; then
+            echo 'Unexpected non-ARM64 native library in the device candidate'
+            exit 1
+          fi
+          {
+            echo '### Android compilation evidence'
+            echo "Source: $GITHUB_SHA"
+            echo 'ARM64 release-mode APK assembled with the Expo-generated development signing key.'
+            echo 'This is compilation proof, not Play signing, device QA, or a beta release.'
+            echo 'APK is not retained/uploaded; no build artifact storage is added by this workflow.'
+          } >> "$GITHUB_STEP_SUMMARY"
