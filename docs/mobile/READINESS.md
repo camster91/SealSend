@@ -12,7 +12,7 @@ The default-disabled `/api/mobile/v1` gateway validates revocable seven-day data
 
 Create uses a client UUID stored with the pending payload in device SecureStore, in Unicode-safe items smaller than 2KB. A host-scoped server mutation table stores the request hash and resulting event in the same transaction under the existing host lock. A lost response or app restart retries the original key and returns the same event; different payloads conflict. Keys survive event deletion as tombstones, preventing resurrection. Temporary encrypted draft records are removed after confirmation/sign-out. Guests/attendee lists are never cached on disk. Web preview storage is memory only.
 
-Unknown check-in results block further local changes until a successful refresh. Backend attendee locks suppress duplicate audit/webhook effects and preserve original arrival timestamps for repeated desired states. Offline sign-out attempts credential and draft removal independently, always clears private UI, and distinguishes unconfirmed server revocation. If the OS refuses storage removal, the app warns and offers a cleanup retry; actual keychain failure/lock behavior needs device testing. Repeated pending deletion requests keep the original seven-day date; the deletion processor itself still needs release-time proof.
+Unknown check-in results block further local changes until a successful refresh. Backend attendee locks suppress duplicate audit/webhook effects and preserve original arrival timestamps for repeated desired states. Offline sign-out attempts credential and draft removal independently, always clears private UI, and distinguishes unconfirmed server revocation. If the OS refuses storage removal, the app warns and offers a cleanup retry; actual keychain failure/lock behavior needs device testing. Repeated pending deletion requests keep the original seven-day date; the deletion processor has local isolated HTTP proof; production scheduling, vendor retention and operational proof remain open.
 
 ## Evidence
 
@@ -22,14 +22,14 @@ Unknown check-in results block further local changes until a successful refresh.
 | Mobile lint | Pass, separate TypeScript and hooks rules, zero warnings |
 | Mobile tests | 24 passing: origin/link validation, source-aware arrival commands, fetch failures, no auto retry, credentials/redirect handling, browser fetch receiver binding, Unicode-safe draft recovery across store re-instantiation and failed local writes, account-scoped recovery visibility, corrupt recovery storage and cleanup failure isolation |
 | Gateway unit tests | 3 passing within root suite: allowlist, bearer format, concurrent async identity isolation |
-| Isolated PostgreSQL + actual Next HTTP | 39 assertions pass: native vs cookie auth, OTP single use/concurrent consumption, roles/cross-owner access, expiry/deletion/orphan identity, create retry/conflict/quota, edit/publish/archive, arrival retries, deletion-date stability, logout and CSRF |
+| Isolated PostgreSQL + actual Next HTTP | 53 assertions pass: native vs cookie auth, OTP single use/concurrent consumption, roles/cross-owner access, expiry/deletion/orphan identity, create retry/conflict/quota, edit/publish/archive, arrival retries, deletion-date stability, logout and CSRF; plus due-account processor authentication, account/event/session/recovery-key/upload cleanup, future/cancelled preservation and paid-account blocking/resumption |
 | iOS, Android, web JS exports | Pass; Hermes output for both native platforms. These are bundles, not signed installable apps. |
 | Native prebuild | Pass, iOS/Android project generation and permission configuration inspected. Native compilation not performed. |
 | Web root checks | Typecheck/lint and full 609-test suite checked; see final run logs. The check-in source assertion was updated for preserving original attribution, with HTTP persistence/effect checks added. |
 | Next production build | Pass on the 11 October retry after disk capacity increased. Earlier ENOSPC attempt retained as history; current successful log is `web-build-pass.log`. Remote CI has not run. |
 | Rendered browser preview | Welcome/sign-in inspected at 390×844; invalid email keeps submit disabled. Final Router welcome and sign-in rendering re-checked at 390×844; screenshot at `outputs/sealsend-mobile/final-welcome-390.png`. A preview-server directory replacement was corrected before the final check. No native-device UI claim. |
 | Independent review | Two substantive read-only reviews; material recovery, calendar, navigation and permissions findings repaired. Final source re-review confirmed the idempotency design; conditional sign-out cleanup finding repaired with independent cleanup attempts and failure-injection tests. Focused final independent confirmation passed 19 tests, typecheck/lint and found no new P1 issue in that repair. |
-| CI definition | New independent Node22 native source/bundle job prepared. Remote CI not run until branch is pushed. Audit artifact is informational; a green job does not mean release approval. |
+| CI definition | Branch pushed and draft PR #249 opened on 12 October. First remote native source/bundle job passed; web Build reached browser smoke checks. Final candidate CI result must be checked after the beta-packet commit. Audit artifact is informational; a green job does not mean release approval. |
 
 Final command logs and the dependency audit are preserved in the task output folder `/Users/Cameron/Documents/Codex/2026-10-08/re/outputs/sealsend-mobile/`. HTTP tests use an isolated loopback PostgreSQL cluster and fabricated `.example.test` accounts. They do not send emails, access production data or accept store terms.
 
@@ -71,6 +71,14 @@ Android readiness is independently blocked: `/usr/libexec/java_home -V` reports 
 
 Historical web findings were reconciled against current source: `b7ac828` already repairs private sharing, authorized transactional RSVP edits, scoped check-in camera policy and HTTPS artwork CSP. Current `tests/rsvp-edit.test.ts` passes all six tests, including persisted edit identity, capacity, rollback and guest status synchronization. Log: `web-findings-recheck.log`. This is a local regression/source recheck, not a new deployment or current production-policy verification.
 
+## Android testing and TestFlight preparation
+
+On 12 October Cameron selected Android testing and Apple TestFlight. Branch `feat/native-mobile-apps` was pushed and [draft PR #249](https://github.com/camster91/SealSend/pull/249) opened/attached. No merge or backend deployment occurred. `submit.beta` prepares an Android internal-track draft upload and interactive iOS submission; no guessed owner/app IDs or automatic upload are configured. The beta packet and bounded metadata draft are in [BETA_RELEASE.md](BETA_RELEASE.md) and `store-metadata.json`.
+
+Actual isolated Next/PostgreSQL checks now pass 53 assertions. They prove due-account removal of events, sessions, mutation recovery records and local upload files; cancelled/future requests are retained; active paid accounts are blocked and their requests complete after billing cancellation. Processor authorization is tested. This does not establish production scheduling or Stripe/vendor erasure, and team workspace handover still requires representative processor coverage. Store support and privacy URLs returned HTTP200 on 12 October.
+
+Nine installed source SDK privacy manifests were parsed and none declared tracking. This is a source inventory, not a signed aggregate manifest or a complete production data-safety declaration. The worksheet explicitly retains backend diagnostics, email-provider and retention review. Signing, store ownership, build path/cost, device verification and tester group remain unresolved owner inputs. Physical-device results, testers and store acceptance are not invented.
+
 ## Outstanding gates and owners
 
 | Priority / gate | Owner | Resume condition |
@@ -80,7 +88,7 @@ Historical web findings were reconciled against current source: `b7ac828` alread
 | Reviewed backend beta release | Cameron / engineering | Green full web build/CI and reviewed additive migration; approve enabling `ENABLE_NATIVE_MOBILE_API=true` only after native testing. Gateway remains off by default. |
 | Native platform QA | Engineering + Cameron/devices | Install compiled app on simulator/emulator and physical iOS/Android; inspect real keyboard, font scaling, VoiceOver/TalkBack, permissions, share/calendar cancel, rotations, cold starts, offline recovery and repeated actions. |
 | Store ownership/signing | Cameron | Verify bundle/package IDs, Apple/Play/Expo account ownership, signing profile/keystore, certificates and account terms. Provisional identifier is `com.ashbi.sealsend`; no credentials created or exposed. |
-| Privacy, billing and deletion | Cameron / engineering | Complete store privacy/data-safety forms from actual SDK manifests; prove scheduled deletion removes data, check web deletion pathway and paid-account cancellation policy. No native purchases implemented. |
+| Privacy, billing and deletion | Cameron / engineering | Complete store privacy/data-safety forms from actual SDK manifests; verify production deletion scheduling/vendor retention (local processor assertions pass), check web deletion pathway and paid-account cancellation policy. No native purchases implemented. |
 | Human pilot and support | Cameron + pilot participants | Approved recruitment/invitations and mixed-device task testing; no recruited-user validation exists yet. |
 | Store distribution | Cameron / Apple / Google | Signed artifacts, screenshots, support/privacy/review access, approved submission, processing/review acceptance and phased monitoring. |
 

@@ -34,3 +34,5 @@ Credentials live in device SecureStore. Web preview keeps credentials in memory 
 See [research](../../docs/mobile/RESEARCH.md) and [readiness](../../docs/mobile/READINESS.md). Full web feature parity, universal links, push notifications, media/social tooling, native exports and billing are not claimed in v0.1.
 
 SealSend-specific code follows the repository AGPL-3.0-only license. The generated Expo scaffold notice is retained in LICENSE.
+
+For the selected Android internal testing and Apple TestFlight path, see [beta release packet](../../docs/mobile/BETA_RELEASE.md). `submit.beta` holds Android uploads as an internal-track draft; iOS account/app identifiers are configured interactively after owner confirmation. No build or submission runs automatically.

@@ -25,5 +25,14 @@
         "simulator": true
       }
     }
+  },
+  "submit": {
+    "beta": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {}
+    }
   }
 }

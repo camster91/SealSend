@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { open } from 'node:fs/promises';
+import { open, mkdir, writeFile, access, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { startSocialQa } from './start-social-qa';
 import { hashAuthCode } from '../../src/lib/auth/code-hash';
 
 const origin = 'http://127.0.0.1:3130';
 const secret = 'local-mobile-auth-code-secret-for-qa-only';
+const cronSecret = 'local-mobile-deletion-cron-secret-for-qa-only';
 process.env.SEALSEND_QA_USE_POSTGRES = 'true';
 process.env.SESSION_SECRET = secret;
 const owner = '00000000-0000-4000-8000-000000000010';
@@ -17,9 +19,11 @@ async function main() {
 const qa = await startSocialQa();
 const log = await open('/tmp/sealsend-mobile-http.log', 'w');
 const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--hostname', '127.0.0.1', '--port', '3130'], {
-  stdio: ['ignore', log.fd, log.fd], env: { ...process.env, DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:55432/postgres', SESSION_SECRET: secret, ENABLE_NATIVE_MOBILE_API: 'true', COMMUNICATIONS_TEST_ONLY: 'true', PAYMENTS_TEST_ONLY: 'true', AI_PROVIDER: 'fake', NEXT_PUBLIC_SITE_URL: origin },
+  stdio: ['ignore', log.fd, log.fd], env: { ...process.env, DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:55432/postgres', SESSION_SECRET: secret, CRON_SECRET: cronSecret, ENABLE_NATIVE_MOBILE_API: 'true', COMMUNICATIONS_TEST_ONLY: 'true', PAYMENTS_TEST_ONLY: 'true', AI_PROVIDER: 'fake', NEXT_PUBLIC_SITE_URL: origin },
 });
 let checks = 0;
+const deletionUser = randomUUID();
+const deletionDirectory = join(process.cwd(), 'uploads', deletionUser);
 async function request(path: string, status: number, token?: string, method = 'GET', body?: unknown, web = false, mutationKey?: string) {
   const response = await fetch(`${origin}/api/${web ? '' : 'mobile/v1/'}${path}`, { method, headers: { Origin: origin, 'Content-Type': 'application/json', DNT: '1', ...(!web && path === 'events' && method === 'POST' ? { 'Idempotency-Key': mutationKey || randomUUID() } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
   assert.equal(response.status, status, `${method} ${path}`);
@@ -97,10 +101,44 @@ try {
   const simultaneous = await Promise.all([0, 1].map(() => fetch(`${origin}/api/mobile/v1/auth/verify`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', DNT: '1' }, body: JSON.stringify({ method: 'email', email: 'builder-qa@example.test', code: '789012' }) })));
   assert.deepEqual(simultaneous.map(r => r.status).sort(), [200, 401], 'concurrent OTP verification must only mint one session');
   await Promise.all(simultaneous.map(r => r.arrayBuffer())); checks += 2;
+
+  // Execute the real processor only against freshly fabricated users in this cluster.
+  const futureUser = randomUUID(), cancelledUser = randomUUID(), paidUser = randomUUID();
+  const deletionToken = randomUUID();
+  for (const userId of [deletionUser, futureUser, cancelledUser, paidUser]) {
+    await qa.db.query('INSERT INTO admin_users(id,email,password) VALUES ($1,$2,$3)', [userId, `${userId}@example.test`, 'unused-local-fixture-password']);
+  }
+  await qa.db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'admin',$2,NOW()+INTERVAL '1 day')", [deletionUser, deletionToken]);
+  const deletionEvent = await (await request('events', 201, deletionToken, 'POST', { ...draft, title: 'Disposable deletion QA' }, false, randomUUID())).json();
+  await request('account/deletion', 202, deletionToken, 'POST');
+  await qa.db.query("UPDATE account_deletion_requests SET scheduled_for=NOW()-INTERVAL '1 minute' WHERE user_id=$1", [deletionUser]);
+  await qa.db.query("INSERT INTO account_deletion_requests(user_id,status,scheduled_for) VALUES ($1,'pending',NOW()+INTERVAL '1 day'),($2,'cancelled',NOW()-INTERVAL '1 day'),($3,'pending',NOW()-INTERVAL '1 day')", [futureUser, cancelledUser, paidUser]);
+  await qa.db.query("INSERT INTO user_subscriptions(user_id,tier,status) VALUES ($1,'pro_annual','active')", [paidUser]);
+  await mkdir(join(process.cwd(), 'uploads'), { recursive: true });
+  await mkdir(deletionDirectory, { recursive: false });
+  await writeFile(join(deletionDirectory, 'deletion-proof.txt'), 'Fabricated local deletion QA only.');
+  const unauthorizedCron = await fetch(`${origin}/api/cron/delete-accounts`, { headers: { DNT: '1' } });
+  assert.equal(unauthorizedCron.status, 401); await unauthorizedCron.arrayBuffer(); checks++;
+  const processed = await fetch(`${origin}/api/cron/delete-accounts`, { headers: { Authorization: `Bearer ${cronSecret}`, DNT: '1' } });
+  assert.equal(processed.status, 200); checks++;
+  assert.deepEqual(await processed.json(), { examined: 2, deleted: 1, blocked: 1, uploadsDeleted: 1, uploadCleanupPending: 0 }); checks++;
+  assert.equal((await qa.db.query('SELECT id FROM admin_users WHERE id=$1', [deletionUser])).rows.length, 0); checks++;
+  assert.equal((await qa.db.query('SELECT id FROM events WHERE id=$1', [deletionEvent.id])).rows.length, 0); checks++;
+  assert.equal((await qa.db.query('SELECT id FROM user_sessions WHERE user_id=$1', [deletionUser])).rows.length, 0); checks++;
+  assert.equal((await qa.db.query('SELECT mutation_key FROM mobile_event_mutations WHERE user_id=$1', [deletionUser])).rows.length, 0); checks++;
+  assert.equal((await qa.db.query('SELECT id FROM admin_users WHERE id=ANY($1::uuid[])', [[futureUser, cancelledUser, paidUser]])).rows.length, 3); checks++;
+  await assert.rejects(access(deletionDirectory), { code: 'ENOENT' }); checks++;
+  await request('me', 401, deletionToken);
+  // Once billing is cancelled, a formerly blocked request can finish on a later run.
+  await qa.db.query("UPDATE user_subscriptions SET status='canceled' WHERE user_id=$1", [paidUser]);
+  const resumed = await fetch(`${origin}/api/cron/delete-accounts`, { headers: { Authorization: `Bearer ${cronSecret}`, DNT: '1' } });
+  assert.equal(resumed.status, 200); checks++;
+  assert.deepEqual(await resumed.json(), { examined: 1, deleted: 1, blocked: 0, uploadsDeleted: 1, uploadCleanupPending: 0 }); checks++;
   console.log(`PASS: ${checks} isolated native/web HTTP assertions. No provider communication or production access.`);
 } finally {
   app.kill('SIGTERM'); await new Promise(resolve => app.once('exit', resolve));
   await log.close(); await qa.server.stop(); await qa.db.close();
+  await rm(deletionDirectory, { recursive: true, force: true });
 }
 
 }

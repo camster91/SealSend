@@ -1,0 +1,20 @@
+{
+  "status": "draft-not-submitted",
+  "name": "SealSend",
+  "iosSubtitle": "Good plans. Great company.",
+  "androidShortDescription": "Create invitations, manage your gatherings, and welcome guests with SealSend.",
+  "description": "Bring your people together with SealSend. Create an event, fine-tune the details, and share an invitation link. Guests can open their invitation and reply on the web without installing the app.\n\nFOR HOSTS\n• Sign in with an email code.\n• Create, edit, publish and archive your events.\n• Share published invitations using your device’s share sheet.\n• Search your guest list, check guests in and undo an arrival.\n• Scan a guest’s personal QR code, or use guest search without camera access.\n• Add an event to your calendar on supported devices.\n• Find privacy, support and account-deletion controls in the app.\n\nA connection is required for sign-in, event changes and check-in. Guests reply through the website. This version has no in-app purchases. Calendar composition is supported on Android and iOS17 or later.\n\nA little less organizing. A lot more showing up.",
+  "supportUrl": "https://sealsend.app/support",
+  "privacyUrl": "https://sealsend.app/privacy",
+  "marketingUrl": "https://sealsend.app",
+  "candidateBundleId": "com.ashbi.sealsend",
+  "reviewNotes": "Host functionality requires a verified email sign-in code and the enabled mobile backend. Supply a dedicated reviewer mailbox/access process and a fabricated event with personal guest QR codes through the store review channel after approval. Do not place credentials in this file. Guest RSVP opens the existing website. Camera access is optional; guest search is available. No real guests should be contacted during review.",
+  "unresolved": [
+    "Developer/store owner and bundle registration",
+    "Signed build and aggregated privacy manifests",
+    "Reviewer access and enabled beta backend",
+    "Native screenshots and content/age-rating questionnaire",
+    "Final privacy/data-safety declarations",
+    "Dependency risk resolution and device/pilot validation"
+  ]
+}
