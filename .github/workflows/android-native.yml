@@ -49,13 +49,30 @@ jobs:
           apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           test -s "$apk"
           sha256sum "$apk"
-          unzip -l "$apk" > /tmp/sealsend-apk-entries.txt
-          rg 'assets/index.android.bundle' /tmp/sealsend-apk-entries.txt
-          rg 'lib/arm64-v8a/libhermes' /tmp/sealsend-apk-entries.txt
-          if rg 'lib/(armeabi-v7a|x86|x86_64)/' /tmp/sealsend-apk-entries.txt; then
-            echo 'Unexpected non-ARM64 native library in the device candidate'
-            exit 1
-          fi
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import os
+          import subprocess
+          apk = Path('apps/mobile/android/app/build/outputs/apk/release/app-release.apk')
+          with ZipFile(apk) as archive:
+              entries = archive.namelist()
+          assert 'assets/index.android.bundle' in entries, 'Missing embedded JS bundle'
+          assert any(name.startswith('lib/arm64-v8a/libhermes') for name in entries), 'Missing ARM64 Hermes runtime'
+          abis = {name.split('/')[1] for name in entries if name.startswith('lib/') and name.endswith('.so')}
+          assert abis == {'arm64-v8a'}, f'Unexpected ABI set: {abis}'
+          print('Verified embedded JS, Hermes and ARM64-only native libraries')
+          aapt_tools = sorted(Path(os.environ['ANDROID_HOME']).glob('build-tools/*/aapt2'))
+          assert aapt_tools, 'Android SDK manifest inspection tool is required'
+          permissions = subprocess.check_output([str(aapt_tools[-1]), 'dump', 'permissions', str(apk)], text=True)
+          assert "'android.permission.CAMERA'" in permissions, 'Missing optional scanner camera declaration'
+          blocked = ['RECORD_AUDIO', 'READ_CONTACTS', 'WRITE_CONTACTS', 'READ_CALENDAR', 'WRITE_CALENDAR',
+                     'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE', 'READ_MEDIA_IMAGES',
+                     'READ_MEDIA_VIDEO', 'READ_MEDIA_AUDIO', 'SYSTEM_ALERT_WINDOW',
+                     'ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION']
+          assert not any(f"'android.permission.{permission}'" in permissions for permission in blocked), permissions
+          print(permissions)
+          PY
           {
             echo '### Android compilation evidence'
             echo "Source: $GITHUB_SHA"

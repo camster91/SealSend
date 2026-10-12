@@ -1,6 +1,6 @@
 # Native candidate verification and release gates
 
-Date: 11 October 2026. Branch: `feat/native-mobile-apps`, based on `efff91bdd98703e18bef9263801ede5cf38c96c6`. This is an implemented local candidate. No iOS/Android binary, signed package, TestFlight/Play distribution, production mobile gateway or real-customer validation is claimed.
+Date: 11 October 2026. Branch: `feat/native-mobile-apps`, based on `efff91bdd98703e18bef9263801ede5cf38c96c6`. This is an implemented local candidate. No store-signed package, TestFlight/Play distribution, production mobile gateway or real-customer validation is claimed. Android compilation progress is recorded in the dated continuation below; iOS compilation is still unverified.
 
 ## What exists
 
@@ -79,11 +79,17 @@ Actual isolated Next/PostgreSQL checks now pass 58 assertions. They prove due-ac
 
 Nine installed source SDK privacy manifests were parsed and none declared tracking. This is a source inventory, not a signed aggregate manifest or a complete production data-safety declaration. The worksheet explicitly retains backend diagnostics, email-provider and retention review. Signing, store ownership, build path/cost, device verification and tester group remain unresolved owner inputs. Physical-device results, testers and store acceptance are not invented.
 
+## Standard hosted Android compilation
+
+A standard Ubuntu24.04 public-repository workflow now generates Android from checked-in Expo configuration and compiles an ARM64 release-mode APK without Apple/Google/Expo credentials. It uploads no APK and caches no native artifacts. The first run at `f762763` completed Gradle assembly successfully in 11m16s and produced an APK checksum, but the evidence step failed because the runner did not include ripgrep. This was an evidence-tool failure, not a failed native compiler. Its logs are retained as `android-first-assembly.log` and `android-first-evidence-failure.log`.
+
+The verifier has been replaced with Python standard-library archive checks and Android SDK manifest inspection: embedded JS, ARM64 Hermes, no extra ABI libraries, scanner camera declaration, and no microphone/contact/calendar/shared-storage/overlay/location permissions. Verification of the repaired workflow is pending. An assembled APK with Expo's generated development key is not a Play-signed release, retained download, installed-device proof or human beta. The full web and mobile source/bundle CI run passed `f762763`; subsequent workflow changes still require CI.
+
 ## Outstanding gates and owners
 
 | Priority / gate | Owner | Resume condition |
 | --- | --- | --- |
-| Native binary builds | Cameron / build environment | Provide at least 15–20GB local headroom plus the required platform toolchain, or explicitly select/authorize Expo cloud build/account/cost. Earlier compilation attempts ran out of disk. The full Next production build has since passed; native compilation remains unperformed. No unrelated files were removed. |
+| Native binary builds | Cameron / build environment | Provide at least 15–20GB local headroom plus the required platform toolchain, or explicitly select/authorize Expo cloud build/account/cost. Earlier compilation attempts ran out of disk. The full Next production build has since passed; iOS native compilation remains unperformed; Android assembly succeeded on the hosted runner, with final verification pending. No unrelated files were removed. |
 | Upstream dependency advisories | Engineering / dependency maintainers | Review current npm audit. At research time braces and node-forge had no published patched registry version; decode-uri-component0.5 fixes its advisory but is ESM and breaks the current query-string7 consumer when overridden directly. Do not force a downgrade to an incompatible Expo SDK or claim audit clean. Native intent filtering reduces arbitrary input but is not proof that the upstream advisory is fixed. Resolve/assess before external beta. |
 | Reviewed backend beta release | Cameron / engineering | Green full web build/CI and reviewed additive migration; approve enabling `ENABLE_NATIVE_MOBILE_API=true` only after native testing. Gateway remains off by default. |
 | Native platform QA | Engineering + Cameron/devices | Install compiled app on simulator/emulator and physical iOS/Android; inspect real keyboard, font scaling, VoiceOver/TalkBack, permissions, share/calendar cancel, rotations, cold starts, offline recovery and repeated actions. |
