@@ -10,11 +10,19 @@
   "candidateBundleId": "com.ashbi.sealsend",
   "reviewNotes": "Host functionality requires a verified email sign-in code and the enabled mobile backend. Supply a dedicated reviewer mailbox/access process and a fabricated event with personal guest QR codes through the store review channel after approval. Do not place credentials in this file. Guest RSVP opens the existing website. Camera access is optional; guest search is available. No real guests should be contacted during review.",
   "unresolved": [
-    "Developer/store owner and bundle registration",
+    "Android app/package registration; Apple registration verified",
     "Signed build and aggregated privacy manifests",
     "Reviewer access and enabled beta backend",
     "Native screenshots and content/age-rating questionnaire",
     "Final privacy/data-safety declarations",
     "Dependency risk resolution and device/pilot validation"
-  ]
+  ],
+  "iosRegistration": {
+    "appId": "6822377285",
+    "teamId": "NVJ5UY3T2X",
+    "bundleIdentifier": "com.ashbi.sealsend",
+    "sku": "sealsend-ios",
+    "primaryLanguage": "en-CA",
+    "status": "created-not-uploaded"
+  }
 }

@@ -13,7 +13,7 @@ npm run mobile:export
 npm run test:mobile:http
 ```
 
-Use Node22.13+ (local verification uses Node26), Xcode26.4+ and Android SDK36. `npm --prefix apps/mobile start` starts Metro. Generated `ios`, `android`, `.expo` and `dist` are rebuildable and ignored. `npm run prebuild --prefix apps/mobile` generates native projects; local `build:ios:local`/`build:android:local` require sufficient disk, native dependencies and platform setup. Android local release may use development signing; it is not a store-signed AAB. Bundle IDs `com.ashbi.sealsend` are provisional until owner registration is confirmed.
+Use Node22.13+ (local verification uses Node26), Xcode26.4+ and Android SDK36. `npm --prefix apps/mobile start` starts Metro. Generated `ios`, `android`, `.expo` and `dist` are rebuildable and ignored. `npm run prebuild --prefix apps/mobile` generates native projects; local `build:ios:local`/`build:android:local` require sufficient disk, native dependencies and platform setup. Android local release may use development signing; it is not a store-signed AAB. The iOS `com.ashbi.sealsend` identifier is registered to Cameron Ashley (team `NVJ5UY3T2X`). Android package registration remains pending.
 
 ## Prepared native build profiles
 
@@ -35,4 +35,4 @@ See [research](../../docs/mobile/RESEARCH.md) and [readiness](../../docs/mobile/
 
 SealSend-specific code follows the repository AGPL-3.0-only license. The generated Expo scaffold notice is retained in LICENSE.
 
-For the selected Android internal testing and Apple TestFlight path, see [beta release packet](../../docs/mobile/BETA_RELEASE.md). `submit.beta` holds Android uploads as an internal-track draft; iOS account/app identifiers are configured interactively after owner confirmation. No build or submission runs automatically.
+For the selected Android internal testing and Apple TestFlight path, see [beta release packet](../../docs/mobile/BETA_RELEASE.md). `submit.beta` holds Android uploads as an internal-track draft; iOS targets the verified Apple app ID `6822377285` and team `NVJ5UY3T2X`; authentication and signing remain required. No build or submission runs automatically.

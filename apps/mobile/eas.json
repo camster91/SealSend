@@ -32,7 +32,12 @@
         "track": "internal",
         "releaseStatus": "draft"
       },
-      "ios": {}
+      "ios": {
+        "ascAppId": "6822377285",
+        "appleTeamId": "NVJ5UY3T2X",
+        "sku": "sealsend-ios",
+        "language": "en-CA"
+      }
     }
   }
 }
