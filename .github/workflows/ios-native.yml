@@ -48,7 +48,7 @@ jobs:
           -configuration Release -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/sealsend-ios-derived"
-          -jobs 2 CODE_SIGNING_ALLOWED=NO build
+          -jobs 2 ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
       - name: Record assembly evidence
         shell: bash
         run: |
@@ -57,7 +57,7 @@ jobs:
           test -s "$app/main.jsbundle"
           test -s "$app/Info.plist"
           file "$app/SealSend"
-          lipo -verify_arch arm64 "$app/SealSend"
+          lipo "$app/SealSend" -verify_arch arm64
           shasum -a 256 "$app/SealSend" "$app/main.jsbundle"
           python3 - <<'PY'
           from pathlib import Path
