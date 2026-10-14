@@ -70,3 +70,9 @@ scripts/archive/
 
 # Local SEO research cache
 .seo-cache/
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/build/

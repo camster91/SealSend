@@ -35,8 +35,19 @@ export async function PATCH(request: Request, { params }: Params) {
       [eventId],
     );
     const ownerId = ownerResult.rows[0]?.user_id;
+    // Serialize arrivals for this attendee. A repeated desired state must not
+    // create duplicate arrival webhooks/audit entries after a lost response.
+    const publicResponse = Boolean(parsed.data.rsvpResponseId);
+    const table = publicResponse ? 'rsvp_responses' : 'guests';
+    const identifier = parsed.data.inviteToken ? 'invite_token' : 'id';
+    const before = await client.query<{ checked_in_at: string | null }>(
+      `SELECT checked_in_at FROM ${table} WHERE ${identifier} = $1 AND event_id = $2 ${publicResponse ? 'AND guest_id IS NULL' : ''} FOR UPDATE`,
+      [parsed.data.rsvpResponseId ?? parsed.data.guestId ?? parsed.data.inviteToken, eventId],
+    );
+    const changed = before.rows.length > 0 && Boolean(before.rows[0].checked_in_at) !== parsed.data.checkedIn;
     const guest = await updateCheckInGuest(async <T>(sql: string, values?: unknown[]) => ({ rows: (await client.query(sql, values)).rows as T[] }), eventId, auth.user.id, parsed.data);
     if (!guest) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Guest not found" }, { status: 404 }); }
+    if (!changed) { await client.query('COMMIT'); return NextResponse.json(guest); }
     await client.query(
       `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
        VALUES ($1, $2, $3, $4::jsonb)`,

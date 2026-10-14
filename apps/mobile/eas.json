@@ -1,0 +1,43 @@
+{
+  "cli": {
+    "requireCommit": true,
+    "appVersionSource": "local",
+    "promptToConfigurePushNotifications": false
+  },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "autoIncrement": false,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "preview": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    }
+  },
+  "submit": {
+    "beta": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascAppId": "6822377285",
+        "appleTeamId": "NVJ5UY3T2X",
+        "sku": "sealsend-ios",
+        "language": "en-CA"
+      }
+    }
+  }
+}

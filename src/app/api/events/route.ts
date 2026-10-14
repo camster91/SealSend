@@ -10,6 +10,8 @@ import { getUserTier } from '@/lib/subscription';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy } from '@/lib/invitation-defaults';
+import { getMobileContext } from '@/lib/auth/mobile-context';
+import { createHash } from 'node:crypto';
 
 export async function GET() {
   try {
@@ -39,6 +41,10 @@ export async function POST(request: NextRequest) {
     const user = auth.user;
 
     const body = await request.json();
+    const mutationKey = getMobileContext() ? request.headers.get('Idempotency-Key') : null;
+    if (getMobileContext() && (!mutationKey || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mutationKey))) {
+      return NextResponse.json({ error: 'A valid draft mutation key is required.' }, { status: 400 });
+    }
     const parsed = eventCreateSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -80,6 +86,23 @@ export async function POST(request: NextRequest) {
     client = await getDb().connect();
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [user.id]);
+
+    const requestHash = createHash('sha256').update(JSON.stringify({ ...parsed.data, organization_id: organizationId })).digest('hex');
+    if (mutationKey) {
+      const previous = await client.query<{ request_hash: string; event_id: string | null }>(
+        'SELECT request_hash, event_id FROM mobile_event_mutations WHERE user_id = $1 AND mutation_key = $2', [user.id, mutationKey],
+      );
+      if (previous.rows[0]) {
+        if (previous.rows[0].request_hash !== requestHash) {
+          await client.query('ROLLBACK');
+          return NextResponse.json({ error: 'This draft key was already used for different details. Recover the original draft.' }, { status: 409 });
+        }
+        const recovered = await client.query('SELECT * FROM events WHERE id = $1 AND user_id = $2', [previous.rows[0].event_id, user.id]);
+        await client.query('COMMIT');
+        return recovered.rows[0] ? NextResponse.json(recovered.rows[0]) : NextResponse.json({ error: 'The previously saved event was deleted.' }, { status: 410 });
+      }
+      await client.query('INSERT INTO mobile_event_mutations(user_id, mutation_key, request_hash) VALUES ($1,$2,$3)', [user.id, mutationKey, requestHash]);
+    }
 
     const eventCountResult = await client.query<{ count: string }>(
       "SELECT COUNT(*)::text AS count FROM events WHERE user_id = $1 AND status <> 'archived'",
@@ -203,6 +226,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (event) {
+      if (mutationKey) await client.query('UPDATE mobile_event_mutations SET event_id = $3 WHERE user_id = $1 AND mutation_key = $2', [user.id, mutationKey, (event as { id: string }).id]);
       if (ai_generation_id && ai_edit_count !== undefined) {
         await client.query('UPDATE ai_generations SET edit_count = $3 WHERE id = $1 AND user_id = $2', [ai_generation_id, user.id, ai_edit_count]);
       }

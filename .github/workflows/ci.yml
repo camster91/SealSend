@@ -87,7 +87,38 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: npm run test:marketing:native
 
+      - name: Native app gateway transaction QA
+        if: github.actor != 'dependabot[bot]'
+        run: npm run test:mobile:http
+
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e
 
+  mobile:
+    name: Native app source and bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - run: npm run lint --prefix apps/mobile
+      - run: npm run mobile:typecheck
+      - run: npm run mobile:test
+      - run: npm run mobile:export
+      - name: Record upstream native tooling advisories
+        run: npm audit --prefix apps/mobile --json > mobile-audit.json || test -s mobile-audit.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-source-verification
+          path: |
+            mobile-audit.json
+            apps/mobile/dist
