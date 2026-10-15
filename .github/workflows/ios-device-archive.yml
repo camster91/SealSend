@@ -1,0 +1,124 @@
+name: iOS TestFlight device archive
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/testflight-device-archive]
+    paths: ['.github/workflows/ios-device-archive.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-device-archive-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    name: Unsigned iOS device archive
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Record Xcode toolchain
+        run: xcodebuild -version
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - name: Generate iOS project from checked-in Expo configuration
+        working-directory: apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform ios --no-install
+      - name: Install native dependencies
+        working-directory: apps/mobile/ios
+        run: pod install
+      - name: Compile unsigned device archive for local distribution signing
+        working-directory: apps/mobile/ios
+        run: >-
+          xcodebuild -workspace SealSend.xcworkspace -scheme SealSend
+          -configuration Release -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/sealsend-ios-derived"
+          -archivePath "$RUNNER_TEMP/SealSend.xcarchive"
+          -jobs 2 ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO archive
+      - name: Record assembly evidence
+        shell: bash
+        run: |
+          app="$RUNNER_TEMP/SealSend.xcarchive/Products/Applications/SealSend.app"
+          test -s "$app/SealSend"
+          test -s "$app/main.jsbundle"
+          test -s "$app/Info.plist"
+          file "$app/SealSend"
+          lipo "$app/SealSend" -verify_arch arm64
+          shasum -a 256 "$app/SealSend" "$app/main.jsbundle"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import plistlib
+          app = Path(os.environ['RUNNER_TEMP']) / 'SealSend.xcarchive/Products/Applications/SealSend.app'
+          with (app / 'Info.plist').open('rb') as file:
+              info = plistlib.load(file)
+          with Path('apps/mobile/app.json').open() as file:
+              expected = json.load(file)['expo']['ios']['bundleIdentifier']
+          assert info['CFBundleIdentifier'] == expected, 'Unexpected application identity'
+          assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS'], 'Device archive required'
+          assert info['CFBundleShortVersionString'] == '0.1.0'
+          assert info['CFBundleVersion'] == '1'
+          assert isinstance(info.get('NSCameraUsageDescription'), str) and info['NSCameraUsageDescription'].strip()
+          blocked = ['NSMicrophoneUsageDescription', 'NSContactsUsageDescription', 'NSCalendarsUsageDescription',
+                     'NSCalendarsFullAccessUsageDescription', 'NSCalendarsWriteOnlyAccessUsageDescription',
+                     'NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysUsageDescription',
+                     'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSPhotoLibraryUsageDescription',
+                     'NSPhotoLibraryAddUsageDescription', 'NSFaceIDUsageDescription']
+          assert not any(info.get(key) for key in blocked), 'Unexpected sensitive permission usage description'
+          manifests = []
+          for path in sorted(app.rglob('PrivacyInfo.xcprivacy')):
+              with path.open('rb') as file:
+                  data = plistlib.load(file)
+              assert not data.get('NSPrivacyTracking'), f'Unexpected tracking declaration: {path.name}'
+              manifests.append({'path': str(path.relative_to(app)), 'declarations': data})
+          assert manifests, 'Packaged privacy manifest inspection is required'
+          print(json.dumps({'bundleIdentifier': expected, 'cameraDescription': info['NSCameraUsageDescription'],
+                            'packagedPrivacyManifests': manifests}, indent=2))
+          PY
+      - name: Package archive and source evidence
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/sealsend-device-artifact"
+          ditto -c -k --keepParent "$RUNNER_TEMP/SealSend.xcarchive" "$RUNNER_TEMP/sealsend-device-artifact/SealSend.xcarchive.zip"
+          SOURCE_COMMIT="$GITHUB_SHA" node -e '
+            const fs = require("node:fs");
+            const app = require("./apps/mobile/app.json").expo;
+            fs.writeFileSync(process.env.RUNNER_TEMP + "/sealsend-device-artifact/source.json", JSON.stringify({
+              repository: process.env.GITHUB_REPOSITORY,
+              commit: process.env.SOURCE_COMMIT,
+              runId: process.env.GITHUB_RUN_ID,
+              bundleIdentifier: app.ios.bundleIdentifier,
+              version: app.version, buildNumber: app.ios.buildNumber,
+              platform: "iphoneos", signed: false, apiOrigin: process.env.EXPO_PUBLIC_API_URL
+            }, null, 2) + "\n");'
+          xcodebuild -version > "$RUNNER_TEMP/sealsend-device-artifact/toolchain.txt"
+          cd "$RUNNER_TEMP/sealsend-device-artifact"
+          shasum -a 256 SealSend.xcarchive.zip source.json toolchain.txt > SHA256SUMS
+          {
+            echo '### Unsigned iPhoneOS archive'
+            echo "Source: $GITHUB_SHA"
+            echo 'Retained for one day for local signing/export; no private key is used on the runner.'
+            echo 'This is not yet a signed TestFlight package, upload or device test.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain archive for local signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealsend-iphoneos-${{ github.sha }}
+          path: ${{ runner.temp }}/sealsend-device-artifact/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
