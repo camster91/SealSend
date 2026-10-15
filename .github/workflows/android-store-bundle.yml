@@ -1,0 +1,93 @@
+name: Android store bundle candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/testflight-device-archive]
+    paths: ['.github/workflows/android-store-bundle.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-store-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android unsigned store bundle assembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - name: Generate Android project from checked-in Expo configuration
+        working-directory: apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform android --no-install
+      - name: Compile release-mode ARM64 app bundle
+        working-directory: apps/mobile/android
+        run: ./gradlew bundleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+      - name: Verify bundle contents and remove generated development signature
+        shell: bash
+        run: |
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import hashlib, json, os, re
+          import xml.etree.ElementTree as ET
+          root = Path('apps/mobile/android/app/build')
+          original = root / 'outputs/bundle/release/app-release.aab'
+          out = Path(os.environ['RUNNER_TEMP']) / 'sealsend-android-artifact'
+          out.mkdir()
+          with ZipFile(original) as archive:
+              entries = archive.namelist()
+              assert 'base/assets/index.android.bundle' in entries
+              assert any(n.startswith('base/lib/arm64-v8a/libhermes') for n in entries)
+              assert {n.split('/')[2] for n in entries if n.startswith('base/lib/') and n.endswith('.so')} == {'arm64-v8a'}
+              with ZipFile(out / 'SealSend-unsigned.aab', 'w', ZIP_DEFLATED) as unsigned:
+                  for entry in archive.infolist():
+                      if re.fullmatch(r'META-INF/(?:MANIFEST\.MF|[^/]+\.(?:SF|RSA|DSA|EC))', entry.filename, re.I):
+                          continue
+                      unsigned.writestr(entry, archive.read(entry))
+          manifests = list(root.glob('intermediates/merged_manifests/release/**/AndroidManifest.xml'))
+          assert len(manifests) == 1, f'Expected one merged release manifest: {manifests}'
+          manifest = ET.parse(manifests[0]).getroot()
+          android = '{http://schemas.android.com/apk/res/android}'
+          assert manifest.attrib['package'] == 'com.ashbi.sealsend'
+          permissions = {node.attrib[android + 'name'] for node in manifest.findall('uses-permission')}
+          assert 'android.permission.CAMERA' in permissions
+          blocked = {'RECORD_AUDIO','READ_CONTACTS','WRITE_CONTACTS','READ_CALENDAR','WRITE_CALENDAR',
+                     'READ_EXTERNAL_STORAGE','WRITE_EXTERNAL_STORAGE','READ_MEDIA_IMAGES','READ_MEDIA_VIDEO',
+                     'READ_MEDIA_AUDIO','SYSTEM_ALERT_WINDOW','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION'}
+          assert not permissions.intersection({'android.permission.' + p for p in blocked}), permissions
+          (out / 'source.json').write_text(json.dumps({'repository': os.environ['GITHUB_REPOSITORY'],
+              'commit': os.environ['GITHUB_SHA'], 'runId': os.environ['GITHUB_RUN_ID'],
+              'package': 'com.ashbi.sealsend', 'version': '0.1.0', 'versionCode': 1,
+              'signed': False, 'apiOrigin': os.environ['EXPO_PUBLIC_API_URL'],
+              'permissions': sorted(permissions)}, indent=2) + '\n')
+          (out / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n'
+              for p in sorted(out.iterdir()) if p.is_file()))
+          print('Verified ARM64 bundle, embedded JS, app identity and bounded permissions; generated development signature removed.')
+          PYVERIFY
+      - name: Retain bundle for owner upload signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealsend-android-${{ github.sha }}
+          path: ${{ runner.temp }}/sealsend-android-artifact/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
