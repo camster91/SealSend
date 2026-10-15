@@ -67,13 +67,16 @@ jobs:
           with (app / 'Info.plist').open('rb') as file:
               info = plistlib.load(file)
           with Path('apps/mobile/app.json').open() as file:
-              expected = json.load(file)['expo']['ios']['bundleIdentifier']
+              config = json.load(file)['expo']
+          expected = config['ios']['bundleIdentifier']
           assert info['CFBundleIdentifier'] == expected, 'Unexpected application identity'
           assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS'], 'Device archive required'
-          assert info['CFBundleShortVersionString'] == '0.1.0'
-          assert info['CFBundleVersion'] == '1'
+          assert info['CFBundleShortVersionString'] == config['version']
+          assert info['CFBundleVersion'] == config['ios']['buildNumber']
           assert isinstance(info.get('NSCameraUsageDescription'), str) and info['NSCameraUsageDescription'].strip()
-          blocked = ['NSMicrophoneUsageDescription', 'NSContactsUsageDescription', 'NSCalendarsUsageDescription',
+          calendar = next(plugin[1] for plugin in config['plugins'] if isinstance(plugin, list) and plugin[0] == 'expo-calendar')
+          assert info.get('NSCalendarsUsageDescription') == calendar['calendarPermission'], 'Required calendar SDK purpose string missing'
+          blocked = ['NSMicrophoneUsageDescription', 'NSContactsUsageDescription',
                      'NSCalendarsFullAccessUsageDescription', 'NSCalendarsWriteOnlyAccessUsageDescription',
                      'NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysUsageDescription',
                      'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSPhotoLibraryUsageDescription',
