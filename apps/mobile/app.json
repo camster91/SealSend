@@ -13,7 +13,7 @@
       "config": {
         "usesNonExemptEncryption": false
       },
-      "buildNumber": "1"
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.ashbi.sealsend",
@@ -55,7 +55,7 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": false,
+          "calendarPermission": "Open the calendar event editor so you can save an event you choose. SealSend does not read or sync your calendars.",
           "writeOnlyAccess": true,
           "writeOnlyCalendarPermission": false,
           "remindersPermission": false

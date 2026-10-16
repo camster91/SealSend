@@ -99,7 +99,16 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
       await questions.last().click();
       expect((await questionsSaved).ok()).toBe(true);
       await expectAccessibleAndContained(page, 'review');
+      // A second edit uses the same saver after rerender; Publish must flush it.
+      const updatedQuestion = `QA question ${viewport.width}`;
+      const finalQuestionsSaved = page.waitForResponse((res) =>
+        res.request().method() === 'PUT'
+        && new URL(res.url()).pathname === `/api/events/${eventId}/rsvp-fields`
+        && (res.request().postData() ?? '').includes(updatedQuestion));
+      await page.getByLabel('Question', { exact: true }).last().fill(updatedQuestion);
       await page.getByRole('button', { name: 'Publish', exact: true }).click();
+      expect((await finalQuestionsSaved).ok()).toBe(true);
+
       await expect(page.getByRole('heading', { name: 'Your invite is live' })).toBeVisible();
       await page.getByRole('button', { name: 'Copy link' }).click();
       await expect(page.getByText(/^(Link copied|Could not copy\.)/)).toBeVisible();
