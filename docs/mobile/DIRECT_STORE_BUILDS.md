@@ -5,7 +5,9 @@ The existing Expo project can be compiled by GitHub Actions and signed locally f
 ## Build candidates
 
 - `iOS TestFlight device archive` generates an unsigned ARM64 iPhoneOS archive on a standard macOS runner. It verifies identity, embedded JavaScript, sensitive permissions and packaged privacy manifests, then retains the archive with source and checksum evidence for one day.
-- `Android store bundle candidate` builds an ARM64 AAB on a standard Ubuntu runner. It verifies application identity, embedded JavaScript, Hermes and merged release permissions, removes the generated development signature and retains the unsigned bundle with source and checksum evidence for one day.
+- `Android store bundle candidate` builds an ARM64 AAB on a standard Ubuntu runner. It verifies application identity, embedded JavaScript, Hermes and packaged release permissions, removes the generated development signature and retains the unsigned bundle with source and checksum evidence for one day.
+
+Android provenance reads `expo.version` and `expo.android.versionCode` directly from `apps/mobile/app.json`. Checksum-pinned bundletool 1.18.3 decodes the finished AAB's base manifest; artifact retention fails if the packaged identity, version name or version code differs from that configuration. `source.json` retains repository, commit and run identity, and `SHA256SUMS` covers both the unsigned AAB and metadata. Regression tests run in both the candidate workflow and normal PR CI (`python3 -m unittest discover -s scripts/mobile/tests -v`), including future version increments and rejected mismatches. Building a verification candidate does not require signing or another store upload.
 
 Both workflows support manual dispatch once available on the default branch. The preparation branch also has narrowly scoped push triggers for the workflow files. They do not use signing secrets, submit to stores, activate a testing release or deploy the website. Retrieve successful artifacts before their one-day expiry. Public repository artifacts contain application code, so never include private configuration, signing material or user data in build inputs.
 
