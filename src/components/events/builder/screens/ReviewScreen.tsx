@@ -7,7 +7,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { defaultInvitationCopy } from "@/lib/invitation-defaults";
 import { getPublicationReadiness, type PublicationBlocker } from "@/lib/publication-readiness";
 import { builderDataToPreviewEvent } from "@/lib/event-builder/mapping";
-import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED, saveThenAct } from "@/lib/event-builder/review";
+import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED, saveThenAct, type RsvpSaver } from "@/lib/event-builder/review";
 import { TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderRsvpField } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
@@ -26,8 +26,9 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
     ctxRef.current = ctx;
   });
   const [rsvpError, setRsvpError] = useState<string>();
-  const [saver] = useState(() =>
-    createRsvpSaver({
+  const saverRef = useRef<RsvpSaver | null>(null);
+  useEffect(() => {
+    const saver = createRsvpSaver({
       sleep: (ms) => new Promise<void>((r) => setTimeout(r, ms)),
       onError: setRsvpError,
       send: async (fields) => {
@@ -45,10 +46,14 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
           return RSVP_SAVE_FAILED;
         }
       },
-    }),
-  );
-  // Leaving the screen sends any edit still waiting.
-  useEffect(() => () => void saver.flush(), [saver]);
+    });
+    saverRef.current = saver;
+    // Leaving the screen sends any edit still waiting.
+    return () => {
+      void saver.flush();
+      saverRef.current = null;
+    };
+  }, []);
   const [busy, setBusy] = useState<"publish" | "draft" | "save" | undefined>();
   const [serverBlockers, setServerBlockers] = useState<PublicationBlocker[]>([]);
   const [error, setError] = useState<string>();
@@ -63,7 +68,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
   const setField = (index: number, patch: Partial<BuilderRsvpField>) => {
     const next = data.rsvp_fields.map((f, i) => (i === index ? { ...f, ...patch } : f));
     ctx.update({ rsvp_fields: next });
-    saver.schedule(next);
+    saverRef.current?.schedule(next);
   };
 
   const run = async (kind: "publish" | "draft" | "save", work: (id: string) => Promise<void>) => {
@@ -75,7 +80,7 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
       const problem = await saveThenAct({
         ensureDraft: ctx.ensureDraft,
         flush: ctx.flush,
-        flushQuestions: () => saver.flush(),
+        flushQuestions: () => saverRef.current?.flush() ?? Promise.resolve(RSVP_SAVE_FAILED),
         act: work,
       });
       if (problem) {
