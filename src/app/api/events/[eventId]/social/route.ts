@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
-import { ensureSocialSchema } from '@/lib/social/access';
 import { loadSocialState, socialDb } from '@/lib/social/store';
 import { hostActionSchema } from '@/lib/social/contracts';
 import { applyHostAction } from '@/lib/social/actions';
@@ -17,7 +16,6 @@ export async function GET(_request: Request, { params }: Context) {
     if (auth.error) return auth.error;
     const event = await queryOne<{ event_date:string | null }>('SELECT event_date FROM events WHERE id=$1',[eventId]);
     if (!event) return NextResponse.json({ error:'Not found' },{ status:404 });
-    await ensureSocialSchema();
     return NextResponse.json(await loadSocialState(eventId,null,event.event_date,true),{ headers:{ 'Cache-Control':'private, no-store' } });
   } catch { return NextResponse.json({ error:'Unable to load event activities.' },{ status:503 }); }
 }
@@ -33,7 +31,6 @@ export async function POST(request: Request, { params }: Context) {
     if (!limit.success) return NextResponse.json({ error:'Please try again shortly.' },{ status:429 });
     const parsed = hostActionSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return NextResponse.json({ error:'Check the activity details.' },{ status:400 });
-    await ensureSocialSchema();
     const action = parsed.data;
     const result = action.action === 'delete_photo'
       ? await deleteSocialPhoto(eventId,action.id,null,true)

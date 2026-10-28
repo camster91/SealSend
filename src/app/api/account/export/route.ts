@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { query, queryOne } from "@/lib/db/client";
-import { ensureSocialSchema } from '@/lib/social/access';
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 
 export async function GET() {
   const auth = await requireApiHost();
   if (auth.error) return auth.error;
 
-  await ensureSocialSchema();
   const userId = auth.user.id;
   const account = await queryOne<{ id: string; email: string; name: string | null; created_at: string }>(
     "SELECT id, email, name, created_at FROM admin_users WHERE id = $1",

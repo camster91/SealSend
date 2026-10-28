@@ -17,6 +17,9 @@ export function openSqliteDb(path: string): SqliteDb {
   const handle = new DatabaseSync(path);
   // D1 enforces foreign keys; match it.
   handle.exec("PRAGMA foreign_keys = ON");
+  // Dev servers and QA scripts can share one file: wait for the other writer instead of failing.
+  handle.exec("PRAGMA busy_timeout = 5000");
+  if (path !== ":memory:") handle.exec("PRAGMA journal_mode = WAL");
 
   const run = <T>({ text, params }: Statement): T[] =>
     handle.prepare(toSqlite(text)).all(...encodeParams(params)).map((row) => decodeRow<T>(row as Record<string, unknown>));

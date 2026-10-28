@@ -41,70 +41,67 @@ function assertLocalOrigin(origin) {
 async function assertFixtureIdsAvailable(db) {
   const ids = Object.values(IDS);
   for (const table of ["admin_users", "organizations", "events", "guests"]) {
-    const result = await db.query(`SELECT id FROM ${table} WHERE id = ANY($1::uuid[])`, [ids]);
+    const result = await db.query(`SELECT id FROM ${table} WHERE id IN (SELECT value FROM json_each($1))`, [ids]);
     assert.equal(result.rows.length, 0, `organizer journey fixture collides with ${table}`);
   }
 }
 
 async function seed(db) {
   await assertFixtureIdsAvailable(db);
-  await db.query("BEGIN");
-  try {
-    await db.query(
-      `INSERT INTO admin_users (id, email, name, password)
-       VALUES
-         ($1, $2, 'Organizer Journey Owner', 'disabled-local-qa'),
-         ($3, $4, 'Organizer Journey Planner', 'disabled-local-qa'),
-         ($5, $6, 'Organizer Journey Outsider', 'disabled-local-qa')`,
-      [IDS.owner, OWNER_EMAIL, IDS.planner, PLANNER_EMAIL, IDS.outsider, OUTSIDER_EMAIL],
-    );
-    await db.query(
-      `INSERT INTO organizations (id, name, slug, plan, is_personal, created_by)
-       VALUES ($1, 'Organizer Journey Workspace', 'organizer-journey-workspace', 'studio', FALSE, $2)`,
-      [IDS.organization, IDS.owner],
-    );
-    await db.query(
-      `INSERT INTO organization_members (organization_id, user_id, role)
-       VALUES ($1, $2, 'owner'), ($1, $3, 'planner')`,
-      [IDS.organization, IDS.owner, IDS.planner],
-    );
-    await db.query(
-      `INSERT INTO events
-        (id, user_id, organization_id, title, slug, status, event_date, event_timezone,
-         location_name, host_name, invitation_headline, invitation_body, customization)
-       VALUES ($1, $2, $3, 'Organizer Journey Event', $4, 'published',
-               NOW() + INTERVAL '14 days', 'America/Toronto', 'QA Hall',
-               'Organizer Journey Owner', 'You are invited', 'A local synthetic RSVP check.', '{}')`,
-      [IDS.event, IDS.owner, IDS.organization, EVENT_SLUG],
-    );
-    await db.query(
-      `INSERT INTO rsvp_fields
-        (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
-       VALUES
-        ($1, 'respondent_name', 'text', 'Full Name', TRUE, TRUE, 0, NULL, 'Enter your full name'),
-        ($1, 'email', 'email', 'Email Address', TRUE, TRUE, 1, NULL, 'your@email.com'),
-        ($1, 'attending', 'attendance', 'Will you be attending?', TRUE, TRUE, 2, '["attending","not_attending","maybe"]', NULL),
-        ($1, 'headcount', 'number', 'Number of Guests', FALSE, TRUE, 3, NULL, 'Including yourself')`,
-      [IDS.event],
-    );
-    await db.query(
-      `INSERT INTO guests (id, event_id, name, email, invite_token, invite_status, rsvp_status)
-       VALUES ($1, $2, 'Organizer Journey Guest', 'organizer-journey-guest@example.test', $3, 'pending', 'pending')`,
-      [IDS.guest, IDS.event, "organizer-journey-guest-token"],
-    );
-    await db.query(
-      `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-       VALUES
-         ($1, 'admin', $2, NOW() + INTERVAL '1 day'),
-         ($3, 'admin', $4, NOW() + INTERVAL '1 day'),
-         ($5, 'admin', $6, NOW() + INTERVAL '1 day')`,
-      [IDS.owner, SESSIONS.owner, IDS.planner, SESSIONS.planner, IDS.outsider, SESSIONS.outsider],
-    );
-    await db.query("COMMIT");
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+  // One batch: all fixtures or none, like the old transaction.
+  const statements = [];
+  const add = (text, params) => statements.push({ text, params });
+  add(
+    `INSERT INTO admin_users (id, email, name, password)
+     VALUES
+       ($1, $2, 'Organizer Journey Owner', 'disabled-local-qa'),
+       ($3, $4, 'Organizer Journey Planner', 'disabled-local-qa'),
+       ($5, $6, 'Organizer Journey Outsider', 'disabled-local-qa')`,
+    [IDS.owner, OWNER_EMAIL, IDS.planner, PLANNER_EMAIL, IDS.outsider, OUTSIDER_EMAIL],
+  );
+  add(
+    `INSERT INTO organizations (id, name, slug, plan, is_personal, created_by)
+     VALUES ($1, 'Organizer Journey Workspace', 'organizer-journey-workspace', 'studio', FALSE, $2)`,
+    [IDS.organization, IDS.owner],
+  );
+  add(
+    `INSERT INTO organization_members (organization_id, user_id, role)
+     VALUES ($1, $2, 'owner'), ($1, $3, 'planner')`,
+    [IDS.organization, IDS.owner, IDS.planner],
+  );
+  add(
+    `INSERT INTO events
+      (id, user_id, organization_id, title, slug, status, event_date, event_timezone,
+       location_name, host_name, invitation_headline, invitation_body, customization)
+     VALUES ($1, $2, $3, 'Organizer Journey Event', $4, 'published',
+             strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'), 'America/Toronto', 'QA Hall',
+             'Organizer Journey Owner', 'You are invited', 'A local synthetic RSVP check.', '{}')`,
+    [IDS.event, IDS.owner, IDS.organization, EVENT_SLUG],
+  );
+  add(
+    `INSERT INTO rsvp_fields
+      (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
+     VALUES
+      ($1, 'respondent_name', 'text', 'Full Name', TRUE, TRUE, 0, NULL, 'Enter your full name'),
+      ($1, 'email', 'email', 'Email Address', TRUE, TRUE, 1, NULL, 'your@email.com'),
+      ($1, 'attending', 'attendance', 'Will you be attending?', TRUE, TRUE, 2, '["attending","not_attending","maybe"]', NULL),
+      ($1, 'headcount', 'number', 'Number of Guests', FALSE, TRUE, 3, NULL, 'Including yourself')`,
+    [IDS.event],
+  );
+  add(
+    `INSERT INTO guests (id, event_id, name, email, invite_token, invite_status, rsvp_status)
+     VALUES ($1, $2, 'Organizer Journey Guest', 'organizer-journey-guest@example.test', $3, 'pending', 'pending')`,
+    [IDS.guest, IDS.event, "organizer-journey-guest-token"],
+  );
+  add(
+    `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+     VALUES
+       ($1, 'admin', $2, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day')),
+       ($3, 'admin', $4, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day')),
+       ($5, 'admin', $6, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))`,
+    [IDS.owner, SESSIONS.owner, IDS.planner, SESSIONS.planner, IDS.outsider, SESSIONS.outsider],
+  );
+  await db.batch(statements);
 }
 
 async function cleanup(db) {
@@ -116,14 +113,14 @@ async function cleanup(db) {
   );
   await db.query("DELETE FROM organization_webhooks WHERE organization_id = $1", [IDS.organization]);
   await db.query("DELETE FROM event_audit_log WHERE event_id = $1", [IDS.event]);
-  await db.query("DELETE FROM activation_events WHERE user_id = ANY($1::uuid[])", [[IDS.owner, IDS.planner, IDS.outsider]]);
-  await db.query("DELETE FROM user_sessions WHERE session_token = ANY($1::text[])", [Object.values(SESSIONS)]);
+  await db.query("DELETE FROM activation_events WHERE user_id IN (SELECT value FROM json_each($1))", [[IDS.owner, IDS.planner, IDS.outsider]]);
+  await db.query("DELETE FROM user_sessions WHERE session_token IN (SELECT value FROM json_each($1))", [Object.values(SESSIONS)]);
   await db.query("DELETE FROM events WHERE id = $1", [IDS.event]);
   await db.query("DELETE FROM organization_members WHERE organization_id = $1", [IDS.organization]);
   // The settings pages create a personal workspace on first load. It is
   // fixture-owned, so remove it together with the explicit team workspace.
-  await db.query("DELETE FROM organizations WHERE created_by = ANY($1::uuid[])", [[IDS.owner, IDS.planner, IDS.outsider]]);
-  await db.query("DELETE FROM admin_users WHERE id = ANY($1::uuid[])", [[IDS.owner, IDS.planner, IDS.outsider]]);
+  await db.query("DELETE FROM organizations WHERE created_by IN (SELECT value FROM json_each($1))", [[IDS.owner, IDS.planner, IDS.outsider]]);
+  await db.query("DELETE FROM admin_users WHERE id IN (SELECT value FROM json_each($1))", [[IDS.owner, IDS.planner, IDS.outsider]]);
 }
 
 async function sessionContext(browser, origin, sessionToken) {
@@ -236,7 +233,7 @@ export async function organizerJourneyBrowserChecks({ browser, origin, db }) {
     await ownerPage.getByRole("button", { name: "Remove brand", exact: true }).click();
     await ownerPage.getByRole("status").filter({ hasText: "Brand removed" }).waitFor();
     assert.equal(
-      (await db.query("SELECT COUNT(*)::int AS count FROM brands WHERE organization_id = $1 AND is_default", [IDS.organization])).rows[0].count,
+      (await db.query("SELECT COUNT(*) AS count FROM brands WHERE organization_id = $1 AND is_default", [IDS.organization])).rows[0].count,
       0,
       "removing a brand must delete the workspace default",
     );
@@ -381,7 +378,7 @@ export async function organizerJourneyBrowserChecks({ browser, origin, db }) {
     assert.equal(createdAnnouncement.status, "queued");
     assert.equal(createdAnnouncement.dispatch, null);
     assert.equal(
-      (await db.query("SELECT COUNT(*)::int AS count FROM announcement_deliveries WHERE announcement_id = $1", [createdAnnouncement.id])).rows[0].count,
+      (await db.query("SELECT COUNT(*) AS count FROM announcement_deliveries WHERE announcement_id = $1", [createdAnnouncement.id])).rows[0].count,
       0,
       "future scheduling must not create provider delivery rows",
     );
@@ -434,12 +431,12 @@ export async function organizerJourneyBrowserChecks({ browser, origin, db }) {
       const { deliverDueWebhooks, verifyWebhookSignature } = await import("../../src/lib/webhooks.ts");
       // Make the fixture due immediately; production cron timing is not
       // changed and no external scheduler is contacted.
-      await db.query("UPDATE webhook_deliveries SET next_attempt_at = NOW() WHERE webhook_id = $1", [webhookId]);
+      await db.query("UPDATE webhook_deliveries SET next_attempt_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE webhook_id = $1", [webhookId]);
       const first = await deliverDueWebhooks(10);
       assert.deepEqual(first, { attempted: 1, delivered: 0, failed: 0 }, "first receiver response should schedule a retry");
       const afterFirst = (await db.query("SELECT status, attempts, last_status_code FROM webhook_deliveries WHERE webhook_id = $1", [webhookId])).rows[0];
       assert.deepEqual(afterFirst, { status: "pending", attempts: 1, last_status_code: 503 });
-      await db.query("UPDATE webhook_deliveries SET next_attempt_at = NOW() WHERE webhook_id = $1", [webhookId]);
+      await db.query("UPDATE webhook_deliveries SET next_attempt_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE webhook_id = $1", [webhookId]);
       const second = await deliverDueWebhooks(10);
       assert.deepEqual(second, { attempted: 1, delivered: 1, failed: 0 }, "retry should deliver after the receiver recovers");
       const afterSecond = (await db.query("SELECT status, attempts, last_status_code FROM webhook_deliveries WHERE webhook_id = $1", [webhookId])).rows[0];
@@ -456,8 +453,8 @@ export async function organizerJourneyBrowserChecks({ browser, origin, db }) {
     await ownerPage.getByRole("alertdialog").getByRole("button", { name: "Delete webhook", exact: true }).click();
     await ownerPage.getByText("Webhook deleted.", { exact: true }).waitFor();
     await webhookRow.waitFor({ state: "detached" });
-    assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM organization_webhooks WHERE id = $1", [webhookId])).rows[0].count, 0);
-    assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM webhook_deliveries WHERE webhook_id = $1", [webhookId])).rows[0].count, 0);
+    assert.equal((await db.query("SELECT COUNT(*) AS count FROM organization_webhooks WHERE id = $1", [webhookId])).rows[0].count, 0);
+    assert.equal((await db.query("SELECT COUNT(*) AS count FROM webhook_deliveries WHERE webhook_id = $1", [webhookId])).rows[0].count, 0);
 
     console.log(`PASS organizer brand kit create/validation/removal, public RSVP application, role denial, one-time webhook secret, pause/resume/delete authorization, and ${deliveryEvidence}`);
   } finally {

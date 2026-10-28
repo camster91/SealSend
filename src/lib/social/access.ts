@@ -35,10 +35,3 @@ export async function resolveSocialAccess(request: Request, slug: string, deps: 
   return null;
 }
 
-/**
- * @deprecated No-op. The social tables and the photo cleanup trigger are part of
- * src/lib/db/schema.sql now; kept only so existing callers keep working until they drop the call.
- */
-export function ensureSocialSchema(): Promise<void> {
-  return Promise.resolve();
-}

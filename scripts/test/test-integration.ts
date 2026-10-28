@@ -7,7 +7,10 @@
  *   npx tsx scripts/test/test-integration.ts
  *
  * This creates a test event and sends real emails/SMS.
- * Requires all environment variables to be configured.
+ * Requires all environment variables to be configured. The database is the local SQLite file
+ * at SQLITE_PATH (default .data/sealsend.db), which the running app must also use, or the
+ * production D1 with D1_REMOTE=true plus CLOUDFLARE_ACCOUNT_ID, D1_DATABASE_ID and
+ * CLOUDFLARE_API_TOKEN.
  */
 
 import * as dotenv from 'dotenv';
@@ -16,10 +19,9 @@ import { resolve } from 'path';
 // Load environment variables from .env.local
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
-import { Pool } from 'pg';
+import { query, queryOne } from '../../src/lib/db/client';
 import { hashPassword } from '../../src/lib/password';
-
-const DATABASE_URL = process.env.DATABASE_URL;
+import { requireCliDatabase } from '../lib/cli-database';
 
 interface TestContext {
   userId?: string;
@@ -65,42 +67,31 @@ async function runIntegrationTests(): Promise<void> {
   const context: TestContext = {};
 
   // Check environment
-  if (!DATABASE_URL) {
-    console.error('Missing DATABASE_URL environment variable');
-    process.exit(1);
-  }
-
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
+  requireCliDatabase();
 
   // Test 1: Create test admin user
   console.log('Test 1: Creating test admin user...');
   try {
     const hashedPassword = await hashPassword('TestPassword123!');
-    const result = await pool.query<AdminUser>(
+    const user = await queryOne<AdminUser>(
       `INSERT INTO admin_users (email, name, password)
        VALUES ($1, $2, $3)
        RETURNING id, email`,
       [`test-${Date.now()}@sealsend.test`, 'Test User', hashedPassword]
     );
 
-    const user = result.rows[0];
+    if (!user) throw new Error('admin user was not created');
     context.userId = user.id;
     console.log(`   Created user: ${user.email} (ID: ${user.id})\n`);
   } catch (error: unknown) {
     console.error('   Failed:', error);
-    await pool.end();
     process.exit(1);
   }
 
   // Test 2: Create test event
   console.log('Test 2: Creating test event...');
   try {
-    const result = await pool.query<Event>(
+    const event = await queryOne<Event>(
       `INSERT INTO events (
         user_id, title, description, event_date, location_name,
         location_address, host_name, dress_code, tier, status,
@@ -130,20 +121,20 @@ async function runIntegrationTests(): Promise<void> {
       ]
     );
 
-    const event = result.rows[0];
+    if (!event) throw new Error('event was not created');
     context.eventId = event.id;
     console.log(`   Created event: ${event.title} (ID: ${event.id})`);
     console.log(`   Slug: ${event.slug}\n`);
   } catch (error: unknown) {
     console.error('   Failed:', error);
-    await cleanup(context, pool);
+    await cleanup(context);
     process.exit(1);
   }
 
   // Test 3: Create RSVP fields
   console.log('Test 3: Creating RSVP fields...');
   try {
-    await pool.query(
+    await query(
       `INSERT INTO rsvp_fields (event_id, field_name, field_label, field_type, is_required, is_enabled, sort_order)
        VALUES
          ($1, 'attendance', 'Will you be attending?', 'attendance', true, true, 0),
@@ -155,7 +146,7 @@ async function runIntegrationTests(): Promise<void> {
     console.log('   Created RSVP fields\n');
   } catch (error: unknown) {
     console.error('   Failed:', error);
-    await cleanup(context, pool);
+    await cleanup(context);
     process.exit(1);
   }
 
@@ -184,13 +175,13 @@ async function runIntegrationTests(): Promise<void> {
     const insertedGuests: Guest[] = [];
 
     for (const g of testGuests) {
-      const result = await pool.query<Guest>(
+      const guest = await queryOne<Guest>(
         `INSERT INTO guests (event_id, name, email, phone)
          VALUES ($1, $2, $3, $4)
          RETURNING id, name, email, phone, invite_status, invite_token`,
         [context.eventId, g.name, g.email, g.phone]
       );
-      const guest = result.rows[0];
+      if (!guest) throw new Error('guest was not created');
       guestIds.push(guest.id);
       insertedGuests.push(guest);
     }
@@ -203,7 +194,7 @@ async function runIntegrationTests(): Promise<void> {
     console.log('');
   } catch (error: unknown) {
     console.error('   Failed:', error);
-    await cleanup(context, pool);
+    await cleanup(context);
     process.exit(1);
   }
 
@@ -216,7 +207,7 @@ async function runIntegrationTests(): Promise<void> {
     const sessionToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await pool.query(
+    await query(
       `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
        VALUES ($1, $2, $3, $4)`,
       [context.userId, 'admin', sessionToken, expiresAt.toISOString()]
@@ -262,12 +253,11 @@ async function runIntegrationTests(): Promise<void> {
     await sleep(3000);
 
     // Check send_logs
-    const logResult = await pool.query<SendLog>(
+    const sendLogs = await query<SendLog>(
       'SELECT send_type, recipient, status FROM send_logs WHERE event_id = $1',
       [context.eventId]
     );
 
-    const sendLogs = logResult.rows;
     console.log(`   Send logs created: ${sendLogs.length}`);
     sendLogs.forEach((log: SendLog) => {
       console.log(`      - ${log.send_type.toUpperCase()} to ${log.recipient}: ${log.status}`);
@@ -282,12 +272,11 @@ async function runIntegrationTests(): Promise<void> {
   // Test 6: Check guest invite status
   console.log('Test 6: Checking guest invite status...');
   try {
-    const result = await pool.query<Guest>(
+    const guests = await query<Guest>(
       'SELECT name, invite_status, invite_token FROM guests WHERE event_id = $1',
       [context.eventId]
     );
 
-    const guests = result.rows;
     console.log('   Guest invite status:');
     guests.forEach((g: Guest) => {
       console.log(`      - ${g.name}: ${g.invite_status} (token: ${g.invite_token?.slice(0, 10)}...)`);
@@ -317,26 +306,22 @@ async function runIntegrationTests(): Promise<void> {
 
   // Auto-cleanup
   console.log('\nAuto-cleaning up test data...');
-  await cleanup(context, pool);
+  await cleanup(context);
   console.log('Cleanup complete');
 }
 
-async function cleanup(context: TestContext, pool: Pool): Promise<void> {
-  try {
-    if (context.eventId) {
-      await pool.query('DELETE FROM guests WHERE event_id = $1', [context.eventId]);
-      await pool.query('DELETE FROM rsvp_fields WHERE event_id = $1', [context.eventId]);
-      await pool.query('DELETE FROM event_announcements WHERE event_id = $1', [context.eventId]);
-      await pool.query('DELETE FROM send_logs WHERE event_id = $1', [context.eventId]);
-      await pool.query('DELETE FROM events WHERE id = $1', [context.eventId]);
-    }
+async function cleanup(context: TestContext): Promise<void> {
+  if (context.eventId) {
+    await query('DELETE FROM guests WHERE event_id = $1', [context.eventId]);
+    await query('DELETE FROM rsvp_fields WHERE event_id = $1', [context.eventId]);
+    await query('DELETE FROM event_announcements WHERE event_id = $1', [context.eventId]);
+    await query('DELETE FROM send_logs WHERE event_id = $1', [context.eventId]);
+    await query('DELETE FROM events WHERE id = $1', [context.eventId]);
+  }
 
-    if (context.userId) {
-      await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [context.userId]);
-      await pool.query('DELETE FROM admin_users WHERE id = $1', [context.userId]);
-    }
-  } finally {
-    await pool.end();
+  if (context.userId) {
+    await query('DELETE FROM user_sessions WHERE user_id = $1', [context.userId]);
+    await query('DELETE FROM admin_users WHERE id = $1', [context.userId]);
   }
 }
 

@@ -22,10 +22,8 @@ import { startSocialQa } from './start-social-qa.ts';
 import { hashMagicToken, previewMagicToken } from '../../src/lib/magic-token.ts';
 async function main() {
 const cwd = process.cwd();
-// Concurrent RSVP transactions require native PostgreSQL, not the socket emulator.
-process.env.SEALSEND_QA_USE_POSTGRES ??= 'true';
+// Throwaway SQLite file; startSocialQa points SQLITE_PATH at it before the app is imported below.
 const { db,server } = await startSocialQa();
-process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:55432/postgres';
 process.env.AI_PROVIDER = 'fake';
 process.env.PAYMENTS_TEST_ONLY = 'true';
 process.env.COMMUNICATIONS_TEST_ONLY = 'true';
@@ -67,7 +65,7 @@ try {
     const betaPolicy = JSON.parse(await readFile(join(cwd,'config/beta-acceptance-policy.json'),'utf8'));
     await db.query(`INSERT INTO beta_enrollment_invites
       (token_hash,token_preview,participant_label,segment,cohort_version,expires_at)
-      VALUES ($1,$2,'host-abcdef123456','repeat_planner',$3,NOW()+INTERVAL '1 day')`,
+      VALUES ($1,$2,'host-abcdef123456','repeat_planner',$3,strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))`,
       [hashMagicToken(betaToken),previewMagicToken(betaToken),betaPolicy.cohortVersion]);
     for (const suite of ['live-full.spec.ts','live-builder.spec.ts','live-templates.spec.ts','live-account-privacy.spec.ts','live-ai-chat.spec.ts']) {
     await db.query("DELETE FROM rate_limit_attempts WHERE key LIKE 'login-password:%'");
@@ -109,7 +107,7 @@ try {
   assert.equal(await hostPage.getByLabel('Question',{exact:true}).inputValue(),'');
   await hostPage.getByRole('button',{name:'Refresh activities',exact:true}).click();
   await hostPage.getByRole('heading',{name:'Recovery test poll',exact:true}).waitFor();
-  assert.equal((await db.query("SELECT COUNT(*)::int AS count FROM event_social_polls WHERE question = 'Recovery test poll'")).rows[0].count,1);
+  assert.equal((await db.query("SELECT COUNT(*) AS count FROM event_social_polls WHERE question = 'Recovery test poll'")).rows[0].count,1);
   const token = 'a'.repeat(24), otherToken = 'b'.repeat(24);
   const ctx = await browser.newContext({ ignoreHTTPSErrors:true,extraHTTPHeaders:{ Origin:origin } });
   const page = await ctx.newPage(); page.on('pageerror',e=>errors.push(e.message)); 
@@ -142,7 +140,7 @@ try {
   await page.getByText('1 vote',{ exact:true }).waitFor();
   await page.getByLabel('Crackers').click();
   await page.getByRole('radio',{ name:'Crackers 1 vote',exact:true }).waitFor();
-  const votes = await db.query('SELECT COUNT(*)::int AS count FROM event_social_votes');
+  const votes = await db.query('SELECT COUNT(*) AS count FROM event_social_votes');
   assert.equal(votes.rows[0].count,1);
   const png = await sharp({ create:{ width:16,height:16,channels:3,background:'#224466' } }).png().toBuffer();
   await page.getByLabel(/Photo \(JPEG/).setInputFiles({ name:'qa.png',mimeType:'image/png',buffer:png });
@@ -159,7 +157,7 @@ try {
   await page.getByRole('button',{name:'Refresh activities',exact:true}).click();
   await page.getByText('Waiting for host approval',{ exact:true }).waitFor();
   const photo = (await db.query('SELECT id,storage_path FROM event_social_photos')).rows[0];
-  assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,1);
+  assert.equal((await db.query('SELECT COUNT(*) AS count FROM event_social_photos')).rows[0].count,1);
   console.log('PASS confirmed guest save/upload survives failed refresh and upload form resets without a duplicate');
   const publicResponse = await fetch(`${localApi}${photo.storage_path}`); assert.equal(publicResponse.status,404);
   const denied = await fetch(`${localApi}/api/social/social-qa/photos/${photo.id}`); assert.equal(denied.status,404);
@@ -182,7 +180,7 @@ try {
   await page.getByRole('button',{ name:'Remove my photo',exact:true }).click();
   await page.getByRole('alertdialog').getByRole('button',{name:'Remove photo',exact:true}).click();
   await page.getByText('Photo removed.',{ exact:true }).waitFor();
-  assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_photos')).rows[0].count,0);
+  assert.equal((await db.query('SELECT COUNT(*) AS count FROM event_social_photos')).rows[0].count,0);
   console.log('PASS guest opt-in, reactions, changeable single vote, private upload, moderation and removal');
   for (const deletingEvent of [false,true]) {
     const invite = deletingEvent ? otherToken : token;
@@ -194,8 +192,8 @@ try {
     const endpoint = deletingEvent ? `/api/events/${eventId}` : `/api/events/${eventId}/guests/00000000-0000-4000-8000-000000000012`;
     assert.equal((await host.request.delete(`${origin}${endpoint}`,{headers:{Origin:origin}})).status(),200);
     await assert.rejects(readFile(file),{code:'ENOENT'});
-    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM upload_assets')).rows[0].count,0);
-    assert.equal((await db.query('SELECT COUNT(*)::int AS count FROM event_social_file_cleanup')).rows[0].count,0);
+    assert.equal((await db.query('SELECT COUNT(*) AS count FROM upload_assets')).rows[0].count,0);
+    assert.equal((await db.query('SELECT COUNT(*) AS count FROM event_social_file_cleanup')).rows[0].count,0);
     if (!deletingEvent) {
       await page.getByRole('button',{name:/I'm excited/}).click();
       await page.getByText('Open your personal invitation to join in.',{exact:true}).waitFor();

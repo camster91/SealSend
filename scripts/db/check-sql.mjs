@@ -20,7 +20,7 @@ const POSTGRES_ONLY = [
   [/\bILIKE\b/i, "ILIKE"],
   [/\bDISTINCT\s+ON\b/i, "DISTINCT ON"],
   [/\bpg_advisory/i, "advisory lock"],
-  [/\bjsonb?_(build|agg|array_elements|each|set|typeof|strip)/i, "jsonb function"],
+  [/\bjsonb_|\bjson_(build|agg|array_elements|strip|typeof)\b/i, "jsonb function"],
   [/->>?/, "JSON operator"],
   [/\bto_char\(/i, "to_char"],
   [/\bgenerate_series\(/i, "generate_series"],
