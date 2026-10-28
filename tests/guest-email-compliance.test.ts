@@ -142,7 +142,7 @@ test("mailgun sends custom headers as h: fields and refuses header injection", a
   const mailgun = await readFile("src/lib/mailgun.ts", "utf8");
   const email = await readFile("src/lib/email.ts", "utf8");
   assert.match(mailgun, /headers\?: Record<string, string>/);
-  assert.match(mailgun, /messageData\[`h:\$\{name\}`\]/);
+  assert.match(mailgun, /append\(`h:\$\{name\}`, value\)/);
   assert.match(mailgun, /\[\\r\\n\]/);
   assert.match(email, /headers\?: Record<string, string>/);
   assert.match(email, /headers: params\.headers/);

@@ -1,9 +1,7 @@
-import path from 'node:path';
-import { unlink } from 'node:fs/promises';
-import sharp from 'sharp';
+import { toWebp } from '@/lib/image-processor';
 import { query } from '@/lib/db/client';
 import { saveImageForUser, validateMagicBytes } from '@/lib/upload-store';
-import { resolveUploadPath } from '@/lib/upload-path';
+import { blobKeyFromUploadPath, getBlobStore } from '@/lib/blob-store';
 import { socialTransaction } from './actions';
 import { ensureSocialSchema } from './access';
 import type { SocialAccess } from './access';
@@ -30,7 +28,7 @@ export async function readBoundedBody(request: Request, max = MAX_PHOTO_BYTES + 
 export async function normalizePhoto(bytes: Buffer, contentType: string): Promise<Buffer | null> {
   if (!['image/jpeg','image/png','image/webp'].includes(contentType) || bytes.length > MAX_PHOTO_BYTES || !validateMagicBytes(bytes,contentType)) return null;
   try {
-    return await sharp(bytes, { limitInputPixels: 25000000 }).rotate().resize(1600,1600,{ fit:'inside',withoutEnlargement:true }).webp({ quality:80 }).toBuffer();
+    return Buffer.from(await toWebp(bytes, { maxSize:1600,quality:80,autoRotate:true,limitInputPixels:25000000 }));
   } catch { return null; }
 }
 export async function saveSocialPhoto(access: SocialAccess, bytes: Buffer, caption: string): Promise<{ status: number; error?: string; id?: string }> {
@@ -59,12 +57,12 @@ export async function saveSocialPhoto(access: SocialAccess, bytes: Buffer, capti
 
 export function privatePhotoPath(storagePath: string): string | null {
   if (!/^\/uploads\/[0-9a-f-]+\/social-private\/[A-Za-z0-9._-]+\.webp$/.test(storagePath)) return null;
-  return resolveUploadPath(path.join(process.cwd(),'uploads'),storagePath.slice('/uploads/'.length).split('/'));
+  return blobKeyFromUploadPath(storagePath);
 }
 export async function removePrivateFile(storagePath: string): Promise<void> {
   const file = privatePhotoPath(storagePath);
   if (!file) return;
-  await unlink(file).catch(error => { if (error.code !== 'ENOENT') throw error; });
+  await getBlobStore().delete(file);
   await query('DELETE FROM upload_assets WHERE path=$1',[storagePath]);
   await query('DELETE FROM event_social_file_cleanup WHERE storage_path=$1',[storagePath]);
 }

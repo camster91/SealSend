@@ -103,8 +103,18 @@ function isPlausibleIp(value: string): boolean {
  * Extract client IP from request headers.
  * Prefer x-real-ip (set by trusted reverse proxy). Only use the left-most
  * x-forwarded-for hop when TRUST_PROXY_HEADERS=true (Coolify/nginx setups).
+ * Behind Cloudflare, set TRUST_CF_CONNECTING_IP=true: Cloudflare overwrites
+ * CF-Connecting-IP on every request, so clients can't forge it (unlike the
+ * left-most x-forwarded-for hop).
  */
 export function getClientIp(request: Request): string {
+  if (process.env.TRUST_CF_CONNECTING_IP === 'true') {
+    const cfIp = request.headers.get("cf-connecting-ip");
+    if (cfIp && isPlausibleIp(cfIp)) {
+      return cfIp.trim();
+    }
+  }
+
   const trustProxy = process.env.TRUST_PROXY_HEADERS === 'true';
 
   if (trustProxy) {

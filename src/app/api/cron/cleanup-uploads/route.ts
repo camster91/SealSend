@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unlink } from "fs/promises";
-import path from "path";
 import { query } from "@/lib/db/client";
 import { purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { ensureSocialSchema } from '@/lib/social/access';
-import { resolveUploadPath } from "@/lib/upload-path";
+import { blobKeyFromUploadPath, getBlobStore } from "@/lib/blob-store";
 
 type Asset = { id: string; path: string };
 
@@ -26,16 +24,14 @@ export async function GET(request: NextRequest) {
   if (!enabled) return NextResponse.json({ enabled: false, candidates: assets.length, deleted: 0, socialPhotosDeleted });
 
   let deleted = 0;
-  const uploadsDir = path.join(process.cwd(), "uploads");
+  const store = getBlobStore();
   for (const asset of assets) {
-    const segments = asset.path.replace(/^\/uploads\//, "").split("/");
+    const key = blobKeyFromUploadPath(asset.path);
+    if (!key) continue;
     try {
-      const resolved = resolveUploadPath(uploadsDir, segments);
-      if (!resolved) continue;
-      await unlink(resolved);
-    } catch (error) {
-      const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined;
-      if (code !== "ENOENT") continue;
+      await store.delete(key);
+    } catch {
+      continue;
     }
     await query("DELETE FROM upload_assets WHERE id = $1", [asset.id]);
     deleted += 1;

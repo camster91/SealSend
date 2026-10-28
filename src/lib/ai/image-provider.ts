@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { deflateSync } from "node:zlib";
 
 export type CoverImageResult = { bytes: Buffer } | { refused: true };
 
@@ -70,11 +70,43 @@ class OpenAiCoverImageProvider implements CoverImageProvider {
   }
 }
 
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  let crc = 0xffffffff;
+  for (const byte of body) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  const out = Buffer.alloc(body.length + 8);
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE((crc ^ 0xffffffff) >>> 0, body.length + 4);
+  return out;
+}
+
+/** A solid-colour RGB PNG, built without an image library so it also runs on Workers. */
+function solidPng(width: number, height: number, [r, g, b]: [number, number, number]): Buffer {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8); // 8-bit RGB, no interlace
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: width }, () => [r, g, b]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
 // Test-only: a tiny deterministic PNG.
 class FakeCoverImageProvider implements CoverImageProvider {
   async generate(): Promise<CoverImageResult> {
-    const bytes = await sharp({ create: { width: 64, height: 43, channels: 3, background: { r: 120, g: 90, b: 160 } } }).png().toBuffer();
-    return { bytes };
+    return { bytes: solidPng(64, 43, [120, 90, 160]) };
   }
 }
 

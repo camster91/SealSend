@@ -79,3 +79,4 @@ apps/mobile/build/
 /dist/
 .vinext/
 .cloudflare/
+.dev.vars

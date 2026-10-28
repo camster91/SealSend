@@ -83,7 +83,7 @@ test("a trailing-dot localhost is refused", () => {
 });
 
 test("delivery-time DNS lookup refuses names that resolve to private addresses", async () => {
-  const { publicOnlyLookup } = await import("../src/lib/webhooks");
+  const { publicOnlyLookup } = await import("../src/lib/webhook-transport");
   const error = await new Promise<NodeJS.ErrnoException | null>((resolve) => {
     publicOnlyLookup("localhost", { all: true }, (err) => resolve(err));
   });

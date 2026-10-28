@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { resolveSocialAccess, ensureSocialSchema } from '@/lib/social/access';
+import { getBlobStore } from '@/lib/blob-store';
 import { canReadPhoto, privatePhotoPath, deleteSocialPhoto } from '@/lib/social/photos';
 import { getSocialSettings } from '@/lib/social/store';
 import { queryOne } from '@/lib/db/client';
@@ -35,7 +35,9 @@ export async function GET(request: Request, { params }: Context) {
     if (!photo || !canReadPhoto(photo.approved,photo.guest_id,access.guestId,access.host)) return missing();
     const file = privatePhotoPath(photo.storage_path);
     if (!file) return missing();
-    return new NextResponse(new Uint8Array(await readFile(file)),{ headers:{ 'Content-Type':'image/webp','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',Vary:'Cookie' } });
+    const bytes = await getBlobStore().get(file);
+    if (!bytes) return missing();
+    return new NextResponse(bytes as BodyInit,{ headers:{ 'Content-Type':'image/webp','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',Vary:'Cookie' } });
   } catch { return missing(); }
 }
 export async function DELETE(request: Request, { params }: Context) {
