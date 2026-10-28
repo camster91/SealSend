@@ -64,7 +64,7 @@ try {
   const hostPage = await host.newPage(); hostPage.on('pageerror',e=>errors.push(e.message));
   if (process.env.SEALSEND_QA_BUILDER === 'true') {
     const betaToken = 'q'.repeat(43);
-    const betaPolicy = JSON.parse(await readFile('config/beta-acceptance-policy.json','utf8'));
+    const betaPolicy = JSON.parse(await readFile(join(cwd,'config/beta-acceptance-policy.json'),'utf8'));
     await db.query(`INSERT INTO beta_enrollment_invites
       (token_hash,token_preview,participant_label,segment,cohort_version,expires_at)
       VALUES ($1,$2,'host-abcdef123456','repeat_planner',$3,NOW()+INTERVAL '1 day')`,
