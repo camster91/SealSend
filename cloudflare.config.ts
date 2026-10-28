@@ -33,7 +33,8 @@ const SECRET_NAMES = [
 // Safe defaults that match the controlled beta (see CLAUDE.md and DEPLOYMENT_READINESS.md).
 // Payments and outbound messages stay test-only and every automation stays off until you change them here.
 const PLAIN_VALUES = {
-  NEXT_PUBLIC_SITE_URL: "https://sealsend.app",
+  // Override with NEXT_PUBLIC_SITE_URL at build time for a workers.dev rehearsal, so links don't point at production.
+  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? "https://sealsend.app",
   PAYMENTS_TEST_ONLY: "true",
   COMMUNICATIONS_TEST_ONLY: "true",
   ENABLE_STALE_DRAFT_CLEANUP: "false",
