@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { resolveSocialAccess, ensureSocialSchema } from '@/lib/social/access';
+import { resolveSocialAccess } from '@/lib/social/access';
 import { getBlobStore } from '@/lib/blob-store';
 import { canReadPhoto, privatePhotoPath, deleteSocialPhoto } from '@/lib/social/photos';
 import { getSocialSettings } from '@/lib/social/store';
@@ -28,7 +28,6 @@ export async function GET(request: Request, { params }: Context) {
     if (!z.uuid().safeParse(id).success) return missing();
     const access = await viewer(request,slug);
     if (!access) return missing();
-    await ensureSocialSchema();
     const settings = await getSocialSettings(access.eventId);
     if (!access.host && !settings.photos_enabled) return missing();
     const photo = await queryOne<{ guest_id:string; approved:boolean; storage_path:string }>('SELECT guest_id,approved,storage_path FROM event_social_photos WHERE event_id=$1 AND id=$2',[access.eventId,id]);
@@ -46,7 +45,6 @@ export async function DELETE(request: Request, { params }: Context) {
     if (!z.uuid().safeParse(id).success) return missing();
     const access = await viewer(request,slug);
     if (!access) return missing();
-    await ensureSocialSchema();
     if (!await deleteSocialPhoto(access.eventId,id,access.guestId,access.host)) return missing();
     return NextResponse.json({ success:true },{ headers:{ 'Cache-Control':'private, no-store' } });
   } catch { return NextResponse.json({ error:'Unable to remove the photo.' },{ status:503 }); }

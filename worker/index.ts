@@ -1,5 +1,4 @@
 import handler from "vinext/server/fetch-handler";
-import { runWithDbScope } from "@/lib/db/client.cloudflare";
 
 type WorkerEnv = { CRON_SECRET?: string; NEXT_PUBLIC_SITE_URL?: string } & Record<string, unknown>;
 type ExecutionContextLike = { waitUntil(promise: Promise<unknown>): void };
@@ -32,7 +31,7 @@ function rewriteUploads(request: Request): Request {
 
 const worker = {
   fetch(request: Request, env: WorkerEnv, ctx: ExecutionContextLike) {
-    return runWithDbScope(() => app.fetch(rewriteUploads(request), env, ctx));
+    return app.fetch(rewriteUploads(request), env, ctx);
   },
 
   async scheduled(controller: { cron: string }, env: WorkerEnv, ctx: ExecutionContextLike) {
@@ -40,7 +39,7 @@ const worker = {
     if (!route || !env.CRON_SECRET) return;
     const origin = env.NEXT_PUBLIC_SITE_URL ?? "https://sealsend.app";
     const request = new Request(`${origin}${route}`, { method: "POST", headers: { Authorization: `Bearer ${env.CRON_SECRET}` } });
-    const response = await runWithDbScope(() => app.fetch(request, env, ctx));
+    const response = await app.fetch(request, env, ctx);
     if (!response.ok) console.error(`[cron] ${route} returned ${response.status}`);
   },
 };

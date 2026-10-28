@@ -2,7 +2,7 @@
 
 Digital invitations with RSVP tracking, guest messaging and check-in, for one-off hosts and event planners.
 
-SealSend lets a host design an invitation, send it by email or SMS, and watch responses come in. Guests RSVP from a public event page without creating an account. Planners who run events for clients get team workspaces, their own branding, client review links and webhooks into their other tools. It is a full-stack Next.js app backed by PostgreSQL, with Stripe billing and Mailgun/Twilio delivery.
+SealSend lets a host design an invitation, send it by email or SMS, and watch responses come in. Guests RSVP from a public event page without creating an account. Planners who run events for clients get team workspaces, their own branding, client review links and webhooks into their other tools. It is a full-stack Next.js app backed by SQLite (Cloudflare D1 in production), with Stripe billing and Mailgun/Twilio delivery.
 
 ## Features
 
@@ -36,7 +36,7 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 | Area | Technology |
 |------|------------|
 | Framework | Next.js 16 (App Router), React 19, TypeScript |
-| Database | PostgreSQL 16 with raw SQL via `pg` |
+| Database | SQLite with raw SQL: Cloudflare D1 in production, `node:sqlite` locally |
 | Styling and UI | Tailwind CSS 4, Radix UI Tooltip, Framer Motion, Lucide icons |
 | Forms and validation | React Hook Form, Zod |
 | Email / SMS | Mailgun, Twilio |
@@ -47,7 +47,7 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 
 ## Getting started
 
-Prerequisites: Node.js 20+, PostgreSQL 16, and Mailgun, Twilio and Stripe accounts (test credentials are fine for local work).
+Prerequisites: Node.js 22.13+, and Mailgun, Twilio and Stripe accounts (test credentials are fine for local work).
 
 ```bash
 git clone https://github.com/camster91/SealSend.git
@@ -58,14 +58,10 @@ cp .env.example .env.local   # fill in values; see comments in .env.example
 
 Keep `PAYMENTS_TEST_ONLY=true` and `COMMUNICATIONS_TEST_ONLY=true` outside production.
 
-Set up the database:
+The local database is a SQLite file at `SQLITE_PATH` (default `.data/sealsend.db`). Load the schema (idempotent) with:
 
 ```bash
-# Fresh database
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/lib/db/schema.sql
-
-# Upgrading an existing database (idempotent)
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f apply-security-indexes.sql
+npx tsx -e "import('./src/lib/db/migrate.ts').then((m) => m.runMigrations())"
 ```
 
 Run it:
@@ -76,7 +72,7 @@ npm run build
 npm run start
 ```
 
-`docker-compose.yml` builds and runs the web container (point `DATABASE_URL` at your PostgreSQL instance).
+`docker-compose.yml` builds the current production container (Postgres). It is retired when production moves to Cloudflare Workers and D1 (`docs/d1-port.md`).
 
 ## Testing
 

@@ -1,43 +1,45 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import { Pool } from "pg";
 import { getBinding } from "@/lib/runtime-bindings";
+import { decodeRow, encodeParams, toSqlite, type SqlValue, type Statement } from "./sqlite-dialect";
 
 /**
- * Workers can't reuse a socket opened by another request, so each request gets
- * its own pool (see worker/index.ts). Hyperdrive pools connections to the real
- * database, so opening one per request is cheap.
+ * Cloudflare D1 (binding `DB`), swapped in for client.ts by the Worker build.
+ * D1 has no interactive transactions: use `batch` for writes that must succeed or fail together.
  */
-const requestScope = new AsyncLocalStorage<{ pool: Pool | null }>();
+type D1Prepared = { all<T>(): Promise<{ results: T[] }> };
+type D1Statement = { bind(...values: SqlValue[]): D1Prepared };
+export type D1Database = {
+  prepare(text: string): D1Statement;
+  batch<T>(statements: D1Prepared[]): Promise<{ results: T[] }[]>;
+  exec(sql: string): Promise<unknown>;
+};
 
-function connectionString(): string {
-  const hyperdrive = getBinding<{ connectionString: string }>("HYPERDRIVE");
-  const url = hyperdrive?.connectionString ?? process.env.DATABASE_URL;
-  if (!url) throw new Error("HYPERDRIVE binding or DATABASE_URL is not configured");
-  return url;
+export function getDb(): D1Database {
+  const database = getBinding<D1Database>("DB");
+  if (!database) throw new Error("D1 binding DB is not configured");
+  return database;
 }
 
-function createPool(): Pool {
-  return new Pool({ connectionString: connectionString(), max: 5, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 });
-}
-
-export function getDb(): Pool {
-  const scope = requestScope.getStore();
-  if (!scope) return createPool();
-  scope.pool ??= createPool();
-  return scope.pool;
-}
-
-/** Runs `work` with a request-scoped pool. The runtime closes its sockets when the request ends. */
-export function runWithDbScope<T>(work: () => T): T {
-  return requestScope.run({ pool: null }, work);
+function prepare({ text, params }: Statement): D1Prepared {
+  return getDb().prepare(toSqlite(text)).bind(...encodeParams(params));
 }
 
 export async function query<T = unknown>(text: string, params?: unknown[]): Promise<T[]> {
-  const result = await getDb().query(text, params);
-  return result.rows as T[];
+  const { results } = await prepare({ text, params }).all<Record<string, unknown>>();
+  return results.map((row) => decodeRow<T>(row));
 }
 
 export async function queryOne<T = unknown>(text: string, params?: unknown[]): Promise<T | null> {
   const rows = await query<T>(text, params);
   return rows[0] ?? null;
+}
+
+/** Runs the statements in order, all or nothing. Returns each statement's rows. */
+export async function batch<T = unknown>(statements: Statement[]): Promise<T[][]> {
+  const results = await getDb().batch<Record<string, unknown>>(statements.map(prepare));
+  return results.map(({ results: rows }) => rows.map((row) => decodeRow<T>(row)));
+}
+
+/** Runs a script of statements without parameters (for example the schema). */
+export async function exec(sql: string): Promise<void> {
+  await getDb().exec(sql);
 }

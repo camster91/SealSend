@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
+import { sqlNowPlus } from "@/lib/db/sqlite-dialect";
 import { purgeQueuedSocialPhotos } from '@/lib/social/photos';
-import { ensureSocialSchema } from '@/lib/social/access';
 import { blobKeyFromUploadPath, getBlobStore } from "@/lib/blob-store";
 
 type Asset = { id: string; path: string };
@@ -11,12 +11,11 @@ export async function GET(request: NextRequest) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  await ensureSocialSchema();
   const socialPhotosDeleted = await purgeQueuedSocialPhotos();
   const enabled = process.env.ENABLE_ORPHAN_UPLOAD_CLEANUP === "true";
   const assets = await query<Asset>(
     `SELECT a.id, a.path FROM upload_assets a
-      WHERE a.created_at < NOW() - INTERVAL '7 days'
+      WHERE a.created_at < ${sqlNowPlus("-7 days")}
         AND NOT EXISTS (SELECT 1 FROM events e WHERE e.design_url = a.path)
         AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path = a.path)
       ORDER BY a.created_at LIMIT 100`,

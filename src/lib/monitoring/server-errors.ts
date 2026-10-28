@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { getDb, query } from "@/lib/db/client";
-import type { PoolClient } from "pg";
+import { query } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 
 export type SafeServerError = {
   fingerprint: string;
@@ -47,22 +47,22 @@ async function deliverSafeAlert(safe: SafeServerError): Promise<void> {
   const webhook = process.env.ERROR_ALERT_WEBHOOK_URL;
   if (!webhook) return;
   const { cooldownSeconds, retrySeconds } = getAlertDeliveryTiming();
-  let client: PoolClient | undefined;
   try {
-    client = await getDb().connect();
-    const claim = await client.query<{ fingerprint: string }>(
+    const now = Date.now();
+    // One conditional upsert claims the alert, so parallel errors deliver it once.
+    const claim = await query<{ fingerprint: string }>(
       `INSERT INTO monitoring_alert_deliveries (fingerprint, last_attempted_at, last_delivery_status, attempt_count)
-       VALUES ($1, NOW(), 'pending', 1)
+       VALUES ($1, ${SQL_NOW}, 'pending', 1)
        ON CONFLICT (fingerprint) DO UPDATE SET
-         last_attempted_at = NOW(),
+         last_attempted_at = ${SQL_NOW},
          last_delivery_status = 'pending',
          attempt_count = monitoring_alert_deliveries.attempt_count + 1
-       WHERE monitoring_alert_deliveries.last_attempted_at < NOW() - ($2 * INTERVAL '1 second')
-         AND (monitoring_alert_deliveries.last_delivered_at IS NULL OR monitoring_alert_deliveries.last_delivered_at < NOW() - ($3 * INTERVAL '1 second'))
+       WHERE monitoring_alert_deliveries.last_attempted_at < $2
+         AND (monitoring_alert_deliveries.last_delivered_at IS NULL OR monitoring_alert_deliveries.last_delivered_at < $3)
        RETURNING fingerprint`,
-      [safe.fingerprint, retrySeconds, cooldownSeconds],
+      [safe.fingerprint, new Date(now - retrySeconds * 1000), new Date(now - cooldownSeconds * 1000)],
     );
-    if (!claim.rows[0]) return;
+    if (!claim[0]) return;
 
     let delivered = false;
     try {
@@ -75,13 +75,12 @@ async function deliverSafeAlert(safe: SafeServerError): Promise<void> {
       delivered = response.ok;
     } catch { /* A future error can retry after the configured interval. */ }
 
-    await client.query(
+    await query(
       `UPDATE monitoring_alert_deliveries
        SET last_delivery_status = $2,
-           last_delivered_at = CASE WHEN $2 = 'delivered' THEN NOW() ELSE last_delivered_at END
+           last_delivered_at = CASE WHEN $2 = 'delivered' THEN ${SQL_NOW} ELSE last_delivered_at END
        WHERE fingerprint = $1`,
       [safe.fingerprint, delivered ? "delivered" : "failed"],
     );
   } catch { /* Monitoring must never cause a second application failure. */ }
-  finally { client?.release(); }
 }

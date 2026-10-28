@@ -20,7 +20,7 @@ export async function rsvpAuditBrowserChecks({ browser, origin, db, host }) {
     await db.query(
       `INSERT INTO events
          (id, user_id, title, slug, status, event_date, event_timezone, location_name, host_name)
-       VALUES ($1, $2, 'RSVP field audit', $3, 'published', NOW() + INTERVAL '14 days',
+       VALUES ($1, $2, 'RSVP field audit', $3, 'published', strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'),
                'America/Toronto', 'QA Hall', 'QA Host')`,
       [event, owner, slug],
     );
@@ -66,7 +66,7 @@ export async function rsvpAuditBrowserChecks({ browser, origin, db, host }) {
 
     // Choice edits must keep an authorized historical answer visible and
     // editable, while rejecting a fabricated new option.
-    await db.query("UPDATE rsvp_fields SET options = '[\"Vegan\",\"Gluten-free\"]'::jsonb WHERE event_id = $1 AND field_name = 'meal_preferences'", [event]);
+    await db.query("UPDATE rsvp_fields SET options = '[\"Vegan\",\"Gluten-free\"]' WHERE event_id = $1 AND field_name = 'meal_preferences'", [event]);
     await guest.reload();
     await guest.getByRole('button', { name: 'Update your response', exact: true }).click();
     const legacyChoice = guest.getByRole('checkbox', { name: /Vegetarian.*previously selected/ });
@@ -105,7 +105,7 @@ export async function rsvpAuditBrowserChecks({ browser, origin, db, host }) {
     });
     assert.equal(deleted.status(), 200, await deleted.text());
     assert.equal(
-      (await db.query('SELECT COUNT(*)::int AS count FROM rsvp_responses WHERE event_id = $1', [event])).rows[0].count,
+      (await db.query('SELECT COUNT(*) AS count FROM rsvp_responses WHERE event_id = $1', [event])).rows[0].count,
       0,
     );
     console.log('PASS custom textarea/multiselect persistence, summary counts, CSV serialization, and response deletion');

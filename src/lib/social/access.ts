@@ -1,7 +1,6 @@
-import { queryOne, getDb } from '@/lib/db/client';
+import { queryOne } from '@/lib/db/client';
 import { getCurrentUser } from '@/lib/auth/session';
 import type { AuthUser } from '@/lib/auth/types';
-import { SOCIAL_SCHEMA_SQL } from './schema';
 
 export type SocialEvent = { id: string; user_id: string; event_date: string | null; slug: string };
 export type SocialGuest = { id: string; name: string };
@@ -36,22 +35,3 @@ export async function resolveSocialAccess(request: Request, slug: string, deps: 
   return null;
 }
 
-let ready: Promise<void> | undefined;
-/** Additive tables and deletion cleanup trigger; old versions can still run. */
-export function ensureSocialSchema(): Promise<void> {
-  if (!ready) {
-    ready = (async () => {
-      const client = await getDb().connect();
-      try {
-        await client.query('BEGIN');
-        await client.query("SELECT pg_advisory_xact_lock(hashtext('sealsend-social-schema-v1'))");
-        await client.query(SOCIAL_SCHEMA_SQL);
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally { client.release(); }
-    })().catch(error => { ready = undefined; throw error; });
-  }
-  return ready;
-}

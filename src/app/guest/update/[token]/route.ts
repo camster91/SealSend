@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db/client';
+import { batch, queryOne } from '@/lib/db/client';
+import { SQL_NOW, abortCode, guard } from '@/lib/db/sqlite-dialect';
 import { hashMagicToken, isValidMagicToken } from '@/lib/magic-token';
 
 type RouteParams = { params: Promise<{ token: string }> };
@@ -26,40 +27,46 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { token } = await params;
   if (!isValidMagicToken(token)) return errorRedirect(request);
 
-  const client = await getDb().connect();
   const sessionToken = nanoid(32);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const tokenHash = hashMagicToken(token);
+  // Usable means unexpired and unused; the guard re-checks it inside the batch so a
+  // token opened twice at once still creates only one session.
+  const usable = `t.token_hash = $1 AND t.expires_at > ${SQL_NOW} AND t.used_at IS NULL`;
 
   try {
-    await client.query('BEGIN');
-    const result = await client.query<MagicTokenRecord>(
+    const record = await queryOne<MagicTokenRecord>(
       `SELECT t.id, t.guest_id, t.event_id, g.name, g.email, g.phone
        FROM guest_magic_tokens t
        JOIN guests g ON g.id = t.guest_id AND g.event_id = t.event_id
-       WHERE t.token_hash = $1 AND t.expires_at > NOW() AND t.used_at IS NULL
-       FOR UPDATE OF t`,
-      [hashMagicToken(token)]
+       WHERE ${usable}`,
+      [tokenHash]
     );
-    const record = result.rows[0];
 
     if (!record) {
-      await client.query('ROLLBACK');
       return errorRedirect(request);
     }
 
-    await client.query('UPDATE guest_magic_tokens SET used_at = NOW() WHERE id = $1', [record.id]);
-    await client.query(
-      `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+    try {
+      await batch([
+        guard(`EXISTS (SELECT 1 FROM guest_magic_tokens t WHERE ${usable} AND t.id = $2)`, [tokenHash, record.id], "token_used"),
+        { text: `UPDATE guest_magic_tokens SET used_at = ${SQL_NOW} WHERE id = $1`, params: [record.id] },
+        {
+          text: `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
        VALUES ($1, 'guest', $2, $3)`,
-      [record.guest_id, sessionToken, expiresAt.toISOString()]
-    );
-    await client.query(
-      `UPDATE guests
-       SET invite_status = 'accepted', last_login_at = NOW(), login_count = login_count + 1, updated_at = NOW()
+          params: [record.guest_id, sessionToken, expiresAt],
+        },
+        {
+          text: `UPDATE guests
+       SET invite_status = 'accepted', last_login_at = ${SQL_NOW}, login_count = login_count + 1, updated_at = ${SQL_NOW}
        WHERE id = $1`,
-      [record.guest_id]
-    );
-    await client.query('COMMIT');
+          params: [record.guest_id],
+        },
+      ]);
+    } catch (error) {
+      if (abortCode(error) === "token_used") return errorRedirect(request);
+      throw error;
+    }
 
     const response = NextResponse.redirect(appUrl(request, `/events/${record.event_id}/guest`));
     response.cookies.set('sealsend_session', sessionToken, {
@@ -87,10 +94,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     );
     return response;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
     console.error('Magic link acceptance failed:', error);
     return NextResponse.redirect(appUrl(request, '/login?error=session_failed'));
-  } finally {
-    client.release();
   }
 }

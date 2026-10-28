@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     let claims: SignupClaim[] = [];
     if (itemIds.length > 0) {
       claims = await query<SignupClaim>(
-        'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
+        'SELECT * FROM event_signup_claims WHERE item_id IN (SELECT value FROM json_each($1))',
         [itemIds]
       );
     }
@@ -79,11 +79,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get next sort_order
-    const countResult = await queryOne<{ count: string }>(
+    const countResult = await queryOne<{ count: number }>(
       'SELECT COUNT(*) as count FROM event_signup_items WHERE event_id = $1',
       [eventId]
     );
-    const sortOrder = countResult ? parseInt(countResult.count, 10) : 0;
+    const sortOrder = countResult ? Number(countResult.count) : 0;
 
     const item = await queryOne(
       `INSERT INTO event_signup_items (event_id, title, description, category, slots, sort_order)

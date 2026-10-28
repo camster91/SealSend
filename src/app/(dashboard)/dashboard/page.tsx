@@ -67,14 +67,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const activeOwnedEvents = myEvents.filter((event) => event.status !== 'archived');
   const firstOwnedEvent = activeOwnedEvents[0];
   const [onboarding, guestUsage] = await Promise.all([
-    firstOwnedEvent ? queryOne<{ guest_count: string; sent_count: string }>(
-      `SELECT COUNT(*)::text AS guest_count,
-              COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted'))::text AS sent_count
+    firstOwnedEvent ? queryOne<{ guest_count: number; sent_count: number }>(
+      `SELECT COUNT(*) AS guest_count,
+              COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted')) AS sent_count
          FROM guests WHERE event_id = $1`,
       [firstOwnedEvent.id],
     ) : null,
-    queryOne<{ largest_event_guest_count: string }>(
-      `SELECT COALESCE(MAX(event_guest_count), 0)::text AS largest_event_guest_count
+    queryOne<{ largest_event_guest_count: number }>(
+      `SELECT COALESCE(MAX(event_guest_count), 0) AS largest_event_guest_count
          FROM (
            SELECT COUNT(guests.id) AS event_guest_count
              FROM events

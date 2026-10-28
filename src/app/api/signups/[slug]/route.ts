@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getDb, query, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import { abortCode, guard } from "@/lib/db/sqlite-dialect";
 import { z } from "zod";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import type { SignupClaim, SignupItem, SignupItemWithClaims } from "@/types/database";
@@ -34,7 +35,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     let claims: SignupClaim[] = [];
     if (itemIds.length > 0) {
       claims = await query<SignupClaim>(
-        'SELECT * FROM event_signup_claims WHERE item_id = ANY($1)',
+        'SELECT * FROM event_signup_claims WHERE item_id IN (SELECT value FROM json_each($1))',
         [itemIds]
       );
     }
@@ -86,50 +87,51 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Invalid data" }, { status: 400 });
     }
 
-    const client = await getDb().connect();
-    try {
-      await client.query('BEGIN');
-      const itemResult = await client.query<{ id: string; slots: number }>(
-        'SELECT id, slots FROM event_signup_items WHERE id = $1 AND event_id = $2 FOR UPDATE',
-        [parsed.data.item_id, event.id]
-      );
-      const item = itemResult.rows[0];
+    const item = await queryOne<{ id: string; slots: number }>(
+      'SELECT id, slots FROM event_signup_items WHERE id = $1 AND event_id = $2',
+      [parsed.data.item_id, event.id]
+    );
 
-      if (!item) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: "Item not found" }, { status: 404 });
-      }
+    if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
 
     // Check if slots are available
-      const countResult = await client.query<{ count: string }>(
+    const countRow = await queryOne<{ count: number }>(
       'SELECT COUNT(*) as count FROM event_signup_claims WHERE item_id = $1',
       [item.id]
     );
-      const count = parseInt(countResult.rows[0]?.count || '0', 10);
+    if (Number(countRow?.count ?? 0) >= item.slots) {
+      return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
+    }
 
-      if (count >= item.slots) {
-        await client.query('ROLLBACK');
-        return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
-      }
-
-      const claimResult = await client.query(
-      `INSERT INTO event_signup_claims (item_id, event_id, claimant_name, claimant_email)
+    // The guards re-check the item and its free slots when the insert runs (batches run one at a time).
+    let claim: unknown;
+    try {
+      const results = await batch([
+        guard('EXISTS (SELECT 1 FROM event_signup_items WHERE id = $1 AND event_id = $2)', [item.id, event.id], 'item_missing'),
+        guard(
+          '(SELECT COUNT(*) FROM event_signup_claims WHERE item_id = $1) < (SELECT slots FROM event_signup_items WHERE id = $1)',
+          [item.id], 'slots_taken'
+        ),
+        {
+          text: `INSERT INTO event_signup_claims (item_id, event_id, claimant_name, claimant_email)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [parsed.data.item_id, event.id, parsed.data.claimant_name, parsed.data.claimant_email || null]
-    );
-      const claim = claimResult.rows[0];
-
-      if (!claim) throw new Error('Claim insert returned no row');
-      await client.query('COMMIT');
-
-      return NextResponse.json(claim, { status: 201 });
+          params: [parsed.data.item_id, event.id, parsed.data.claimant_name, parsed.data.claimant_email || null],
+        },
+      ]);
+      claim = results[2][0];
     } catch (error) {
-      await client.query('ROLLBACK');
+      const code = abortCode(error);
+      if (code === 'item_missing') return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      if (code === 'slots_taken') return NextResponse.json({ error: "All slots are taken" }, { status: 403 });
       throw error;
-    } finally {
-      client.release();
     }
+
+    if (!claim) throw new Error('Claim insert returned no row');
+
+    return NextResponse.json(claim, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
