@@ -1,41 +1,21 @@
 /**
  * Mailgun email client
- * Uses mailgun.js for sending emails
+ * Calls the Mailgun REST API with fetch, so it runs on Node and on Cloudflare Workers.
  */
 
-import Mailgun from 'mailgun.js';
-import FormData from 'form-data';
+// US endpoint, as before. (MAILGUN_URL in .env.example has never been read.)
+const MAILGUN_API_BASE = 'https://api.mailgun.net';
 
-// Mailgun.js requires FormData
-const mailgun = new Mailgun(FormData);
+type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
-let client: ReturnType<typeof mailgun.client> | null = null;
-
-export function getMailgunClient() {
-  if (!client) {
-    const apiKey = process.env.MAILGUN_API_KEY;
-    const domain = process.env.MAILGUN_DOMAIN;
-
-    if (!apiKey || apiKey === 'your-mailgun-api-key') {
-      throw new Error(
-        'MAILGUN_API_KEY is not configured. Please set a valid Mailgun API key in your environment variables. Get one at https://mailgun.com'
-      );
-    }
-
-    if (!domain) {
-      throw new Error(
-        'MAILGUN_DOMAIN is not configured. Please set your Mailgun domain (e.g., mg.yourdomain.com)'
-      );
-    }
-
-    client = mailgun.client({
-      username: 'api',
-      key: apiKey,
-      url: 'https://api.mailgun.net',
-    });
+export function getMailgunApiKey(): string {
+  const apiKey = process.env.MAILGUN_API_KEY;
+  if (!apiKey || apiKey === 'your-mailgun-api-key') {
+    throw new Error(
+      'MAILGUN_API_KEY is not configured. Please set a valid Mailgun API key in your environment variables. Get one at https://mailgun.com'
+    );
   }
-
-  return client;
+  return apiKey;
 }
 
 export function getMailgunDomain(): string {
@@ -76,57 +56,51 @@ interface MailgunResponse {
   message: string;
 }
 
-export async function sendEmail(params: SendEmailParams): Promise<MailgunResponse> {
-  const client = getMailgunClient();
+export async function sendEmail(params: SendEmailParams, fetchImpl: FetchLike = fetch): Promise<MailgunResponse> {
+  const apiKey = getMailgunApiKey();
   const domain = getMailgunDomain();
 
-  const messageData: Record<string, unknown> = {
-    from: params.from,
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
+  const form = new FormData();
+  const append = (name: string, value: string | string[]) => {
+    for (const item of Array.isArray(value) ? value : [value]) form.append(name, item);
   };
-
-  if (params.text) {
-    messageData.text = params.text;
-  }
-
-  if (params.cc) {
-    messageData.cc = params.cc;
-  }
-
-  if (params.bcc) {
-    messageData.bcc = params.bcc;
-  }
-
-  if (params.replyTo) {
-    messageData['h:Reply-To'] = params.replyTo;
-  }
+  append('from', params.from);
+  append('to', params.to);
+  append('subject', params.subject);
+  append('html', params.html);
+  if (params.text) append('text', params.text);
+  if (params.cc) append('cc', params.cc);
+  if (params.bcc) append('bcc', params.bcc);
+  if (params.replyTo) append('h:Reply-To', params.replyTo);
 
   for (const [name, value] of Object.entries(params.headers ?? {})) {
     // Refuse header injection: names are tokens, values are single lines.
     if (!/^[A-Za-z0-9-]+$/.test(name) || /[\r\n]/.test(value)) {
       throw new Error(`Invalid email header: ${name}`);
     }
-    messageData[`h:${name}`] = value;
+    append(`h:${name}`, value);
   }
 
-  if (params.attachments && params.attachments.length > 0) {
-    // Mailgun uses multipart/form-data for attachments
-    // This is handled automatically by the SDK
-    messageData.attachment = params.attachments.map(att => ({
-      filename: att.filename,
-      data: att.data,
-      contentType: att.contentType || 'application/octet-stream',
-    }));
+  for (const attachment of params.attachments ?? []) {
+    const blob = new Blob([typeof attachment.data === 'string' ? attachment.data : new Uint8Array(attachment.data)], {
+      type: attachment.contentType || 'application/octet-stream',
+    });
+    form.append('attachment', blob, attachment.filename);
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await client.messages.create(domain, messageData as any);
+    const response = await fetchImpl(`${MAILGUN_API_BASE}/v3/${encodeURIComponent(domain)}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${btoa(`api:${apiKey}`)}` },
+      body: form,
+    });
+    const payload = (await response.json().catch(() => ({}))) as { id?: string; message?: string };
+    if (!response.ok) {
+      throw Object.assign(new Error(payload.message || `Mailgun request failed with HTTP ${response.status}`), { status: response.status });
+    }
     return {
-      id: response.id || '',
-      message: response.message || '',
+      id: payload.id || '',
+      message: payload.message || '',
     };
   } catch (error) {
     console.error('Mailgun send error:', error);

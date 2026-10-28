@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
-import { rm } from "fs/promises";
-import path from "path";
+import { getBlobStore } from "@/lib/blob-store";
 
 /**
  * Before a host's rows are deleted, keep their team workspaces working:
@@ -92,7 +91,7 @@ export async function GET(request: NextRequest) {
     let uploadsDeleted = 0;
     for (const { user_directory: userId } of cleanup.rows) {
       try {
-        await rm(path.join(process.cwd(), "uploads", userId), { recursive: true, force: true });
+        await getBlobStore().deletePrefix(userId);
         await getDb().query("DELETE FROM deleted_account_upload_cleanup WHERE user_directory = $1", [userId]);
         uploadsDeleted += 1;
       } catch (error) {

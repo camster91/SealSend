@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
 import path from 'path';
-import { resolveUploadPath } from '@/lib/upload-path';
+import { blobKeySegments, getBlobStore } from '@/lib/blob-store';
 
 const MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -17,8 +16,6 @@ const MIME_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -30,22 +27,25 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const resolved = resolveUploadPath(UPLOADS_DIR, segments);
-    if (!resolved) {
+    const key = blobKeySegments(segments.join('/'))?.join('/');
+    if (!key) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const ext = path.extname(resolved).toLowerCase();
+    const ext = path.extname(key).toLowerCase();
 
     // Never serve SVG as active content
     if (ext === '.svg' || ext === '.svgz' || ext === '.html' || ext === '.htm' || ext === '.js') {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const fileBuffer = await readFile(resolved);
+    const fileBuffer = await getBlobStore().get(key);
+    if (!fileBuffer) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileBuffer as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': contentType,

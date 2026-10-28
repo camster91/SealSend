@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { query } from "@/lib/db/client";
-import { rateLimit } from "@/lib/rate-limit";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 
 /**
  * Public waitlist capture.
@@ -23,14 +23,8 @@ const waitlistSchema = z
   })
   .strict();
 
-function clientIp(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return request.headers.get("x-real-ip") ?? "unknown";
-}
-
 export async function POST(request: Request) {
-  const limited = await rateLimit(`waitlist:${clientIp(request)}`, {
+  const limited = await rateLimit(`waitlist:${getClientIp(request)}`, {
     max: 5,
     windowSeconds: 3600,
   });

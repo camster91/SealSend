@@ -3,29 +3,11 @@ import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendEmail } from '@/lib/email';
-import twilio from 'twilio';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
-import { getTwilioSendOptions, isTwilioConfigured } from '@/lib/twilio';
+import { getTwilioClient, getTwilioSendOptions, isTwilioConfigured } from '@/lib/twilio';
 import { sendCodeSchema } from '@/lib/validations';
 import { assertApprovedRecipient, isApprovedRecipient } from '@/lib/communications-safety';
 import { hashAuthCode } from '@/lib/auth/code-hash';
-
-function getTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const apiKeySid = process.env.TWILIO_API_KEY_SID;
-  const apiKeySecret = process.env.TWILIO_API_KEY_SECRET;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (accountSid && apiKeySid && apiKeySecret) {
-    return twilio(apiKeySid, apiKeySecret, { accountSid });
-  } else if (accountSid && authToken) {
-    return twilio(accountSid, authToken);
-  } else {
-    throw new Error(
-      'Missing Twilio credentials. Set TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN, or TWILIO_ACCOUNT_SID + TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET'
-    );
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {

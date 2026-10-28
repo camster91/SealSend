@@ -10,7 +10,7 @@
     "start:e2e": "node scripts/test/start-playwright-server.mjs",
     "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
-    "test": "node --import tsx --test tests/readiness.test.mjs tests/legal-pages.test.mjs tests/host-lifecycle.test.ts tests/retention.test.ts tests/rate-limit.test.ts tests/storage.test.ts tests/upload-store.test.ts tests/ai-cover-route.test.ts tests/ai-cover-client.test.ts tests/ai-cover-ui.test.mjs tests/datetime.test.ts tests/event-builder-schema.test.ts tests/event-validation.test.ts tests/publication-readiness.test.ts tests/event-brief.test.ts tests/guest-import.test.ts tests/upload-path.test.ts tests/magic-token.test.ts tests/auth-code.test.ts tests/entitlements.test.ts tests/billing.test.ts tests/provider-readiness.test.ts tests/launch-decision.test.ts tests/quality-score.test.ts tests/ai-event-draft.test.ts tests/ai-fallback.test.ts tests/activation-events.test.ts tests/onboarding-checklist.test.ts tests/beta-participation.test.ts tests/beta-outcome.test.ts tests/beta-defect-review.test.ts tests/beta-support-review.test.ts tests/beta-acceptance-decision.test.ts tests/beta-invite-operations.test.ts tests/beta-participant-report.test.ts tests/beta-metrics.test.ts tests/calendar.test.ts tests/event-access.test.ts tests/message-audience.test.ts tests/message-cost-estimate.test.ts tests/communications-safety.test.ts tests/email-quota.test.ts tests/wizard-submit.test.ts tests/communication-suppressions.test.ts tests/repeat-event.test.ts tests/rsvp-summary.test.ts tests/server-monitoring.test.ts tests/event-templates.test.ts tests/waitlist-cta.test.ts tests/icon-button-labels.test.ts tests/client-bundle-node-imports.test.ts tests/sms-allowance.test.ts tests/brands.test.ts tests/clients.test.ts tests/webhooks.test.ts tests/invitation-defaults.test.ts tests/event-builder-save.test.ts tests/event-builder-basics.test.ts tests/event-builder-guests.test.ts tests/event-builder-review.test.ts tests/event-builder-shell.test.mjs tests/event-builder-start.test.ts tests/event-builder-final-fixes.test.ts tests/event-builder-stored-links.test.ts tests/unsubscribe.test.ts tests/guest-email-compliance.test.ts tests/guest-contact-confirmation.test.ts tests/ai-chat-schema.test.ts tests/ai-chat-prompt.test.ts tests/ai-cover-prompt.test.ts tests/ai-chat-route.test.ts tests/event-builder-chat-apply.test.ts tests/event-builder-chat-client.test.ts tests/event-builder-chat-ui.test.mjs tests/event-builder-chat-entry.test.mjs tests/social-access.test.ts tests/social-store.test.ts tests/social-photos.test.ts tests/mobile-worker.test.mjs tests/rsvp-edit.test.ts tests/rsvp-fields.test.ts tests/check-in-store.test.ts tests/rsvp-audit.test.ts tests/input-accessibility.test.tsx tests/marketing-measurement.test.ts tests/growth-report.test.ts tests/search-indexing.test.ts tests/mobile-gateway.test.ts",
+    "test": "node --import tsx --test tests/readiness.test.mjs tests/legal-pages.test.mjs tests/host-lifecycle.test.ts tests/retention.test.ts tests/provider-clients.test.ts tests/rate-limit.test.ts tests/storage.test.ts tests/upload-store.test.ts tests/ai-cover-route.test.ts tests/ai-cover-client.test.ts tests/ai-cover-ui.test.mjs tests/datetime.test.ts tests/event-builder-schema.test.ts tests/event-validation.test.ts tests/publication-readiness.test.ts tests/event-brief.test.ts tests/guest-import.test.ts tests/upload-path.test.ts tests/magic-token.test.ts tests/auth-code.test.ts tests/entitlements.test.ts tests/billing.test.ts tests/provider-readiness.test.ts tests/launch-decision.test.ts tests/quality-score.test.ts tests/ai-event-draft.test.ts tests/ai-fallback.test.ts tests/activation-events.test.ts tests/onboarding-checklist.test.ts tests/beta-participation.test.ts tests/beta-outcome.test.ts tests/beta-defect-review.test.ts tests/beta-support-review.test.ts tests/beta-acceptance-decision.test.ts tests/beta-invite-operations.test.ts tests/beta-participant-report.test.ts tests/beta-metrics.test.ts tests/calendar.test.ts tests/event-access.test.ts tests/message-audience.test.ts tests/message-cost-estimate.test.ts tests/communications-safety.test.ts tests/email-quota.test.ts tests/wizard-submit.test.ts tests/communication-suppressions.test.ts tests/repeat-event.test.ts tests/rsvp-summary.test.ts tests/server-monitoring.test.ts tests/event-templates.test.ts tests/waitlist-cta.test.ts tests/icon-button-labels.test.ts tests/client-bundle-node-imports.test.ts tests/sms-allowance.test.ts tests/brands.test.ts tests/clients.test.ts tests/webhooks.test.ts tests/invitation-defaults.test.ts tests/event-builder-save.test.ts tests/event-builder-basics.test.ts tests/event-builder-guests.test.ts tests/event-builder-review.test.ts tests/event-builder-shell.test.mjs tests/event-builder-start.test.ts tests/event-builder-final-fixes.test.ts tests/event-builder-stored-links.test.ts tests/unsubscribe.test.ts tests/guest-email-compliance.test.ts tests/guest-contact-confirmation.test.ts tests/ai-chat-schema.test.ts tests/ai-chat-prompt.test.ts tests/ai-cover-prompt.test.ts tests/ai-chat-route.test.ts tests/event-builder-chat-apply.test.ts tests/event-builder-chat-client.test.ts tests/event-builder-chat-ui.test.mjs tests/event-builder-chat-entry.test.mjs tests/social-access.test.ts tests/social-store.test.ts tests/social-photos.test.ts tests/mobile-worker.test.mjs tests/rsvp-edit.test.ts tests/rsvp-fields.test.ts tests/check-in-store.test.ts tests/rsvp-audit.test.ts tests/input-accessibility.test.tsx tests/marketing-measurement.test.ts tests/growth-report.test.ts tests/search-indexing.test.ts tests/mobile-gateway.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:prepare-authenticated": "tsx scripts/test/prepare-authenticated-e2e.ts",
     "test:load": "node scripts/load/public-readiness.mjs",
@@ -41,9 +41,9 @@
     "mobile:export": "npm --prefix apps/mobile run export",
     "test:mobile:http": "node --import tsx scripts/test/mobile-native.ts",
     "dev:vinext": "vite dev --port 3001",
-    "build:vinext": "vite build",
+    "build:vinext": "SEALSEND_TARGET=cloudflare vite build",
     "start:vinext": "vite preview",
-    "deploy:vinext": "vinext-cloudflare deploy"
+    "deploy:vinext": "SEALSEND_TARGET=cloudflare vinext-cloudflare deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -55,11 +55,9 @@
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "form-data": "^4.0.6",
     "framer-motion": "^12.43.0",
     "libphonenumber-js": "^1.13.15",
     "lucide-react": "^0.577.0",
-    "mailgun.js": "^12.9.0",
     "nanoid": "^5.1.16",
     "next": "^16.4.0",
     "pg": "^8.23.1",
@@ -71,7 +69,6 @@
     "sharp": "^0.35.5",
     "stripe": "^20.4.1",
     "tailwind-merge": "^3.7.0",
-    "twilio": "^5.13.1",
     "vinext": "^1.3.1",
     "zod": "^4.6.5"
   },
@@ -94,6 +91,7 @@
     "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
+    "twilio": "^5.13.1",
     "typescript": "^5",
     "vite": "^8.3.0"
   },

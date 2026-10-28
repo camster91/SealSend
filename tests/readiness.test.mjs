@@ -128,12 +128,18 @@ test('fresh and upgraded schemas create workspace webhooks and their delivery qu
 test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-checked, redirect-free POST', async () => {
   const route = await read('src/app/api/cron/deliver-webhooks/route.ts');
   const lib = await read('src/lib/webhooks.ts');
+  const nodeTransport = await read('src/lib/webhook-transport.ts');
+  const workerTransport = await read('src/lib/webhook-transport.cloudflare.ts');
   assert.match(route, /Bearer \$\{cronSecret\}/);
   assert.match(route, /deliverDueWebhooks/);
-  assert.match(lib, /lookup: publicOnlyLookup/);
+  assert.match(nodeTransport, /lookup: publicOnlyLookup/);
+  assert.doesNotMatch(nodeTransport, /\bfetch\(/);
   assert.match(lib, /FOR UPDATE OF pending SKIP LOCKED/);
   assert.match(lib, /JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active/);
   assert.doesNotMatch(lib, /\bfetch\(/);
+  // The Workers transport has no dns module: it checks DNS-over-HTTPS answers and never follows redirects.
+  assert.match(workerTransport, /redirect: "manual"/);
+  assert.match(workerTransport, /addresses\.some\(isPrivateAddress\)/);
 });
 
 test('the welcome tour shows once, only to new hosts, and is an accessible dialog', async () => {
@@ -1791,4 +1797,39 @@ test('the Stripe test-mode end-to-end run refuses live keys and non-local databa
   assert.match(script, /livemode/);
   assert.match(script, /STRIPE_E2E_ALLOW_REMOTE_DB/);
   assert.doesNotMatch(script, /sk_live_[A-Za-z0-9]/);
+});
+
+test('Cloudflare cron triggers match the worker routes and the VPS jobs that are enabled', async () => {
+  const config = await read('cloudflare.config.ts');
+  const worker = await read('worker/index.ts');
+  const schedules = [...config.matchAll(/triggers\.scheduled\(\{ schedule: "([^"]+)" \}\)/g)].map((match) => match[1]).sort();
+  const routes = Object.fromEntries([...worker.matchAll(/"([^"]+)": "(\/api\/cron\/[a-z-]+)"/g)].map((match) => [match[1], match[2]]));
+  assert.deepEqual(Object.keys(routes).sort(), schedules);
+  for (const route of Object.values(routes)) await read(`src/app${route}/route.ts`);
+  // Gated jobs (provider/retention gates in ops/sealsend-maintenance.cron) must not be scheduled by default.
+  for (const gated of ['send-reminders', 'send-announcements', 'send-host-lifecycle', 'cleanup-drafts']) {
+    assert.doesNotMatch(worker, new RegExp(`"/api/cron/${gated}"`));
+  }
+  assert.match(worker, /Authorization: `Bearer \$\{env\.CRON_SECRET\}`/);
+});
+
+test('every Workers platform twin exposes the same names as the Node module', async () => {
+  // Node-only on purpose: the Workers transport has no dns module and checks DNS-over-HTTPS answers instead.
+  const nodeOnly = new Set(['publicOnlyLookup']);
+  const names = (text) => new Set([
+    ...[...text.matchAll(/export (?:async )?(?:function|const) (\w+)/g)].map((match) => match[1]),
+    ...[...text.matchAll(/export (?:type )?\{([^}]+)\}/g)].flatMap((match) => match[1].split(',').map((name) => name.trim().replace(/^type /, '')).filter(Boolean)),
+  ]);
+  for (const [node, twin] of [
+    ['src/lib/blob-store.ts', 'src/lib/blob-store.cloudflare.ts'],
+    ['src/lib/db/client.ts', 'src/lib/db/client.cloudflare.ts'],
+    ['src/lib/image-processor.ts', 'src/lib/image-processor.cloudflare.ts'],
+    ['src/lib/runtime-bindings.ts', 'src/lib/runtime-bindings.cloudflare.ts'],
+    ['src/lib/webhook-transport.ts', 'src/lib/webhook-transport.cloudflare.ts'],
+  ]) {
+    const have = names(await read(twin));
+    for (const name of names(await read(node))) {
+      if (!nodeOnly.has(name)) assert.ok(have.has(name), `${twin} is missing ${name}`);
+    }
+  }
 });

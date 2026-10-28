@@ -71,6 +71,9 @@ jobs:
       - name: Build (standalone)
         run: npm run build
 
+      - name: Build (Cloudflare Worker)
+        run: npm run build:vinext
+
       - name: Install browsers
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit

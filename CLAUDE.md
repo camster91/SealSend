@@ -129,6 +129,10 @@ docs/             Launch operations, evidence register, policy decisions
 
 See `.env.example` for the full list. Core: `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `SESSION_SECRET`, Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL`, `MAILGUN_WEBHOOK_SIGNING_KEY`), Twilio (`TWILIO_*`), Stripe (`STRIPE_*`), `CRON_SECRET`, `OPERATIONS_SECRET`, and the safety switches `PAYMENTS_TEST_ONLY` / `COMMUNICATIONS_TEST_ONLY`.
 
+## Cloudflare Workers build
+
+The same code also builds as a Cloudflare Worker (vinext): `npm run build:vinext`. Platform-specific modules come in pairs, `name.ts` (Node) and `name.cloudflare.ts` (Worker); `vite.config.ts` swaps them for the Worker build only, and `tests/readiness.test.mjs` checks the pairs export the same names. The pairs are `blob-store` (files: disk vs R2), `db/client`, `image-processor` (sharp vs Cloudflare Images), `runtime-bindings` and `webhook-transport`. Use them (never import `sharp`, `node:fs` for uploads, or `node:dns` directly in app code). Mailgun and Twilio use `fetch`, not their SDKs. Verify Stripe webhooks with `constructEventAsync`. Env vars only reach the Worker if they are declared in `cloudflare.config.ts`. Runbook: `docs/cloudflare-migration.md`.
+
 ## Deployment
 
 Docker image (`Dockerfile`, Next standalone output) on a Hostinger VPS behind Coolify, with PostgreSQL 16 in its own container. Current production details, release steps and rollback targets are in `DEPLOYMENT_READINESS.md`; operational scripts are in `ops/`. An external scheduler calls the `/api/cron/*` endpoints.

@@ -6,7 +6,8 @@ const upgradeInsecureRequests = process.env.NEXT_PUBLIC_SITE_URL?.startsWith('ht
   : '';
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // The Docker image uses standalone output; the Cloudflare Worker build does not.
+  ...(process.env.SEALSEND_TARGET === "cloudflare" ? {} : { output: "standalone" as const }),
   turbopack: {
     root: process.cwd(),
   },

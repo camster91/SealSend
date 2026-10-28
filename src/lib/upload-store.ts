@@ -1,12 +1,10 @@
-import { mkdir, unlink, writeFile } from 'fs/promises';
-import path from 'path';
 import { randomUUID } from 'crypto';
-import sharp from 'sharp';
+import { toWebp } from '@/lib/image-processor';
 import { getDb } from '@/lib/db/client';
+import { getBlobStore } from '@/lib/blob-store';
 import { canReserveStorage, storageQuotaBytes } from '@/lib/storage';
 
-const COMPRESS_MAX_WIDTH = 2048;
-const COMPRESS_MAX_HEIGHT = 2048;
+const COMPRESS_MAX_EDGE = 2048;
 const COMPRESS_QUALITY = 80;
 
 export function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
@@ -37,23 +35,8 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
     return { data: buffer, ext: 'gif', mime: contentType };
   }
 
-  const image = sharp(buffer);
-  const metadata = await image.metadata();
-
-  // Resize if larger than max dimensions
-  const needsResize =
-    (metadata.width && metadata.width > COMPRESS_MAX_WIDTH) ||
-    (metadata.height && metadata.height > COMPRESS_MAX_HEIGHT);
-
-  if (needsResize) {
-    image.resize(COMPRESS_MAX_WIDTH, COMPRESS_MAX_HEIGHT, {
-      fit: 'inside',
-      withoutEnlargement: true,
-    });
-  }
-
-  // Compress to WebP for best size/quality ratio
-  const compressed = await image.webp({ quality: COMPRESS_QUALITY }).toBuffer();
+  // Resize to fit the maximum dimensions (never enlarging) and use WebP for the best size/quality ratio
+  const compressed = Buffer.from(await toWebp(buffer, { maxSize: COMPRESS_MAX_EDGE, quality: COMPRESS_QUALITY }));
 
   // Only use compressed if it's actually smaller
   if (compressed.length < buffer.length) {
@@ -113,12 +96,8 @@ export async function storeBufferForUser(
   deps: StoreDeps = {},
 ): Promise<StoreResult> {
   const finalFileName = fileName;
-  const uploadsDir = deps.uploadsDir ?? path.join(process.cwd(), "uploads");
-  const userDir = path.join(uploadsDir, userId, deps.privateFolder ?? "");
-  const filePath = path.join(userDir, finalFileName);
-
-  // Ensure the user's upload directory exists
-  await mkdir(userDir, { recursive: true });
+  const store = getBlobStore({ uploadsDir: deps.uploadsDir });
+  const blobKey = `${userId}/${deps.privateFolder ? deps.privateFolder + "/" : ""}${finalFileName}`;
 
   const urlPath = `/uploads/${userId}/${deps.privateFolder ? deps.privateFolder + "/" : ""}${finalFileName}`;
 
@@ -138,7 +117,7 @@ export async function storeBufferForUser(
       await client.query('ROLLBACK');
       return { error: 'quota', usedBytes, quotaBytes };
     }
-    await writeFile(filePath, buffer);
+    await store.put(blobKey, buffer);
     await client.query(
       'INSERT INTO upload_assets (user_id, path, byte_size, media_type) VALUES ($1, $2, $3, $4)',
       [userId, urlPath, buffer.length, mediaType],
@@ -147,7 +126,7 @@ export async function storeBufferForUser(
     return { url: urlPath, usedBytes: usedBytes + buffer.length, quotaBytes };
   } catch (error) {
     await client.query('ROLLBACK');
-    await unlink(filePath).catch(() => undefined);
+    await store.delete(blobKey).catch(() => undefined);
     console.error('[upload] Failed to reserve storage', error);
     throw error;
   } finally {
