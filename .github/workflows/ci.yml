@@ -44,7 +44,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          # node:sqlite (local database for tests) needs Node 22.13+.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -75,16 +76,11 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Make PostgreSQL tools available for isolated transaction QA
-        if: github.actor != 'dependabot[bot]'
-        run: pg_config --bindir >> "$GITHUB_PATH"
-
       - name: Verified guest and authenticated builder QA
         if: github.actor != 'dependabot[bot]'
         run: npm run test:social:browser
         env:
           SEALSEND_QA_BUILDER: 'true'
-          SEALSEND_QA_USE_POSTGRES: 'true'
 
       - name: Native marketing measurement QA
         if: github.actor != 'dependabot[bot]'

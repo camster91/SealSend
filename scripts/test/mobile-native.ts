@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { open, mkdir, writeFile, access, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startSocialQa } from './start-social-qa';
 import { hashAuthCode } from '../../src/lib/auth/code-hash';
@@ -16,7 +17,7 @@ const eventId = '00000000-0000-4000-8000-000000000011';
 const guestId = '00000000-0000-4000-8000-000000000012';
 async function main() {
 const qa = await startSocialQa();
-const log = await open('/tmp/sealsend-mobile-http.log', 'w');
+const log = await open(join(tmpdir(), 'sealsend-mobile-http.log'), 'w');
 const app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--hostname', '127.0.0.1', '--port', '3130'], {
   stdio: ['ignore', log.fd, log.fd], env: { ...process.env, SQLITE_PATH: qa.db.path, SESSION_SECRET: secret, CRON_SECRET: cronSecret, ENABLE_NATIVE_MOBILE_API: 'true', COMMUNICATIONS_TEST_ONLY: 'true', PAYMENTS_TEST_ONLY: 'true', AI_PROVIDER: 'fake', NEXT_PUBLIC_SITE_URL: origin },
 });
