@@ -71,9 +71,6 @@ jobs:
       - name: Build (standalone)
         run: npm run build
 
-      - name: Build (Cloudflare Worker)
-        run: npm run build:vinext
-
       - name: Install browsers
         if: github.actor != 'dependabot[bot]'
         run: npx playwright install --with-deps chromium firefox webkit
@@ -100,6 +97,16 @@ jobs:
       - name: Browser smoke tests
         if: github.actor != 'dependabot[bot]'
         run: npm run test:e2e
+
+      # Last on purpose: vinext needs Node 22 (fs/promises glob), while the Docker image and the steps above use Node 20.
+      - name: Setup Node.js 22 (Cloudflare Worker build)
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Build (Cloudflare Worker)
+        run: npm run build:vinext
 
   mobile:
     name: Native app source and bundles
