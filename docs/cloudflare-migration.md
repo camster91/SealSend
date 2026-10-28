@@ -15,6 +15,8 @@ SealSend can build as a Cloudflare Worker (vinext) next to the Docker image. Bot
 | Mailgun / Twilio | `fetch` clients (same code on both) | same |
 | Client IP for rate limits | `TRUST_PROXY_HEADERS` | `TRUST_CF_CONNECTING_IP` (set in `cloudflare.config.ts`) |
 
+The Worker build needs Node 22 or newer (the Docker image still uses Node 20).
+
 Modules that differ by platform live in pairs: `name.ts` (Node) and `name.cloudflare.ts` (Worker). `vite.config.ts` swaps them in only for the Worker build. `tests/readiness.test.mjs` checks each pair exports the same names. Keep them in step when you change one.
 
 ## What must be decided first
