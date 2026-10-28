@@ -1,12 +1,12 @@
-// Generates src/lib/db/schema.d1.sql (SQLite/D1) from the Postgres schema: loads schema.sql and
+// Generates src/lib/db/schema.sql (SQLite/D1) from the legacy Postgres schema: loads its schema.sql and
 // apply-security-indexes.sql into PGlite, reads the final tables back, and rewrites them for SQLite.
 // Run: node scripts/db/generate-d1-schema.mjs   (one-off for the D1 port; see docs/d1-port.md)
 import { readFileSync, writeFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
-const SCHEMA = "src/lib/db/schema.sql";
-const UPGRADE = "apply-security-indexes.sql";
-const OUT = "src/lib/db/schema.d1.sql";
+const SCHEMA = "src/lib/db/legacy-postgres/schema.sql";
+const UPGRADE = "src/lib/db/legacy-postgres/apply-security-indexes.sql";
+const OUT = "src/lib/db/schema.sql";
 
 async function introspect() {
   const stripExtensions = (sql) => sql.replace(/^CREATE EXTENSION.*$/gm, "");

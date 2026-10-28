@@ -1,35 +1,36 @@
-import { Pool } from 'pg';
+import type { DatabaseSync } from "node:sqlite";
+import { openSqliteDb, type SqliteDb } from "./sqlite-local";
+import type { Statement } from "./sqlite-dialect";
 
-let pool: Pool | null = null;
+/**
+ * Local SQLite (dev, tests, scripts). The Worker build swaps in client.cloudflare.ts (D1).
+ * SQLITE_PATH picks the file; ":memory:" gives a throwaway database.
+ */
+let db: SqliteDb | null = null;
 
-export function getDb(): Pool {
-  if (!pool) {
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not configured');
-    }
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-  }
-  return pool;
+function local(): SqliteDb {
+  db ??= openSqliteDb(process.env.SQLITE_PATH ?? ".data/sealsend.db");
+  return db;
 }
 
-export async function query<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<T[]> {
-  const db = getDb();
-  const result = await db.query(text, params);
-  return result.rows as T[];
+export function getDb(): DatabaseSync {
+  return local().handle;
 }
 
-export async function queryOne<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<T | null> {
-  const rows = await query<T>(text, params);
-  return rows[0] ?? null;
+export function query<T = unknown>(text: string, params?: unknown[]): Promise<T[]> {
+  return local().query<T>(text, params);
+}
+
+export function queryOne<T = unknown>(text: string, params?: unknown[]): Promise<T | null> {
+  return local().queryOne<T>(text, params);
+}
+
+/** Runs the statements in order, all or nothing (D1's batch semantics). Returns each statement's rows. */
+export function batch<T = unknown>(statements: Statement[]): Promise<T[][]> {
+  return local().batch<T>(statements);
+}
+
+/** Runs a script of statements without parameters (for example the schema). */
+export function exec(sql: string): Promise<void> {
+  return local().exec(sql);
 }

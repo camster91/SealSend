@@ -1,5 +1,5 @@
 /**
- * Shared by the SQLite clients (node:sqlite locally, D1 on Workers). See schema.d1.sql for the
+ * Shared by the SQLite clients (node:sqlite locally, D1 on Workers). See schema.sql for the
  * storage conventions and docs/d1-port.md for the plan.
  *
  * Queries keep Postgres-style `$1` placeholders; SQLite reads `?1` the same way. Values are
@@ -10,7 +10,7 @@
 export type SqlValue = string | number | null;
 export type Statement = { text: string; params?: unknown[] };
 
-// Column names by stored kind. tests/sqlite-dialect.test.ts checks these against schema.d1.sql;
+// Column names by stored kind. tests/sqlite-dialect.test.ts checks these against schema.sql;
 // no name is used with two different kinds, so decoding by name is safe.
 export const BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
   "active", "allow_plus_ones", "approved", "auto_reminders", "cancel_at_period_end", "closed", "countdown_enabled",
@@ -67,3 +67,30 @@ export function decodeRow<T>(row: Record<string, unknown>): T {
 
 /** The SQL text for "now", matching the stored timestamp format. */
 export const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+
+/** SQL for "now" shifted by a SQLite modifier such as '-15 minutes' or '+7 days'. */
+export function sqlNowPlus(modifier: string): string {
+  if (!/^[+-]\d+(\.\d+)? (seconds|minutes|hours|days|months|years)$/.test(modifier)) throw new Error(`Bad time modifier: ${modifier}`);
+  return `strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '${modifier}')`;
+}
+
+const ABORT_PREFIX = "sealsend_abort:";
+
+/**
+ * A batch statement that aborts the whole batch (rolling back earlier statements) unless
+ * `condition` is true when it runs. Batches run one at a time, so this replaces
+ * "lock, check, then write" transactions. Catch the error and read the code with `abortCode`.
+ */
+export function guard(condition: string, params: unknown[], code: string): Statement {
+  if (!/^[a-z_]+$/.test(code)) throw new Error(`Bad guard code: ${code}`);
+  return {
+    text: `SELECT json_extract('{}', CASE WHEN (${condition}) THEN '$' ELSE '$${ABORT_PREFIX}${code}' END) AS guard_ok`,
+    params,
+  };
+}
+
+/** The code of the `guard` that aborted a batch, or null for any other error. */
+export function abortCode(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.match(new RegExp(`\\$${ABORT_PREFIX}([a-z_]+)`))?.[1] ?? null;
+}

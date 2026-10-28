@@ -61,12 +61,8 @@ export default defineConfig({
       UPLOADS: bindings.r2({ name: "sealsend-uploads" }),
       // Image resizing (replaces sharp).
       IMAGES: bindings.images(),
-      // Pooled connection to PostgreSQL. Create it with `HYPERDRIVE_ID` set; see docs/cloudflare-migration.md.
-      HYPERDRIVE: bindings.hyperdrive({
-        id: process.env.HYPERDRIVE_ID ?? "00000000000000000000000000000000",
-        // Local preview only. Deliberately not DATABASE_URL, so a production URL can never end up in the build output.
-        dev: { connectionString: process.env.HYPERDRIVE_LOCAL_CONNECTION_STRING },
-      }),
+      // The database (replaces PostgreSQL). Create it once and export D1_DATABASE_ID; see docs/d1-port.md.
+      DB: bindings.d1({ name: "sealsend-db", id: process.env.D1_DATABASE_ID }),
       ...Object.fromEntries(SECRET_NAMES.map((name) => [name, bindings.secret()])),
       ...Object.fromEntries(Object.entries(PLAIN_VALUES).map(([name, value]) => [name, bindings.text(value)])),
     },

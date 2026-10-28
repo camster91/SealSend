@@ -6,12 +6,15 @@ import {
   BOOLEAN_COLUMNS,
   JSON_COLUMNS,
   TIMESTAMP_COLUMNS,
+  abortCode,
   decodeRow,
   encodeParam,
+  guard,
+  sqlNowPlus,
   toSqlite,
 } from "../src/lib/db/sqlite-dialect";
 
-const schema = readFileSync("src/lib/db/schema.d1.sql", "utf8");
+const schema = readFileSync("src/lib/db/schema.sql", "utf8");
 
 function freshDb() {
   const db = new DatabaseSync(":memory:");
@@ -121,7 +124,7 @@ test("D1 schema keeps defaults, checks, cascades and both triggers", () => {
 
 test("local SQLite client decodes rows and rolls back a failed batch", async () => {
   process.env.SQLITE_PATH = ":memory:";
-  const { getDb, query, queryOne, batch } = await import("../src/lib/db/client.sqlite");
+  const { getDb, query, queryOne, batch } = await import("../src/lib/db/client");
   getDb().exec(schema);
 
   const [created] = await query<{ id: string; created_at: Date }>(
@@ -151,4 +154,25 @@ test("local SQLite client decodes rows and rolls back a failed batch", async () 
     { text: "SELECT name FROM guests WHERE event_id = $1", params: [event!.id] },
   ]);
   assert.deepEqual(rows.map((row) => row.name), ["Ada"]);
+});
+
+test("a failed guard rolls back the whole batch and reports its code", async () => {
+  process.env.SQLITE_PATH = ":memory:";
+  const { query, queryOne, batch } = await import("../src/lib/db/client");
+  await query("CREATE TABLE IF NOT EXISTS guard_seats (id INTEGER PRIMARY KEY, holder TEXT)");
+  const takeSeat = (holder: string) => batch([
+    { text: "INSERT INTO guard_seats (holder) VALUES ($1)", params: [holder] },
+    guard("(SELECT count(*) FROM guard_seats) <= $1", [1], "capacity"),
+    { text: "UPDATE guard_seats SET holder = upper(holder) WHERE holder = $1", params: [holder] },
+  ]);
+
+  await takeSeat("ada");
+  const error = await takeSeat("bob").catch((caught: unknown) => caught);
+  assert.equal(abortCode(error), "capacity");
+  assert.equal(abortCode(new Error("disk I/O error")), null);
+  assert.deepEqual((await query<{ holder: string }>("SELECT holder FROM guard_seats")).map((row) => row.holder), ["ADA"]);
+
+  const later = await queryOne<{ later: string; now: string }>(`SELECT ${sqlNowPlus("+1 days")} AS later, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS now`);
+  assert.ok(later!.later > later!.now);
+  assert.throws(() => sqlNowPlus("1 day'; DROP TABLE x; --"));
 });
