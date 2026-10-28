@@ -55,7 +55,7 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     rows=(await db.query('SELECT * FROM rsvp_responses WHERE event_id=$1',[eventId])).rows;assert.equal(rows.length,1);assert.equal(rows[0].id,rid);assert.equal(rows[0].status,'attending');assert.equal(rows[0].headcount,2);
     const summary=await (await host.request.get(`${origin}/api/events/${eventId}/responses/summary`)).json();assert.equal(summary.attendingHeadcount,2);assert.equal(summary.fields.find(f=>f.fieldName==='email').answered,1);
     await builder.goto(`${origin}/events/${eventId}`);
-    await builder.getByText(/6:00\s*PM EDT/).waitFor();
+    await builder.getByText(/6:00\s*PM E[SD]T/).waitFor();
     await builder.getByText('0 invited-list replies · 1 public-link replies',{exact:true}).waitFor();
     await builder.getByRole('link',{name:'Check-in',exact:true}).click();
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('Template Guest');
