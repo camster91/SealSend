@@ -73,7 +73,8 @@ for (const file of files) {
     if (ts.isCallExpression(node) && isQueryCall(node) && node.arguments[0]) candidate = node.arguments[0];
     if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === "text") candidate = node.initializer;
     const sql = candidate && sqlOf(candidate);
-    if (sql && /\b(SELECT|INSERT|UPDATE|DELETE|WITH)\b/i.test(sql.text)) {
+    // SQL starts with a statement keyword; this skips UI copy in `text:` properties.
+    if (sql && /^\s*(SELECT|INSERT|UPDATE|DELETE|WITH|REPLACE)\b/i.test(sql.text)) {
       const line = source.getLineAndCharacterOfPosition(candidate.getStart()).line + 1;
       const where = `${file.replace(/\\/g, "/")}:${line}`;
       checked++;

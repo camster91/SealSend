@@ -1603,7 +1603,12 @@ test('verified account deletion is cancellable, subscription-safe, and executed 
   assert.match(route, /requireApiHost/);
   assert.match(route, /VALUES \(\$1, 'pending', \$\{SQL_NOW\}, \$\{sqlNowPlus\("\+7 days"\)\}/);
   assert.match(route, /Cancel the active subscription/);
-  assert.match(cron, /FOR UPDATE SKIP LOCKED/);
+  // One guarded batch per account: still due, no paid subscription, and the planned handover still valid.
+  assert.match(cron, /account_deletion_requests[\s\S]*scheduled_for <= \$\{SQL_NOW\}\)`, \[userId\], "not_due"\)/);
+  assert.match(cron, /guard\(`NOT \$\{BLOCKING_SUBSCRIPTION_SQL\}`, \[userId\], "blocked"\)/);
+  assert.match(cron, /status IN \('active', 'past_due', 'trialing'\) AND tier <> 'free'/);
+  assert.match(cron, /"ownership_changed"/);
+  assert.match(cron, /await batch\(await deletionStatements\(userId\)\)/);
   assert.match(cron, /DELETE FROM events WHERE user_id/);
   assert.match(cron, /DELETE FROM admin_users/);
   assert.match(cron, /deleted_account_upload_cleanup/);
@@ -1810,7 +1815,9 @@ test('Twilio incoming opt-out events synchronize the local SMS suppression state
   assert.match(twilio, /processTwilioOptOutEvent/);
   assert.match(twilio, /data\.OptOutType/);
   assert.match(twilio, /data\.From/);
-  assert.match(twilio, /BEGIN[\s\S]*processTwilioOptOutEvent[\s\S]*COMMIT/);
+  // The receipt and suppression changes are one batch inside processTwilioOptOutEvent.
+  assert.match(twilio, /await processTwilioOptOutEvent\(\{/);
+  assert.doesNotMatch(twilio, /\bBEGIN\b|\bCOMMIT\b/);
   assert.match(twilio, /<Response><\/Response>/);
   // The lib now builds its own batch: a duplicate-receipt guard, the receipt, then the suppression
   // changes, so a failure leaves no receipt and a replay (even a racing one) is a no-op.
@@ -1842,7 +1849,8 @@ test('complaints, unsubscribes, bounces, and invalid phones block future guest c
   suppress.run('a'.repeat(64));
   rejectsConstraint(() => suppress.run('a'.repeat(64)), 'one suppression per owner, channel and recipient');
   rejectsConstraint(() => suppress.run('+15551234567'), 'raw phone numbers are never stored');
-  assert.match(mailgun, /recordCommunicationSuppression/);
+  assert.match(mailgun, /communicationSuppressionStatement\(/);
+  assert.match(mailgun, /await batch\(statements\)/);
   assert.match(mailgun, /unsubscribed[\s\S]*complained[\s\S]*bounced/);
   for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
     assert.match(sender, /getCommunicationSuppressions/);
@@ -1952,7 +1960,8 @@ test('organizer plan changes and cancellations are owner-only, beta-gated, and a
   assert.doesNotMatch(webhook, /as unknown as \{ current_period_end/);
   // A late event for an older subscription can't overwrite the current one.
   assert.match(webhook, /WHERE organization_subscriptions\.stripe_subscription_id = EXCLUDED\.stripe_subscription_id\s+OR organization_subscriptions\.status = 'canceled'/);
-  assert.match(webhook, /if \(stored\.rowCount\)/);
+  // The plan changes only when the upsert stored this subscription, checked in the same batch.
+  assert.match(webhook, /AND EXISTS \(SELECT 1 FROM organization_subscriptions WHERE organization_id = \$2 AND stripe_subscription_id = \$3\)/);
 
   // Formerly the upgrade migration's ADD COLUMN; now part of the one schema.
   assert.match(tableDefinition(schema, 'organization_subscriptions'), /cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0,/);
