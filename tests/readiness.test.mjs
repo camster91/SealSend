@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -15,6 +16,35 @@ function assertColumns(schema, table, columns) {
     assert.match(definition, new RegExp(`\\b${column}\\s+`), `${table}.${column} is missing`);
   }
 }
+
+// The app runs on SQLite / Cloudflare D1 and src/lib/db/schema.sql is the only schema. The old
+// Postgres upgrade migration (apply-security-indexes.sql) is gone, so "fresh and upgraded" schema
+// checks now only cover the fresh schema; where they protected a constraint, it is exercised here
+// against a real in-memory SQLite database built from schema.sql.
+let schemaSql;
+async function freshDb() {
+  schemaSql ??= await read('src/lib/db/schema.sql');
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec(schemaSql);
+  return db;
+}
+
+function seedUser(db, id = 'user-1', name = 'Host') {
+  db.prepare("INSERT INTO admin_users (id, email, password, name) VALUES (?, ?, 'x', ?)").run(id, `${id}@example.com`, name);
+}
+
+function seedEvent(db, id = 'event-1', userId = 'user-1', extra = {}) {
+  const columns = ['id', 'user_id', 'title', 'slug', ...Object.keys(extra)];
+  const values = [id, userId, 'Party', `slug-${id}`, ...Object.values(extra)];
+  db.prepare(`INSERT INTO events (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`).run(...values);
+}
+
+function seedOrganization(db, id = 'org-1', userId = 'user-1') {
+  db.prepare("INSERT INTO organizations (id, name, slug, created_by) VALUES (?, 'Studio', ?, ?)").run(id, `org-${id}`, userId);
+}
+
+const rejectsConstraint = (fn, message) => assert.throws(fn, /constraint/i, message);
 
 test('fresh database schema matches the send logging contract', async () => {
   const schema = await read('src/lib/db/schema.sql');
@@ -33,96 +63,131 @@ test('fresh database schema matches the send logging contract', async () => {
   }
 });
 
-test('fresh and upgraded guest schemas support reminder tracking', async () => {
+test('fresh guest schema supports reminder tracking', async () => {
+  // Formerly "fresh and upgraded": the upgrade migration no longer exists; only schema.sql is checked.
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const guests = schema.match(/CREATE TABLE IF NOT EXISTS guests \([\s\S]*?\n\);/)?.[0];
 
   assert.ok(guests, 'guests table definition is missing');
-  assert.match(guests, /reminder_sent_at\s+TIMESTAMPTZ/);
-  assert.match(migration, /ALTER TABLE guests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ/);
+  assert.match(guests, /reminder_sent_at\s+TIMESTAMP_TEXT/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_guests_event_reminder ON guests \(event_id, reminder_sent_at\)/);
 });
 
-test('fresh and upgraded schemas accept the Event Pass tier', async () => {
+test('fresh schema accepts the Event Pass tier', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  assert.match(tableDefinition(schema, 'events'), /CHECK \(\(tier IN \('free', 'event_pass',/);
 
-  assert.match(schema, /tier TEXT DEFAULT 'free' CHECK \(tier IN \('free', 'event_pass',/);
-  assert.match(migration, /DROP CONSTRAINT IF EXISTS events_tier_check/);
-  assert.match(migration, /ADD CONSTRAINT events_tier_check\s+CHECK \(tier IN \('free', 'event_pass',/);
+  const db = await freshDb();
+  seedUser(db);
+  seedEvent(db, 'event-pass', 'user-1', { tier: 'event_pass' });
+  rejectsConstraint(() => seedEvent(db, 'event-bad-tier', 'user-1', { tier: 'unlimited' }), 'unknown tiers are rejected');
 });
 
-test('fresh and upgraded schemas create the Event Pass SMS ledger', async () => {
+test('fresh schema creates the Event Pass SMS ledger', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  const ledger = tableDefinition(schema, 'event_sms_ledger');
+  assert.ok(ledger, 'event_sms_ledger table definition is missing');
+  assert.match(ledger, /CHECK \(\(reason IN \('event_pass', 'sms_top_up', 'sms_sent'\)\)\)/);
+  assert.match(ledger, /UNIQUE \(reference\)/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS event_sms_ledger \(/);
-    assert.match(sql, /reason TEXT NOT NULL CHECK \(reason IN \('event_pass', 'sms_top_up', 'sms_sent'\)\)/);
-    assert.match(sql, /reference TEXT UNIQUE/);
-  }
+  const db = await freshDb();
+  seedUser(db);
+  seedEvent(db);
+  const insert = db.prepare('INSERT INTO event_sms_ledger (event_id, delta_segments, reason, reference) VALUES (?, ?, ?, ?)');
+  insert.run('event-1', 100, 'event_pass', 'cs_1');
+  rejectsConstraint(() => insert.run('event-1', 100, 'event_pass', 'cs_1'), 'a purchase reference is credited once');
+  rejectsConstraint(() => insert.run('event-1', 5, 'gift', 'cs_2'), 'unknown ledger reasons are rejected');
 });
 
-test('fresh and upgraded schemas give every event a workspace', async () => {
+test('fresh schema gives every event a workspace', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS organizations \(/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS organization_members \(/);
+  assert.match(tableDefinition(schema, 'organization_members'), /CHECK \(\(role IN \('owner', 'admin', 'planner', 'check_in'\)\)\)/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_personal_owner ON organizations \(created_by\) WHERE is_personal/);
+  assert.match(tableDefinition(schema, 'events'), /FOREIGN KEY \(organization_id\) REFERENCES organizations\(id\)/);
+  assert.match(schema, /CREATE TRIGGER IF NOT EXISTS events_default_organization AFTER INSERT ON events/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS organizations \(/);
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_members \(/);
-    assert.match(sql, /role TEXT NOT NULL CHECK \(role IN \('owner', 'admin', 'planner', 'check_in'\)\)/);
-    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_personal_owner ON organizations\(created_by\) WHERE is_personal/);
-    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations\(id\)/);
-    assert.match(sql, /CREATE TRIGGER events_default_organization BEFORE INSERT ON events/);
-    assert.match(sql, /UPDATE events SET organization_id = sealsend_personal_organization\(user_id\) WHERE organization_id IS NULL/);
-  }
+  // The trigger replaces sealsend_personal_organization(): an event inserted without a workspace
+  // lands in the owner's personal workspace, created once with an owner membership.
+  const db = await freshDb();
+  seedUser(db);
+  seedEvent(db, 'event-1');
+  seedEvent(db, 'event-2');
+  const events = db.prepare('SELECT organization_id FROM events ORDER BY id').all();
+  assert.ok(events[0].organization_id, 'new events get a workspace');
+  assert.equal(events[1].organization_id, events[0].organization_id, 'the personal workspace is reused');
+  const membership = db.prepare('SELECT o.is_personal, m.role FROM organizations o JOIN organization_members m ON m.organization_id = o.id WHERE o.id = ? AND m.user_id = ?').get(events[0].organization_id, 'user-1');
+  assert.equal(membership.is_personal, 1);
+  assert.equal(membership.role, 'owner');
+  rejectsConstraint(() => db.prepare("INSERT INTO organizations (name, slug, is_personal, created_by) VALUES ('Again', 'again', 1, 'user-1')").run(), 'one personal workspace per host');
+  rejectsConstraint(() => db.prepare("INSERT INTO organization_members (organization_id, user_id, role) VALUES (?, 'user-1', 'superuser')").run(events[0].organization_id), 'unknown roles are rejected');
 });
 
-test('fresh and upgraded schemas create the workspace brand kit', async () => {
+test('fresh schema creates the workspace brand kit', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  const brands = tableDefinition(schema, 'brands');
+  assert.ok(brands, 'brands table definition is missing');
+  assert.match(brands, /organization_id TEXT NOT NULL/);
+  assert.match(brands, /FOREIGN KEY \(organization_id\) REFERENCES organizations\(id\) ON DELETE CASCADE/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_default_per_organization ON brands \(organization_id\) WHERE is_default/);
+  assert.match(tableDefinition(schema, 'events'), /FOREIGN KEY \(brand_id\) REFERENCES brands\(id\) ON DELETE SET NULL/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS brands \(/);
-    assert.match(sql, /organization_id UUID NOT NULL REFERENCES organizations\(id\) ON DELETE CASCADE/);
-    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_brands_default_per_organization ON brands\(organization_id\) WHERE is_default/);
-    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands\(id\) ON DELETE SET NULL/);
-  }
+  const db = await freshDb();
+  seedUser(db);
+  seedOrganization(db);
+  const insert = db.prepare("INSERT INTO brands (organization_id, name, is_default) VALUES ('org-1', ?, 1)");
+  insert.run('Main');
+  rejectsConstraint(() => insert.run('Second'), 'one default brand per workspace');
+  rejectsConstraint(() => db.prepare("INSERT INTO brands (organization_id, name, primary_color) VALUES ('org-1', 'Bad', 'red')").run(), 'brand colours must be #RRGGBB');
 });
 
-test('fresh and upgraded schemas store workspace invites as hashed one-time tokens', async () => {
+test('fresh schema stores workspace invites as hashed one-time tokens', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  const invites = tableDefinition(schema, 'organization_invites');
+  assert.ok(invites, 'organization_invites table definition is missing');
+  assert.match(invites, /CHECK \(\(role IN \('admin', 'planner', 'check_in'\)\)\)/);
+  assert.match(invites, /token_hash TEXT NOT NULL/);
+  assert.match(invites, /UNIQUE \(token_hash\)/);
+  assert.doesNotMatch(invites, /\btoken TEXT/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_invites \(/);
-    assert.match(sql, /role TEXT NOT NULL CHECK \(role IN \('admin', 'planner', 'check_in'\)\)/);
-    assert.match(sql, /token_hash TEXT UNIQUE NOT NULL/);
-  }
+  const db = await freshDb();
+  seedUser(db);
+  seedOrganization(db);
+  const insert = db.prepare("INSERT INTO organization_invites (organization_id, email, role, token_hash, token_preview, invited_by, expires_at) VALUES ('org-1', 'a@example.com', ?, ?, 'abcd', 'user-1', '2030-01-01T00:00:00.000Z')");
+  insert.run('planner', 'hash-1');
+  rejectsConstraint(() => insert.run('planner', 'hash-1'), 'token hashes are unique');
+  rejectsConstraint(() => insert.run('owner', 'hash-2'), 'invites cannot grant ownership');
 });
 
-test('fresh and upgraded schemas create clients and hashed client review links', async () => {
+test('fresh schema creates clients and hashed client review links', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
-
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS clients \(/);
-    assert.match(sql, /ALTER TABLE events ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients\(id\) ON DELETE SET NULL/);
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS event_client_shares \(/);
-    assert.match(sql, /token_hash TEXT UNIQUE NOT NULL,\n  token_preview TEXT NOT NULL,\n  created_by UUID/);
-  }
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS clients \(/);
+  assert.match(tableDefinition(schema, 'events'), /FOREIGN KEY \(client_id\) REFERENCES clients\(id\) ON DELETE SET NULL/);
+  const shares = tableDefinition(schema, 'event_client_shares');
+  assert.ok(shares, 'event_client_shares table definition is missing');
+  assert.match(shares, /token_hash TEXT NOT NULL,\n  token_preview TEXT NOT NULL,\n  created_by TEXT/);
+  assert.match(shares, /UNIQUE \(token_hash\)/);
 });
 
-test('fresh and upgraded schemas create workspace webhooks and their delivery queue', async () => {
+test('fresh schema creates workspace webhooks and their delivery queue', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  const webhooks = tableDefinition(schema, 'organization_webhooks');
+  const deliveries = tableDefinition(schema, 'webhook_deliveries');
+  assert.match(webhooks, /CREATE TABLE IF NOT EXISTS organization_webhooks \(\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\n  organization_id TEXT NOT NULL,/);
+  assert.match(webhooks, /FOREIGN KEY \(organization_id\) REFERENCES organizations\(id\) ON DELETE CASCADE/);
+  assert.match(deliveries, /CREATE TABLE IF NOT EXISTS webhook_deliveries \(\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\n  webhook_id TEXT NOT NULL,/);
+  assert.match(deliveries, /FOREIGN KEY \(webhook_id\) REFERENCES organization_webhooks\(id\) ON DELETE CASCADE/);
+  assert.match(deliveries, /status TEXT NOT NULL DEFAULT 'pending'/);
+  assert.match(deliveries, /CHECK \(\(status IN \('pending', 'delivered', 'failed'\)\)\)/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries \(next_attempt_at\) WHERE \(status = 'pending'\)/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS organization_webhooks \(\n  id UUID DEFAULT gen_random_uuid\(\) PRIMARY KEY,\n  organization_id UUID NOT NULL REFERENCES organizations\(id\) ON DELETE CASCADE/);
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS webhook_deliveries \(\n  id UUID DEFAULT gen_random_uuid\(\) PRIMARY KEY,\n  webhook_id UUID NOT NULL REFERENCES organization_webhooks\(id\) ON DELETE CASCADE/);
-    assert.match(sql, /status TEXT NOT NULL DEFAULT 'pending' CHECK \(status IN \('pending', 'delivered', 'failed'\)\)/);
-    assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_due ON webhook_deliveries\(next_attempt_at\) WHERE status = 'pending'/);
-  }
+  const db = await freshDb();
+  seedUser(db);
+  seedOrganization(db);
+  db.prepare("INSERT INTO organization_webhooks (id, organization_id, url, secret, events) VALUES ('hook-1', 'org-1', 'https://example.com/hook', 's', '[\"rsvp.created\"]')").run();
+  rejectsConstraint(() => db.prepare("INSERT INTO webhook_deliveries (webhook_id, event_type, payload, status) VALUES ('hook-1', 'rsvp.created', '{}', 'sent')").run(), 'unknown delivery statuses are rejected');
+  rejectsConstraint(() => db.prepare("INSERT INTO organization_webhooks (organization_id, url, secret, events) VALUES ('org-1', 'https://example.com/hook', 's', '[]')").run(), 'a webhook subscribes to at least one event');
 });
 
 test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-checked, redirect-free POST', async () => {
@@ -134,8 +199,11 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
   assert.match(route, /deliverDueWebhooks/);
   assert.match(nodeTransport, /lookup: publicOnlyLookup/);
   assert.doesNotMatch(nodeTransport, /\bfetch\(/);
-  assert.match(lib, /FOR UPDATE OF pending SKIP LOCKED/);
-  assert.match(lib, /JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active/);
+  // Claiming (formerly FOR UPDATE SKIP LOCKED) is one atomic UPDATE ... WHERE id IN (SELECT ... LIMIT n)
+  // that re-checks the row is still due and pushes next_attempt_at out so overlapping runs skip it.
+  assert.match(lib, /UPDATE webhook_deliveries\s+SET next_attempt_at = \$\{sqlNowPlus\("\+\d+ minutes"\)\}\s+WHERE id IN \(/);
+  assert.match(lib, /LIMIT \$1\)\s+AND status = 'pending' AND next_attempt_at <= \$\{SQL_NOW\}\s+RETURNING id/);
+  assert.match(lib, /JOIN organization_webhooks endpoint ON endpoint.id = pending.webhook_id AND endpoint.active = 1/);
   assert.doesNotMatch(lib, /\bfetch\(/);
   // The Workers transport has no dns module: it checks DNS-over-HTTPS answers and never follows redirects.
   assert.match(workerTransport, /redirect: "manual"/);
@@ -200,33 +268,42 @@ test('public marketing pages linked from the footer do not require a login', asy
   }
 });
 
-test('fresh and upgraded schemas create the waitlist signup table', async () => {
+test('fresh schema creates the waitlist signup table', async () => {
+  // Formerly "fresh and upgraded": only schema.sql exists now.
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS waitlist_signups \(/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan\s+ON waitlist_signups \(lower\(email\), plan_interest\)/);
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS waitlist_signups \(/);
-    assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_signups_email_plan\s+ON waitlist_signups \(LOWER\(email\), plan_interest\)/);
-  }
+  const db = await freshDb();
+  const insert = db.prepare("INSERT INTO waitlist_signups (email, plan_interest) VALUES (?, 'pro_annual')");
+  insert.run('Host@Example.com');
+  rejectsConstraint(() => insert.run('host@example.com'), 'one signup per email (case-insensitive) and plan');
 });
 
-test('production migration backfills and constrains the send logging contract', async () => {
-  const migration = await read('apply-security-indexes.sql');
+test('the schema constrains the send logging contract', async () => {
+  // The Postgres upgrade migration that backfilled send_type from channel is gone (existing rows are
+  // copied at cutover); the constraints it added are part of schema.sql and enforced here.
+  const schema = await read('src/lib/db/schema.sql');
+  const sendLogs = tableDefinition(schema, 'send_logs');
+  assert.match(sendLogs, /send_type TEXT NOT NULL/);
+  assert.match(sendLogs, /CHECK \(\(status IN \('pending', 'sent', 'failed', 'bounced', 'delivered'\)\)\)/);
 
-  assert.match(migration, /UPDATE send_logs[\s\S]*send_type = channel/);
-  assert.match(migration, /ALTER COLUMN send_type SET NOT NULL/);
-  assert.match(migration, /DROP CONSTRAINT IF EXISTS send_logs_status_check/);
-  assert.match(migration, /CHECK \(status IN \('pending', 'sent', 'failed', 'bounced', 'delivered'\)\)/);
+  const db = await freshDb();
+  seedUser(db);
+  seedEvent(db);
+  const insert = db.prepare("INSERT INTO send_logs (event_id, send_type, status, recipient) VALUES ('event-1', ?, ?, 'a@example.com')");
+  insert.run('email', 'sent');
+  rejectsConstraint(() => insert.run(null, 'sent'), 'send_type is required');
+  rejectsConstraint(() => insert.run('email', 'queued'), 'unknown send statuses are rejected');
 });
 
 test('feature table schemas match the SQL contracts used by application routes', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const verification = await read('scripts/test/verify-feature-schema.sql');
 
   assertColumns(schema, 'events', ['location_lat', 'location_lng', 'payment_id', 'event_brief', 'repeated_from_event_id']);
-  assert.match(tableDefinition(schema, 'events'), /repeated_from_event_id\s+UUID\s+REFERENCES events\(id\) ON DELETE SET NULL/);
-  assert.match(migration, /ALTER TABLE events ADD COLUMN IF NOT EXISTS repeated_from_event_id UUID REFERENCES events\(id\) ON DELETE SET NULL/);
+  assert.match(tableDefinition(schema, 'events'), /repeated_from_event_id\s+TEXT,/);
+  assert.match(tableDefinition(schema, 'events'), /FOREIGN KEY \(repeated_from_event_id\) REFERENCES events\(id\) ON DELETE SET NULL/);
   assert.match(verification, /repeated_from_event_id/);
   assertColumns(schema, 'guests', ['tags']);
   assert.match(tableDefinition(schema, 'guests'), /invite_status TEXT DEFAULT 'not_sent'/);
@@ -376,8 +453,11 @@ test('authenticated browser fixture can reset only the named isolated database',
   const fixture = await read('scripts/test/prepare-authenticated-e2e.ts');
 
   assert.match(fixture, /SEALSEND_E2E_FIXTURE_CONFIRM !== ["']isolated["']/);
-  assert.match(fixture, /new URL\(databaseUrl\)\.pathname !== ["']\/sealsend_e2e["']/);
-  assert.match(fixture, /DROP SCHEMA public CASCADE; CREATE SCHEMA public/);
+  // The fixture now resets a local SQLite file: only one exactly named file, never remote D1.
+  assert.match(fixture, /path\.basename\(sqlitePath\) !== ["']sealsend_e2e\.db["']/);
+  assert.match(fixture, /D1_REMOTE === ["']true["'][\s\S]*throw new Error/);
+  assert.match(fixture, /for \(const suffix of \["", "-wal", "-shm"\]\) await rm\(`\$\{qaDatabasePath\}\$\{suffix\}`/);
+  assert.match(fixture, /db\.exec\(await readFile\(path\.resolve\("src\/lib\/db\/schema\.sql"\)/);
   assert.doesNotMatch(fixture, /console\.log\([^\n]*(?:password|inviteToken|email)/i);
 });
 
@@ -421,7 +501,7 @@ test('manual event creation exposes every required publication decision', async 
 });
 
 test('structured event brief survives generation, storage, editing, and publication checks', async () => {
-  const migration = await read('apply-security-indexes.sql');
+  const schema = await read('src/lib/db/schema.sql');
   const validation = await read('src/lib/validations.ts');
   const createRoute = await read('src/app/api/events/route.ts');
   const updateRoute = await read('src/app/api/events/[eventId]/route.ts');
@@ -429,7 +509,7 @@ test('structured event brief survives generation, storage, editing, and publicat
   const aiRoute = await read('src/app/api/ai/event-draft/route.ts');
   const mapping = await read('src/lib/event-builder/mapping.ts');
 
-  assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_brief JSONB/);
+  assert.match(tableDefinition(schema, 'events'), /event_brief JSON_TEXT,/);
   assert.match(validation, /event_brief:\s*eventBriefContextSchema/);
   assert.match(createRoute, /event_brief/);
   assert.match(updateRoute, /event_brief/);
@@ -442,10 +522,12 @@ test('structured event brief survives generation, storage, editing, and publicat
 test('database rate limiting serializes attempts for the same key', async () => {
   const source = await read('src/lib/rate-limit.ts');
 
-  assert.match(source, /await client\.query\(['"]BEGIN['"]\)/);
-  assert.match(source, /pg_advisory_xact_lock/);
-  assert.match(source, /await client\.query\(['"]COMMIT['"]\)/);
-  assert.match(source, /await client\.query\(['"]ROLLBACK['"]\)/);
+  // Formerly BEGIN + pg_advisory_xact_lock: the prune, count and insert now run in one batch (D1 runs
+  // batches one at a time) and the insert itself re-counts, so concurrent attempts cannot overshoot.
+  assert.match(source, /await batch<\{ count: number \}>\(\[\s*\{\s*text: 'DELETE FROM rate_limit_attempts WHERE key = \$1 AND created_at < \$2'/);
+  assert.match(source, /SELECT COUNT\(\*\) AS count FROM rate_limit_attempts WHERE key = \$1 AND created_at >= \$2/);
+  assert.match(source, /INSERT INTO rate_limit_attempts \(key\)[\s\S]*WHERE \(SELECT COUNT\(\*\) FROM rate_limit_attempts WHERE key = \$1 AND created_at >= \$3\) \+ \$2 <= \$4/);
+  assert.doesNotMatch(source, /client\.query\(['"]BEGIN['"]\)/);
 });
 
 test('paid checkout documents every Stripe price ID consumed by the app', async () => {
@@ -457,13 +539,16 @@ test('paid checkout documents every Stripe price ID consumed by the app', async 
   assert.doesNotMatch(envExample, /STRIPE_(SILVER|GOLD)_(MONTHLY|YEARLY)_PRICE_ID/);
 });
 
-test('annual Pro is accepted by fresh and upgraded subscription schemas', async () => {
+test('annual Pro is accepted by the subscription schema', async () => {
+  // Formerly "fresh and upgraded": only schema.sql exists now.
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const webhook = await read('src/app/api/webhooks/stripe/route.ts');
 
-  assert.match(tableDefinition(schema, 'user_subscriptions'), /'pro_annual'/);
-  assert.match(migration, /user_subscriptions_tier_check[\s\S]*'pro_annual'/);
+  assert.match(tableDefinition(schema, 'user_subscriptions'), /CHECK \(\(tier IN \('free', 'pro_annual'\)\)\)/);
+  const db = await freshDb();
+  const insert = db.prepare("INSERT INTO user_subscriptions (user_id, tier, billing_cycle) VALUES ('user-1', ?, 'yearly')");
+  insert.run('pro_annual');
+  rejectsConstraint(() => insert.run('gold'), 'retired tiers are rejected');
   assert.match(webhook, /session\.payment_status/);
 });
 
@@ -472,22 +557,27 @@ test('public capacity writes are serialized and RSVP plus-ones are atomic', asyn
   const signups = await read('src/app/api/signups/[slug]/route.ts');
 
   const store = await read('src/lib/rsvp-store.ts');
-  assert.match(store, /pg_advisory_xact_lock/);
-  assert.match(rsvp, /BEGIN[\s\S]*saveRsvp[\s\S]*COMMIT/);
-  assert.match(store, /INSERT INTO rsvp_responses[\s\S]*INSERT INTO plus_ones/);
+  // Formerly an advisory lock + BEGIN/COMMIT: the RSVP is written in one batch whose guards re-check
+  // the response limit and capacity when it runs, and the response and plus-ones share that batch.
+  assert.match(store, /guard\('\(SELECT COUNT\(\*\) FROM rsvp_responses WHERE event_id = \$1\) < \$2', \[eventId, responseLimit\], 'response_limit'\)/);
+  assert.match(store, /guard\(`\(\$\{attendingTotalSql\}\) \+ \$3 <= \$4`, \[eventId, previous\?\.id \?\? null, headcount, event\.max_attendees\], 'capacity'\)/);
+  assert.match(store, /if \(code === 'capacity'\) throw capacityError/);
+  assert.match(store, /INSERT INTO rsvp_responses[\s\S]*INSERT INTO plus_ones[\s\S]*results = await db\.batch\(statements\)/);
+  assert.match(rsvp, /saveRsvp\(\{ query, batch \}/);
   assert.doesNotMatch(rsvp, /Don't fail the RSVP if plus_ones creation fails/);
-  assert.match(signups, /SELECT id, slots[\s\S]*FOR UPDATE/);
-  assert.match(signups, /BEGIN[\s\S]*INSERT INTO event_signup_claims[\s\S]*COMMIT/);
+  // Sign-up claims: the free-slot check is a guard in the same batch as the insert.
+  assert.match(signups, /await batch\(\[[\s\S]*guard\(\s*'\(SELECT COUNT\(\*\) FROM event_signup_claims WHERE item_id = \$1\) < \(SELECT slots FROM event_signup_items WHERE id = \$1\)',\s*\[item\.id\], 'slots_taken'\s*\),\s*\{\s*text: `INSERT INTO event_signup_claims/);
+  assert.match(signups, /if \(code === 'slots_taken'\) return NextResponse\.json\(\{ error: "All slots are taken" \}, \{ status: 403 \}\)/);
 });
 
 test('event instants preserve the host timezone across browser, database, and invitations', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const mapping = await read('src/lib/event-builder/mapping.ts');
   const invitation = await read('src/lib/email-templates.ts');
 
+  // Instants are stored as ISO-8601 UTC text next to the host's IANA zone (no upgrade migration anymore).
   assert.match(tableDefinition(schema, 'events'), /event_timezone TEXT NOT NULL DEFAULT 'UTC'/);
-  assert.match(migration, /events ADD COLUMN IF NOT EXISTS event_timezone/);
+  assert.match(tableDefinition(schema, 'events'), /event_date TIMESTAMP_TEXT,/);
   assert.match(mapping, /zonedLocalDateTimeToInstant\(/);
   assert.doesNotMatch(mapping, /new Date\((?:data|value|next|local|formData)[^)]*\)\.toISOString\(\)/);
   assert.match(invitation, /formatDateTime\(eventDate, eventTimezone\)/);
@@ -631,11 +721,12 @@ test('controlled beta remains free and enforces one active event throughout the 
   assert.match(checkout, /controlled beta/i);
   assert.match(events, /status\s*<>\s*['"]archived['"]/i);
   assert.match(events, /one active event/i);
-  assert.match(events, /pg_advisory_xact_lock/);
-  assert.match(events, /BEGIN/);
-  assert.match(events, /COMMIT/);
-  assert.match(events, /ROLLBACK/);
-  assert.match(events, /SAVEPOINT event_slug_attempt/);
+  // Formerly an advisory lock + transaction: the insert batch carries a guard that the active event
+  // count is unchanged since the plan check, and a lost race or slug collision retries from the reads.
+  assert.match(events, /statements\.push\(guard\(\s*"\(SELECT COUNT\(\*\) FROM events WHERE user_id = \$1 AND status <> 'archived'\) <= \$2",\s*\[user\.id, eventCount\],\s*'event_count_changed',/);
+  assert.match(events, /await batch<Record<string, unknown>>\(statements\)/);
+  assert.match(events, /if \(code === 'mutation_exists' \|\| code === 'event_count_changed'\) continue;/);
+  assert.match(events, /UNIQUE constraint failed: events\\\.slug/);
 });
 
 test('dashboard reports truthful per-event guest usage', async () => {
@@ -655,15 +746,17 @@ test('repeat organizers get an explicit, atomic, privacy-limited next-event work
   const eventRoute = await read('src/app/api/events/[eventId]/route.ts');
 
   assert.match(route, /parseRepeatEventRequest/);
-  assert.match(route, /pg_advisory_xact_lock/);
   assert.match(route, /status\s*<>\s*['"]archived['"]/i);
   assert.match(route, /canCreateEvent/);
   assert.match(route, /archiveSource/);
   assert.match(route, /UPDATE events SET status = ['"]archived['"]/i);
   assert.match(route, /requiresArchive/);
-  assert.match(route, /BEGIN/);
-  assert.match(route, /COMMIT/);
-  assert.match(route, /ROLLBACK/);
+  // Formerly an advisory lock + transaction: the archive and copy run in one batch guarded on the
+  // owner and the unchanged active-event count; a lost race retries.
+  assert.match(route, /guard\("\(SELECT user_id FROM events WHERE id = \$1\) = \$2", \[eventId, original\.user_id\], "owner_changed"\)/);
+  assert.match(route, /guard\(\s*"\(SELECT COUNT\(\*\) FROM events WHERE user_id = \$1 AND status <> 'archived' AND NOT \(id = \$2 AND \$3\)\) <= \$4",[\s\S]*?"event_count_changed",/);
+  assert.match(route, /await batch<\{ id: string; title: string \}>\(statements\)/);
+  assert.match(route, /if \(code === "event_count_changed"\) continue;/);
   assert.match(route, /includeGuests/);
   assert.match(route, /buildRepeatedEventBrief/);
   assert.match(route, /event_brief/);
@@ -807,19 +900,26 @@ test('organizer use cases and comparison stay inside the shipped product scope',
   assert.match(organizerFit, /not a claim about every competitor/i);
 });
 
-test('activation analytics has a privacy-limited fresh schema and upgrade path', async () => {
+test('activation analytics has a privacy-limited schema with first-time uniqueness', async () => {
+  // Formerly also checked the upgrade path; the upgrade migration no longer exists.
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
 
   const activationTable = tableDefinition(schema, 'activation_events');
   assert.match(activationTable, /event_name TEXT NOT NULL/);
-  assert.match(activationTable, /metadata JSONB NOT NULL DEFAULT '\{\}'/);
+  assert.match(activationTable, /metadata JSON_TEXT NOT NULL DEFAULT '\{\}'/);
   assert.doesNotMatch(activationTable, /email|phone|message|recipient/i);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS activation_events/);
   assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user/);
   assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event/);
-  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_user/);
-  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_activation_first_event/);
+
+  const db = await freshDb();
+  seedUser(db);
+  seedEvent(db);
+  const insert = db.prepare('INSERT INTO activation_events (event_name, user_id, event_id) VALUES (?, ?, ?)');
+  insert.run('first_rsvp_received', null, 'event-1');
+  rejectsConstraint(() => insert.run('first_rsvp_received', null, 'event-1'), 'first-per-event milestones are recorded once');
+  insert.run('account_created', 'user-1', null);
+  rejectsConstraint(() => insert.run('account_created', 'user-1', null), 'first-per-user milestones are recorded once');
+  rejectsConstraint(() => insert.run('page_viewed', 'user-1', null), 'unknown activation events are rejected');
 });
 
 test('the core activation funnel is recorded at successful lifecycle boundaries', async () => {
@@ -836,7 +936,8 @@ test('the core activation funnel is recorded at successful lifecycle boundaries'
   assert.match(publishRoute, /newStatus === ['"]published['"][\s\S]*event_published/);
   assert.match(guestsRoute, /recordActivationEventSafely[\s\S]*first_guest_added/);
   assert.match(invitesRoute, /successIds\.length > 0[\s\S]*first_invitation_sent/);
-  assert.match(rsvpRoute, /COMMIT[\s\S]*first_rsvp_received/);
+  // Recorded only after the RSVP batch succeeded (saveRsvp throws on any guard failure).
+  assert.match(rsvpRoute, /const saved = await saveRsvp\([\s\S]*first_rsvp_received/);
 });
 
 test('operations scripts schedule authenticated maintenance without exposing secrets', async () => {
@@ -904,22 +1005,31 @@ test('calendar downloads expose only published events with safe response headers
 
 test('co-hosting schemas enforce roles, uniqueness, hashed invitations, and auditability', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
 
   const members = tableDefinition(schema, 'event_members');
   const invites = tableDefinition(schema, 'event_member_invites');
   const audit = tableDefinition(schema, 'event_audit_log');
 
   assert.match(members, /UNIQUE\s*\(event_id, user_id\)/);
-  assert.match(members, /'manager'[\s\S]*'check_in'[\s\S]*'viewer'/);
-  assert.match(invites, /token_hash TEXT UNIQUE NOT NULL/);
-  assert.match(invites, /expires_at TIMESTAMPTZ NOT NULL/);
-  assert.doesNotMatch(invites, /token TEXT/);
-  assert.match(audit, /actor_user_id UUID/);
+  assert.match(members, /CHECK \(\(role IN \('manager', 'check_in', 'viewer'\)\)\)/);
+  assert.match(invites, /token_hash TEXT NOT NULL/);
+  assert.match(invites, /UNIQUE \(token_hash\)/);
+  assert.match(invites, /expires_at TIMESTAMP_TEXT NOT NULL/);
+  assert.doesNotMatch(invites, /\btoken TEXT/);
+  assert.match(audit, /actor_user_id TEXT/);
   assert.match(audit, /action TEXT NOT NULL/);
-  for (const table of ['event_members', 'event_member_invites', 'event_audit_log']) {
-    assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
-  }
+
+  const db = await freshDb();
+  seedUser(db, 'owner');
+  seedUser(db, 'cohost');
+  seedEvent(db, 'event-1', 'owner');
+  const addMember = db.prepare("INSERT INTO event_members (event_id, user_id, role, invited_by) VALUES ('event-1', 'cohost', ?, 'owner')");
+  addMember.run('manager');
+  rejectsConstraint(() => addMember.run('viewer'), 'one membership per event and user');
+  rejectsConstraint(() => db.prepare("INSERT INTO event_members (event_id, user_id, role, invited_by) VALUES ('event-1', 'owner', 'owner', 'owner')").run(), 'unknown co-host roles are rejected');
+  const invite = db.prepare("INSERT INTO event_member_invites (event_id, email, role, token_hash, token_preview, invited_by, expires_at) VALUES ('event-1', ?, 'viewer', ?, 'abcd', 'owner', '2030-01-01T00:00:00.000Z')");
+  invite.run('Guest@Example.com', 'hash-1');
+  rejectsConstraint(() => invite.run('guest@example.com', 'hash-2'), 'one pending invite per email (case-insensitive)');
 });
 
 test('co-host invitation APIs are owner-gated, capacity-safe, and never persist raw tokens', async () => {
@@ -928,7 +1038,10 @@ test('co-host invitation APIs are owner-gated, capacity-safe, and never persist 
   const acceptRoute = await read('src/app/api/team-invites/[token]/accept/route.ts');
 
   assert.match(membersRoute, /roleCan\([^,]+, ['"]manage_members['"]\)/);
-  assert.match(membersRoute, /FOR UPDATE/);
+  // Formerly FOR UPDATE: the seat limit is re-checked by a guard in the same batch as the invite insert.
+  assert.match(membersRoute, /guard\(`\$\{occupiedSeatsSql\} < \$2`, \[eventId, teamLimit\], "seat_limit"\)/);
+  assert.match(membersRoute, /await batch\(statements\)/);
+  assert.match(membersRoute, /if \(code === "seat_limit"\) return seatLimitResponse\(\)/);
   assert.match(membersRoute, /getTeamMemberLimit/);
   assert.match(membersRoute, /hashMagicToken/);
   assert.match(membersRoute, /token_hash/);
@@ -940,18 +1053,20 @@ test('co-host invitation APIs are owner-gated, capacity-safe, and never persist 
   assert.match(memberRoute, /roleCan\([^,]+, ['"]manage_members['"]\)/);
   assert.match(acceptRoute, /hashMagicToken/);
   assert.match(acceptRoute, /LOWER\(i\.email\) = LOWER\(\$2\)/);
-  assert.match(acceptRoute, /BEGIN[\s\S]*INSERT INTO event_members[\s\S]*accepted_at[\s\S]*COMMIT/);
+  // One-time tokens: the batch guards that the invite is still unaccepted and unexpired, then joins and marks it used.
+  assert.match(acceptRoute, /await batch\(\[[\s\S]*guard\(\s*`EXISTS \(SELECT 1 FROM event_member_invites WHERE id = \$1 AND accepted_at IS NULL AND expires_at > \$\{SQL_NOW\}\)`,[\s\S]*"invite_used",[\s\S]*INSERT INTO event_members[\s\S]*UPDATE event_member_invites SET accepted_at = \$\{SQL_NOW\}/);
+  assert.match(acceptRoute, /if \(abortCode\(error\) === "invite_used"\) return invalid\(\)/);
 });
 
 test('mobile check-in is permission-gated, auditable, and reversible', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const route = await read('src/app/api/events/[eventId]/check-in/route.ts');
   const page = await read('src/app/(dashboard)/events/[eventId]/check-in/page.tsx');
 
-  assert.match(schema, /checked_in_at TIMESTAMPTZ/);
-  assert.match(schema, /checked_in_by UUID REFERENCES admin_users/);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMPTZ/);
+  const guests = tableDefinition(schema, 'guests');
+  assert.match(guests, /checked_in_at TIMESTAMP_TEXT/);
+  assert.match(guests, /checked_in_by TEXT/);
+  assert.match(guests, /FOREIGN KEY \(checked_in_by\) REFERENCES admin_users\(id\) ON DELETE SET NULL/);
   assert.match(route, /roleCan\([^,]+, ['"]check_in_guests['"]\)/);
   assert.match(route, /updateCheckInGuest/);
   const store = await read('src/lib/check-in-store.ts');
@@ -1001,18 +1116,22 @@ test('event owners can download a privacy-limited check-in fallback', async () =
 
 test('scheduled announcements are approved, cancellable, and idempotently dispatched', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const cron = await read('src/app/api/cron/send-announcements/route.ts');
+  const dispatch = await read('src/lib/messages/dispatch-announcement.ts');
   const route = await read('src/app/api/events/[eventId]/announcements/route.ts');
   const cancel = await read('src/app/api/events/[eventId]/announcements/[announcementId]/route.ts');
 
-  assert.match(schema, /announcement_deliveries[\s\S]*UNIQUE \(announcement_id, guest_id, channel\)/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS announcement_deliveries/);
+  assert.match(tableDefinition(schema, 'announcement_deliveries'), /UNIQUE \(announcement_id, guest_id, channel\)/);
   assert.match(route, /approved[\s\S]*audience[\s\S]*scheduledAt/);
   assert.match(cancel, /status = 'cancelled'[\s\S]*status = 'queued'/);
   assert.match(cron, /Bearer \$\{cronSecret\}/);
   assert.match(cron, /dispatchAnnouncement/);
-  assert.match(cron, /FOR UPDATE SKIP LOCKED/);
+  assert.match(cron, /WHERE status = 'queued' AND approved_at IS NOT NULL AND scheduled_at <= \$\{SQL_NOW\}/);
+  // Formerly FOR UPDATE SKIP LOCKED in the cron: each announcement is claimed by a batch whose guard
+  // re-checks it is still queued and approved, so overlapping runs dispatch it once.
+  assert.match(dispatch, /await batch\(\[\s*guard\(\s*`EXISTS \(SELECT 1 FROM event_announcements\s+WHERE id = \$1 AND status = 'queued' AND approved_at IS NOT NULL AND scheduled_at <= \$\{SQL_NOW\}\)`,\s*\[announcementId\],\s*"announcement_not_queued",\s*\),\s*\{ text: "UPDATE event_announcements SET status = 'processing'/);
+  assert.match(dispatch, /if \(abortCode\(error\) === "announcement_not_queued"\) return \{ dispatched: false/);
+  assert.match(dispatch, /ON CONFLICT \(announcement_id, guest_id, channel\) DO NOTHING/);
 });
 
 test('every event mutation is routed through the explicit role permission model', async () => {
@@ -1045,14 +1164,14 @@ test('every event mutation is routed through the explicit role permission model'
 
 test('beta operations include privacy-safe error capture and authenticated feedback', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const monitoring = await read('src/lib/monitoring/server-errors.ts');
   const instrumentation = await read('src/instrumentation.ts');
   const feedback = await read('src/app/api/feedback/route.ts');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS server_error_events/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS monitoring_alert_deliveries/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS beta_feedback/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS server_error_events/);
+  // Error capture stores only a fingerprint and route metadata, never the message or stack.
+  assert.doesNotMatch(tableDefinition(schema, 'server_error_events'), /message|stack/i);
   assert.doesNotMatch(monitoring, /error\.message|error\.stack/);
   assert.match(monitoring, /last_delivered_at/);
   assert.match(monitoring, /response\.ok/);
@@ -1063,7 +1182,6 @@ test('beta operations include privacy-safe error capture and authenticated feedb
 
 test('controlled beta evidence requires explicit consent, supports withdrawal, and records real milestones', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const route = await read('src/app/api/beta/participation/route.ts');
   const panel = await read('src/components/dashboard/BetaParticipation.tsx');
   const settings = await read('src/app/(dashboard)/settings/page.tsx');
@@ -1076,24 +1194,23 @@ test('controlled beta evidence requires explicit consent, supports withdrawal, a
   const metrics = await read('src/app/api/operations/metrics/route.ts');
   const live = await read('tests/e2e/live-full.spec.ts');
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_participants/);
-    assert.match(sql, /consent_version TEXT NOT NULL/);
-    assert.match(sql, /consented_at TIMESTAMPTZ NOT NULL/);
-    assert.match(sql, /withdrawn_at TIMESTAMPTZ/);
-    for (const segment of ['club_association', 'volunteer_nonprofit', 'creative_community', 'alumni_professional', 'repeat_planner']) {
-      assert.match(sql, new RegExp(`['"]${segment}['"]`));
-    }
-    for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
-      assert.match(sql, new RegExp(`['"]${milestone}['"]`));
-    }
+  // Only schema.sql now; the upgrade migration (which also withdrew out-of-scope legacy
+  // participants) no longer exists, so that data step is not checked here.
+  const participants = tableDefinition(schema, 'beta_participants');
+  assert.ok(participants, 'beta_participants table definition is missing');
+  assert.match(participants, /consent_version TEXT NOT NULL/);
+  assert.match(participants, /consented_at TIMESTAMP_TEXT NOT NULL/);
+  assert.match(participants, /withdrawn_at TIMESTAMP_TEXT/);
+  for (const segment of ['club_association', 'volunteer_nonprofit', 'creative_community', 'alumni_professional', 'repeat_planner']) {
+    assert.match(participants, new RegExp(`['"]${segment}['"]`));
   }
-  assert.match(migration, /DROP CONSTRAINT IF EXISTS beta_participants_segment_check/);
-  assert.match(migration, /withdrawn_at = COALESCE\(withdrawn_at, NOW\(\)\)/);
+  for (const milestone of ['event_repeated', 'guest_import_completed', 'announcement_approved', 'calendar_exported', 'first_guest_checked_in']) {
+    assert.match(tableDefinition(schema, 'activation_events'), new RegExp(`['"]${milestone}['"]`));
+  }
   assert.match(route, /requireApiHost/);
   assert.match(route, /parseBetaEnrollment/);
   assert.match(route, /deriveBetaProgress/);
-  assert.match(route, /withdrawn_at = NOW\(\)/);
+  assert.match(route, /SET withdrawn_at = \$\{SQL_NOW\}[\s\S]*WHERE user_id = \$1 AND withdrawn_at IS NULL/);
   assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
   assert.doesNotMatch(route, /SELECT \*/);
   assert.match(panel, /Join controlled beta/);
@@ -1121,28 +1238,22 @@ test('controlled beta evidence requires explicit consent, supports withdrawal, a
 
 test('controlled beta enrollment accepts only operator invitations', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const route = await read('src/app/api/beta/participation/route.ts');
   const panel = await read('src/components/dashboard/BetaParticipation.tsx');
   const command = await read('scripts/create-beta-invite.ts');
   const pkg = JSON.parse(await read('package.json'));
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_enrollment_invites/);
-    for (const column of ['token_hash', 'token_preview', 'participant_label', 'segment', 'expires_at', 'accepted_by', 'accepted_at', 'revoked_at']) {
-      assert.match(sql, new RegExp(`${column}\\s`));
-    }
-  }
+  assertColumns(schema, 'beta_enrollment_invites', ['token_hash', 'token_preview', 'participant_label', 'segment', 'expires_at', 'accepted_by', 'accepted_at', 'revoked_at']);
   assert.match(route, /hashMagicToken\(enrollment\.inviteToken\)/);
-  assert.match(route, /BEGIN/);
-  assert.match(route, /FOR UPDATE/);
   assert.match(route, /accepted_at IS NULL/);
   assert.match(route, /revoked_at IS NULL/);
-  assert.match(route, /expires_at > NOW\(\)/);
+  assert.match(route, /expires_at > \$\{SQL_NOW\}/);
   assert.match(route, /Enter a valid invitation code and explicitly consent/);
-  assert.match(route, /accepted_by = \$2[\s\S]*accepted_at = NOW\(\)/);
-  assert.match(route, /COMMIT/);
-  assert.match(route, /ROLLBACK/);
+  // Formerly BEGIN ... FOR UPDATE ... COMMIT: the enrollment batch guards that the invite is still
+  // unused, unrevoked and unexpired, then records the participant and marks the invite accepted.
+  assert.match(route, /await batch\(\[\s*guard\(\s*`EXISTS \(SELECT 1 FROM beta_enrollment_invites\s+WHERE id = \$1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > \$\{SQL_NOW\} AND cohort_version = \$2\)`,[\s\S]*?"invite_used",/);
+  assert.match(route, /accepted_by = \$2, accepted_at = \$\{SQL_NOW\}\s+WHERE id = \$1 AND accepted_at IS NULL/);
+  assert.match(route, /if \(abortCode\(error\) === "invite_used"\) return noStore/);
   assert.doesNotMatch(route, /randomBytes/);
   assert.doesNotMatch(route, /enrollment\.segment/);
   assert.match(panel, /Invitation code/);
@@ -1152,19 +1263,26 @@ test('controlled beta enrollment accepts only operator invitations', async () =>
   assert.match(command, /hashMagicToken/);
   assert.match(command, /previewMagicToken/);
   assert.match(command, /BETA_SEGMENTS/);
-  assert.match(command, /INTERVAL '7 days'/);
+  assert.match(command, /strftime\('%Y-%m-%dT%H:%M:%fZ', 'now', '\+7 days'\)/);
   assert.equal(pkg.scripts['create-beta-invite'], 'npx tsx scripts/create-beta-invite.ts');
 });
 
 test('accepted beta invitations survive account deletion without retaining the account id', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
 
-  for (const sql of [schema, migration]) {
-    const invites = tableDefinition(sql, 'beta_enrollment_invites');
-    assert.match(invites, /accepted_by UUID REFERENCES admin_users\(id\) ON DELETE SET NULL/);
-    assert.doesNotMatch(invites, /accepted_at IS NULL OR accepted_by IS NOT NULL/);
-  }
+  const invites = tableDefinition(schema, 'beta_enrollment_invites');
+  assert.match(invites, /accepted_by TEXT,/);
+  assert.match(invites, /FOREIGN KEY \(accepted_by\) REFERENCES admin_users\(id\) ON DELETE SET NULL/);
+  assert.doesNotMatch(invites, /accepted_at IS NULL\)? OR \(?accepted_by IS NOT NULL/);
+
+  // Behaviour: deleting the account keeps the accepted invite (so the code stays used) and clears the id.
+  const db = await freshDb();
+  seedUser(db);
+  db.prepare("INSERT INTO beta_enrollment_invites (id, token_hash, token_preview, participant_label, segment, cohort_version, expires_at, accepted_by, accepted_at) VALUES ('inv-1', ?, 'abcd', 'host-0123456789ab', 'repeat_planner', 'beta-2026', '2030-01-01T00:00:00.000Z', 'user-1', '2026-01-01T00:00:00.000Z')").run('a'.repeat(64));
+  db.prepare("DELETE FROM admin_users WHERE id = 'user-1'").run();
+  const invite = db.prepare("SELECT accepted_by, accepted_at FROM beta_enrollment_invites WHERE id = 'inv-1'").get();
+  assert.equal(invite.accepted_by, null);
+  assert.equal(invite.accepted_at, '2026-01-01T00:00:00.000Z');
 });
 
 test('operators can inspect and revoke beta invitations without exposing raw codes', async () => {
@@ -1181,7 +1299,7 @@ test('operators can inspect and revoke beta invitations without exposing raw cod
   assert.match(revokeCommand, /parseBetaInviteLabel/);
   assert.match(revokeCommand, /accepted_at IS NULL/);
   assert.match(revokeCommand, /revoked_at IS NULL/);
-  assert.match(revokeCommand, /SET revoked_at = NOW\(\)/);
+  assert.match(revokeCommand, /SET revoked_at = strftime\('%Y-%m-%dT%H:%M:%fZ', 'now'\)/);
   assert.doesNotMatch(revokeCommand, /token_hash/);
 
   assert.equal(pkg.scripts['list-beta-invites'], 'npx tsx scripts/list-beta-invites.ts');
@@ -1206,20 +1324,22 @@ test('operators can export a pseudonymous five-host acceptance report without pe
 
 test('structured beta outcomes are consent-scoped, price-versioned, and evidence-limited', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const route = await read('src/app/api/beta/outcome/route.ts');
   const panel = await read('src/components/dashboard/BetaOutcomeSurvey.tsx');
   const participation = await read('src/components/dashboard/BetaParticipation.tsx');
   const register = await read('docs/paid-beta-evidence-register.md');
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_outcomes/);
-    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
-    assert.match(sql, /self_reported_support_minutes INTEGER NOT NULL CHECK \(self_reported_support_minutes BETWEEN 0 AND 600\)/);
-  }
+  const outcomes = tableDefinition(schema, 'beta_outcomes');
+  assert.ok(outcomes, 'beta_outcomes table definition is missing');
+  assert.match(outcomes, /UNIQUE \(user_id, consented_at\)/);
+  assert.match(outcomes, /self_reported_support_minutes INTEGER NOT NULL/);
+  assert.match(outcomes, /CHECK \(\(\(self_reported_support_minutes >= 0\) AND \(self_reported_support_minutes <= 600\)\)\)/);
+  assert.match(outcomes, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
   assert.match(route, /requireApiHost/);
   assert.match(route, /withdrawn_at IS NULL/);
-  assert.match(route, /segment = ANY/);
+  assert.match(route, /segment IN \(SELECT value FROM json_each\(\$2\)\)/);
+  // The consent is re-checked by a guard in the same batch as the upsert.
+  assert.match(route, /guard\(\s*`EXISTS \(SELECT 1 FROM beta_participants\s+WHERE user_id = \$1 AND consented_at = \$2 AND withdrawn_at IS NULL\s+AND segment IN \(SELECT value FROM json_each\(\$3\)\)\)`,[\s\S]*?"consent_changed",\s*\),\s*\{\s*text: `INSERT INTO beta_outcomes/);
   assert.match(route, /ON CONFLICT \(user_id, consented_at\)/);
   assert.doesNotMatch(route, /request.*consent|request.*segment|request.*priceVersion/i);
   assert.match(panel, /\$124\.99\/year/);
@@ -1245,25 +1365,26 @@ test('pending beta hosts never claim zero critical defects before human review',
 
 test('operators can record explicit consent-window severity review without guest or defect text', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const command = await read('scripts/record-beta-defect-review.ts');
   const report = await read('scripts/report-beta-participants.ts');
   const metrics = await read('src/app/api/operations/metrics/route.ts');
   const register = await read('docs/paid-beta-evidence-register.md');
   const pkg = JSON.parse(await read('package.json'));
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_defect_reviews/);
-    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
-    assert.match(sql, /unresolved_severity_1 INTEGER NOT NULL CHECK \(unresolved_severity_1 BETWEEN 0 AND 100\)/);
-    assert.match(sql, /unresolved_severity_2 INTEGER NOT NULL CHECK \(unresolved_severity_2 BETWEEN 0 AND 100\)/);
-    assert.doesNotMatch(sql, /defect_(?:message|notes|description)/);
-    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent/);
-    assert.match(sql, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
-  }
+  const reviews = tableDefinition(schema, 'beta_defect_reviews');
+  assert.ok(reviews, 'beta_defect_reviews table definition is missing');
+  assert.match(reviews, /UNIQUE \(user_id, consented_at\)/);
+  assert.match(reviews, /unresolved_severity_1 INTEGER NOT NULL/);
+  assert.match(reviews, /unresolved_severity_2 INTEGER NOT NULL/);
+  assert.match(reviews, /CHECK \(\(\(unresolved_severity_1 >= 0\) AND \(unresolved_severity_1 <= 100\)\)\)/);
+  assert.match(reviews, /CHECK \(\(\(unresolved_severity_2 >= 0\) AND \(unresolved_severity_2 <= 100\)\)\)/);
+  assert.doesNotMatch(schema, /defect_(?:message|notes|description)/);
+  assert.match(schema, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_user_consent/);
+  assert.match(reviews, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
   assert.match(command, /parseBetaDefectReview/);
-  assert.match(command, /FOR UPDATE/);
-  assert.match(command, /segment = ANY/);
+  // Formerly lock-then-upsert: one INSERT ... SELECT FROM beta_participants (scoped to the approved
+  // segments) ... ON CONFLICT ... RETURNING is atomic; no row back means no current participant.
+  assert.match(command, /INSERT INTO beta_defect_reviews[\s\S]*SELECT user_id, consented_at,[\s\S]*FROM beta_participants\s+WHERE participant_label = \$1\s+AND segment IN \(SELECT value FROM json_each\(\$2\)\)\s+ON CONFLICT \(user_id, consented_at\) DO UPDATE SET[\s\S]*RETURNING reviewed_at/);
   assert.match(command, /ON CONFLICT \(user_id, consented_at\)/);
   assert.match(command, /reviewer_name/);
   assert.doesNotMatch(command, /SELECT \*/);
@@ -1278,23 +1399,22 @@ test('operators can record explicit consent-window severity review without guest
 
 test('operators can record consent-window support effort without conflating host self-report', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const command = await read('scripts/record-beta-support-review.ts');
   const report = await read('scripts/report-beta-participants.ts');
   const metrics = await read('src/app/api/operations/metrics/route.ts');
   const register = await read('docs/paid-beta-evidence-register.md');
   const pkg = JSON.parse(await read('package.json'));
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /CREATE TABLE IF NOT EXISTS beta_support_reviews/);
-    assert.match(sql, /UNIQUE \(user_id, consented_at\)/);
-    assert.match(sql, /operator_recorded_support_minutes INTEGER NOT NULL CHECK \(operator_recorded_support_minutes BETWEEN 0 AND 600\)/);
-    assert.doesNotMatch(sql, /support_(?:message|notes|description)/);
-    assert.match(sql, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
-  }
+  const reviews = tableDefinition(schema, 'beta_support_reviews');
+  assert.ok(reviews, 'beta_support_reviews table definition is missing');
+  assert.match(reviews, /UNIQUE \(user_id, consented_at\)/);
+  assert.match(reviews, /operator_recorded_support_minutes INTEGER NOT NULL/);
+  assert.match(reviews, /CHECK \(\(\(operator_recorded_support_minutes >= 0\) AND \(operator_recorded_support_minutes <= 600\)\)\)/);
+  assert.doesNotMatch(schema, /support_(?:message|notes|description)/);
+  assert.match(reviews, /FOREIGN KEY \(user_id, consented_at\) REFERENCES beta_participants\(user_id, consented_at\) ON DELETE CASCADE/);
   assert.match(command, /parseBetaSupportReview/);
-  assert.match(command, /FOR UPDATE/);
-  assert.match(command, /segment = ANY/);
+  // Formerly lock-then-upsert: one atomic INSERT ... SELECT FROM beta_participants ... ON CONFLICT ... RETURNING.
+  assert.match(command, /INSERT INTO beta_support_reviews[\s\S]*SELECT user_id, consented_at,[\s\S]*FROM beta_participants\s+WHERE participant_label = \$1\s+AND segment IN \(SELECT value FROM json_each\(\$2\)\)\s+ON CONFLICT \(user_id, consented_at\) DO UPDATE SET[\s\S]*RETURNING reviewed_at/);
   assert.match(command, /ON CONFLICT \(user_id, consented_at\)/);
   assert.match(command, /reviewer_name/);
   assert.doesNotMatch(command, /SELECT \*/);
@@ -1333,7 +1453,6 @@ test('beta acceptance is evaluated only against pre-approved, pre-cohort thresho
 
 test('beta evidence is isolated to one approved cohort with one active host per segment', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const createInvite = await read('scripts/create-beta-invite.ts');
   const listInvites = await read('scripts/list-beta-invites.ts');
   const participation = await read('src/app/api/beta/participation/route.ts');
@@ -1342,14 +1461,19 @@ test('beta evidence is isolated to one approved cohort with one active host per 
   const featureSchemaVerification = await read('scripts/test/verify-feature-schema.sql');
   const operations = await read('docs/launch-operations.md');
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /beta_enrollment_invites[\s\S]*cohort_version TEXT NOT NULL/);
-    assert.match(sql, /beta_participants[\s\S]*cohort_version TEXT NOT NULL/);
-    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_participants_active_cohort_segment/);
-    assert.match(sql, /ON beta_participants\(cohort_version, segment\)/);
-    assert.match(sql, /WHERE withdrawn_at IS NULL AND cohort_version <> 'legacy-unassigned'/);
-    assert.match(sql, /UNIQUE INDEX IF NOT EXISTS idx_beta_invites_open_cohort_segment/);
-  }
+  assert.match(tableDefinition(schema, 'beta_enrollment_invites'), /cohort_version TEXT NOT NULL/);
+  assert.match(tableDefinition(schema, 'beta_participants'), /cohort_version TEXT NOT NULL/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_participants_active_cohort_segment ON beta_participants \(cohort_version, segment\) WHERE \(\(withdrawn_at IS NULL\) AND \(cohort_version <> 'legacy-unassigned'\)\)/);
+  assert.match(schema, /CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_invites_open_cohort_segment/);
+
+  // Behaviour: one active host per segment in a cohort; a withdrawn host frees the seat.
+  const db = await freshDb();
+  for (const id of ['user-1', 'user-2']) seedUser(db, id);
+  const enroll = db.prepare("INSERT INTO beta_participants (user_id, participant_label, segment, cohort_version, consent_version) VALUES (?, ?, 'repeat_planner', 'beta-2026', 'v1')");
+  enroll.run('user-1', 'host-000000000001');
+  rejectsConstraint(() => enroll.run('user-2', 'host-000000000002'), 'a second active host in the same segment is rejected');
+  db.prepare("UPDATE beta_participants SET withdrawn_at = '2026-01-01T00:00:00.000Z' WHERE user_id = 'user-1'").run();
+  enroll.run('user-2', 'host-000000000002');
   assert.match(createInvite, /betaAcceptancePolicy/);
   assert.match(createInvite, /status !== "approved"/);
   assert.match(createInvite, /cohort_version/);
@@ -1419,11 +1543,12 @@ test('RSVP field options are valid JSON and replacement is transactional', async
   const createRoute = await read('src/app/api/events/route.ts');
   const fieldsRoute = await read('src/app/api/events/[eventId]/rsvp-fields/route.ts');
   assert.match(createRoute, /field\.options \? JSON\.stringify\(field\.options\) : null/);
-  assert.match(fieldsRoute, /await client\.query\('BEGIN'\)/);
-  assert.match(fieldsRoute, /await client\.query\('DELETE FROM rsvp_fields/);
+  // Formerly BEGIN/DELETE/INSERT/COMMIT: the delete and the re-inserts run in one atomic batch.
+  assert.match(fieldsRoute, /const statements: Statement\[\] = \[\s*\{ text: 'DELETE FROM rsvp_fields WHERE event_id = \$1', params: \[eventId\] \},/);
+  assert.match(fieldsRoute, /INSERT INTO rsvp_fields/);
   assert.match(fieldsRoute, /f\.options \? JSON\.stringify\(f\.options\) : null/);
-  assert.match(fieldsRoute, /await client\.query\('COMMIT'\)/);
-  assert.match(fieldsRoute, /await client\.query\('ROLLBACK'\)/);
+  assert.match(fieldsRoute, /const results = await batch\(statements\)/);
+  assert.doesNotMatch(fieldsRoute, /client\.query\('BEGIN'\)/);
 });
 
 test('event checkout verifies ownership before exposing billing configuration', async () => {
@@ -1434,9 +1559,28 @@ test('event checkout verifies ownership before exposing billing configuration', 
   assert.ok(billingIndex > ownershipIndex);
 });
 
-test('check-in actor IDs are explicitly typed for PostgreSQL CASE assignment', async () => {
+test('check-in keeps the first staff actor and clears it when undone', async () => {
+  // Formerly asserted the Postgres-only `$4::uuid` cast in the CASE. SQLite needs no cast; the
+  // property that matters (first actor kept, cleared on undo) is now exercised against schema.sql.
   const store = await read('src/lib/check-in-store.ts');
-  assert.match(store, /checked_in_by = CASE WHEN \$3 THEN COALESCE\(checked_in_by, \$4::uuid\) ELSE NULL END/);
+  assert.match(store, /checked_in_by = CASE WHEN \$3 THEN COALESCE\(checked_in_by, \$4\) ELSE NULL END/);
+
+  const { updateCheckInGuestStatement } = await import('../src/lib/check-in-store.ts');
+  const { toSqlite, encodeParams } = await import('../src/lib/db/sqlite-dialect.ts');
+  const db = await freshDb();
+  for (const id of ['owner', 'staff-1', 'staff-2']) seedUser(db, id);
+  seedEvent(db, 'event-1', 'owner');
+  const guestId = '11111111-1111-4111-8111-111111111111';
+  db.prepare("INSERT INTO guests (id, event_id, name) VALUES (?, 'event-1', 'Guest')").run(guestId);
+  const run = (actor, checkedIn) => {
+    const { text, params } = updateCheckInGuestStatement('event-1', actor, { guestId, checkedIn });
+    return db.prepare(toSqlite(text)).get(...encodeParams(params));
+  };
+  assert.ok(run('staff-1', true).checked_in_at);
+  run('staff-2', true);
+  assert.equal(db.prepare('SELECT checked_in_by FROM guests WHERE id = ?').get(guestId).checked_in_by, 'staff-1');
+  assert.equal(run('staff-2', false).checked_in_at, null);
+  assert.equal(db.prepare('SELECT checked_in_by FROM guests WHERE id = ?').get(guestId).checked_in_by, null);
 });
 
 test('published retention and deletion terms match the support-request workflow', async () => {
@@ -1457,7 +1601,7 @@ test('verified account deletion is cancellable, subscription-safe, and executed 
   const settings = await read('src/app/(dashboard)/settings/page.tsx');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS account_deletion_requests/);
   assert.match(route, /requireApiHost/);
-  assert.match(route, /INTERVAL '7 days'/);
+  assert.match(route, /VALUES \(\$1, 'pending', \$\{SQL_NOW\}, \$\{sqlNowPlus\("\+7 days"\)\}/);
   assert.match(route, /Cancel the active subscription/);
   assert.match(cron, /FOR UPDATE SKIP LOCKED/);
   assert.match(cron, /DELETE FROM events WHERE user_id/);
@@ -1474,7 +1618,10 @@ test('storage is quota-backed and destructive retention jobs default off', async
   const drafts = await read('src/app/api/cron/cleanup-drafts/route.ts');
   const uploads = await read('src/app/api/cron/cleanup-uploads/route.ts');
   assert.match(schema, /CREATE TABLE IF NOT EXISTS upload_assets/);
-  assert.match(upload, /pg_advisory_xact_lock/);
+  // Formerly an advisory lock: the quota is re-checked inside the insert itself, and no row back
+  // (a concurrent upload used the space) deletes the stored blob and reports the quota error.
+  assert.match(upload, /INSERT INTO upload_assets \(user_id, path, byte_size, media_type\)\s+SELECT \$1, \$2, \$3, \$4\s+WHERE \(SELECT COALESCE\(SUM\(byte_size\), 0\) FROM upload_assets WHERE user_id = \$1\) \+ \$3 <= \$5\s+RETURNING id/);
+  assert.match(upload, /if \(inserted\.length === 0\) \{\s*await store\.delete\(blobKey\)[\s\S]*?return \{ error: 'quota'/);
   assert.match(upload, /canReserveStorage/);
   assert.match(uploadRoute, /Storage quota exceeded/);
   assert.match(drafts, /ENABLE_STALE_DRAFT_CLEANUP/);
@@ -1498,7 +1645,9 @@ test('host lifecycle emails are deduplicated, controlled, and disabled by defaul
   const schema = await read('src/lib/db/schema.sql');
   const route = await read('src/app/api/cron/send-host-lifecycle/route.ts');
   const example = await read('.env.example');
-  assert.match(schema, /scope_key TEXT UNIQUE NOT NULL/);
+  const notifications = tableDefinition(schema, 'host_lifecycle_notifications');
+  assert.match(notifications, /scope_key TEXT NOT NULL/);
+  assert.match(notifications, /UNIQUE \(scope_key\)/);
   assert.match(route, /ENABLE_HOST_LIFECYCLE_EMAILS/);
   assert.match(route, /sendEmail/);
   assert.match(route, /ON CONFLICT \(scope_key\) DO NOTHING/);
@@ -1514,8 +1663,8 @@ test('post-event repeat prompts are bounded, deduplicated, and measurable', asyn
   assert.match(schema, /host_lifecycle_notifications_notification_type_check/);
   assert.match(schema, /post_event_repeat/);
   assert.match(lifecycle, /notification_type: [^;]*post_event_repeat/);
-  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) <= NOW\(\) - INTERVAL '24 hours'/);
-  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) >= NOW\(\) - INTERVAL '7 days'/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) <= \$\{sqlNowPlus\("-24 hours"\)\}/);
+  assert.match(route, /COALESCE\(e\.event_end_date, e\.event_date\) >= \$\{sqlNowPlus\("-7 days"\)\}/);
   assert.match(route, /EXISTS \(SELECT 1 FROM rsvp_responses/);
   assert.match(route, /repeated\.repeated_from_event_id = e\.id/);
   assert.match(lifecycle, /Review outcomes/);
@@ -1535,10 +1684,18 @@ test('stale-draft warnings cover the complete 14-day pre-cleanup window', async 
   assert.match(lifecycle, /stale_draft_warning/);
   assert.match(route, /STALE_DRAFT_RETENTION_DAYS/);
   assert.match(route, /STALE_DRAFT_WARNING_DAYS/);
-  assert.match(route, /e\.updated_at <= NOW\(\) - \(\$1::int \* INTERVAL '1 day'\)/);
-  assert.match(route, /e\.updated_at > NOW\(\) - \(\$2::int \* INTERVAL '1 day'\)/);
-  assert.match(route, /EXTRACT\(EPOCH FROM e\.updated_at\)::bigint/);
-  assert.match(route, /e\.updated_at \+ \(\$2::int \* INTERVAL '1 day'\)/);
+  // The window bounds are now computed in JS and bound as ISO instants (formerly NOW() - n days in SQL):
+  // drafts last updated between the retention cutoff and the warning age are warned.
+  assert.match(route, /const warnFrom = new Date\(Date\.now\(\) - warningAgeDays \* day\)/);
+  assert.match(route, /const retentionCutoff = new Date\(Date\.now\(\) - retentionDays \* day\)/);
+  assert.match(route, /e\.updated_at <= \$1\s+AND e\.updated_at > \$3/);
+  assert.match(route, /\[warnFrom, retentionDays, retentionCutoff\]/);
+  // The scope key keeps the Postgres EXTRACT(EPOCH ...)::bigint rounding so pre-D1 warnings still match.
+  assert.match(route, /CAST\(round\(unixepoch\(e\.updated_at, 'subsec'\)\) AS INTEGER\)/);
+  assert.match(route, /strftime\('%Y-%m-%dT%H:%M:%fZ', e\.updated_at, '\+' \|\| \$2 \|\| ' days'\) AS action_at/);
+  const db = await freshDb();
+  assert.equal(db.prepare("SELECT CAST(round(unixepoch('2026-01-01T00:00:00.600Z', 'subsec')) AS INTEGER) AS epoch").get().epoch, 1767225601);
+  assert.equal(db.prepare("SELECT strftime('%Y-%m-%dT%H:%M:%fZ', '2026-01-01T00:00:00.600Z', '+' || 14 || ' days') AS at").get().at, '2026-01-15T00:00:00.600Z');
   assert.match(privacy, /90 days after (?:its|the) last update/i);
   assert.match(privacy, /14-day warning/i);
   assert.match(privacy, /unreferenced upload[^.]*7 days/i);
@@ -1550,7 +1707,8 @@ test('stale-draft deletion requires the current warning and its full waiting per
 
   assert.match(cleanup, /resolveStaleDraftPolicy/);
   assert.match(cleanup, /notification_type = ['"]stale_draft_warning['"]/);
-  assert.match(cleanup, /EXTRACT\(EPOCH FROM events\.updated_at\)::bigint/);
+  // Same scope-key epoch as the warning sender (formerly EXTRACT(EPOCH ...)::bigint in both).
+  assert.match(cleanup, /notifications\.scope_key = 'stale_draft_warning:' \|\| events\.id \|\| ':' \|\|\s+CAST\(round\(unixepoch\(events\.updated_at, 'subsec'\)\) AS INTEGER\) \|\| ':' \|\| \$4/);
   assert.match(cleanup, /notifications\.sent_at <= \$3/);
   assert.match(cleanup, /blockedWithoutWarning/);
   assert.match(cleanup, /DELETE FROM events[\s\S]*EXISTS[\s\S]*stale_draft_warning/);
@@ -1654,16 +1812,18 @@ test('Twilio incoming opt-out events synchronize the local SMS suppression state
   assert.match(twilio, /data\.From/);
   assert.match(twilio, /BEGIN[\s\S]*processTwilioOptOutEvent[\s\S]*COMMIT/);
   assert.match(twilio, /<Response><\/Response>/);
-  assert.match(inbound, /STOP[\s\S]*recordCommunicationSuppression/);
-  assert.match(inbound, /START[\s\S]*removeCommunicationSuppressionsForRecipient/);
+  // The lib now builds its own batch: a duplicate-receipt guard, the receipt, then the suppression
+  // changes, so a failure leaves no receipt and a replay (even a racing one) is a no-op.
+  assert.match(inbound, /START[\s\S]*removeCommunicationSuppressionsStatement/);
+  assert.match(inbound, /STOP[\s\S]*communicationSuppressionStatement\(\{[\s\S]*reason: "unsubscribed"/);
   assert.match(inbound, /HELP/);
-  assert.match(inbound, /INSERT INTO webhook_receipts/);
+  assert.match(inbound, /await db\.batch\(\[\s*guard\(\s*"NOT EXISTS \(SELECT 1 FROM webhook_receipts WHERE provider = 'twilio' AND event_id = \$1\)",\s*\[receiptId\],\s*"duplicate_receipt",\s*\),\s*\{ text: "INSERT INTO webhook_receipts \(provider, event_id\) VALUES \('twilio', \$1\)", params: \[receiptId\] \},\s*\.\.\.changes,/);
+  assert.match(inbound, /if \(abortCode\(error\) === "duplicate_receipt"\)/);
   assert.match(inbound, /JOIN events/);
 });
 
 test('complaints, unsubscribes, bounces, and invalid phones block future guest communications', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const mailgun = await read('src/app/api/webhooks/mailgun/route.ts');
   const invitations = await read('src/app/api/events/[eventId]/send-invites/route.ts');
   const reminders = await read('src/app/api/events/[eventId]/send-reminders/route.ts');
@@ -1671,11 +1831,17 @@ test('complaints, unsubscribes, bounces, and invalid phones block future guest c
   const announcements = await read('src/lib/messages/dispatch-announcement.ts');
   const guestUpdate = await read('src/app/api/events/[eventId]/guests/[guestId]/route.ts');
 
-  for (const sql of [schema, migration]) {
-    assert.match(sql, /communication_suppressions/);
-    assert.match(sql, /recipient_hash/);
-    assert.match(sql, /(?:UNIQUE|PRIMARY KEY)\s*\(user_id, channel, recipient_hash\)/);
-  }
+  const suppressions = tableDefinition(schema, 'communication_suppressions');
+  assert.ok(suppressions, 'communication_suppressions table definition is missing');
+  assert.match(suppressions, /recipient_hash TEXT NOT NULL/);
+  assert.match(suppressions, /PRIMARY KEY \(user_id, channel, recipient_hash\)/);
+  // Only hashes are stored: anything that isn't 64 lowercase hex characters is rejected.
+  const db = await freshDb();
+  seedUser(db);
+  const suppress = db.prepare("INSERT INTO communication_suppressions (user_id, channel, recipient_hash, reason, provider) VALUES ('user-1', 'sms', ?, 'unsubscribed', 'twilio')");
+  suppress.run('a'.repeat(64));
+  rejectsConstraint(() => suppress.run('a'.repeat(64)), 'one suppression per owner, channel and recipient');
+  rejectsConstraint(() => suppress.run('+15551234567'), 'raw phone numbers are never stored');
   assert.match(mailgun, /recordCommunicationSuppression/);
   assert.match(mailgun, /unsubscribed[\s\S]*complained[\s\S]*bounced/);
   for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
@@ -1686,7 +1852,7 @@ test('complaints, unsubscribes, bounces, and invalid phones block future guest c
   assert.match(reminders, /phone_invalid_at/);
   assert.match(scheduledReminders, /phone_invalid_at/);
   for (const sender of [invitations, reminders, scheduledReminders, announcements]) {
-    assert.match(sender, /SET phone_invalid_at = NOW\(\)/);
+    assert.match(sender, /SET phone_invalid_at = \$\{SQL_NOW\}/);
   }
   assert.match(guestUpdate, /phone_invalid_at = NULL/);
 });
@@ -1708,13 +1874,17 @@ test('operations readiness is secret-gated and never returns credential values',
 
 test('authentication codes are hashed and scoped to one login context', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const send = await read('src/app/api/auth/send-code/route.ts');
   const verify = await read('src/app/api/auth/verify-code/route.ts');
   const password = await read('src/app/api/auth/login-password/route.ts');
-  assert.match(schema, /code_hash TEXT NOT NULL/);
-  assert.doesNotMatch(schema, /\n\s*code TEXT NOT NULL/);
-  assert.match(migration, /ADD COLUMN IF NOT EXISTS code_hash/);
+  const authCodes = tableDefinition(schema, 'auth_codes');
+  assert.match(authCodes, /code_hash TEXT NOT NULL/);
+  assert.doesNotMatch(authCodes, /\n\s*code TEXT/);
+  // SQLite (3.39+) evaluates IS NOT DISTINCT FROM, so a NULL event_id scopes host logins correctly.
+  const db = await freshDb();
+  const scoped = db.prepare('SELECT (NULL IS NOT DISTINCT FROM NULL) AS same, (NULL IS NOT DISTINCT FROM ?) AS differs').get('event-1');
+  assert.equal(scoped.same, 1);
+  assert.equal(scoped.differs, 0);
   assert.match(send, /hashAuthCode/);
   assert.match(send, /event_id IS NOT DISTINCT FROM/);
   assert.match(verify, /code_hash = \$2/);
@@ -1733,16 +1903,16 @@ test('operator-created admin accounts require a hashed password and never print 
 
 test('organizer plan checkout is owner-only, beta-gated, and synced from verified Stripe webhooks', async () => {
   const schema = await read('src/lib/db/schema.sql');
-  const migration = await read('apply-security-indexes.sql');
   const route = await read('src/app/api/organizations/[organizationId]/billing/checkout/route.ts');
   const webhook = await read('src/app/api/webhooks/stripe/route.ts');
   const envExample = await read('.env.example');
 
-  for (const sql of [schema, migration]) {
-    assertColumns(sql, 'organization_subscriptions', ['organization_id', 'stripe_customer_id', 'stripe_subscription_id', 'plan', 'status', 'current_period_end', 'cancel_at_period_end']);
-    assert.match(tableDefinition(sql, 'organization_subscriptions'), /organization_id UUID PRIMARY KEY REFERENCES organizations\(id\) ON DELETE CASCADE/);
-    assert.match(tableDefinition(sql, 'organization_subscriptions'), /plan TEXT NOT NULL CHECK \(plan IN \('solo', 'studio', 'agency'\)\)/);
-  }
+  assertColumns(schema, 'organization_subscriptions', ['organization_id', 'stripe_customer_id', 'stripe_subscription_id', 'plan', 'status', 'current_period_end', 'cancel_at_period_end']);
+  const subscriptions = tableDefinition(schema, 'organization_subscriptions');
+  assert.match(subscriptions, /organization_id TEXT PRIMARY KEY,/);
+  assert.match(subscriptions, /FOREIGN KEY \(organization_id\) REFERENCES organizations\(id\) ON DELETE CASCADE/);
+  assert.match(subscriptions, /plan TEXT NOT NULL,/);
+  assert.match(subscriptions, /CHECK \(\(plan IN \('solo', 'studio', 'agency'\)\)\)/);
 
   assert.match(route, /auth\.role !== "owner"/);
   assert.match(route, /if \(BETA_MODE\)/);
@@ -1763,7 +1933,7 @@ test('organizer plan checkout is owner-only, beta-gated, and synced from verifie
 test('organizer plan changes and cancellations are owner-only, beta-gated, and applied only by the webhook', async () => {
   const route = await read('src/app/api/organizations/[organizationId]/billing/subscription/route.ts');
   const webhook = await read('src/app/api/webhooks/stripe/route.ts');
-  const migration = await read('apply-security-indexes.sql');
+  const schema = await read('src/lib/db/schema.sql');
 
   assert.match(route, /auth\.role !== "owner"/);
   assert.match(route, /if \(BETA_MODE\)/);
@@ -1784,7 +1954,8 @@ test('organizer plan changes and cancellations are owner-only, beta-gated, and a
   assert.match(webhook, /WHERE organization_subscriptions\.stripe_subscription_id = EXCLUDED\.stripe_subscription_id\s+OR organization_subscriptions\.status = 'canceled'/);
   assert.match(webhook, /if \(stored\.rowCount\)/);
 
-  assert.match(migration, /ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;/);
+  // Formerly the upgrade migration's ADD COLUMN; now part of the one schema.
+  assert.match(tableDefinition(schema, 'organization_subscriptions'), /cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0,/);
 });
 
 test('the Stripe test-mode end-to-end run refuses live keys and non-local databases', async () => {
