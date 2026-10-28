@@ -19,12 +19,36 @@ The Worker build needs Node 22 or newer (the Docker image still uses Node 20).
 
 Modules that differ by platform live in pairs: `name.ts` (Node) and `name.cloudflare.ts` (Worker). `vite.config.ts` swaps them in only for the Worker build. `tests/readiness.test.mjs` checks each pair exports the same names. Keep them in step when you change one.
 
-## What must be decided first
+## Decisions made
 
-1. **Where the database lives.** Hyperdrive needs a Postgres it can reach over the internet.
-   - Keep it on the VPS: expose Postgres on a TLS port, allow only Cloudflare, and use a dedicated database user. Or run a Cloudflare Tunnel from the VPS.
-   - Or move it to a managed Postgres (Neon, Supabase, etc.).
+1. **Database: Neon** (managed Postgres 16). Hyperdrive connects to it and pools connections, so the app keeps using `pg`.
 2. **The domain.** Cut over `sealsend.app` only after a `workers.dev` rehearsal passes.
+
+## Neon setup
+
+1. Create a Neon project on Postgres 16, in the region closest to your users (for example AWS US East). Turn off any "scale to zero" setting if offered, or accept a slower first query after idle time.
+2. Create a dedicated role for the app. Do not use the owner role.
+3. Copy the **direct** (non-pooled) connection string, the one without `-pooler` in the host name, with `sslmode=require`. Hyperdrive does its own pooling, and Neon's pooler can break session settings.
+4. Create the Hyperdrive config from that string (see One-time setup below) and keep the string out of the repo.
+
+## Move the data from the VPS to Neon
+
+Rehearse this first with a copy, then repeat for the real cutover.
+
+```bash
+# On the VPS (the existing backup script already writes custom-format dumps)
+pg_dump --format=custom --no-owner --no-privileges --dbname="$VPS_DATABASE_URL" --file=sealsend.dump
+
+# Restore into Neon. --no-owner avoids role errors; extensions listed in schema.sql must be allowed on Neon.
+pg_restore --no-owner --no-privileges --dbname="$NEON_DIRECT_URL" sealsend.dump
+
+# Then apply the idempotent upgrade file so Neon matches production
+psql -v ON_ERROR_STOP=1 "$NEON_DIRECT_URL" -f apply-security-indexes.sql
+```
+
+Checks before cutover: row counts of `admin_users`, `events`, `guests`, `rsvp_responses` and `upload_assets` match the VPS; sign in works against the rehearsal Worker; `/api/health` returns `ok`.
+
+Cutover order, to avoid losing writes: put the VPS app in maintenance (or stop it), take the final dump, restore, point the Worker at Neon, switch DNS, then remove the VPS cron lines. Keep the VPS database untouched for a week as the rollback copy. Writes made on Neon after cutover would need to be copied back if you roll back.
 
 ## One-time setup
 
@@ -32,7 +56,7 @@ Sign in with `cf auth`, then:
 
 ```bash
 cf r2 buckets create --name sealsend-uploads
-cf hyperdrive create --help          # create a config from the production connection string; note the ID
+cf hyperdrive create --help          # create a config from the Neon direct connection string; note the ID
 export HYPERDRIVE_ID=<id from above>
 ```
 
