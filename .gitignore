@@ -76,3 +76,6 @@ apps/mobile/dist/
 apps/mobile/ios/
 apps/mobile/android/
 apps/mobile/build/
+/dist/
+.vinext/
+.cloudflare/

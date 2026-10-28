@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "apps/mobile/**",
+    ".cloudflare/**",
+    "dist/**",
+    ".vinext/**",
   ]),
   {
     rules: {

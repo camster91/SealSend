@@ -39,7 +39,11 @@
     "mobile:typecheck": "npm --prefix apps/mobile run typecheck",
     "mobile:test": "npm --prefix apps/mobile test",
     "mobile:export": "npm --prefix apps/mobile run export",
-    "test:mobile:http": "node --import tsx scripts/test/mobile-native.ts"
+    "test:mobile:http": "node --import tsx scripts/test/mobile-native.ts",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "vinext-cloudflare deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -47,6 +51,7 @@
     "@stripe/stripe-js": "^8.11.0",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
+    "@vinext/cloudflare": "^1.2.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
@@ -59,17 +64,20 @@
     "next": "^16.4.0",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-hook-form": "^7.90.0",
+    "react-server-dom-webpack": "^19.3.1",
     "sharp": "^0.35.5",
     "stripe": "^20.4.1",
     "tailwind-merge": "^3.7.0",
     "twilio": "^5.13.1",
+    "vinext": "^1.3.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@cloudflare/vite-plugin": "^2.0.0-beta.v.6",
     "@electric-sql/pglite": "^0.5.8",
     "@electric-sql/pglite-socket": "^0.2.11",
     "@playwright/test": "^1.64.0",
@@ -78,14 +86,19 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-rsc": "^0.5.38",
+    "cf": "^1.0.0-beta.24",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^8.3.0"
   },
   "overrides": {
     "postcss": "^8.5.10"
-  }
+  },
+  "type": "module"
 }
