@@ -142,7 +142,7 @@ export async function getEventBranding(eventId: string): Promise<EventBranding |
        FROM events e
        JOIN organizations o ON o.id = e.organization_id
        JOIN brands b ON b.id = COALESCE(e.brand_id, (
-         SELECT id FROM brands WHERE organization_id = e.organization_id AND is_default
+         SELECT id FROM brands WHERE organization_id = e.organization_id AND is_default = 1
        ))
       WHERE e.id = $1`,
     [eventId],

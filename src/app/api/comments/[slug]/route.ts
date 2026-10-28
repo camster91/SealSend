@@ -24,7 +24,7 @@ export async function GET(
 
     // Only show public comments on the public page
     const comments = await query(
-      'SELECT * FROM event_comments WHERE event_id = $1 AND is_private != true ORDER BY created_at DESC',
+      'SELECT * FROM event_comments WHERE event_id = $1 AND is_private != 1 ORDER BY created_at DESC',
       [event.id]
     );
 

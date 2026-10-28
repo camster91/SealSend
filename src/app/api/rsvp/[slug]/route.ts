@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getDb, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import { guard } from "@/lib/db/sqlite-dialect";
 import { rsvpSubmissionSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { sendEmail } from "@/lib/email";
@@ -12,13 +13,16 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { enqueueWebhookEvent } from "@/lib/webhooks";
 import { getApiUser } from "@/lib/auth/api-auth";
 import { generateMagicToken, isValidMagicToken } from "@/lib/magic-token";
-import { findRsvp, saveRsvp, RsvpError, type RsvpQuery } from "@/lib/rsvp-store";
+import { findRsvp, saveRsvp, RsvpError, RSVP_CHANGED } from "@/lib/rsvp-store";
 import { validateRsvpResponseData } from '@/lib/rsvp-fields';
 import type { RSVPField } from '@/types/database';
 
 const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie, X-Guest-Token, X-Rsvp-Edit-Token" };
 type Context = { params: Promise<{ slug: string }> };
-const editCookieName = (event: Event) => `sealsend_rsvp_${event.id}`;
+// Every field definition that affects validation, as one comparable value.
+const rsvpFieldsFingerprintSql = `SELECT json_group_array(json_array(id, field_name, field_label, field_type, options, is_required, is_enabled, sort_order))
+  FROM (SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order, id)`;
+const editCookieName =(event: Event) => `sealsend_rsvp_${event.id}`;
 function setEditCookie(result: NextResponse, event: Event, token: string) {
   result.cookies.set(editCookieName(event), token, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict",
@@ -60,11 +64,10 @@ export async function GET(request: Request, { params }: Context) {
     const event = await publishedEvent(slug);
     const guestId = await resolveGuest(request, event.id);
     const token = await resolveEditToken(request, event);
-    const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await getDb().query(sql, values)).rows as T[] });
-    const response = await findRsvp(db, event.id, guestId, token);
+    const response = await findRsvp({ query, batch }, event.id, guestId, token);
     let spotsRemaining: number | null = null;
     if (event.max_attendees) {
-      const total = await queryOne<{ total: number }>("SELECT COALESCE(SUM(headcount), 0)::int AS total FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2::uuid IS NULL OR id <> $2)", [event.id, response?.id ?? null]);
+      const total = await queryOne<{ total: number }>("SELECT COALESCE(SUM(headcount), 0) AS total FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)", [event.id, response?.id ?? null]);
       spotsRemaining = Math.max(0, event.max_attendees - (total?.total ?? 0));
     }
     const deadlinePassed = Boolean(event.rsvp_deadline && new Date(event.rsvp_deadline).getTime() <= Date.now());
@@ -89,29 +92,24 @@ export async function POST(request: Request, { params }: Context) {
     const editToken = await resolveEditToken(request, event, parsed.data.edit_token);
     const accountPlan = await getUserTier(event.user_id);
     const effectiveLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).responses;
-    const client = await getDb().connect();
-    let saved: Awaited<ReturnType<typeof saveRsvp>>;
-    try {
-      await client.query("BEGIN");
-      const db: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await client.query(sql, values)).rows as T[] });
-      // Read field definitions under the same event lock as saveRsvp so a
-      // concurrent builder save cannot change validation mid-submission.
-      await db('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [event.id]);
-      const previous = await findRsvp(db, event.id, guestId, editToken);
-      const fields = (await db<RSVPField>(
-        'SELECT id, event_id, field_name, field_label, field_type, options, placeholder, is_required, is_enabled, sort_order, created_at FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
-        [event.id],
-      )).rows;
-      const responseDataValidation = validateRsvpResponseData(fields, parsed.data.response_data, previous?.response_data);
-      if (!responseDataValidation.valid) {
-        throw new RsvpError('Please complete the required RSVP fields.', 400);
-      }
-      saved = await saveRsvp(db, event.id, guestId, editToken, parsed.data, effectiveLimit);
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally { client.release(); }
+    const saved = await saveRsvp({ query, batch }, event.id, guestId, editToken, parsed.data, effectiveLimit, {
+      // Validate against the field definitions read with saveRsvp's other reads; the guard
+      // retries the save if a concurrent builder save changes them before the write.
+      validate: async (previous) => {
+        const [fields, [{ fingerprint }]] = await Promise.all([
+          query<RSVPField>(
+            'SELECT id, event_id, field_name, field_label, field_type, options, placeholder, is_required, is_enabled, sort_order, created_at FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+            [event.id],
+          ),
+          query<{ fingerprint: string }>(`SELECT (${rsvpFieldsFingerprintSql}) AS fingerprint`, [event.id]),
+        ]);
+        const responseDataValidation = validateRsvpResponseData(fields, parsed.data.response_data, previous?.response_data);
+        if (!responseDataValidation.valid) {
+          throw new RsvpError('Please complete the required RSVP fields.', 400);
+        }
+        return [guard(`(${rsvpFieldsFingerprintSql}) = $2`, [event.id, fingerprint], RSVP_CHANGED)];
+      },
+    });
     const { response, updated } = saved;
     const { respondent_name, status, plus_ones } = parsed.data;
     const headcount = response.headcount;

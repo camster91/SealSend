@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
 import { ensureSocialSchema } from '@/lib/social/access';
-import { loadSocialState } from '@/lib/social/store';
+import { loadSocialState, socialDb } from '@/lib/social/store';
 import { hostActionSchema } from '@/lib/social/contracts';
-import { applyHostAction, socialTransaction } from '@/lib/social/actions';
+import { applyHostAction } from '@/lib/social/actions';
 import { deleteSocialPhoto } from '@/lib/social/photos';
 import { rateLimit } from '@/lib/rate-limit';
 type Context = { params: Promise<{ eventId:string }> };
@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: Context) {
     const action = parsed.data;
     const result = action.action === 'delete_photo'
       ? await deleteSocialPhoto(eventId,action.id,null,true)
-      : await socialTransaction(eventId,db => applyHostAction(eventId,action,db));
+      : await applyHostAction(eventId,action,socialDb);
     if (!result) return NextResponse.json({ error:'Activity not found or limit reached.' },{ status:409 });
     return NextResponse.json({ success:true },{ headers:{ 'Cache-Control':'private, no-store' } });
   } catch { return NextResponse.json({ error:'Unable to save event activities.' },{ status:503 }); }

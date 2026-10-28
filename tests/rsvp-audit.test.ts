@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PGlite } from '@electric-sql/pglite';
-import { deleteRsvp, type RsvpQuery } from '../src/lib/rsvp-store';
+import { openTestDb } from '../src/lib/db/sqlite-local';
+import { deleteRsvp, saveRsvp } from '../src/lib/rsvp-store';
+import { rsvpSubmissionSchema } from '../src/lib/validations';
 import { rsvpResponseValues, serializeRsvpResponseValue, validateRsvpResponseData } from '../src/lib/rsvp-fields';
 import type { RSVPField } from '../src/types/database';
 
@@ -27,33 +28,45 @@ function field(overrides: Partial<RSVPField>): RSVPField {
   };
 }
 
-test('deleting a response recalculates the invited guest status and falls back to pending', async () => {
-  const db = new PGlite();
-  await db.exec(`
-    CREATE TABLE events (id UUID PRIMARY KEY);
-    CREATE TABLE guests (id UUID PRIMARY KEY, event_id UUID, rsvp_status TEXT, updated_at TIMESTAMPTZ);
-    CREATE TABLE rsvp_responses (
-      id UUID PRIMARY KEY, event_id UUID, guest_id UUID, status TEXT,
-      submitted_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
-    );
-    INSERT INTO events (id) VALUES ('${eventId}');
-    INSERT INTO guests (id, event_id, rsvp_status) VALUES ('${guestId}', '${eventId}', 'attending');
-    INSERT INTO rsvp_responses (id, event_id, guest_id, status, submitted_at, updated_at)
-      VALUES ('${olderResponseId}', '${eventId}', '${guestId}', 'not_attending', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '2 minutes');
-    INSERT INTO rsvp_responses (id, event_id, guest_id, status, submitted_at, updated_at)
-      VALUES ('${newerResponseId}', '${eventId}', '${guestId}', 'attending', NOW() - INTERVAL '1 minute', NOW() - INTERVAL '1 minute');
-  `);
-  const execute: RsvpQuery = async <T>(sql: string, values?: unknown[]) => ({ rows: (await db.query<T>(sql, values)).rows });
-  try {
-    await db.transaction((tx) => deleteRsvp(async <T>(sql: string, values?: unknown[]) => ({ rows: (await tx.query<T>(sql, values)).rows }), eventId, newerResponseId));
-    assert.equal((await db.query<{ rsvp_status: string }>('SELECT rsvp_status FROM guests WHERE id = $1', [guestId])).rows[0].rsvp_status, 'not_attending');
-    assert.equal((await db.query('SELECT id FROM rsvp_responses WHERE id = $1', [newerResponseId])).rows.length, 0);
+async function auditFixture() {
+  const db = openTestDb();
+  await db.query("INSERT INTO events (id, user_id, title, slug, status) VALUES ($1, 'host', 'Event', 'audit', 'published')", [eventId]);
+  await db.query("INSERT INTO guests (id, event_id, name, rsvp_status) VALUES ($1, $2, 'Guest', 'attending')", [guestId, eventId]);
+  const older = new Date(Date.now() - 120_000);
+  const newer = new Date(Date.now() - 60_000);
+  await db.query(
+    "INSERT INTO rsvp_responses (id, event_id, guest_id, respondent_name, status, submitted_at, updated_at) VALUES ($1, $2, $3, 'Guest', 'not_attending', $4, $4), ($5, $2, $3, 'Guest', 'attending', $6, $6)",
+    [olderResponseId, eventId, guestId, older, newerResponseId, newer],
+  );
+  return db;
+}
 
-    assert.equal(await deleteRsvp(execute, eventId, olderResponseId), true);
-    assert.equal((await db.query<{ rsvp_status: string }>('SELECT rsvp_status FROM guests WHERE id = $1', [guestId])).rows[0].rsvp_status, 'pending');
-    assert.equal(await deleteRsvp(execute, eventId, olderResponseId), false);
+test('deleting a response recalculates the invited guest status and falls back to pending', async () => {
+  const db = await auditFixture();
+  try {
+    assert.equal(await deleteRsvp(db, eventId, newerResponseId), true);
+    assert.equal((await db.query<{ rsvp_status: string }>('SELECT rsvp_status FROM guests WHERE id = $1', [guestId]))[0].rsvp_status, 'not_attending');
+    assert.equal((await db.query('SELECT id FROM rsvp_responses WHERE id = $1', [newerResponseId])).length, 0);
+
+    assert.equal(await deleteRsvp(db, eventId, olderResponseId), true);
+    assert.equal((await db.query<{ rsvp_status: string }>('SELECT rsvp_status FROM guests WHERE id = $1', [guestId]))[0].rsvp_status, 'pending');
+    assert.equal(await deleteRsvp(db, eventId, olderResponseId), false);
   } finally {
-    await db.close();
+    db.handle.close();
+  }
+});
+
+test('a delete racing a public reply leaves the guest status matching the remaining response', async () => {
+  const db = await auditFixture();
+  try {
+    const reply = rsvpSubmissionSchema.parse({ respondent_name: 'Guest', status: 'maybe', headcount: 1, plus_ones: [] });
+    const [, deleted] = await Promise.all([saveRsvp(db, eventId, guestId, undefined, reply, null), deleteRsvp(db, eventId, olderResponseId)]);
+    assert.equal(deleted, true);
+    const latest = (await db.query<{ status: string }>('SELECT status FROM rsvp_responses WHERE guest_id = $1 ORDER BY updated_at DESC, submitted_at DESC, id DESC LIMIT 1', [guestId]))[0];
+    const guest = (await db.query<{ rsvp_status: string }>('SELECT rsvp_status FROM guests WHERE id = $1', [guestId]))[0];
+    assert.equal(guest.rsvp_status, latest?.status ?? 'pending');
+  } finally {
+    db.handle.close();
   }
 });
 

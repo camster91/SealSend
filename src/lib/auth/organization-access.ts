@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { query, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import type { Statement } from "@/lib/db/sqlite-dialect";
 import { requireApiHost, type AuthenticatedUser } from "@/lib/auth/api-auth";
 import { ORGANIZATION_ROLES, type OrganizationRole } from "@/lib/auth/event-access";
 import { ORGANIZER_PLANS } from "@/lib/constants";
@@ -62,10 +63,40 @@ export async function listUserOrganizations(userId: string): Promise<Organizatio
   );
 }
 
-/** Ensures the host has a personal workspace (hosts without events may not have one yet). */
+/**
+ * Statements that create the host's personal workspace if it is missing (named after the host,
+ * or "My events") and make the host its owner. Safe to repeat; add them to a larger batch when
+ * the workspace must exist before later statements (for example an event insert).
+ */
+export function personalOrganizationStatements(userId: string): Statement[] {
+  return [
+    {
+      text: `INSERT OR IGNORE INTO organizations (name, slug, is_personal, created_by)
+             SELECT COALESCE(NULLIF(TRIM(u.name), ''), 'My events'), 'personal-' || REPLACE(u.id, '-', ''), 1, u.id
+               FROM admin_users u
+              WHERE u.id = $1
+                AND NOT EXISTS (SELECT 1 FROM organizations WHERE created_by = $1 AND is_personal = 1)`,
+      params: [userId],
+    },
+    {
+      text: `INSERT OR IGNORE INTO organization_members (organization_id, user_id, role)
+             SELECT id, $1, 'owner' FROM organizations WHERE created_by = $1 AND is_personal = 1`,
+      params: [userId],
+    },
+  ];
+}
+
+/**
+ * Ensures the host has a personal workspace (hosts without events may not have one yet) and
+ * returns its id, or null when the user is not a host. Replaces the Postgres function
+ * sealsend_personal_organization().
+ */
 export async function ensurePersonalOrganization(userId: string): Promise<string | null> {
-  const row = await queryOne<{ id: string | null }>("SELECT sealsend_personal_organization($1) AS id", [userId]);
-  return row?.id ?? null;
+  const results = await batch<{ id: string }>([
+    ...personalOrganizationStatements(userId),
+    { text: "SELECT id FROM organizations WHERE created_by = $1 AND is_personal = 1", params: [userId] },
+  ]);
+  return results[results.length - 1][0]?.id ?? null;
 }
 
 export async function requireOrganizationPermission(organizationId: string, permission: OrganizationPermission): Promise<

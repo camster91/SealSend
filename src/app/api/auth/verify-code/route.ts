@@ -2,6 +2,7 @@ import { measurementOptedOut, type MarketingChannel } from "@/lib/analytics/mark
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { getMobileContext } from '@/lib/auth/mobile-context';
 import { cookies } from 'next/headers';
@@ -24,7 +25,7 @@ async function upsertHostUser(email: string | null, phone: string | null, channe
     const created = await queryOne<{ id: string }>(
       `INSERT INTO admin_users (email, password, name)
        VALUES ($1, $2, $3)
-       ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+       ON CONFLICT (email) DO UPDATE SET updated_at = ${SQL_NOW}
        RETURNING id`,
       [email.toLowerCase(), unusablePassword, email.split('@')[0] || null]
     );
@@ -51,7 +52,7 @@ async function upsertHostUser(email: string | null, phone: string | null, channe
     const created = await queryOne<{ id: string }>(
       `INSERT INTO admin_users (email, password, name)
        VALUES ($1, $2, $3)
-       ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
+       ON CONFLICT (email) DO UPDATE SET updated_at = ${SQL_NOW}
        RETURNING id`,
       [syntheticEmail, unusablePassword, phone]
     );

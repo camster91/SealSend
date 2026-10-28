@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     `UPDATE organization_webhooks
         SET active = COALESCE($3, active),
             events = COALESCE($4, events),
-            consecutive_failures = CASE WHEN $3 IS TRUE THEN 0 ELSE consecutive_failures END
+            consecutive_failures = CASE WHEN $3 = 1 THEN 0 ELSE consecutive_failures END
       WHERE id = $1 AND organization_id = $2
       RETURNING id, active, events`,
     [webhookId, organizationId, parsed.data.active ?? null, parsed.data.events ? [...new Set(parsed.data.events)] : null],

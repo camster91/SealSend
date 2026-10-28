@@ -14,17 +14,17 @@ export function buildAudienceQuery(eventId: string, audience: MessageAudience) {
   const params: unknown[] = [eventId];
   if (audience.rsvpStatuses.length) {
     params.push(audience.rsvpStatuses);
-    clauses.push(`g.rsvp_status = ANY($${params.length}::text[])`);
+    clauses.push(`g.rsvp_status IN (SELECT value FROM json_each($${params.length}))`);
   }
   if (audience.invitationStatuses.length) {
     params.push(audience.invitationStatuses);
-    clauses.push(`g.invite_status = ANY($${params.length}::text[])`);
+    clauses.push(`g.invite_status IN (SELECT value FROM json_each($${params.length}))`);
   }
   if (audience.tagIds.length) {
     params.push(audience.tagIds);
     clauses.push(`EXISTS (
       SELECT 1 FROM guest_tag_assignments gta
-      WHERE gta.guest_id = g.id AND gta.tag_id = ANY($${params.length}::uuid[])
+      WHERE gta.guest_id = g.id AND gta.tag_id IN (SELECT value FROM json_each($${params.length}))
     )`);
   }
   if (audience.unansweredOnly) {

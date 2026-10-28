@@ -11,7 +11,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   if (auth.error) return auth.error;
   const clients = await query(
     `SELECT c.id, c.name, c.contact_email, c.contact_phone, c.notes, c.created_at,
-            (SELECT COUNT(*) FROM events e WHERE e.client_id = c.id)::int AS event_count
+            (SELECT COUNT(*) FROM events e WHERE e.client_id = c.id) AS event_count
        FROM clients c WHERE c.organization_id = $1 ORDER BY LOWER(c.name)`,
     [organizationId],
   );

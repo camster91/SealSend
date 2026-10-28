@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { getEventAccess, roleCan } from "@/lib/auth/event-access";
 import { queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { eventMemberRoleSchema } from "@/lib/validations";
 
 type Params = { params: Promise<{ eventId: string; memberId: string }> };
@@ -20,7 +21,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
 
   const member = await queryOne(
-    `UPDATE event_members SET role = $1, updated_at = NOW()
+    `UPDATE event_members SET role = $1, updated_at = ${SQL_NOW}
      WHERE id = $2 AND event_id = $3
      RETURNING id, user_id, role, updated_at`,
     [parsed.data.role, memberId, eventId],
@@ -29,7 +30,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
   await queryOne(
     `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-     VALUES ($1, $2, 'member_role_changed', $3::jsonb) RETURNING id`,
+     VALUES ($1, $2, 'member_role_changed', $3) RETURNING id`,
     [eventId, auth.user.id, JSON.stringify({ memberId, role: parsed.data.role })],
   );
   return NextResponse.json(member);
