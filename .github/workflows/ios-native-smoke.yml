@@ -1,8 +1,9 @@
 name: SealSend iOS native smoke evidence
 
-# This is a manual, bounded evidence workflow. It does not sign, upload, log
-# in, or submit the app. The candidate checkout is pinned below so a harness
-# change cannot silently test a different source tree.
+# This is a manual, bounded evidence workflow. It uses only Xcode's local
+# ad-hoc simulator signing; it does not distribution-sign, upload, log in, or
+# submit the app. The candidate checkout is pinned below so a harness change
+# cannot silently test a different source tree.
 on:
   pull_request:
     paths:
