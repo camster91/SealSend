@@ -87,6 +87,14 @@ jobs:
           CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
           build
 
+      - name: Ad-hoc sign simulator app with CI-only keychain entitlements
+        run: |
+          APP_PATH="$RUNNER_TEMP/sealsend-ios-derived/Build/Products/Release-iphonesimulator/SealSend.app" \
+          OUTPUT_ROOT="$GITHUB_WORKSPACE/artifacts/ios-native-smoke" \
+          ENTITLEMENTS_PATH="$RUNNER_TEMP/sealsend-simulator.entitlements.plist" \
+          SEALSEND_TEAM_IDENTIFIER="NVJ5UY3T2X" \
+          "$GITHUB_WORKSPACE/ci-harness/scripts/mobile/sign-ios-simulator-app.sh"
+
       - name: Capture untouched native startup/login screens
         run: |
           SOURCE_ROOT="$GITHUB_WORKSPACE/candidate" \

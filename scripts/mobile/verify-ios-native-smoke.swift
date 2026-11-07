@@ -62,6 +62,25 @@ let recognized = (request.results ?? [])
     .lowercased()
 let matched = arguments.requiredTokens.filter { recognized.contains($0) }
 
+// A screenshot with source tokens is still a failure when the native app is
+// visibly broken or the simulator has left an OS URL-confirmation prompt over
+// it. Compacting OCR text catches both spaced and concatenated Vision output.
+let compactRecognized = recognized.filter { $0.isLetter || $0.isNumber }
+let forbiddenTokens = [
+    "functioncallexception",
+    "keychainexception",
+    "securestore",
+    "requiredentitlement",
+    "entitlementisntpresent",
+    "openinsealsend",
+    "cancelopen",
+]
+let forbidden = forbiddenTokens.filter { compactRecognized.contains($0) }
+guard forbidden.isEmpty else {
+    fputs("native screenshot contains forbidden error/prompt OCR tokens: \(forbidden.joined(separator: ", ")); OCR was: \(recognized)\n", stderr)
+    exit(1)
+}
+
 // Pixel dimensions alone can be satisfied by SpringBoard. Require two
 // source-owned tokens so a live PID with a launch/splash screen is rejected.
 guard matched.count >= 2 else {
@@ -73,6 +92,7 @@ let payload: [String: Any] = [
     "width": width,
     "height": height,
     "matchedTokens": matched,
+    "forbiddenTokens": forbidden,
     "recognizedText": recognized
 ]
 if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),

@@ -36,6 +36,27 @@ if [[ ! -d "$APP_PATH" || ! -s "$APP_PATH/SealSend" || ! -s "$APP_PATH/main.jsbu
   exit 1
 fi
 
+if ! /usr/bin/codesign --verify --deep --strict "$APP_PATH" >"$RUN_ROOT/code-signature-verify.txt" 2>&1; then
+  cat "$RUN_ROOT/code-signature-verify.txt" >&2
+  echo "Release simulator app is not ad-hoc signed with CI entitlements" >&2
+  exit 1
+fi
+
+signed_entitlements="$RUN_ROOT/signed-entitlements.txt"
+/usr/bin/codesign -d --entitlements :- "$APP_PATH" >"$signed_entitlements" 2>&1 || {
+  cat "$signed_entitlements" >&2
+  echo "Unable to read simulator app entitlements" >&2
+  exit 1
+}
+for entitlement in "application-identifier" "com.apple.developer.team-identifier" "keychain-access-groups"; do
+  if ! grep -q "$entitlement" "$signed_entitlements"; then
+    echo "Missing simulator entitlement: $entitlement" >&2
+    cat "$signed_entitlements" >&2
+    exit 1
+  fi
+done
+cp "$signed_entitlements" "$OUTPUT_ROOT/signed-entitlements.txt"
+
 swiftc "$HARNESS_ROOT/scripts/mobile/verify-ios-native-smoke.swift" \
   -o "$VERIFY_BIN" \
   -framework AppKit \
@@ -220,12 +241,15 @@ capture_device() {
     return 1
   fi
 
-  # Capture the source-owned first-run welcome screen, then use the app's
-  # declared sealsend://login route to reach the login surface without user
-  # credentials or mocked network state.
+  # Capture the source-owned first-run welcome screen, then use the ephemeral
+  # XCTest UI target to activate the real Host a gathering accessibility
+  # control. No guessed coordinates, deep links, injected JS, credentials, or
+  # mocked network state are used.
   capture_screen "$udid" "$label-startup" "$width" "$height" \
     'good plans,host a gathering,sealsend,free host beta' "$pid" "$launch_output"
-  xcrun simctl openurl "$udid" 'sealsend:///login'
+  UI_TEST_DEVICE_UDID="$udid" \
+  UI_TEST_OUTPUT_ROOT="$OUTPUT_ROOT/$label-ui-test" \
+  "$HARNESS_ROOT/scripts/mobile/run-sealsend-ui-test.sh"
   capture_screen "$udid" "$label-login" "$width" "$height" \
     'welcome host,email address,send sign-in code,sealsend' "$pid" "$launch_output"
 
