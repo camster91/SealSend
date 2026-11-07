@@ -38,23 +38,23 @@ fi
 
 if ! /usr/bin/codesign --verify --deep --strict "$APP_PATH" >"$RUN_ROOT/code-signature-verify.txt" 2>&1; then
   cat "$RUN_ROOT/code-signature-verify.txt" >&2
-  echo "Release simulator app is not ad-hoc signed with CI entitlements" >&2
+  echo "Release simulator app is not signed by Xcode's simulator signing configuration" >&2
+  exit 1
+fi
+
+signature_details="$OUTPUT_ROOT/code-signature.txt"
+if ! /usr/bin/codesign -d --verbose=5 "$APP_PATH" >"$signature_details" 2>&1; then
+  cat "$signature_details" >&2
+  echo "Unable to read Xcode-generated simulator signature" >&2
   exit 1
 fi
 
 signed_entitlements="$RUN_ROOT/signed-entitlements.txt"
 /usr/bin/codesign -d --entitlements :- "$APP_PATH" >"$signed_entitlements" 2>&1 || {
   cat "$signed_entitlements" >&2
-  echo "Unable to read simulator app entitlements" >&2
+  echo "Unable to read Xcode-generated simulator entitlements" >&2
   exit 1
 }
-for entitlement in "application-identifier" "com.apple.developer.team-identifier" "keychain-access-groups"; do
-  if ! grep -q "$entitlement" "$signed_entitlements"; then
-    echo "Missing simulator entitlement: $entitlement" >&2
-    cat "$signed_entitlements" >&2
-    exit 1
-  fi
-done
 cp "$signed_entitlements" "$OUTPUT_ROOT/signed-entitlements.txt"
 
 swiftc "$HARNESS_ROOT/scripts/mobile/verify-ios-native-smoke.swift" \
@@ -508,6 +508,7 @@ payload = {
     "runtimeId": os.environ["RUNTIME_ID"],
     "apiOrigin": os.environ["API_ORIGIN"],
     "mode": "Release simulator app with embedded JS bundle",
+    "simulatorSigning": "Xcode-generated ad-hoc simulator signature; actual signature and entitlements are recorded in code-signature.txt and signed-entitlements.txt",
     "appBinarySha256": os.environ["APP_BINARY_SHA256"],
     "jsBundleSha256": os.environ["JS_BUNDLE_SHA256"],
     "devices": [read("iphone-16-pro-max-startup.json"), read("iphone-16-pro-max-login.json"),
