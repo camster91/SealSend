@@ -105,6 +105,23 @@ class AndroidBundleTests(unittest.TestCase):
                     self.verify()
                 self.assertFalse(self.out.exists())
 
+    def test_accepts_expo_default_architectures_when_requested(self):
+        with ZipFile(self.bundle, 'w') as archive:
+            for name in ['base/assets/index.android.bundle',
+                         'base/lib/arm64-v8a/libhermes.so',
+                         'base/lib/armeabi-v7a/libhermes.so',
+                         'base/lib/x86_64/libhermes.so']:
+                archive.writestr(name, b'payload')
+        self.config.write_text(json.dumps({'expo': {'version': '0.1.0', 'android': {
+            'versionCode': 1, 'package': 'com.ashbi.sealsend'}}}))
+        manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.ashbi.sealsend" android:versionName="0.1.0" android:versionCode="1">
+            <uses-permission android:name="android.permission.CAMERA"/></manifest>'''
+        with patch.object(verifier.subprocess, 'check_output', return_value=manifest):
+            verifier.verify_bundle(self.bundle, self.config, self.out, Path('bundletool.jar'), self.env,
+                                   allow_default_abis=True)
+        self.assertTrue((self.out / 'SealSend-unsigned.aab').exists())
+
     def test_bundletool_failure_does_not_create_artifacts(self):
         self.config.write_text(json.dumps({'expo': {'version': '0.1.0', 'android': {
             'versionCode': 1, 'package': 'com.ashbi.sealsend'}}}))
