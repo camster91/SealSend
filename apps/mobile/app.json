@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "scheme": "sealsend",
     "orientation": "default",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon-1024.png",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.ashbi.sealsend",
@@ -13,7 +13,7 @@
       "config": {
         "usesNonExemptEncryption": false
       },
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "package": "com.ashbi.sealsend",
@@ -35,7 +35,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "versionCode": 1
+      "versionCode": 2
     },
     "plugins": [
       [
