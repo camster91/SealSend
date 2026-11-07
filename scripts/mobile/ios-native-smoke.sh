@@ -138,6 +138,23 @@ create_device() {
   xcrun simctl bootstatus "$CREATED_UDID" -b >&2
 }
 
+run_bounded() {
+  local timeout_seconds="$1" output_file="$2"
+  shift 2
+  "$@" >"$output_file" 2>&1 &
+  local child="$!"
+  local deadline=$((SECONDS + timeout_seconds))
+  while kill -0 "$child" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      kill "$child" 2>/dev/null || true
+      wait "$child" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+  done
+  wait "$child"
+}
+
 assert_live_pid() {
   local udid="$1" pid="$2" process_list
   process_list="$(xcrun simctl spawn "$udid" ps -p "$pid" -o pid=,comm= 2>&1 || true)"
@@ -228,11 +245,38 @@ PY
 
 capture_device() {
   local label="$1" width="$2" height="$3" type_id="$4"
-  local udid launch_output pid
+  local udid launch_output pid install_log launch_log install_status launch_status
   create_device "$label" "$type_id"
   udid="$CREATED_UDID"
-  xcrun simctl install "$udid" "$APP_PATH"
-  launch_output="$(xcrun simctl launch "$udid" "$BUNDLE_ID" 2>&1)"
+  install_log="$OUTPUT_ROOT/$label-install.log"
+  launch_log="$OUTPUT_ROOT/$label-launch.log"
+  set +e
+  run_bounded 180 "$install_log" xcrun simctl install "$udid" "$APP_PATH"
+  install_status="$?"
+  set -e
+  if (( install_status != 0 )); then
+    {
+      printf 'label=%s\nudid=%s\ninstallStatus=%s\ninstallLog=%s\n' \
+        "$label" "$udid" "$install_status" "$install_log"
+      cat "$install_log"
+    } > "$OUTPUT_ROOT/$label-install-failure.txt"
+    echo "simctl install failed for $label (status $install_status); see $install_log" >&2
+    return 1
+  fi
+  set +e
+  run_bounded 90 "$launch_log" xcrun simctl launch "$udid" "$BUNDLE_ID"
+  launch_status="$?"
+  set -e
+  launch_output="$(cat "$launch_log")"
+  if (( launch_status != 0 )); then
+    {
+      printf 'label=%s\nudid=%s\nlaunchStatus=%s\nlaunchLog=%s\n' \
+        "$label" "$udid" "$launch_status" "$launch_log"
+      cat "$launch_log"
+    } > "$OUTPUT_ROOT/$label-launch-failure.txt"
+    echo "simctl launch failed for $label (status $launch_status); see $launch_log" >&2
+    return 1
+  fi
   printf '%s\n' "$launch_output"
   pid="$(printf '%s\n' "$launch_output" | sed -nE 's/.*: ([0-9]+)$/\1/p' | tail -1)"
   if [[ ! "$pid" =~ ^[0-9]+$ ]]; then
