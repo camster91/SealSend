@@ -139,6 +139,7 @@ fi
 created_devices=()
 CREATED_UDID=""
 CONSOLE_LAUNCH_PID=""
+LAUNCHED_APP_PID=""
 
 stop_console_launcher() {
   local launcher_pid="${CONSOLE_LAUNCH_PID:-}"
@@ -214,6 +215,7 @@ launch_with_console() {
   local udid="$1" bundle_id="$2" output_file="$3"
   local launcher_pid app_pid launch_status deadline
   : >"$output_file"
+  LAUNCHED_APP_PID=""
   xcrun simctl launch --console "$udid" "$bundle_id" >"$output_file" 2>&1 &
   launcher_pid="$!"
   CONSOLE_LAUNCH_PID="$launcher_pid"
@@ -225,8 +227,7 @@ launch_with_console() {
       sleep 2
       if assert_live_pid "$udid" "$app_pid" >/dev/null 2>&1; then
         printf 'consoleLauncherPid=%s\nappPid=%s\n' "$launcher_pid" "$app_pid" >>"$output_file"
-        stop_console_launcher
-        printf '%s\n' "$app_pid"
+        LAUNCHED_APP_PID="$app_pid"
         return 0
       fi
     fi
@@ -244,7 +245,7 @@ launch_with_console() {
   CONSOLE_LAUNCH_PID=""
   app_pid="$(sed -nE 's/.*: ([0-9]+)$/\1/p' "$output_file" | tail -1 || true)"
   if [[ "$app_pid" =~ ^[0-9]+$ ]] && assert_live_pid "$udid" "$app_pid" >/dev/null 2>&1; then
-    printf '%s\n' "$app_pid"
+    LAUNCHED_APP_PID="$app_pid"
     return 0
   fi
   return "$launch_status"
@@ -277,6 +278,7 @@ collect_host_crash_reports() {
 record_installed_identity() {
   local udid="$1" label="$2" installed_app info_plist executable binary
   local installed_identifier installed_version installed_build installed_platform
+  local signature_status entitlements_status
   local identity_file="$OUTPUT_ROOT/$label-installed-identity.txt"
   local signature_file="$OUTPUT_ROOT/$label-installed-code-signature.txt"
   local entitlements_file="$OUTPUT_ROOT/$label-installed-entitlements.txt"
@@ -310,8 +312,22 @@ record_installed_identity() {
     lipo -info "$binary"
     otool -l "$binary" | grep -A 5 'LC_BUILD_VERSION' || true
   } >"$identity_file" 2>&1
-  /usr/bin/codesign --verify --deep --strict "$installed_app" >"$signature_file" 2>&1
-  /usr/bin/codesign -d --entitlements :- "$installed_app" >"$entitlements_file" 2>&1
+  if /usr/bin/codesign --verify --deep --strict "$installed_app" >"$signature_file" 2>&1; then
+    signature_status=0
+  else
+    signature_status="$?"
+  fi
+  if /usr/bin/codesign -d --entitlements :- "$installed_app" >"$entitlements_file" 2>&1; then
+    entitlements_status=0
+  else
+    entitlements_status="$?"
+  fi
+  if (( signature_status != 0 )); then
+    return "$signature_status"
+  fi
+  if (( entitlements_status != 0 )); then
+    return "$entitlements_status"
+  fi
 }
 
 capture_screen() {
@@ -413,8 +429,10 @@ capture_device() {
     return 1
   fi
   set +e
-  pid="$(launch_with_console "$udid" "$BUNDLE_ID" "$launch_log")"
+  LAUNCHED_APP_PID=""
+  launch_with_console "$udid" "$BUNDLE_ID" "$launch_log"
   launch_status="$?"
+  pid="$LAUNCHED_APP_PID"
   set -e
   launch_output="$(cat "$launch_log")"
   if (( launch_status != 0 )); then
@@ -447,6 +465,10 @@ capture_device() {
   capture_screen "$udid" "$label-login" "$width" "$height" \
     'welcome host,email address,send sign-in code,sealsend' "$pid" "$launch_output"
 
+  # Keep the console launcher attached through all liveness/UI checks. Stop it
+  # only after this device's evidence is complete; the EXIT trap covers early
+  # failures and preserves the parent-shell PID for cleanup.
+  stop_console_launcher
   xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
   xcrun simctl delete "$udid" >/dev/null 2>&1 || true
 }
