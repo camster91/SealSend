@@ -1,0 +1,333 @@
+name: SealSend native mobile candidates
+
+# CNG generates the Android project from apps/mobile/app.json in CI. The
+# generated android/ tree is intentionally not committed or used as source.
+# This workflow produces an owner-signing candidate only; it never signs with
+# a Play key and never uploads to Google Play.
+on:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "scripts/mobile/**"
+      - ".github/workflows/native-mobile-candidates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sealsend-native-android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    name: Generate and verify Android AAB candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+
+    steps:
+      - name: Check out source without credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.23+
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Set up JDK 21 for Expo SDK 57 React Native Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Record toolchain and checked-in mobile identity
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          java -version
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const config = JSON.parse(fs.readFileSync('apps/mobile/app.json', 'utf8')).expo;
+          const icon = path.join('apps/mobile', config.icon.replace(/^\.\//, ''));
+          if (config.android?.package !== 'com.ashbi.sealsend') throw new Error('Unexpected Android package');
+          if (config.version !== '0.1.0') throw new Error('Unexpected app version');
+          if (config.android?.versionCode !== 2) throw new Error('Expected unused Android versionCode 2');
+          if (!fs.existsSync(icon)) throw new Error(`Configured icon is missing: ${icon}`);
+          console.log(JSON.stringify({
+            package: config.android.package,
+            version: config.version,
+            versionCode: config.android.versionCode,
+            icon,
+            iconSha256: require('node:crypto').createHash('sha256').update(fs.readFileSync(icon)).digest('hex'),
+            adaptiveForeground: config.android.adaptiveIcon?.foregroundImage,
+          }, null, 2));
+          NODE
+
+      - name: Install locked web and mobile dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix apps/mobile --no-audit --no-fund
+
+      - name: Generate Android project with Expo CNG
+        working-directory: apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform android --no-install
+
+      - name: Assemble Expo-default-ABI release AAB
+        working-directory: apps/mobile/android
+        run: ./gradlew bundleRelease --no-daemon --max-workers=2
+
+      - name: Download checksum-pinned bundletool
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  $RUNNER_TEMP/bundletool.jar" \
+            | sha256sum --check --strict
+
+      - name: Run Android provenance regression tests
+        run: python3 -m unittest discover -s scripts/mobile/tests -v
+
+      - name: Verify AAB identity, manifest, permissions and Expo ABI set
+        run: >-
+          python3 scripts/mobile/verify-android-bundle.py
+          --bundletool "$RUNNER_TEMP/bundletool.jar" --allow-default-abis
+
+      - name: Add manifest, signature state and source/hash proof
+        shell: bash
+        run: |
+          bundle="apps/mobile/android/app/build/outputs/bundle/release/app-release.aab"
+          artifact="$RUNNER_TEMP/sealsend-android-artifact"
+          test -s "$bundle"
+
+          if unzip -l "$bundle" | awk '{print $4}' | grep -Eq '(^|/)META-INF/(MANIFEST\.MF|[^/]+\.(SF|RSA|DSA|EC))$'; then
+            signature_state="generated-development-signature-present-and-removed-from-retained-candidate"
+          else
+            signature_state="unsigned"
+          fi
+
+          java -jar "$RUNNER_TEMP/bundletool.jar" dump manifest \
+            --bundle="$bundle" --module=base > "$artifact/base-manifest.xml"
+
+          SIGNATURE_STATE="$signature_state" ARTIFACT_DIR="$artifact" node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = process.env.ARTIFACT_DIR;
+          const sourcePath = path.join(dir, 'source.json');
+          const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+          source.originalBundleSignatureState = process.env.SIGNATURE_STATE;
+          source.retainedArtifact = 'SealSend-unsigned.aab';
+          source.playReady = false;
+          source.signingRequired = 'Owner must sign with the verified Google Play upload key before any Play upload.';
+          fs.writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n');
+          NODE
+
+          ARTIFACT_DIR="$artifact" python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          import os
+
+          directory = Path(os.environ['ARTIFACT_DIR'])
+          files = sorted(path for path in directory.iterdir() if path.is_file() and path.name != 'SHA256SUMS')
+          (directory / 'SHA256SUMS').write_text(''.join(
+              f"{sha256(path.read_bytes()).hexdigest()}  {path.name}" + chr(10) for path in files
+          ))
+          PY
+
+          {
+            echo "### SealSend Android candidate"
+            echo "Source: $GITHUB_SHA"
+            echo "Expo CNG generated the Android project from apps/mobile/app.json."
+            echo "Retained artifact: unsigned AAB for owner signing; Play-ready status: false."
+            echo "Original bundle signature state: $signature_state"
+            echo "The artifact includes the decoded base manifest, source identity, and SHA256SUMS."
+            echo "No Play upload key, credential, EAS project, or store upload was used."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain AAB and provenance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealsend-android-native-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/sealsend-android-artifact/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
+
+  ios:
+    name: Generate and verify unsigned iPhoneOS archive
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+
+    steps:
+      - name: Check out source without credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22.23+
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.0"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Record Xcode, SDK and CocoaPods toolchains
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/sealsend-ios-toolchain"
+          xcodebuild -version | tee "$RUNNER_TEMP/sealsend-ios-toolchain/xcode-version.txt"
+          xcodebuild -showsdks | tee "$RUNNER_TEMP/sealsend-ios-toolchain/xcode-sdks.txt"
+          pod --version | tee "$RUNNER_TEMP/sealsend-ios-toolchain/cocoapods-version.txt"
+
+      - name: Install locked web and mobile dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix apps/mobile --no-audit --no-fund
+
+      - name: Generate iOS project with Expo CNG
+        working-directory: apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform ios --no-install
+
+      - name: Install generated CocoaPods dependencies
+        working-directory: apps/mobile/ios
+        run: pod install --silent
+
+      - name: Archive unsigned ARM64 iPhoneOS release candidate
+        working-directory: apps/mobile/ios
+        run: >-
+          xcodebuild -workspace SealSend.xcworkspace -scheme SealSend
+          -configuration Release -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/sealsend-ios-derived"
+          -archivePath "$RUNNER_TEMP/SealSend.xcarchive"
+          -jobs 2 ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          archive
+
+      - name: Verify archive identity and package unsigned evidence
+        shell: bash
+        run: |
+          app="$RUNNER_TEMP/SealSend.xcarchive/Products/Applications/SealSend.app"
+          artifact="$RUNNER_TEMP/sealsend-ios-artifact"
+          test -s "$app/SealSend"
+          test -s "$app/main.jsbundle"
+          test -s "$app/Info.plist"
+          lipo "$app/SealSend" -verify_arch arm64
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import plistlib
+
+          app = Path(os.environ['RUNNER_TEMP']) / 'SealSend.xcarchive/Products/Applications/SealSend.app'
+          with (app / 'Info.plist').open('rb') as file:
+              info = plistlib.load(file)
+          with Path('apps/mobile/app.json').open() as file:
+              config = json.load(file)['expo']
+          assert info['CFBundleIdentifier'] == config['ios']['bundleIdentifier']
+          assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS']
+          assert info['CFBundleShortVersionString'] == config['version']
+          assert info['CFBundleVersion'] == config['ios']['buildNumber']
+          assert isinstance(info.get('NSCameraUsageDescription'), str) and info['NSCameraUsageDescription'].strip()
+          calendar = next(plugin[1] for plugin in config['plugins'] if isinstance(plugin, list) and plugin[0] == 'expo-calendar')
+          assert info.get('NSCalendarsUsageDescription') == calendar['calendarPermission']
+          blocked = ['NSMicrophoneUsageDescription', 'NSContactsUsageDescription',
+                     'NSCalendarsFullAccessUsageDescription', 'NSCalendarsWriteOnlyAccessUsageDescription',
+                     'NSLocationWhenInUseUsageDescription', 'NSLocationAlwaysUsageDescription',
+                     'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSPhotoLibraryUsageDescription',
+                     'NSPhotoLibraryAddUsageDescription', 'NSFaceIDUsageDescription']
+          assert not any(info.get(key) for key in blocked)
+          manifests = []
+          for path in sorted(app.rglob('PrivacyInfo.xcprivacy')):
+              with path.open('rb') as file:
+                  data = plistlib.load(file)
+              assert not data.get('NSPrivacyTracking'), f'Unexpected tracking declaration: {path.name}'
+              manifests.append(str(path.relative_to(app)))
+          assert manifests, 'Packaged privacy manifest inspection is required'
+          print(json.dumps({'bundleIdentifier': info['CFBundleIdentifier'],
+                            'version': info['CFBundleShortVersionString'],
+                            'buildNumber': info['CFBundleVersion'],
+                            'privacyManifests': manifests}, indent=2))
+          PY
+
+          if [ -d "$app/_CodeSignature" ]; then
+            signature_state="signature-directory-present; not accepted as TestFlight signing"
+          else
+            signature_state="unsigned-CODE_SIGNING_ALLOWED_NO"
+          fi
+
+          mkdir -p "$artifact"
+          ditto -c -k --keepParent "$RUNNER_TEMP/SealSend.xcarchive" "$artifact/SealSend-unsigned.xcarchive.zip"
+          ditto -c -k --keepParent "$app" "$artifact/SealSend-unsigned.app.zip"
+          cp "$RUNNER_TEMP/sealsend-ios-toolchain/"* "$artifact/"
+
+          SIGNATURE_STATE="$signature_state" ARTIFACT_DIR="$artifact" node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const config = require('./apps/mobile/app.json').expo;
+          const artifact = process.env.ARTIFACT_DIR;
+          fs.writeFileSync(path.join(artifact, 'source.json'), JSON.stringify({
+            repository: process.env.GITHUB_REPOSITORY,
+            commit: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            bundleIdentifier: config.ios.bundleIdentifier,
+            version: config.version,
+            buildNumber: config.ios.buildNumber,
+            platform: 'iphoneos',
+            signed: false,
+            playReady: false,
+            testFlightReady: false,
+            codeSigningAllowed: false,
+            signatureState: process.env.SIGNATURE_STATE,
+            signingRequired: 'Owner must sign/export with the verified Apple distribution identity before TestFlight submission.',
+            apiOrigin: process.env.EXPO_PUBLIC_API_URL,
+          }, null, 2) + '\n');
+          NODE
+
+          ARTIFACT_DIR="$artifact" python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          import os
+
+          directory = Path(os.environ['ARTIFACT_DIR'])
+          files = sorted(path for path in directory.iterdir() if path.is_file() and path.name != 'SHA256SUMS')
+          (directory / 'SHA256SUMS').write_text(''.join(
+              f"{sha256(path.read_bytes()).hexdigest()}  {path.name}" + chr(10) for path in files
+          ))
+          PY
+
+          {
+            echo "### SealSend iOS candidate"
+            echo "Source: $GITHUB_SHA"
+            echo "Expo CNG generated the iOS project from apps/mobile/app.json."
+            echo "Retained archive/app: unsigned iPhoneOS candidate; TestFlight-ready status: false."
+            echo "Signature state: $signature_state"
+            echo "No Apple private key, provisioning profile, EAS project, or App Store upload was used."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain archive, app and provenance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealsend-ios-native-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/sealsend-ios-artifact/
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
