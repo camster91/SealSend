@@ -1,9 +1,10 @@
 name: SealSend iOS native smoke evidence
 
-# This is a manual, bounded evidence workflow. It uses only Xcode's local
-# ad-hoc simulator signing; it does not distribution-sign, upload, log in, or
-# submit the app. The candidate checkout is pinned below so a harness change
-# cannot silently test a different source tree.
+# This is a pull-request-triggered or manually dispatched, bounded evidence
+# workflow. It uses Xcode-generated ad-hoc simulator signing for the diagnostic;
+# it does not distribution-sign, upload, log in, or submit the app. The candidate
+# checkout is pinned below so a harness change cannot silently test a different
+# source tree.
 on:
   pull_request:
     paths:
@@ -28,7 +29,7 @@ jobs:
       CI: "true"
       EXPO_NO_TELEMETRY: "1"
       EXPO_PUBLIC_API_URL: https://sealsend.app
-      EXPECTED_COMMIT: 75f7cff4b1d53403d39ba88a00aa91fd9d612583
+      EXPECTED_COMMIT: 57b4242ec4f129914165aed4ac62cb9fcc6886ec
 
     steps:
       - name: Check out the current smoke harness
@@ -41,7 +42,7 @@ jobs:
       - name: Check out the frozen SealSend candidate
         uses: actions/checkout@v4
         with:
-          ref: 75f7cff4b1d53403d39ba88a00aa91fd9d612583
+          ref: 57b4242ec4f129914165aed4ac62cb9fcc6886ec
           path: candidate
           fetch-depth: 1
           persist-credentials: false
@@ -88,6 +89,18 @@ jobs:
           CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
           build
 
+      - name: Verify the finished simulator app root privacy manifest
+        run: |
+          app="$RUNNER_TEMP/sealsend-ios-derived/Build/Products/Release-iphonesimulator/SealSend.app"
+          manifest="$app/PrivacyInfo.xcprivacy"
+          test -s "$manifest"
+          mkdir -p artifacts/ios-native-smoke
+          python3 candidate/scripts/mobile/verify-ios-privacy-manifest.py \
+            --config candidate/apps/mobile/app.json \
+            --manifest "$manifest" \
+            > artifacts/ios-native-smoke/privacy-manifest-verification.json
+          cat artifacts/ios-native-smoke/privacy-manifest-verification.json
+
       - name: Capture untouched native startup/login screens
         run: |
           SOURCE_ROOT="$GITHUB_WORKSPACE/candidate" \
@@ -111,7 +124,8 @@ jobs:
             echo "### SealSend iOS native smoke evidence"
             echo "Candidate source: $EXPECTED_COMMIT"
             echo "Harness source: $(cat artifacts/ios-native-smoke/harness-commit.txt)"
-            echo "Xcode ad-hoc simulator signing with embedded JS bundle; no distribution signing or store upload."
+            echo "PR/manual trigger; Xcode ad-hoc simulator signing with embedded JS bundle; no distribution signing or store upload."
+            echo "Manifest verification result, when generated: artifacts/ios-native-smoke/privacy-manifest-verification.json; inspect the verification-step conclusion."
             echo "Screens require exact native dimensions and at least two source-owned OCR tokens."
           } >> "$GITHUB_STEP_SUMMARY"
 
