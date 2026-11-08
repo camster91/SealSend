@@ -205,6 +205,11 @@ jobs:
         working-directory: apps/mobile
         run: ./node_modules/.bin/expo prebuild --platform ios --no-install
 
+      - name: Verify emitted root privacy manifest
+        run: >-
+          python3 scripts/mobile/verify-ios-privacy-manifest.py
+          --manifest apps/mobile/ios/SealSend/PrivacyInfo.xcprivacy
+
       - name: Install generated CocoaPods dependencies
         working-directory: apps/mobile/ios
         run: pod install --silent
@@ -229,6 +234,8 @@ jobs:
           test -s "$app/SealSend"
           test -s "$app/main.jsbundle"
           test -s "$app/Info.plist"
+          python3 scripts/mobile/verify-ios-privacy-manifest.py \
+            --manifest "$app/PrivacyInfo.xcprivacy"
           lipo "$app/SealSend" -verify_arch arm64
 
           python3 - <<'PY'
