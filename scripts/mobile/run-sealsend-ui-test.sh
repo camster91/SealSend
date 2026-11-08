@@ -12,6 +12,7 @@ RUN_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sealsend-ios-ui-test"
 PROJECT_ROOT="$RUN_ROOT/project"
 PROJECT_FILE="$PROJECT_ROOT/SealSendSmokeUITests.xcodeproj"
 DERIVED_DATA="$RUN_ROOT/derived"
+RESULT_BUNDLE="$OUTPUT_ROOT/$UI_TEST_CASE.xcresult"
 
 case "$UI_TEST_CASE" in
   testLaunchesInForeground|testHostAGatheringOpensLogin) ;;
@@ -22,6 +23,7 @@ case "$UI_TEST_CASE" in
 esac
 
 rm -rf "$PROJECT_ROOT" "$DERIVED_DATA"
+rm -rf "$RESULT_BUNDLE"
 mkdir -p "$PROJECT_ROOT" "$OUTPUT_ROOT"
 cp "$HARNESS_ROOT/scripts/mobile/SealSendSmokeUITest.swift" "$PROJECT_ROOT/SealSendSmokeUITest.swift"
 cp "$HARNESS_ROOT/scripts/mobile/SealSendSmokeUITestHost.swift" "$PROJECT_ROOT/SealSendSmokeUITestHost.swift"
@@ -388,6 +390,7 @@ build_args=(
   -configuration Release
   -destination "platform=iOS Simulator,id=$DEVICE_UDID"
   -derivedDataPath "$DERIVED_DATA"
+  -resultBundlePath "$RESULT_BUNDLE"
   CODE_SIGNING_ALLOWED=YES
   CODE_SIGNING_REQUIRED=YES
   CODE_SIGN_IDENTITY=-
@@ -395,7 +398,7 @@ build_args=(
 )
 
 set +e
-"${build_args[@]}" 2>&1 | tee "$OUTPUT_ROOT/xctest.log"
+xcodebuild "${build_args[@]}" 2>&1 | tee "$OUTPUT_ROOT/xctest.log"
 status=${PIPESTATUS[0]}
 set -e
 if (( status != 0 )); then
@@ -403,10 +406,26 @@ if (( status != 0 )); then
   exit "$status"
 fi
 
+test_case_pattern="Test Case '-\\[[^]]+ ${UI_TEST_CASE}\\]'"
+started_count="$(grep -Ec "${test_case_pattern} started\\." "$OUTPUT_ROOT/xctest.log" || true)"
+passed_count="$(grep -Ec "${test_case_pattern} passed" "$OUTPUT_ROOT/xctest.log" || true)"
+skipped_count="$(grep -Ec "${test_case_pattern} (skipped|not run)" "$OUTPUT_ROOT/xctest.log" || true)"
+if (( started_count != 1 || passed_count != 1 || skipped_count != 0 )) || \
+  ! grep -Eq 'Executed [1-9][0-9]* tests?, with 0 failures' "$OUTPUT_ROOT/xctest.log"; then
+  {
+    printf 'testCase=%s\nstarted=%s\npassed=%s\nskipped=%s\nresultBundle=%s\n' \
+      "$UI_TEST_CASE" "$started_count" "$passed_count" "$skipped_count" "$RESULT_BUNDLE"
+    printf '\nRecent XCTest output:\n'
+    tail -120 "$OUTPUT_ROOT/xctest.log"
+  } > "$OUTPUT_ROOT/test-execution-failure.txt"
+  echo "Selected SealSend XCTest did not execute exactly once and pass; see $OUTPUT_ROOT/test-execution-failure.txt and $RESULT_BUNDLE" >&2
+  exit 1
+fi
+
 if [[ "$UI_TEST_CASE" == "testLaunchesInForeground" ]]; then
-  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\nexpectedUi=Good plans. Great company.;Host a gathering\nmethod=XCUIApplication exact bundle foreground assertion\n' \
-    "$DEVICE_UDID" > "$OUTPUT_ROOT/result.txt"
+  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\ntestCase=%s\ntestsExecuted=1\nexpectedUi=Good plans. Great company.;Host a gathering\nmethod=XCUIApplication exact bundle foreground assertion\nresultBundle=%s\n' \
+    "$DEVICE_UDID" "$UI_TEST_CASE" "$RESULT_BUNDLE" > "$OUTPUT_ROOT/result.txt"
 else
-  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\nexpectedUi=Welcome, host.;Email address;Send sign-in code\nmethod=XCUIApplication accessibility navigation Host a gathering\n' \
-    "$DEVICE_UDID" > "$OUTPUT_ROOT/result.txt"
+  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\ntestCase=%s\ntestsExecuted=1\nexpectedUi=Welcome, host.;Email address;Send sign-in code\nmethod=XCUIApplication accessibility navigation Host a gathering\nresultBundle=%s\n' \
+    "$DEVICE_UDID" "$UI_TEST_CASE" "$RESULT_BUNDLE" > "$OUTPUT_ROOT/result.txt"
 fi
