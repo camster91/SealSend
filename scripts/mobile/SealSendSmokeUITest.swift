@@ -5,9 +5,32 @@ final class SealSendSmokeUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testLaunchesInForeground() throws {
+        let app = XCUIApplication(bundleIdentifier: "com.ashbi.sealsend")
+        app.launch()
+
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 30),
+            "SealSend did not reach XCUIApplication.State.runningForeground"
+        )
+        XCTAssertTrue(
+            app.staticTexts["Good plans. Great company."].waitForExistence(timeout: 30),
+            "The source-owned welcome title did not appear while SealSend was foreground"
+        )
+        XCTAssertTrue(
+            app.buttons["Host a gathering"].waitForExistence(timeout: 10),
+            "The source-owned Host a gathering control did not appear while SealSend was foreground"
+        )
+    }
+
     func testHostAGatheringOpensLogin() throws {
         let app = XCUIApplication(bundleIdentifier: "com.ashbi.sealsend")
         app.launch()
+
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 30),
+            "SealSend did not remain in XCUIApplication.State.runningForeground before navigation"
+        )
 
         let hostButton = app.buttons["Host a gathering"]
         XCTAssertTrue(

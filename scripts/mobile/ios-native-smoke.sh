@@ -140,6 +140,8 @@ created_devices=()
 CREATED_UDID=""
 CONSOLE_LAUNCH_PID=""
 LAUNCHED_APP_PID=""
+PID_PROBE_FILE=""
+PID_PROBE_SUMMARY=""
 
 stop_console_launcher() {
   local launcher_pid="${CONSOLE_LAUNCH_PID:-}"
@@ -192,23 +194,34 @@ run_bounded() {
   wait "$child"
 }
 
-assert_live_pid() {
-  local udid="$1" pid="$2" process_list
-  process_list="$(xcrun simctl spawn "$udid" ps -p "$pid" -o pid=,comm= 2>&1 || true)"
-  if awk -v expected="$pid" '$1 == expected { found = 1 } END { exit found ? 0 : 1 }' <<<"$process_list"; then
-    LIVE_PROCESS_CHECK="simulator ps: $process_list"
-    return 0
-  fi
-  # Current macOS 26 runtimes may not ship a spawnable `ps` binary. simctl's
-  # launch response is still the authoritative app PID; kill -0 confirms that
-  # the corresponding process remains live on the runner in that environment.
-  if kill -0 "$pid" 2>/dev/null; then
-    LIVE_PROCESS_CHECK="host kill -0 for simctl PID $pid (simulator ps unavailable: $process_list)"
-    return 0
-  fi
-  LIVE_PROCESS_CHECK="$process_list"
-  printf '%s\n' "$process_list"
-  return 1
+record_pid_probe() {
+  local udid="$1" label="$2" pid="$3"
+  local probe_root="$OUTPUT_ROOT/$label-pid-probe"
+  local simulator_stdout="$probe_root/stdout.txt"
+  local simulator_stderr="$probe_root/stderr.txt"
+  local host_stderr="$probe_root/host-kill-0-stderr.txt"
+  local simulator_status host_status
+  mkdir -p "$probe_root"
+
+  set +e
+  xcrun simctl spawn "$udid" ps -p "$pid" -o 'pid=,comm=' >"$simulator_stdout" 2>"$simulator_stderr"
+  simulator_status="$?"
+  kill -0 "$pid" 2>"$host_stderr"
+  host_status="$?"
+  set -e
+
+  PID_PROBE_FILE="$OUTPUT_ROOT/$label-pid-probe.txt"
+  {
+    printf 'command=xcrun simctl spawn %s ps -p %s -o pid=,comm=\n' "$udid" "$pid"
+    printf 'simulatorPsStatus=%s\n' "$simulator_status"
+    printf 'simulatorPsStdoutFile=%s\n' "$simulator_stdout"
+    printf 'simulatorPsStderrFile=%s\n' "$simulator_stderr"
+    printf 'hostKill0Command=kill -0 %s\n' "$pid"
+    printf 'hostKill0Status=%s\n' "$host_status"
+    printf 'hostKill0StderrFile=%s\n' "$host_stderr"
+    printf 'acceptance=not-used; native XCTest exact-bundle runningForeground assertion is required\n'
+  } >"$PID_PROBE_FILE"
+  PID_PROBE_SUMMARY="simulator ps status=$simulator_status stdout=$simulator_stdout stderr=$simulator_stderr; host kill -0 status=$host_status stderr=$host_stderr"
 }
 
 launch_with_console() {
@@ -222,14 +235,11 @@ launch_with_console() {
   deadline=$((SECONDS + 45))
 
   while kill -0 "$launcher_pid" 2>/dev/null; do
-    app_pid="$(sed -nE 's/.*: ([0-9]+)$/\1/p' "$output_file" | tail -1 || true)"
+    app_pid="$(awk -v bundle="$bundle_id" '$1 == bundle ":" && NF == 2 && $2 ~ /^[0-9]+$/ { print $2; exit }' "$output_file" || true)"
     if [[ "$app_pid" =~ ^[0-9]+$ ]]; then
-      sleep 2
-      if assert_live_pid "$udid" "$app_pid" >/dev/null 2>&1; then
-        printf 'consoleLauncherPid=%s\nappPid=%s\n' "$launcher_pid" "$app_pid" >>"$output_file"
-        LAUNCHED_APP_PID="$app_pid"
-        return 0
-      fi
+      printf 'consoleLauncherPid=%s\nappPid=%s\npidEvidence=exact bundle launch acknowledgement\n' "$launcher_pid" "$app_pid" >>"$output_file"
+      LAUNCHED_APP_PID="$app_pid"
+      return 0
     fi
     if (( SECONDS >= deadline )); then
       stop_console_launcher
@@ -243,8 +253,8 @@ launch_with_console() {
   launch_status="$?"
   set -e
   CONSOLE_LAUNCH_PID=""
-  app_pid="$(sed -nE 's/.*: ([0-9]+)$/\1/p' "$output_file" | tail -1 || true)"
-  if [[ "$app_pid" =~ ^[0-9]+$ ]] && assert_live_pid "$udid" "$app_pid" >/dev/null 2>&1; then
+  app_pid="$(awk -v bundle="$bundle_id" '$1 == bundle ":" && NF == 2 && $2 ~ /^[0-9]+$/ { print $2; exit }' "$output_file" || true)"
+  if [[ "$app_pid" =~ ^[0-9]+$ ]]; then
     LAUNCHED_APP_PID="$app_pid"
     return 0
   fi
@@ -335,29 +345,27 @@ capture_screen() {
   local screenshot="$OUTPUT_ROOT/$label.png"
   local verification_error="$OUTPUT_ROOT/$label-verification-error.txt"
   local launch_output="$7"
+  local foreground_evidence="$8"
   local attempt=1
   local deadline=$((SECONDS + 90))
   local verification=""
-  local process_check=""
   : > "$verification_error"
 
-  while (( SECONDS < deadline )); do
-    if ! assert_live_pid "$udid" "$pid"; then
-      {
-        printf 'label=%s\npid=%s\nlaunchOutput=%s\nliveProcessCheck=%s\n' "$label" "$pid" "$launch_output" "$LIVE_PROCESS_CHECK"
-        printf 'attempt=%s\n' "$attempt"
-      } > "$OUTPUT_ROOT/$label-failure.txt"
-      echo "SealSend PID $pid is not live on simulator $udid ($label)" >&2
-      return 1
-    fi
-    process_check="$LIVE_PROCESS_CHECK"
+  if [[ ! -s "$foreground_evidence" ]] || ! grep -Fqx 'state=runningForeground' "$foreground_evidence"; then
+    printf 'label=%s\npid=%s\nforegroundEvidence=%s\nrequired=state=runningForeground\n' \
+      "$label" "$pid" "$foreground_evidence" > "$OUTPUT_ROOT/$label-failure.txt"
+    echo "Native XCTest foreground evidence is missing for $label; see $foreground_evidence" >&2
+    return 1
+  fi
 
+  while (( SECONDS < deadline )); do
     xcrun simctl io "$udid" screenshot "$screenshot"
     if verification="$($VERIFY_BIN "$screenshot" "$width" "$height" "$tokens" 2>"$verification_error")"; then
       local sha256
       sha256="$(shasum -a 256 "$screenshot" | awk '{print $1}')"
       VERIFY_JSON="$verification" SHA256="$sha256" DEVICE_UDID="$udid" SOURCE_COMMIT="$actual_commit" \
-        LABEL="$label" PID="$pid" LAUNCH_OUTPUT="$launch_output" PROCESS_CHECK="$process_check" \
+        LABEL="$label" PID="$pid" LAUNCH_OUTPUT="$launch_output" FOREGROUND_EVIDENCE="$foreground_evidence" \
+        PID_PROBE_FILE="$PID_PROBE_FILE" PID_PROBE_SUMMARY="$PID_PROBE_SUMMARY" \
         API_ORIGIN="$API_ORIGIN" python3 - "$OUTPUT_ROOT/$label.json" <<'PY'
 import json
 import os
@@ -368,8 +376,10 @@ payload.update({
     "label": os.environ["LABEL"],
     "deviceUdid": os.environ["DEVICE_UDID"],
     "pid": int(os.environ["PID"]),
-    "pidEvidence": "simctl launch numeric PID plus live-process check",
-    "liveProcessCheck": os.environ["PROCESS_CHECK"],
+    "pidEvidence": "simctl launch exact bundle PID acknowledgement; native XCTest runningForeground assertion",
+    "foregroundEvidence": os.environ["FOREGROUND_EVIDENCE"],
+    "pidProbe": os.environ["PID_PROBE_FILE"],
+    "pidProbeSummary": os.environ["PID_PROBE_SUMMARY"],
     "launchOutput": os.environ["LAUNCH_OUTPUT"],
     "sourceCommit": os.environ["SOURCE_COMMIT"],
     "bundleId": "com.ashbi.sealsend",
@@ -389,8 +399,8 @@ PY
   done
 
   {
-    printf 'label=%s\npid=%s\nlaunchOutput=%s\nliveProcessCheck=%s\nattempts=%s\nelapsedSeconds=%s\n' \
-      "$label" "$pid" "$launch_output" "$process_check" "$attempt" "$SECONDS"
+    printf 'label=%s\npid=%s\nlaunchOutput=%s\nforegroundEvidence=%s\npidProbe=%s\nattempts=%s\nelapsedSeconds=%s\n' \
+      "$label" "$pid" "$launch_output" "$foreground_evidence" "$PID_PROBE_FILE" "$attempt" "$SECONDS"
     printf 'lastVerificationError='
     tr '\n' ' ' < "$verification_error"
     printf '\n'
@@ -452,18 +462,26 @@ capture_device() {
     echo "simctl did not return a native app PID ($label): $launch_output" >&2
     return 1
   fi
+  record_pid_probe "$udid" "$label" "$pid"
 
   # Capture the source-owned first-run welcome screen, then use the ephemeral
   # XCTest UI target to activate the real Host a gathering accessibility
   # control. No guessed coordinates, deep links, injected JS, credentials, or
   # mocked network state are used.
+  UI_TEST_DEVICE_UDID="$udid" \
+  UI_TEST_OUTPUT_ROOT="$OUTPUT_ROOT/$label-foreground-test" \
+  UI_TEST_CASE=testLaunchesInForeground \
+  "$HARNESS_ROOT/scripts/mobile/run-sealsend-ui-test.sh"
+  local foreground_evidence="$OUTPUT_ROOT/$label-foreground-test/result.txt"
   capture_screen "$udid" "$label-startup" "$width" "$height" \
-    'good plans,host a gathering,sealsend,free host beta' "$pid" "$launch_output"
+    'good plans,host a gathering,sealsend,free host beta' "$pid" "$launch_output" "$foreground_evidence"
   UI_TEST_DEVICE_UDID="$udid" \
   UI_TEST_OUTPUT_ROOT="$OUTPUT_ROOT/$label-ui-test" \
+  UI_TEST_CASE=testHostAGatheringOpensLogin \
   "$HARNESS_ROOT/scripts/mobile/run-sealsend-ui-test.sh"
+  foreground_evidence="$OUTPUT_ROOT/$label-ui-test/result.txt"
   capture_screen "$udid" "$label-login" "$width" "$height" \
-    'welcome host,email address,send sign-in code,sealsend' "$pid" "$launch_output"
+    'welcome host,email address,send sign-in code,sealsend' "$pid" "$launch_output" "$foreground_evidence"
 
   # Keep the console launcher attached through all liveness/UI checks. Stop it
   # only after this device's evidence is complete; the EXIT trap covers early

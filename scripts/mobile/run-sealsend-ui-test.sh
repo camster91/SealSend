@@ -6,11 +6,20 @@ set -euo pipefail
 # simulator app is launched by XCUIApplication using its public bundle ID.
 DEVICE_UDID="${UI_TEST_DEVICE_UDID:?UI_TEST_DEVICE_UDID is required}"
 OUTPUT_ROOT="${UI_TEST_OUTPUT_ROOT:?UI_TEST_OUTPUT_ROOT is required}"
+UI_TEST_CASE="${UI_TEST_CASE:-testHostAGatheringOpensLogin}"
 HARNESS_ROOT="${HARNESS_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 RUN_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sealsend-ios-ui-test"
 PROJECT_ROOT="$RUN_ROOT/project"
 PROJECT_FILE="$PROJECT_ROOT/SealSendSmokeUITests.xcodeproj"
 DERIVED_DATA="$RUN_ROOT/derived"
+
+case "$UI_TEST_CASE" in
+  testLaunchesInForeground|testHostAGatheringOpensLogin) ;;
+  *)
+    echo "Unsupported SealSend UI test case: $UI_TEST_CASE" >&2
+    exit 2
+    ;;
+esac
 
 rm -rf "$PROJECT_ROOT" "$DERIVED_DATA"
 mkdir -p "$PROJECT_ROOT" "$OUTPUT_ROOT"
@@ -372,17 +381,21 @@ scheme.write_text(r'''<?xml version="1.0" encoding="UTF-8"?>
 ''', encoding="utf-8")
 PY
 
+build_args=(
+  test
+  -project "$PROJECT_FILE"
+  -scheme SealSendSmokeUITests
+  -configuration Release
+  -destination "platform=iOS Simulator,id=$DEVICE_UDID"
+  -derivedDataPath "$DERIVED_DATA"
+  CODE_SIGNING_ALLOWED=YES
+  CODE_SIGNING_REQUIRED=YES
+  CODE_SIGN_IDENTITY=-
+  "-only-testing:SealSendSmokeUITests/SealSendSmokeUITests/$UI_TEST_CASE"
+)
+
 set +e
-xcodebuild test \
-  -project "$PROJECT_FILE" \
-  -scheme SealSendSmokeUITests \
-  -configuration Release \
-  -destination "platform=iOS Simulator,id=$DEVICE_UDID" \
-  -derivedDataPath "$DERIVED_DATA" \
-  CODE_SIGNING_ALLOWED=YES \
-  CODE_SIGNING_REQUIRED=YES \
-  CODE_SIGN_IDENTITY=- \
-  2>&1 | tee "$OUTPUT_ROOT/xctest.log"
+"${build_args[@]}" 2>&1 | tee "$OUTPUT_ROOT/xctest.log"
 status=${PIPESTATUS[0]}
 set -e
 if (( status != 0 )); then
@@ -390,5 +403,10 @@ if (( status != 0 )); then
   exit "$status"
 fi
 
-printf 'passed\ndevice=%s\nmethod=XCUIApplication accessibility label Host a gathering\n' \
-  "$DEVICE_UDID" > "$OUTPUT_ROOT/result.txt"
+if [[ "$UI_TEST_CASE" == "testLaunchesInForeground" ]]; then
+  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\nexpectedUi=Good plans. Great company.;Host a gathering\nmethod=XCUIApplication exact bundle foreground assertion\n' \
+    "$DEVICE_UDID" > "$OUTPUT_ROOT/result.txt"
+else
+  printf 'passed\ndevice=%s\nbundleIdentifier=com.ashbi.sealsend\nstate=runningForeground\nexpectedUi=Welcome, host.;Email address;Send sign-in code\nmethod=XCUIApplication accessibility navigation Host a gathering\n' \
+    "$DEVICE_UDID" > "$OUTPUT_ROOT/result.txt"
+fi
