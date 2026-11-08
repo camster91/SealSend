@@ -11,6 +11,7 @@ BUNDLE_ID="com.ashbi.sealsend"
 EXPECTED_VERSION="0.1.0"
 EXPECTED_BUILD="3"
 API_ORIGIN="${EXPO_PUBLIC_API_URL:-https://sealsend.app}"
+LAUNCH_TIMEOUT_SECONDS="${LAUNCH_TIMEOUT_SECONDS:-45}"
 SOURCE_ROOT="${SOURCE_ROOT:?SOURCE_ROOT is required}"
 HARNESS_ROOT="${HARNESS_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 APP_PATH="${APP_PATH:?APP_PATH is required}"
@@ -138,27 +139,11 @@ fi
 
 created_devices=()
 CREATED_UDID=""
-CONSOLE_LAUNCH_PID=""
 LAUNCHED_APP_PID=""
 PID_PROBE_FILE=""
 PID_PROBE_SUMMARY=""
 
-stop_console_launcher() {
-  local launcher_pid="${CONSOLE_LAUNCH_PID:-}"
-  if [[ "$launcher_pid" =~ ^[0-9]+$ ]] && kill -0 "$launcher_pid" 2>/dev/null; then
-    kill "$launcher_pid" 2>/dev/null || true
-    for _ in 1 2 3 4 5; do
-      kill -0 "$launcher_pid" 2>/dev/null || break
-      sleep 1
-    done
-    kill -KILL "$launcher_pid" 2>/dev/null || true
-    wait "$launcher_pid" 2>/dev/null || true
-  fi
-  CONSOLE_LAUNCH_PID=""
-}
-
 cleanup() {
-  stop_console_launcher
   for udid in "${created_devices[@]}"; do
     xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
     xcrun simctl delete "$udid" >/dev/null 2>&1 || true
@@ -224,41 +209,39 @@ record_pid_probe() {
   PID_PROBE_SUMMARY="simulator ps status=$simulator_status stdout=$simulator_stdout stderr=$simulator_stderr; host kill -0 status=$host_status stderr=$host_stderr"
 }
 
-launch_with_console() {
+launch_app() {
   local udid="$1" bundle_id="$2" output_file="$3"
-  local launcher_pid app_pid launch_status deadline
+  local app_pid launch_status
   : >"$output_file"
   LAUNCHED_APP_PID=""
-  xcrun simctl launch --console "$udid" "$bundle_id" >"$output_file" 2>&1 &
-  launcher_pid="$!"
-  CONSOLE_LAUNCH_PID="$launcher_pid"
-  deadline=$((SECONDS + 45))
-
-  while kill -0 "$launcher_pid" 2>/dev/null; do
-    app_pid="$(awk -v bundle="$bundle_id" '$1 == bundle ":" && NF == 2 && $2 ~ /^[0-9]+$/ { print $2; exit }' "$output_file" || true)"
-    if [[ "$app_pid" =~ ^[0-9]+$ ]]; then
-      printf 'consoleLauncherPid=%s\nappPid=%s\npidEvidence=exact bundle launch acknowledgement\n' "$launcher_pid" "$app_pid" >>"$output_file"
-      LAUNCHED_APP_PID="$app_pid"
-      return 0
-    fi
-    if (( SECONDS >= deadline )); then
-      stop_console_launcher
-      return 124
-    fi
-    sleep 1
-  done
-
-  set +e
-  wait "$launcher_pid"
-  launch_status="$?"
-  set -e
-  CONSOLE_LAUNCH_PID=""
-  app_pid="$(awk -v bundle="$bundle_id" '$1 == bundle ":" && NF == 2 && $2 ~ /^[0-9]+$/ { print $2; exit }' "$output_file" || true)"
-  if [[ "$app_pid" =~ ^[0-9]+$ ]]; then
-    LAUNCHED_APP_PID="$app_pid"
-    return 0
+  if run_bounded "$LAUNCH_TIMEOUT_SECONDS" "$output_file" xcrun simctl launch "$udid" "$bundle_id"; then
+    launch_status=0
+  else
+    launch_status="$?"
   fi
-  return "$launch_status"
+  printf 'launchCommand=xcrun simctl launch %s %s\nlaunchStatus=%s\n' "$udid" "$bundle_id" "$launch_status" >>"$output_file"
+  app_pid="$(awk -v bundle="$bundle_id" '$1 == bundle ":" && NF == 2 && $2 ~ /^[0-9]+$/ { print $2; exit }' "$output_file" || true)"
+  if (( launch_status != 0 )); then
+    return "$launch_status"
+  fi
+  if [[ ! "$app_pid" =~ ^[0-9]+$ ]]; then
+    printf 'pidEvidence=missing exact bundle launch acknowledgement\n' >>"$output_file"
+    return 1
+  fi
+  printf 'appPid=%s\npidEvidence=exact bundle launch acknowledgement after finite simctl launch\n' "$app_pid" >>"$output_file"
+  LAUNCHED_APP_PID="$app_pid"
+  return 0
+}
+
+capture_raw_failure_screen() {
+  local udid="$1" label="$2"
+  local screenshot="$OUTPUT_ROOT/$label-raw-failure.png"
+  local screenshot_error="$OUTPUT_ROOT/$label-raw-failure-error.txt"
+  if xcrun simctl io "$udid" screenshot "$screenshot" > /dev/null 2>"$screenshot_error"; then
+    printf 'diagnosticOnly=true\nreason=launch or native startup failure\n' > "$OUTPUT_ROOT/$label-raw-failure.txt"
+  else
+    printf 'diagnosticOnly=true\nscreenshotStatus=failed\nerrorFile=%s\n' "$screenshot_error" > "$OUTPUT_ROOT/$label-raw-failure.txt"
+  fi
 }
 
 collect_launch_diagnostics() {
@@ -440,12 +423,13 @@ capture_device() {
   fi
   set +e
   LAUNCHED_APP_PID=""
-  launch_with_console "$udid" "$BUNDLE_ID" "$launch_log"
+  launch_app "$udid" "$BUNDLE_ID" "$launch_log"
   launch_status="$?"
   pid="$LAUNCHED_APP_PID"
   set -e
   launch_output="$(cat "$launch_log")"
   if (( launch_status != 0 )); then
+    capture_raw_failure_screen "$udid" "$label"
     collect_launch_diagnostics "$udid" "$label"
     {
       printf 'label=%s\nudid=%s\nlaunchStatus=%s\nlaunchLog=%s\n' \
@@ -464,10 +448,10 @@ capture_device() {
   fi
   record_pid_probe "$udid" "$label" "$pid"
 
-  # Capture the source-owned first-run welcome screen, then use the ephemeral
-  # XCTest UI target to activate the real Host a gathering accessibility
-  # control. No guessed coordinates, deep links, injected JS, credentials, or
-  # mocked network state are used.
+  # Use the ephemeral XCTest UI target to prove the source-owned foreground
+  # welcome state, capture it, then activate the real Host a gathering
+  # accessibility control. No guessed coordinates, deep links, injected JS,
+  # credentials, or mocked network state are used.
   UI_TEST_DEVICE_UDID="$udid" \
   UI_TEST_OUTPUT_ROOT="$OUTPUT_ROOT/$label-foreground-test" \
   UI_TEST_CASE=testLaunchesInForeground \
@@ -483,10 +467,6 @@ capture_device() {
   capture_screen "$udid" "$label-login" "$width" "$height" \
     'welcome host,email address,send sign-in code,sealsend' "$pid" "$launch_output" "$foreground_evidence"
 
-  # Keep the console launcher attached through all liveness/UI checks. Stop it
-  # only after this device's evidence is complete; the EXIT trap covers early
-  # failures and preserves the parent-shell PID for cleanup.
-  stop_console_launcher
   xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
   xcrun simctl delete "$udid" >/dev/null 2>&1 || true
 }
@@ -531,8 +511,8 @@ payload = {
     "jsBundleSha256": os.environ["JS_BUNDLE_SHA256"],
     "devices": [read("iphone-16-pro-max-startup.json"), read("iphone-16-pro-max-login.json"),
                 read("ipad-pro-13-m4-startup.json"), read("ipad-pro-13-m4-login.json")],
-    "dataMode": "empty first-run; login screen reached by declared sealsend://login route; no credentials",
-    "captureMethod": "xcrun simctl io screenshot after native simulator launch/openurl",
+    "dataMode": "empty first-run; login screen reached through the source-owned Host a gathering XCTest control; no credentials",
+    "captureMethod": "xcrun simctl io screenshot after finite native simulator launch and XCTest accessibility navigation",
     "nativeContentVerification": "Vision OCR requires at least two source-owned UI tokens and exact native pixel dimensions",
 }
 with (root / "manifest.json").open("w", encoding="utf-8") as handle:
