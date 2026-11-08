@@ -1,0 +1,124 @@
+name: SealSend iOS native smoke evidence
+
+# This is a manual, bounded evidence workflow. It uses only Xcode's local
+# ad-hoc simulator signing; it does not distribution-sign, upload, log in, or
+# submit the app. The candidate checkout is pinned below so a harness change
+# cannot silently test a different source tree.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ios-native-smoke.yml"
+      - "scripts/mobile/ios-native-smoke.sh"
+      - "scripts/mobile/verify-ios-native-smoke.swift"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sealsend-ios-native-smoke
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: Release startup and login screens
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_PUBLIC_API_URL: https://sealsend.app
+      EXPECTED_COMMIT: 75f7cff4b1d53403d39ba88a00aa91fd9d612583
+
+    steps:
+      - name: Check out the current smoke harness
+        uses: actions/checkout@v4
+        with:
+          path: ci-harness
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out the frozen SealSend candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 75f7cff4b1d53403d39ba88a00aa91fd9d612583
+          path: candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            candidate/package-lock.json
+            candidate/apps/mobile/package-lock.json
+
+      - name: Record Xcode and simulator toolchains
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          pod --version
+          xcrun simctl list runtimes --json > "$RUNNER_TEMP/sealsend-runtimes.json"
+          xcrun simctl list devicetypes --json > "$RUNNER_TEMP/sealsend-devicetypes.json"
+
+      - name: Install locked web and mobile dependencies
+        working-directory: candidate
+        run: |
+          npm ci --no-audit --no-fund
+          npm ci --prefix apps/mobile --no-audit --no-fund
+
+      - name: Generate the iOS project with Expo CNG
+        working-directory: candidate/apps/mobile
+        run: ./node_modules/.bin/expo prebuild --platform ios --no-install
+
+      - name: Install generated CocoaPods dependencies
+        working-directory: candidate/apps/mobile/ios
+        run: pod install --silent
+
+      - name: Build the frozen candidate in Release simulator mode
+        working-directory: candidate/apps/mobile/ios
+        run: >-
+          xcodebuild -workspace SealSend.xcworkspace -scheme SealSend
+          -configuration Release -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/sealsend-ios-derived"
+          -jobs 2 ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+          CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES CODE_SIGN_IDENTITY=-
+          build
+
+      - name: Capture untouched native startup/login screens
+        run: |
+          SOURCE_ROOT="$GITHUB_WORKSPACE/candidate" \
+          HARNESS_ROOT="$GITHUB_WORKSPACE/ci-harness" \
+          APP_PATH="$RUNNER_TEMP/sealsend-ios-derived/Build/Products/Release-iphonesimulator/SealSend.app" \
+          OUTPUT_ROOT="$GITHUB_WORKSPACE/artifacts/ios-native-smoke" \
+          "$GITHUB_WORKSPACE/ci-harness/scripts/mobile/ios-native-smoke.sh"
+
+      - name: Record source, toolchain and artifact hashes
+        if: always()
+        run: |
+          mkdir -p artifacts/ios-native-smoke
+          git -C ci-harness rev-parse HEAD > artifacts/ios-native-smoke/harness-commit.txt
+          git -C candidate rev-parse HEAD > artifacts/ios-native-smoke/candidate-commit.txt
+          test "$(cat artifacts/ios-native-smoke/candidate-commit.txt)" = "$EXPECTED_COMMIT"
+          xcodebuild -version > artifacts/ios-native-smoke/xcode-version.txt
+          find artifacts/ios-native-smoke -type f \
+            ! -name SHA256SUMS ! -name '*.sha256' -exec shasum -a 256 {} + \
+            > artifacts/ios-native-smoke/SHA256SUMS
+          {
+            echo "### SealSend iOS native smoke evidence"
+            echo "Candidate source: $EXPECTED_COMMIT"
+            echo "Harness source: $(cat artifacts/ios-native-smoke/harness-commit.txt)"
+            echo "Xcode ad-hoc simulator signing with embedded JS bundle; no distribution signing or store upload."
+            echo "Screens require exact native dimensions and at least two source-owned OCR tokens."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload native screen evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sealsend-ios-native-smoke-${{ github.run_id }}
+          path: artifacts/ios-native-smoke
+          if-no-files-found: error
