@@ -3,13 +3,13 @@ set -euo pipefail
 
 # This harness is intentionally separate from the candidate source checkout.
 # It builds the frozen Release simulator app, launches it on ephemeral devices,
-# and retains native framebuffer evidence. It never signs, logs in, or changes
-# the app's API origin.
+# and retains native framebuffer evidence. It never distribution-signs, logs in,
+# or changes the app's API origin.
 
-EXPECTED_COMMIT="${EXPECTED_COMMIT:-75f7cff4b1d53403d39ba88a00aa91fd9d612583}"
+EXPECTED_COMMIT="${EXPECTED_COMMIT:-1ee5babeba48acadd3242483f7e74ed34f5c2ca7}"
 BUNDLE_ID="com.ashbi.sealsend"
 EXPECTED_VERSION="0.1.0"
-EXPECTED_BUILD="3"
+EXPECTED_BUILD="4"
 API_ORIGIN="${EXPO_PUBLIC_API_URL:-https://sealsend.app}"
 LAUNCH_TIMEOUT_SECONDS="${LAUNCH_TIMEOUT_SECONDS:-45}"
 SOURCE_ROOT="${SOURCE_ROOT:?SOURCE_ROOT is required}"
