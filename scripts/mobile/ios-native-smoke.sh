@@ -6,7 +6,7 @@ set -euo pipefail
 # and retains native framebuffer evidence. It never distribution-signs, logs in,
 # or changes the app's API origin.
 
-EXPECTED_COMMIT="${EXPECTED_COMMIT:-57b4242ec4f129914165aed4ac62cb9fcc6886ec}"
+EXPECTED_COMMIT="${EXPECTED_COMMIT:-1ee5babeba48acadd3242483f7e74ed34f5c2ca7}"
 BUNDLE_ID="com.ashbi.sealsend"
 EXPECTED_VERSION="0.1.0"
 EXPECTED_BUILD="4"

@@ -29,7 +29,7 @@ jobs:
       CI: "true"
       EXPO_NO_TELEMETRY: "1"
       EXPO_PUBLIC_API_URL: https://sealsend.app
-      EXPECTED_COMMIT: 57b4242ec4f129914165aed4ac62cb9fcc6886ec
+      EXPECTED_COMMIT: 1ee5babeba48acadd3242483f7e74ed34f5c2ca7
 
     steps:
       - name: Check out the current smoke harness
@@ -42,7 +42,7 @@ jobs:
       - name: Check out the frozen SealSend candidate
         uses: actions/checkout@v4
         with:
-          ref: 57b4242ec4f129914165aed4ac62cb9fcc6886ec
+          ref: 1ee5babeba48acadd3242483f7e74ed34f5c2ca7
           path: candidate
           fetch-depth: 1
           persist-credentials: false
