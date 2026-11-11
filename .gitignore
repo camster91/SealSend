@@ -80,3 +80,5 @@ apps/mobile/build/
 .vinext/
 .cloudflare/
 .dev.vars
+# Local SQLite database (src/lib/db/client.sqlite.ts)
+/.data/

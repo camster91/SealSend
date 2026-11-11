@@ -1,12 +1,15 @@
 import { captureSocialPhotoPaths, purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
+import { toTimestamp } from '@/lib/events';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
+
+const TIMESTAMP_KEYS = new Set(['event_date', 'event_end_date', 'rsvp_deadline']);
 
 function eventForAccess(event: unknown, role: string): unknown {
   if (role === 'owner' || !event || typeof event !== 'object') return event;
@@ -132,6 +135,10 @@ export async function PATCH(
     const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
     const values = keys.map((key) => {
       const val = updates[key];
+      // Timestamps are stored as ISO-8601 UTC text, so normalize request strings.
+      if (TIMESTAMP_KEYS.has(key)) {
+        return toTimestamp(val as string | null | undefined);
+      }
       // JSON columns need to be stringified
       if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
         return JSON.stringify(val);

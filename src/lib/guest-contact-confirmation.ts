@@ -24,7 +24,7 @@ export async function recordGuestContactConfirmation(
   const audit = contactConfirmationAudit(kind, count);
   await query(
     `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-     VALUES ($1, $2, $3, $4::jsonb)`,
-    [eventId, userId, audit.action, JSON.stringify(audit.metadata)],
+     VALUES ($1, $2, $3, $4)`,
+    [eventId, userId, audit.action, audit.metadata],
   );
 }

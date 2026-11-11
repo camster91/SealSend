@@ -1,10 +1,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getDb } from './client';
+import { exec } from './client';
 
 export async function runMigrations() {
-  const db = getDb();
   const schema = readFileSync(join(process.cwd(), 'src/lib/db/schema.sql'), 'utf-8');
-  await db.query(schema);
+  await exec(schema);
   console.log('Migrations complete');
 }

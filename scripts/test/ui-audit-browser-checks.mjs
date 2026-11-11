@@ -1,5 +1,5 @@
 /**
- * Focused UI regressions for the native PostgreSQL browser harness.
+ * Focused UI regressions for the native SQLite browser harness.
  *
  * This suite uses only disposable .test data. It does not open a send modal,
  * approve a message, call a provider, or mutate production data.
@@ -25,7 +25,7 @@ async function seed(db) {
   );
   await db.query(
     `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-     VALUES ($1, 'admin', $2, NOW() + INTERVAL '1 hour')`,
+     VALUES ($1, 'admin', $2, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour'))`,
     [IDS.owner, SESSION],
   );
   await db.query(
@@ -34,7 +34,7 @@ async function seed(db) {
         location_name, host_name, max_attendees, max_guests_per_rsvp,
         allow_plus_ones, tier)
      VALUES ($1, $2, 'UI audit event', 'ui-audit-event', 'published',
-             NOW() + INTERVAL '14 days', 'America/Toronto', 'UI Audit Hall',
+             strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'), 'America/Toronto', 'UI Audit Hall',
              'UI Audit Host', 100, 10, TRUE, 'event_pass')`,
     [IDS.event, IDS.owner],
   );
@@ -53,7 +53,7 @@ async function seed(db) {
   await db.query(
     `INSERT INTO rsvp_responses
        (id, event_id, guest_id, respondent_name, respondent_email, status, headcount, response_data)
-     VALUES ($1, $2, $3, 'Keyboard Guest', 'keyboard-guest@example.test', 'attending', 1, '{}'::jsonb)`,
+     VALUES ($1, $2, $3, 'Keyboard Guest', 'keyboard-guest@example.test', 'attending', 1, '{}')`,
     [IDS.response, IDS.event, IDS.guest],
   );
 }

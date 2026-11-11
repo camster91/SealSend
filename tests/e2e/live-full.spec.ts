@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { Pool } from 'pg';
+import { openSqliteDb } from '../../src/lib/db/sqlite-local';
 import { openReadyPage } from './page-ready';
 
 import { hashAuthCode } from '../../src/lib/auth/code-hash';
@@ -10,7 +10,8 @@ const qaEmail = process.env.SEALSEND_QA_EMAIL;
 const qaPassword = process.env.SEALSEND_QA_PASSWORD;
 const qaBetaInviteToken = process.env.SEALSEND_QA_BETA_INVITE_TOKEN;
 const allowPendingBetaPolicy = process.env.SEALSEND_QA_ALLOW_PENDING_BETA_POLICY === 'true';
-const qaDatabaseUrl = process.env.SEALSEND_QA_DATABASE_URL;
+// The app's SQLite file (SQLITE_PATH) for the isolated QA run; never a real database.
+const qaSqlitePath = process.env.SEALSEND_QA_SQLITE_PATH;
 const qaGuestCode = process.env.SEALSEND_QA_GUEST_CODE;
 const output = path.resolve('qa-screenshots', 'live-full');
 
@@ -177,14 +178,14 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect(publish.status()).toBe(200);
     expect((await publish.json()).status).toBe('published');
 
-    if (qaDatabaseUrl && qaGuestCode) {
+    if (qaSqlitePath && qaGuestCode) {
       expect(process.env.SEALSEND_E2E_FIXTURE_CONFIRM).toBe('isolated');
-      expect(new URL(qaDatabaseUrl).pathname).toBe('/sealsend_e2e');
-      const pool = new Pool({ connectionString: qaDatabaseUrl, max: 1 });
+      expect(path.basename(qaSqlitePath)).toBe('sealsend_e2e.db');
+      const db = openSqliteDb(qaSqlitePath);
       try {
-        await pool.query(
+        await db.query(
           `INSERT INTO auth_codes (email, code_hash, role, event_id, expires_at)
-           VALUES ($1, $2, 'guest', $3, NOW() + INTERVAL '15 minutes')`,
+           VALUES ($1, $2, 'guest', $3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+15 minutes'))`,
           ['qa-guest-one@example.com', hashAuthCode({
             code: qaGuestCode,
             recipient: 'qa-guest-one@example.com',
@@ -193,7 +194,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
           }), eventId],
         );
       } finally {
-        await pool.end();
+        db.handle.close();
       }
 
       const guestContext = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });

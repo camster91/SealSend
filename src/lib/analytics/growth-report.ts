@@ -288,33 +288,40 @@ export function shapeGrowthReport(
   };
 }
 
+// Days are UTC date strings; timestamps are ISO-8601 UTC text, so text comparison is time order.
+// account_created_at and the milestone columns are aliases, so they come back as ISO strings.
 const PAGEVIEW_SQL = `
-  SELECT day::text AS day, channel, SUM(views)::text AS views
+  SELECT day, channel, SUM(views) AS views
   FROM marketing_pageviews
-  WHERE day >= $1::date AND day <= $2::date
+  WHERE day >= $1 AND day <= $2
   GROUP BY day, channel
 `;
 
 const SIGNUP_SQL = `
   WITH created_events AS (
-    SELECT ae.user_id, ae.created_at, ae.metadata->>'channel' AS channel
+    SELECT ae.user_id, ae.created_at, json_extract(ae.metadata, '$.channel') AS channel
     FROM activation_events ae
     JOIN admin_users owner ON owner.id = ae.user_id
     WHERE ae.event_name = 'account_created'
       AND ae.user_id IS NOT NULL
-      AND ae.created_at >= $1::timestamptz
-      AND ae.created_at <= $2::timestamptz
+      AND ae.created_at >= $1
+      AND ae.created_at <= $2
+  ),
+  ranked_events AS (
+    SELECT user_id, created_at, channel,
+      ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at ASC) AS account_rank
+    FROM created_events
   ),
   accounts AS (
-    SELECT DISTINCT ON (user_id)
+    SELECT
       user_id,
       created_at AS account_created_at,
       CASE
         WHEN channel IN ('direct', 'organic_search', 'social', 'email', 'referral') THEN channel
         ELSE 'unknown'
       END AS channel
-    FROM created_events
-    ORDER BY user_id, created_at ASC
+    FROM ranked_events
+    WHERE account_rank = 1
   ),
   milestones AS (
     SELECT
@@ -325,7 +332,7 @@ const SIGNUP_SQL = `
     JOIN accounts ON accounts.user_id = ae.user_id
     WHERE ae.event_name IN ('event_published', 'first_rsvp_received')
       AND ae.created_at >= accounts.account_created_at
-      AND ae.created_at <= $2::timestamptz
+      AND ae.created_at <= $2
     GROUP BY ae.user_id
   )
   SELECT

@@ -4,7 +4,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 export async function improvementBrowserChecks({browser,origin,db}) {
   const owner='00000000-0000-4000-8000-000000000040';
   await db.query("INSERT INTO admin_users(id,email,name,password) VALUES ($1,'improvements@example.test','Improvement QA','disabled-local-qa')",[owner]);
-  await db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'admin','improvement-local-host-session',NOW()+INTERVAL '1 day')",[owner]);
+  await db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'admin','improvement-local-host-session',strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))",[owner]);
   const host=await browser.newContext({ignoreHTTPSErrors:true});
   await host.addCookies([{name:'sealsend_session',value:'improvement-local-host-session',url:origin}]);
   const builder=await host.newPage();
@@ -65,7 +65,7 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     assert.ok((await db.query('SELECT checked_in_at FROM rsvp_responses WHERE id=$1',[rid])).rows[0].checked_in_at);
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('No such guest');await builder.getByText('No guests match your search. Try another name or clear the search.',{exact:true}).waitFor();
     assert.equal((await host.request.patch(`${origin}/api/events/00000000-0000-4000-8000-000000000011/check-in`,{headers:{Origin:origin},data:{rsvpResponseId:rid,checkedIn:false}})).status(),404);
-    await db.query("UPDATE events SET rsvp_deadline=NOW()-INTERVAL '1 day' WHERE id=$1",[eventId]);
+    await db.query("UPDATE events SET rsvp_deadline=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day') WHERE id=$1",[eventId]);
     const stranger=await browser.newContext({ignoreHTTPSErrors:true});contexts.push(stranger);const fresh=await stranger.newPage();await fresh.goto(`${origin}/e/${slug}`);await fresh.getByRole('heading',{name:'RSVPs are closed',exact:true}).waitFor();
     const rejected=await stranger.request.post(`${origin}/api/rsvp/${slug}`,{headers:{Origin:origin},data:{respondent_name:'Late Guest',status:'attending',headcount:1}});assert.equal(rejected.status(),403);assert.ok((await rejected.json()).error.includes('deadline'));
     await guest.reload();await guest.getByRole('button',{name:'Update your response',exact:true}).click();await guest.getByText('The deadline has passed. You can still update your existing response.',{exact:true}).waitFor();

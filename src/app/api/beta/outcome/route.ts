@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { parseBetaOutcome, type BetaWillingnessToPay } from "@/lib/beta-outcome";
 import { BETA_SEGMENTS, type BetaSegment } from "@/lib/beta-participation";
-import { getDb, queryOne } from "@/lib/db/client";
+import { batch, queryOne } from "@/lib/db/client";
+import { SQL_NOW, abortCode, guard } from "@/lib/db/sqlite-dialect";
 import { rateLimit } from "@/lib/rate-limit";
 
 interface OutcomeRow {
@@ -39,7 +40,7 @@ async function getCurrentOutcome(userId: string) {
         AND outcomes.consented_at = participants.consented_at
       WHERE participants.user_id = $1
         AND participants.withdrawn_at IS NULL
-        AND participants.segment = ANY($2::text[])`,
+        AND participants.segment IN (SELECT value FROM json_each($2))`,
     [userId, BETA_SEGMENTS],
   );
 }
@@ -63,43 +64,45 @@ export async function POST(httpRequest: Request) {
     return noStore({ error: "Complete each outcome question with a valid selection." }, { status: 400 });
   }
 
-  const client = await getDb().connect();
+  const participant = await queryOne<{ consented_at: Date; consent_version: string; segment: BetaSegment }>(
+    `SELECT consented_at, consent_version, segment
+       FROM beta_participants
+      WHERE user_id = $1
+        AND withdrawn_at IS NULL
+        AND segment IN (SELECT value FROM json_each($2))`,
+    [auth.user.id, BETA_SEGMENTS],
+  );
+  if (!participant) return noStore({ error: "Active controlled-beta consent is required." }, { status: 403 });
+
   try {
-    await client.query("BEGIN");
-    const participantResult = await client.query<{ consented_at: string; consent_version: string; segment: BetaSegment }>(
-      `SELECT consented_at, consent_version, segment
-         FROM beta_participants
-        WHERE user_id = $1
-          AND withdrawn_at IS NULL
-          AND segment = ANY($2::text[])
-        FOR UPDATE`,
-      [auth.user.id, BETA_SEGMENTS],
-    );
-    const participant = participantResult.rows[0];
-    if (!participant) {
-      await client.query("ROLLBACK");
-      return noStore({ error: "Active controlled-beta consent is required." }, { status: 403 });
-    }
-    await client.query(
-      `INSERT INTO beta_outcomes
-         (user_id, consented_at, consent_version, willingness_to_pay, repeat_intent,
-          self_reported_support_minutes, price_version, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
-       ON CONFLICT (user_id, consented_at) DO UPDATE SET
-         willingness_to_pay = EXCLUDED.willingness_to_pay,
-         repeat_intent = EXCLUDED.repeat_intent,
-         self_reported_support_minutes = EXCLUDED.self_reported_support_minutes,
-         price_version = EXCLUDED.price_version,
-         updated_at = NOW()`,
-      [auth.user.id, participant.consented_at, participant.consent_version, outcome.willingnessToPay,
-        outcome.repeatIntent, outcome.selfReportedSupportMinutes, outcome.priceVersion],
-    );
-    await client.query("COMMIT");
+    // The outcome belongs to this consent: the guard re-checks, inside the batch, that it was not
+    // withdrawn or replaced since it was read.
+    await batch([
+      guard(
+        `EXISTS (SELECT 1 FROM beta_participants
+                 WHERE user_id = $1 AND consented_at = $2 AND withdrawn_at IS NULL
+                   AND segment IN (SELECT value FROM json_each($3)))`,
+        [auth.user.id, participant.consented_at, BETA_SEGMENTS],
+        "consent_changed",
+      ),
+      {
+        text: `INSERT INTO beta_outcomes
+                 (user_id, consented_at, consent_version, willingness_to_pay, repeat_intent,
+                  self_reported_support_minutes, price_version, updated_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,${SQL_NOW})
+               ON CONFLICT (user_id, consented_at) DO UPDATE SET
+                 willingness_to_pay = excluded.willingness_to_pay,
+                 repeat_intent = excluded.repeat_intent,
+                 self_reported_support_minutes = excluded.self_reported_support_minutes,
+                 price_version = excluded.price_version,
+                 updated_at = ${SQL_NOW}`,
+        params: [auth.user.id, participant.consented_at, participant.consent_version, outcome.willingnessToPay,
+          outcome.repeatIntent, outcome.selfReportedSupportMinutes, outcome.priceVersion],
+      },
+    ]);
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (abortCode(error) === "consent_changed") return noStore({ error: "Active controlled-beta consent is required." }, { status: 403 });
     throw error;
-  } finally {
-    client.release();
   }
   return noStore({ outcome: publicOutcome(await getCurrentOutcome(auth.user.id)) }, { status: 201 });
 }

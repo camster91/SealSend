@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db/client';
+import { batch, query } from '@/lib/db/client';
+import { SQL_NOW, type Statement } from '@/lib/db/sqlite-dialect';
 import { processTwilioOptOutEvent } from '@/lib/twilio-inbound-opt-out';
 
 /**
@@ -54,31 +55,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.OptOutType && data.MessageSid && data.From) {
-      const client = await getDb().connect();
-      try {
-        await client.query('BEGIN');
-        const result = await processTwilioOptOutEvent(client, {
-          messageSid: data.MessageSid,
-          from: data.From,
-          optOutType: data.OptOutType,
-        });
-        await client.query('COMMIT');
+      // The receipt and the suppression changes are written in one batch inside processTwilioOptOutEvent.
+      const result = await processTwilioOptOutEvent({
+        messageSid: data.MessageSid,
+        from: data.From,
+        optOutType: data.OptOutType,
+      });
 
-        if (result.duplicate) {
-          return NextResponse.json({ received: true, duplicate: true });
-        }
-
-        // Advanced Opt-Out has already sent Twilio's configured reply. Return empty TwiML.
-        return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
-          status: 200,
-          headers: { 'Content-Type': 'text/xml; charset=utf-8' },
-        });
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
+      if (result.duplicate) {
+        return NextResponse.json({ received: true, duplicate: true });
       }
+
+      // Advanced Opt-Out has already sent Twilio's configured reply. Return empty TwiML.
+      return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+      });
     }
 
     // Map Twilio status to our status
@@ -172,78 +164,67 @@ async function updateSmsStatus(
     errorMessage?: string;
   }
 ) {
-  const client = await getDb().connect();
+  const receiptId = `${messageSid}:${providerStatus}`;
+  const receipt = await query<{ event_id: string }>(
+    `INSERT INTO webhook_receipts (provider, event_id)
+     VALUES ('twilio', $1)
+     ON CONFLICT DO NOTHING
+     RETURNING event_id`,
+    [receiptId]
+  );
+  if (!receipt[0]) return false;
+
   try {
-    await client.query('BEGIN');
-    const receipt = await client.query(
-      `INSERT INTO webhook_receipts (provider, event_id)
-       VALUES ('twilio', $1)
-       ON CONFLICT DO NOTHING
-       RETURNING event_id`,
-      [`${messageSid}:${providerStatus}`]
-    );
-    if (!receipt.rows[0]) {
-      await client.query('ROLLBACK');
-      return false;
-    }
-
     const deliveryStatus = status === 'sent' ? 'accepted' : status;
-    await client.query(
-      `UPDATE announcement_deliveries SET
-         status = CASE
-           WHEN status IN ('delivered', 'bounced', 'opted_out') THEN status
-           ELSE $1
-         END,
-         error = $2,
-         updated_at = NOW()
-       WHERE provider_message_id = $3`,
-      [deliveryStatus, metadata.errorMessage || null, messageSid]
-    );
-
-    const sendLogResult = await client.query<{ id: string; metadata: Record<string, unknown> | null }>(
-      'SELECT id, metadata FROM send_logs WHERE provider_message_id = $1',
-      [messageSid]
-    );
-    const sendLog = sendLogResult.rows[0];
-
-    if (!sendLog) console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
-
-    if (sendLog) await client.query(
-      `UPDATE send_logs SET
-         status = CASE WHEN status IN ('delivered', 'bounced') THEN status ELSE $1 END,
-         error_message = $2,
-         metadata = $3,
-         updated_at = $4
-       WHERE id = $5`,
-      [
-        status,
-        metadata.errorMessage,
-        JSON.stringify({
-          ...(sendLog.metadata || {}),
-          twilioStatus: status,
-          errorCode: metadata.errorCode,
-          to: metadata.to,
-          from: metadata.from,
-          updatedAt: new Date().toISOString(),
-        }),
-        new Date().toISOString(),
-        sendLog.id,
-      ]
-    );
-
+    const statements: Statement[] = [
+      {
+        text: `UPDATE announcement_deliveries SET
+           status = CASE
+             WHEN status IN ('delivered', 'bounced', 'opted_out') THEN status
+             ELSE $1
+           END,
+           error = $2,
+           updated_at = ${SQL_NOW}
+         WHERE provider_message_id = $3`,
+        params: [deliveryStatus, metadata.errorMessage || null, messageSid],
+      },
+      {
+        // json_patch merges into the stored metadata in the same statement (no read-modify-write race).
+        text: `UPDATE send_logs SET
+           status = CASE WHEN status IN ('delivered', 'bounced') THEN status ELSE $1 END,
+           error_message = $2,
+           metadata = json_patch(COALESCE(metadata, '{}'), $3),
+           updated_at = $4
+         WHERE provider_message_id = $5
+         RETURNING id`,
+        params: [
+          status,
+          metadata.errorMessage ?? null,
+          {
+            twilioStatus: status,
+            errorCode: metadata.errorCode,
+            to: metadata.to,
+            from: metadata.from,
+            updatedAt: new Date().toISOString(),
+          },
+          new Date(),
+          messageSid,
+        ],
+      },
+    ];
     if (status === 'failed' || status === 'bounced') {
-      await client.query(
-        'UPDATE guests SET phone_invalid_at = $1, updated_at = $2 WHERE phone = $3',
-        [new Date().toISOString(), new Date().toISOString(), metadata.to]
-      );
+      statements.push({
+        text: 'UPDATE guests SET phone_invalid_at = $1, updated_at = $2 WHERE phone = $3',
+        params: [new Date(), new Date(), metadata.to],
+      });
     }
-    await client.query('COMMIT');
+    const [, sendLogs] = await batch(statements);
+    if (!sendLogs.length) console.warn(`[Twilio Webhook] No send log found for message: ${messageSid}`);
     return true;
   } catch (error) {
-    await client.query('ROLLBACK');
+    // Release the receipt so Twilio can retry a transient failure.
+    await query("DELETE FROM webhook_receipts WHERE provider = 'twilio' AND event_id = $1", [receiptId]);
     throw error;
-  } finally {
-    client.release();
   }
 }
 

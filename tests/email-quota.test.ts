@@ -44,5 +44,5 @@ test("batched quota is all-or-nothing and single attempts still work", async () 
   const source = await readFile("src/lib/rate-limit.ts", "utf8");
   assert.match(source, /return consumeQuota\(key, 1, options\)/);
   assert.match(source, /currentCount \+ units > options\.max/);
-  assert.match(source, /generate_series\(1, \$2::int\)/);
+  assert.match(source, /WITH RECURSIVE units\(n\)/);
 });

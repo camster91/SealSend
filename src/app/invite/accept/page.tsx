@@ -50,7 +50,7 @@ export default async function AcceptInvitePage({ searchParams }: AcceptInvitePag
   try {
     await query(
       'INSERT INTO user_sessions (user_id, session_token, user_role, expires_at) VALUES ($1, $2, $3, $4)',
-      [guest.id, sessionToken, 'guest', expiresAt.toISOString()]
+      [guest.id, sessionToken, 'guest', expiresAt]
     );
   } catch (sessionError) {
     console.error("Failed to create session:", sessionError);

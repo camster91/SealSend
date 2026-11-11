@@ -1,6 +1,18 @@
 import { query, queryOne } from '@/lib/db/client';
 import type { Event } from '@/types/database';
 
+/**
+ * Timestamps are stored as ISO-8601 UTC text and compared as text, so a timestamp from a request
+ * body is bound as a Date (encoded to that exact format). An unparseable string still fails, as it
+ * did in Postgres.
+ */
+export function toTimestamp(value: string | Date | null | undefined): Date | null {
+  if (value === null || value === undefined) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new RangeError(`Invalid timestamp: ${String(value)}`);
+  return date;
+}
+
 export async function getEvent(eventId: string, options?: { publishedOnly?: boolean }) {
   const data = options?.publishedOnly
     ? await queryOne<Event>(

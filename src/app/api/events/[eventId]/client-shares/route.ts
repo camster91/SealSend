@@ -23,7 +23,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     [eventId, hashMagicToken(token), previewMagicToken(token), auth.user.id, expiresAt.toISOString()],
   );
   await query(
-    `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata) VALUES ($1, $2, 'client_link_created', '{}'::jsonb)`,
+    `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata) VALUES ($1, $2, 'client_link_created', '{}')`,
     [eventId, auth.user.id],
   );
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app").replace(/\/$/, "");

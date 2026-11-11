@@ -40,8 +40,8 @@ export async function logSendAttempt(entry: SendLogEntry): Promise<void> {
         entry.error_message ?? null,
         entry.provider ?? null,
         entry.provider_message_id ?? null,
-        entry.metadata ? JSON.stringify(entry.metadata) : null,
-        new Date().toISOString(),
+        entry.metadata ?? null,
+        new Date(),
       ]
     );
   } catch (error) {
@@ -61,7 +61,7 @@ export async function updateSendStatus(
   try {
     await query(
       'UPDATE send_logs SET status = $1, error_message = $2, updated_at = $3 WHERE id = $4',
-      [status, errorMessage ?? null, new Date().toISOString(), logId]
+      [status, errorMessage ?? null, new Date(), logId]
     );
   } catch (error) {
     console.error('Failed to update send status:', error);
@@ -134,8 +134,8 @@ export async function getEventSendStats(eventId: string): Promise<{
   pending: number;
   byType: Record<SendType, { sent: number; failed: number }>;
 }> {
-  const rows = await query<{ send_type: string; status: string; count: string }>(
-    `SELECT send_type, status, COUNT(*)::text AS count
+  const rows = await query<{ send_type: string; status: string; count: number }>(
+    `SELECT send_type, status, COUNT(*) AS count
      FROM send_logs
      WHERE event_id = $1
      GROUP BY send_type, status`,
@@ -154,7 +154,7 @@ export async function getEventSendStats(eventId: string): Promise<{
   };
 
   for (const row of rows || []) {
-    const count = parseInt(row.count || '0', 10);
+    const count = Number(row.count) || 0;
     stats.total += count;
 
     const type = (row.send_type === 'sms' ? 'sms' : 'email') as SendType;

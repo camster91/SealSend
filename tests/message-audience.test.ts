@@ -18,8 +18,8 @@ test("builds a parameterized event-scoped audience query", () => {
     rsvpStatuses: ["attending"], invitationStatuses: ["sent"], tagIds: [], unansweredOnly: false,
   });
   assert.match(result.sql, /g\.event_id = \$1/);
-  assert.match(result.sql, /g\.rsvp_status = ANY\(\$2::text\[\]\)/);
-  assert.match(result.sql, /g\.invite_status = ANY\(\$3::text\[\]\)/);
+  assert.match(result.sql, /g\.rsvp_status IN \(SELECT value FROM json_each\(\$2\)\)/);
+  assert.match(result.sql, /g\.invite_status IN \(SELECT value FROM json_each\(\$3\)\)/);
   assert.doesNotMatch(result.sql, /attending|sent/);
   assert.deepEqual(result.params, ["event-id", ["attending"], ["sent"]]);
 });

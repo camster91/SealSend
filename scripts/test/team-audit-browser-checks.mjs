@@ -1,5 +1,5 @@
 /**
- * Authenticated workspace/event-team regressions for the native PostgreSQL
+ * Authenticated workspace/event-team regressions for the native SQLite
  * browser harness. The fixture is disposable and uses only .test addresses;
  * Mailgun is deliberately left unconfigured so invitation delivery is tested
  * as a recoverable failure rather than sending a message.
@@ -66,15 +66,15 @@ async function seed(db) {
        (id, user_id, title, slug, status, event_date, event_timezone,
         location_name, host_name, organization_id, client_id, brand_id)
      VALUES ($1, $2, 'Planner Workspace Event', 'team-audit-event', 'published',
-             NOW() + INTERVAL '14 days', 'America/Toronto', 'Team Audit Hall',
+             strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'), 'America/Toronto', 'Team Audit Hall',
              'Team Audit Planner', $3, $4, $5)`,
     [IDS.event, IDS.planner, IDS.organization, IDS.client, IDS.brand],
   );
   await db.query(
     `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-     VALUES ($1, 'admin', $2, NOW() + INTERVAL '1 hour'),
-            ($3, 'admin', $4, NOW() + INTERVAL '1 hour'),
-            ($5, 'admin', $6, NOW() + INTERVAL '1 hour')`,
+     VALUES ($1, 'admin', $2, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour')),
+            ($3, 'admin', $4, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour')),
+            ($5, 'admin', $6, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour'))`,
     [IDS.owner, OWNER_SESSION, IDS.planner, PLANNER_SESSION, IDS.outsider, OUTSIDER_SESSION],
   );
 }
@@ -242,7 +242,7 @@ export async function teamAuditBrowserChecks({ browser, origin, db }) {
     await page.getByRole("button", { name: "Copy invite link", exact: true }).waitFor();
     assert.equal(await page.getByText(/\/team\/workspace\//).count(), 1, "failed delivery must expose the one-time workspace link");
     assert.equal((await db.query(
-      "SELECT COUNT(*)::int AS count FROM organization_invites WHERE organization_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
+      "SELECT COUNT(*) AS count FROM organization_invites WHERE organization_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
       [IDS.organization, "workspace-team-audit@example.test"],
     )).rows[0].count, 1);
     await page.getByRole("button", { name: "Copy invite link", exact: true }).scrollIntoViewIfNeeded();

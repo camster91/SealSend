@@ -26,8 +26,8 @@ export function smsAllowanceMessage(decision: Extract<SmsAllowanceDecision, { al
 }
 
 export async function getSmsBalance(eventId: string): Promise<number> {
-  const row = await queryOne<{ balance: string }>(
-    "SELECT COALESCE(SUM(delta_segments), 0)::text AS balance FROM event_sms_ledger WHERE event_id = $1",
+  const row = await queryOne<{ balance: number }>(
+    "SELECT COALESCE(SUM(delta_segments), 0) AS balance FROM event_sms_ledger WHERE event_id = $1",
     [eventId],
   );
   return Number(row?.balance ?? 0);
