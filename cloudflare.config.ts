@@ -62,8 +62,10 @@ export default defineConfig({
       UPLOADS: bindings.r2({ name: "sealsend-uploads" }),
       // Image resizing (replaces sharp).
       IMAGES: bindings.images(),
-      // The database (replaces PostgreSQL). Create it once and export D1_DATABASE_ID; see docs/d1-port.md.
-      DB: bindings.d1({ name: "sealsend-db", id: process.env.D1_DATABASE_ID }),
+      // The database (replaces PostgreSQL). Override with D1_DATABASE_ID for a different database; see docs/d1-port.md.
+      DB: bindings.d1({ name: "sealsend-db", id: process.env.D1_DATABASE_ID ?? "26ca5b0d-b205-44be-be8e-23e3783ba43a" }),
+      // Cloudflare Email Service. Used when Mailgun isn't configured and FROM_EMAIL is set (src/lib/email.ts).
+      EMAIL: bindings.sendEmail(),
       ...Object.fromEntries(SECRET_NAMES.map((name) => [name, bindings.secret()])),
       ...Object.fromEntries(Object.entries(PLAIN_VALUES).map(([name, value]) => [name, bindings.text(value)])),
     },
