@@ -2,6 +2,7 @@ import { getMobileContext } from './mobile-context';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 
 export interface AuthenticatedUser {
   id: string;
@@ -24,7 +25,7 @@ export async function getApiUser(): Promise<AuthenticatedUser | null> {
       `SELECT s.user_id, s.user_role, a.email
        FROM user_sessions s
        LEFT JOIN admin_users a ON s.user_id = a.id AND s.user_role = 'admin'
-       WHERE s.session_token = $1 AND s.expires_at > NOW()`,
+       WHERE s.session_token = $1 AND s.expires_at > ${SQL_NOW}`,
       [sessionToken]
     );
 

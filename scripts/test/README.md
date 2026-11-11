@@ -7,8 +7,10 @@ This directory contains test scripts for verifying email and SMS functionality.
 All test scripts require your environment variables to be configured. Make sure you have:
 
 ```bash
-# Required for all tests
-DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
+# Database for the tests that use one: a local SQLite file (created from src/lib/db/schema.sql)
+SQLITE_PATH=.data/sealsend.db
+# ...or the production D1 over HTTP (only for the admin CLIs; the QA harnesses refuse it)
+# D1_REMOTE=true CLOUDFLARE_ACCOUNT_ID=... D1_DATABASE_ID=... CLOUDFLARE_API_TOKEN=...
 
 # Required for email tests
 MAILGUN_API_KEY=key-...
@@ -233,13 +235,30 @@ export TWILIO_MESSAGING_SERVICE_SID=MG_...
 - Set correct `NEXT_PUBLIC_SITE_URL`
 - For local testing: `export NEXT_PUBLIC_SITE_URL=http://localhost:3000`
 
+## 🗄️ Throwaway QA databases
+
+The browser and HTTP harnesses (`npm run test:social:browser`, `npm run test:mobile:http`,
+`npm run test:marketing:native`) create a fresh SQLite file in the system temp directory,
+load `src/lib/db/schema.sql` and the synthetic fixtures (`start-social-qa.ts`), and start the
+app with `SQLITE_PATH` pointing at that file. The file is deleted when the run ends. They refuse
+to run with `D1_REMOTE=true`.
+
+`npm run test:social:db` creates the same database and keeps it until Ctrl+C; it prints the
+`SQLITE_PATH` to start the app with.
+
+`npm run test:rate-limit` uses its own throwaway file unless `SQLITE_PATH` is set.
+
+`npm run test:e2e:prepare-authenticated` resets a file that must be named exactly
+`sealsend_e2e.db` (`SQLITE_PATH=.data/sealsend_e2e.db`) and needs
+`SEALSEND_E2E_FIXTURE_CONFIRM=isolated`.
+
 ## 📝 Environment Variables for Testing
 
 Create a `.env.test` file (do not commit to git):
 
 ```env
-# Database
-DATABASE_URL=postgresql://sealsend:PASSWORD@db:5432/sealsend
+# Database (local SQLite file; the app under test must use the same file)
+SQLITE_PATH=.data/sealsend.db
 
 # Email
 MAILGUN_API_KEY=key-...

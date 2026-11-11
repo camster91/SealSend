@@ -1,7 +1,7 @@
 /**
- * Native PostgreSQL checks for anonymous marketing measurement and growth
+ * Native SQLite checks for anonymous marketing measurement and growth
  * reporting. This file is deliberately standalone: it starts the existing
- * loopback-only synthetic QA database and never contacts a provider or a
+ * throwaway synthetic QA database (a temporary SQLite file) and never contacts a provider or a
  * production endpoint.
  */
 import assert from "node:assert/strict";
@@ -9,12 +9,12 @@ import { spawn } from "node:child_process";
 import { request as nodeHttpRequest } from "node:http";
 import { startSocialQa } from "./start-social-qa";
 
-const DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:55432/postgres";
 const OPERATIONS_SECRET = "local-native-growth-secret";
 const SESSION_SECRET = "local-native-session-secret-for-auth-code-qa-only";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type QaDb = {
+  path: string;
   query: <T = Record<string, unknown>>(sql: string, values?: unknown[]) => Promise<{ rows: T[] }>;
 };
 
@@ -87,7 +87,7 @@ async function runHttpProxyCollectionCheck(db: QaDb): Promise<void> {
     stdio: "ignore",
     env: {
       ...process.env,
-      DATABASE_URL,
+      SQLITE_PATH: db.path,
       HOSTNAME: "127.0.0.1",
       PORT: port,
       NEXT_PUBLIC_SITE_URL: origin,
@@ -101,10 +101,10 @@ async function runHttpProxyCollectionCheck(db: QaDb): Promise<void> {
   try {
     await waitForHttp(`${origin}/api/health`);
     const count = async (path: string, channel: string): Promise<number> => {
-      const rows = await queryRows<{ views: string }>(
+      const rows = await queryRows<{ views: number }>(
         db,
-        `SELECT COALESCE(SUM(views), 0)::text AS views
-         FROM marketing_pageviews WHERE day = CURRENT_DATE AND path = $1 AND channel = $2`,
+        `SELECT COALESCE(SUM(views), 0) AS views
+         FROM marketing_pageviews WHERE day = date('now') AND path = $1 AND channel = $2`,
         [path, channel],
       );
       return Number(rows[0]?.views ?? 0);
@@ -185,9 +185,9 @@ async function runHttpProxyCollectionCheck(db: QaDb): Promise<void> {
       headers: documentHeaders(),
     });
     assert.equal(privatePage.status, 307, "private page should retain its auth redirect");
-    const privateRows = await queryRows<{ count: string }>(
+    const privateRows = await queryRows<{ count: number }>(
       db,
-      "SELECT COUNT(*)::text AS count FROM marketing_pageviews WHERE path = '/dashboard'",
+      "SELECT COUNT(*) AS count FROM marketing_pageviews WHERE path = '/dashboard'",
     );
     assert.equal(Number(privateRows[0]?.count), 0, "private paths must not create marketing rows");
 
@@ -195,7 +195,7 @@ async function runHttpProxyCollectionCheck(db: QaDb): Promise<void> {
     const verifySignup = async (email: string, code: string, dnt: boolean) => {
       await db.query(
         `INSERT INTO auth_codes (email, code_hash, role, event_id, expires_at)
-         VALUES ($1, $2, 'admin', NULL, NOW() + INTERVAL '10 minutes')`,
+         VALUES ($1, $2, 'admin', NULL, strftime('%Y-%m-%dT%H:%M:%fZ','now','+10 minutes'))`,
         [email, hashAuthCode({ code, recipient: email, role: "admin" })],
       );
       const response = await fetch(`${origin}/api/auth/verify-code`, {
@@ -214,15 +214,17 @@ async function runHttpProxyCollectionCheck(db: QaDb): Promise<void> {
     };
     await verifySignup("native-attributed@example.test", "482913", false);
     await verifySignup("native-dnt@example.test", "593824", true);
-    const signupChannels = await queryRows<{ email: string; channel: string | null; has_channel: boolean }>(
+    // Computed columns are not decoded: has_channel comes back as 0/1.
+    const signupChannels = (await queryRows<{ email: string; channel: string | null; has_channel: number }>(
       db,
-      `SELECT owner.email, ae.metadata->>'channel' AS channel, ae.metadata ? 'channel' AS has_channel
+      `SELECT owner.email, json_extract(ae.metadata, '$.channel') AS channel,
+              json_type(ae.metadata, '$.channel') IS NOT NULL AS has_channel
        FROM activation_events ae
        JOIN admin_users owner ON owner.id = ae.user_id
        WHERE ae.event_name = 'account_created'
          AND owner.email IN ('native-attributed@example.test', 'native-dnt@example.test')
        ORDER BY owner.email`,
-    );
+    )).map((row) => ({ ...row, has_channel: row.has_channel === 1 }));
     assert.deepEqual(signupChannels, [
       { email: "native-attributed@example.test", channel: "email", has_channel: true },
       { email: "native-dnt@example.test", channel: null, has_channel: false },
@@ -275,7 +277,7 @@ async function seedGrowthFixtures(db: QaDb): Promise<void> {
     channel?: string,
   ) => db.query(
     `INSERT INTO activation_events (event_name, user_id, metadata, created_at)
-     VALUES ($1, $2, $3::jsonb, $4)`,
+     VALUES ($1, $2, $3, $4)`,
     [eventName, userId, JSON.stringify(channel === undefined ? {} : { channel }), createdAt],
   );
 
@@ -296,7 +298,7 @@ async function seedGrowthFixtures(db: QaDb): Promise<void> {
 }
 
 export async function runMarketingMeasurementNativeQa({ db }: { db: QaDb }): Promise<void> {
-  process.env.DATABASE_URL = DATABASE_URL;
+  process.env.SQLITE_PATH = db.path;
   process.env.OPERATIONS_SECRET = OPERATIONS_SECRET;
 
   const { recordMarketingViewSafely } = await import("../../src/lib/analytics/marketing-views");
@@ -307,30 +309,30 @@ export async function runMarketingMeasurementNativeQa({ db }: { db: QaDb }): Pro
   // An expired row is removed on the same write that increments today's row.
   await db.query(
     `INSERT INTO marketing_pageviews (day, path, channel, views)
-     VALUES (CURRENT_DATE - 181, '/', 'direct', 4)`,
+     VALUES (date('now', '-181 days'), '/', 'direct', 4)`,
   );
   const concurrentWrites = await Promise.all(
     Array.from({ length: 16 }, () => recordMarketingViewSafely("/", "social", execute)),
   );
   assert.deepEqual(concurrentWrites, Array(16).fill(true), "all native counter writes should succeed");
 
-  const todaySocial = await queryRows<{ views: string }>(
+  const todaySocial = await queryRows<{ views: number }>(
     db,
-    `SELECT views::text FROM marketing_pageviews
-     WHERE day = CURRENT_DATE AND path = '/' AND channel = 'social'`,
+    `SELECT views FROM marketing_pageviews
+     WHERE day = date('now') AND path = '/' AND channel = 'social'`,
   );
   assert.equal(Number(todaySocial[0]?.views), 16, "concurrent upserts must not lose increments");
-  const expiredRows = await queryRows<{ count: string }>(
+  const expiredRows = await queryRows<{ count: number }>(
     db,
-    `SELECT COUNT(*)::text AS count FROM marketing_pageviews WHERE day < CURRENT_DATE - 180`,
+    `SELECT COUNT(*) AS count FROM marketing_pageviews WHERE day < date('now', '-180 days')`,
   );
   assert.equal(Number(expiredRows[0]?.count), 0, "retention should remove rows older than 180 days");
   assert.equal(await recordMarketingViewSafely("/private", "social", execute), false);
   assert.equal(await recordMarketingViewSafely("/pricing", "legacy_campaign", execute), true);
-  const unknownChannel = await queryRows<{ views: string }>(
+  const unknownChannel = await queryRows<{ views: number }>(
     db,
-    `SELECT views::text FROM marketing_pageviews
-     WHERE day = CURRENT_DATE AND path = '/pricing' AND channel = 'unknown'`,
+    `SELECT views FROM marketing_pageviews
+     WHERE day = date('now') AND path = '/pricing' AND channel = 'unknown'`,
   );
   assert.equal(Number(unknownChannel[0]?.views), 1, "legacy channels should bucket into unknown");
 
@@ -387,13 +389,12 @@ export async function runMarketingMeasurementNativeQa({ db }: { db: QaDb }): Pro
 }
 
 async function main(): Promise<void> {
-  process.env.SEALSEND_QA_USE_POSTGRES = "true";
   process.env.SESSION_SECRET = SESSION_SECRET;
   let harness: NativeHarness | undefined;
   try {
     harness = await startSocialQa();
     await runMarketingMeasurementNativeQa({ db: harness.db });
-    console.log("PASS native PostgreSQL marketing counters, retention, protected growth report, and signup milestones");
+    console.log("PASS native SQLite marketing counters, retention, protected growth report, and signup milestones");
   } finally {
     if (harness) {
       await harness.server.stop();

@@ -33,85 +33,82 @@ const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 async function assertFixtureIdsAvailable(db) {
   const ids = Object.values(IDS);
   for (const table of ["admin_users", "organizations", "events"]) {
-    const result = await db.query(`SELECT id FROM ${table} WHERE id = ANY($1::uuid[])`, [ids]);
+    const result = await db.query(`SELECT id FROM ${table} WHERE id IN (SELECT value FROM json_each($1))`, [ids]);
     assert.equal(result.rows.length, 0, `invite journey fixture collides with an existing ${table} row`);
   }
 }
 
 async function seed(db) {
   await assertFixtureIdsAvailable(db);
-  await db.query("BEGIN");
-  try {
-    await db.query(
-      `INSERT INTO admin_users (id, email, name, password)
-       VALUES
-         ($1, 'invite-journey-owner@example.test', 'Invite Journey Owner', 'disabled-local-qa'),
-         ($2, 'workspace-invitee@example.test', 'Workspace Invitee', 'disabled-local-qa'),
-         ($3, 'event-invitee@example.test', 'Event Invitee', 'disabled-local-qa'),
-         ($4, 'wrong-invite-account@example.test', 'Wrong Invite Account', 'disabled-local-qa')`,
-      [IDS.owner, IDS.workspaceMember, IDS.eventMember, IDS.wrongAccount],
-    );
-    await db.query(
-      `INSERT INTO organizations (id, name, slug, plan, is_personal, created_by)
-       VALUES ($1, 'Invite Journey Workspace', 'invite-journey-workspace', 'studio', FALSE, $2)`,
-      [IDS.organization, IDS.owner],
-    );
-    await db.query(
-      `INSERT INTO organization_members (organization_id, user_id, role)
-       VALUES ($1, $2, 'owner')`,
-      [IDS.organization, IDS.owner],
-    );
-    await db.query(
-      `INSERT INTO events
-        (id, user_id, organization_id, title, slug, status, event_date, event_timezone, host_name)
-       VALUES ($1, $2, $3, 'Invite Journey Event', 'invite-journey-event', 'published',
-               NOW() + INTERVAL '14 days', 'America/Toronto', 'Invite Journey Owner')`,
-      [IDS.event, IDS.owner, IDS.organization],
-    );
-    await db.query(
-      `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-       VALUES
-         ($1, 'admin', $2, NOW() + INTERVAL '1 day'),
-         ($3, 'admin', $4, NOW() + INTERVAL '1 day'),
-         ($5, 'admin', $6, NOW() + INTERVAL '1 day')`,
-      [
-        IDS.workspaceMember,
-        SESSIONS.workspaceMember,
-        IDS.eventMember,
-        SESSIONS.eventMember,
-        IDS.wrongAccount,
-        SESSIONS.wrongAccount,
-      ],
-    );
-    await db.query(
-      `INSERT INTO organization_invites
-        (organization_id, email, role, token_hash, token_preview, invited_by, expires_at)
-       VALUES ($1, 'workspace-invitee@example.test', 'planner', $2, $3, $4, NOW() + INTERVAL '7 days')`,
-      [IDS.organization, hashToken(TOKENS.workspace), TOKENS.workspace.slice(-4), IDS.owner],
-    );
-    await db.query(
-      `INSERT INTO event_member_invites
-        (event_id, email, role, token_hash, token_preview, invited_by, expires_at)
-       VALUES ($1, 'event-invitee@example.test', 'manager', $2, $3, $4, NOW() + INTERVAL '7 days')`,
-      [IDS.event, hashToken(TOKENS.event), TOKENS.event.slice(-4), IDS.owner],
-    );
-    await db.query("COMMIT");
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+  // One batch: all fixtures or none, like the old transaction.
+  const statements = [];
+  const add = (text, params) => statements.push({ text, params });
+  add(
+    `INSERT INTO admin_users (id, email, name, password)
+     VALUES
+       ($1, 'invite-journey-owner@example.test', 'Invite Journey Owner', 'disabled-local-qa'),
+       ($2, 'workspace-invitee@example.test', 'Workspace Invitee', 'disabled-local-qa'),
+       ($3, 'event-invitee@example.test', 'Event Invitee', 'disabled-local-qa'),
+       ($4, 'wrong-invite-account@example.test', 'Wrong Invite Account', 'disabled-local-qa')`,
+    [IDS.owner, IDS.workspaceMember, IDS.eventMember, IDS.wrongAccount],
+  );
+  add(
+    `INSERT INTO organizations (id, name, slug, plan, is_personal, created_by)
+     VALUES ($1, 'Invite Journey Workspace', 'invite-journey-workspace', 'studio', FALSE, $2)`,
+    [IDS.organization, IDS.owner],
+  );
+  add(
+    `INSERT INTO organization_members (organization_id, user_id, role)
+     VALUES ($1, $2, 'owner')`,
+    [IDS.organization, IDS.owner],
+  );
+  add(
+    `INSERT INTO events
+      (id, user_id, organization_id, title, slug, status, event_date, event_timezone, host_name)
+     VALUES ($1, $2, $3, 'Invite Journey Event', 'invite-journey-event', 'published',
+             strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'), 'America/Toronto', 'Invite Journey Owner')`,
+    [IDS.event, IDS.owner, IDS.organization],
+  );
+  add(
+    `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
+     VALUES
+       ($1, 'admin', $2, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day')),
+       ($3, 'admin', $4, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day')),
+       ($5, 'admin', $6, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))`,
+    [
+      IDS.workspaceMember,
+      SESSIONS.workspaceMember,
+      IDS.eventMember,
+      SESSIONS.eventMember,
+      IDS.wrongAccount,
+      SESSIONS.wrongAccount,
+    ],
+  );
+  add(
+    `INSERT INTO organization_invites
+      (organization_id, email, role, token_hash, token_preview, invited_by, expires_at)
+     VALUES ($1, 'workspace-invitee@example.test', 'planner', $2, $3, $4, strftime('%Y-%m-%dT%H:%M:%fZ','now','+7 days'))`,
+    [IDS.organization, hashToken(TOKENS.workspace), TOKENS.workspace.slice(-4), IDS.owner],
+  );
+  add(
+    `INSERT INTO event_member_invites
+      (event_id, email, role, token_hash, token_preview, invited_by, expires_at)
+     VALUES ($1, 'event-invitee@example.test', 'manager', $2, $3, $4, strftime('%Y-%m-%dT%H:%M:%fZ','now','+7 days'))`,
+    [IDS.event, hashToken(TOKENS.event), TOKENS.event.slice(-4), IDS.owner],
+  );
+  await db.batch(statements);
 }
 
 async function cleanup(db) {
   await db.query("DELETE FROM event_member_invites WHERE event_id = $1", [IDS.event]);
   await db.query("DELETE FROM event_audit_log WHERE event_id = $1", [IDS.event]);
   await db.query("DELETE FROM event_members WHERE event_id = $1", [IDS.event]);
-  await db.query("DELETE FROM user_sessions WHERE session_token = ANY($1::text[])", [Object.values(SESSIONS)]);
+  await db.query("DELETE FROM user_sessions WHERE session_token IN (SELECT value FROM json_each($1))", [Object.values(SESSIONS)]);
   await db.query("DELETE FROM events WHERE id = $1", [IDS.event]);
   await db.query("DELETE FROM organization_invites WHERE organization_id = $1", [IDS.organization]);
   await db.query("DELETE FROM organization_members WHERE organization_id = $1", [IDS.organization]);
   await db.query("DELETE FROM organizations WHERE id = $1", [IDS.organization]);
-  await db.query("DELETE FROM admin_users WHERE id = ANY($1::uuid[])", [Object.values(IDS).filter((id) => id !== IDS.organization && id !== IDS.event)]);
+  await db.query("DELETE FROM admin_users WHERE id IN (SELECT value FROM json_each($1))", [Object.values(IDS).filter((id) => id !== IDS.organization && id !== IDS.event)]);
 }
 
 async function sessionContext(browser, origin, sessionToken) {

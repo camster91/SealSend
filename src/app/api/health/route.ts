@@ -5,15 +5,13 @@ const headers = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
   try {
-    const result = await queryOne<{ ready: number; social_ready: boolean }>(`SELECT 1 AS ready,
-      to_regclass('event_social_settings') IS NOT NULL
-      AND to_regclass('event_social_guests') IS NOT NULL
-      AND to_regclass('event_social_polls') IS NOT NULL
-      AND to_regclass('event_social_votes') IS NOT NULL
-      AND to_regclass('event_social_photos') IS NOT NULL
-      AND to_regclass('event_social_file_cleanup') IS NOT NULL
-      AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='queue_deleted_social_photo'
-        AND tgrelid=to_regclass('event_social_photos') AND NOT tgisinternal) AS social_ready`);
+    // social_ready is computed, so it comes back as 0/1 rather than a boolean.
+    const result = await queryOne<{ ready: number; social_ready: number }>(`SELECT 1 AS ready,
+      (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (
+        'event_social_settings', 'event_social_guests', 'event_social_polls',
+        'event_social_votes', 'event_social_photos', 'event_social_file_cleanup')) = 6
+      AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = 'queue_deleted_social_photo'
+        AND tbl_name = 'event_social_photos') AS social_ready`);
     if (result?.ready !== 1 || !result.social_ready) {
       return NextResponse.json({ status: 'unavailable' }, { status: 503, headers });
     }

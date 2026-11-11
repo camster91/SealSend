@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { queryOne } from "@/lib/db/client";
+import { sqlNowPlus } from "@/lib/db/sqlite-dialect";
 import { rateLimit } from "@/lib/rate-limit";
 import { getUserTier } from "@/lib/subscription";
 import { getEventDraftProvider } from "@/lib/ai/provider";
@@ -25,8 +26,8 @@ export async function POST(request: Request) {
   if (!success) return NextResponse.json({ error: "AI generation limit reached. Try again later." }, { status: 429 });
   const plan = await getUserTier(auth.user.id);
   const dailyLimit = plan === "pro_annual" ? 50 : 5;
-  const usage = await queryOne<{ count: string }>(
-    "SELECT COUNT(*)::text AS count FROM ai_generations WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'", [auth.user.id],
+  const usage = await queryOne<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM ai_generations WHERE user_id = $1 AND created_at >= ${sqlNowPlus("-24 hours")}`, [auth.user.id],
   );
   if (Number(usage?.count ?? 0) >= dailyLimit) return NextResponse.json({ error: `Daily AI draft limit reached (${dailyLimit}).` }, { status: 429 });
   await recordActivationEventSafely({ name: "ai_generation_started", userId: auth.user.id, metadata: { aiSchemaVersion: AI_EVENT_DRAFT_SCHEMA_VERSION } });

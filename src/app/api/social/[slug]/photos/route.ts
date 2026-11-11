@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resolveSocialAccess, ensureSocialSchema } from '@/lib/social/access';
+import { resolveSocialAccess } from '@/lib/social/access';
 import { normalizePhoto, readBoundedBody, saveSocialPhoto, MAX_PHOTO_BYTES } from '@/lib/social/photos';
 import { rateLimit } from '@/lib/rate-limit';
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -18,7 +18,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     }
     const normalized = await normalizePhoto(Buffer.from(await file.arrayBuffer()),file.type);
     if (!normalized) return NextResponse.json({ error:'Choose a valid JPEG, PNG or WebP photo.' },{ status:400 });
-    await ensureSocialSchema();
     const result = await saveSocialPhoto(access,normalized,caption.trim());
     return NextResponse.json(result,{ status:result.status,headers:{ 'Cache-Control':'private, no-store' } });
   } catch { return NextResponse.json({ error:'Unable to upload this photo.' },{ status:503 }); }

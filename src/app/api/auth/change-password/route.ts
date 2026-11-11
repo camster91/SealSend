@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { verifyPassword, hashPassword, checkPasswordStrength } from '@/lib/password';
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Hash and save new password
     const hashedPassword = await hashPassword(newPassword);
     await query(
-      'UPDATE admin_users SET password = $1, updated_at = NOW() WHERE id = $2',
+      `UPDATE admin_users SET password = $1, updated_at = ${SQL_NOW} WHERE id = $2`,
       [hashedPassword, user.id]
     );
 

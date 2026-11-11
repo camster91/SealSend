@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { requireOrganizationPermission } from "@/lib/auth/organization-access";
 import { brandInputSchema, canWhiteLabel, toBrandColumns, type Brand } from "@/lib/brands";
 
 type RouteParams = { params: Promise<{ organizationId: string }> };
 
 async function loadBrand(organizationId: string) {
-  return queryOne<Brand>("SELECT * FROM brands WHERE organization_id = $1 AND is_default", [organizationId]);
+  return queryOne<Brand>("SELECT * FROM brands WHERE organization_id = $1 AND is_default = 1", [organizationId]);
 }
 
 async function loadPlan(organizationId: string) {
@@ -44,14 +45,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
   const [brand] = existing
     ? await query<Brand>(
         `UPDATE brands SET name = $2, logo_url = $3, primary_color = $4, background_color = $5, font_family = $6,
-           sender_name = $7, reply_to_email = $8, sms_signature = $9, white_label = $10, updated_at = NOW()
+           sender_name = $7, reply_to_email = $8, sms_signature = $9, white_label = $10, updated_at = ${SQL_NOW}
          WHERE id = $1 RETURNING *`,
         [existing.id, ...values],
       )
     : await query<Brand>(
         `INSERT INTO brands (organization_id, name, logo_url, primary_color, background_color, font_family,
            sender_name, reply_to_email, sms_signature, white_label, is_default)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE) RETURNING *`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1) RETURNING *`,
         [organizationId, ...values],
       );
   return NextResponse.json({ brand });
@@ -61,6 +62,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   const { organizationId } = await params;
   const auth = await requireOrganizationPermission(organizationId, "manage_brand");
   if (auth.error) return auth.error;
-  await query("DELETE FROM brands WHERE organization_id = $1 AND is_default", [organizationId]);
+  await query("DELETE FROM brands WHERE organization_id = $1 AND is_default = 1", [organizationId]);
   return NextResponse.json({ brand: null });
 }

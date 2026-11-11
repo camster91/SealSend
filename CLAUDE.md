@@ -21,7 +21,7 @@ SealSend is a digital invitation and RSVP platform. Hosts create event invitatio
 
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript 5 (strict)
 - **Styling**: Tailwind CSS 4, design tokens in `src/app/globals.css`
-- **Database**: PostgreSQL 16 via `pg` (raw SQL, no ORM)
+- **Database**: SQLite: Cloudflare D1 in production, `node:sqlite` locally (raw SQL, no ORM). See `docs/d1-port.md`
 - **Auth**: Custom database-backed sessions; email/SMS OTP for hosts, password login for admins
 - **Email / SMS**: Mailgun / Twilio (`libphonenumber-js` for phone validation)
 - **Payments**: Stripe
@@ -64,7 +64,7 @@ src/
                   pricing/ marketing/ features/ team/ layout/
   lib/
     auth/         session, api-auth, event-api-access, event-access, auth-service
-    db/           client.ts, schema.sql (fresh schema)
+    db/           client.ts (+ .cloudflare.ts), schema.sql, sqlite-dialect.ts
     ai/ messages/ monitoring/ analytics/
     constants.ts  BETA_MODE, FEATURE_FLAGS, tiers and pricing plans
     entitlements.ts, billing.ts, subscription.ts
@@ -91,13 +91,16 @@ docs/             Launch operations, evidence register, policy decisions
 - Cron routes require `Authorization: Bearer $CRON_SECRET`; operations routes use `OPERATIONS_SECRET`.
 
 ### Database
-- Use `query()` / `queryOne()` from `@/lib/db/client` with parameterized SQL only.
-- `src/lib/db/schema.sql` is the schema for a fresh database (also used by e2e setup and `ops/rehearse-retention.sh`).
-- `apply-security-indexes.sql` (repo root) is the idempotent upgrade migration applied to production with `psql -v ON_ERROR_STOP=1`. `tests/readiness.test.mjs` asserts on its contents, so schema changes usually touch both files plus that test.
-- Write migrations with `IF NOT EXISTS` / `IF EXISTS` so they can run twice.
+- Use `query()` / `queryOne()` / `batch()` from `@/lib/db/client` with parameterized SQL only (`$1` placeholders, SQLite syntax).
+- `src/lib/db/schema.sql` is the SQLite schema (idempotent; `tests/readiness.test.mjs` and `tests/sqlite-dialect.test.ts` check it). Ids are TEXT UUIDs, timestamps ISO-8601 UTC text, booleans 0/1, JSON as text. Rows are decoded back to JS types by column name (`src/lib/db/sqlite-dialect.ts`), so don't reuse a decoded column name as an alias for something else.
+- There are no interactive transactions or row locks. Put writes that must succeed together in one `batch([...])` and race-sensitive checks inside it with `guard(condition, params, code)`; catch with `abortCode()`. See "Transactions without locks" in `docs/d1-port.md`.
+- Bind timestamps as `Date`s (or use `SQL_NOW` / `sqlNowPlus()`), never raw strings.
+- `node scripts/db/check-sql.mjs` prepares every literal query against the schema and flags Postgres-only syntax.
+- Local database: `SQLITE_PATH` (default `.data/sealsend.db`). CLIs reach the real D1 with `D1_REMOTE=true` plus `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID` and `CLOUDFLARE_API_TOKEN`.
+- The old Postgres schema and upgrade migration live in `src/lib/db/legacy-postgres/` only for the production data copy.
 
 ### Workspaces (organizations)
-- Every event belongs to a workspace (`events.organization_id`). Each host has a personal workspace (`organizations.is_personal`), created on first use by the SQL function `sealsend_personal_organization()`; a `BEFORE INSERT` trigger on `events` fills `organization_id` with it when none is given.
+- Every event belongs to a workspace (`events.organization_id`). Each host has a personal workspace (`organizations.is_personal`), created on first use by `ensurePersonalOrganization()` / `personalOrganizationStatements()` in `src/lib/auth/organization-access.ts`; an `AFTER INSERT` trigger on `events` fills `organization_id` with it when none is given (so `INSERT ... RETURNING organization_id` returns NULL; read the row again).
 - Workspace roles (`organization_members.role`): `owner` and `admin` get owner access to every workspace event, `planner` gets manager access, `check_in` gets check-in access. The mapping lives in `src/lib/auth/event-access.ts`.
 - Workspace permissions (`src/lib/auth/organization-access.ts`): use `requireOrganizationPermission(organizationId, permission)` in workspace routes. Owners and admins manage members and the brand; planners manage clients; admins can't change owners or admins; a workspace always keeps at least one owner.
 - Team workspaces (`/settings/team`): invites are hashed one-time tokens in `organization_invites` accepted at `/team/workspace/[token]`. Seat limits per plan are in `ORGANIZATION_SEAT_LIMITS`, with organizer plan prices and seats in `ORGANIZER_PLANS` (`constants.ts`). Organizer plans are not sold yet: owner-only checkout (`POST /api/organizations/[id]/billing/checkout`) returns 503 while `BETA_MODE` is on, and the Stripe webhook keeps `organization_subscriptions` and `organizations.plan` in sync (only active/trialing unlock a paid plan; the billed price, not metadata, decides the plan). Owners change plan, cancel at period end or resume through `POST /api/organizations/[id]/billing/subscription`, which only asks Stripe; the webhook applies the result. Read Stripe period ends and invoice subscriptions through `subscriptionPeriodEnd()` / `invoiceSubscriptionId()` in `src/lib/billing.ts` (the pinned API version moved both fields). `npm run stripe:test-e2e` runs the whole lifecycle against a Stripe test account and a local database; it refuses keys that don't start with `sk_test_`. Account deletion hands team workspaces and their events to remaining members (`src/app/api/cron/delete-accounts/route.ts`).
@@ -127,15 +130,15 @@ docs/             Launch operations, evidence register, policy decisions
 
 ## Environment
 
-See `.env.example` for the full list. Core: `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `SESSION_SECRET`, Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL`, `MAILGUN_WEBHOOK_SIGNING_KEY`), Twilio (`TWILIO_*`), Stripe (`STRIPE_*`), `CRON_SECRET`, `OPERATIONS_SECRET`, and the safety switches `PAYMENTS_TEST_ONLY` / `COMMUNICATIONS_TEST_ONLY`.
+See `.env.example` for the full list. Core: `SQLITE_PATH` (local only), `NEXT_PUBLIC_SITE_URL`, `SESSION_SECRET`, Mailgun (`MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `FROM_EMAIL`, `MAILGUN_WEBHOOK_SIGNING_KEY`), Twilio (`TWILIO_*`), Stripe (`STRIPE_*`), `CRON_SECRET`, `OPERATIONS_SECRET`, and the safety switches `PAYMENTS_TEST_ONLY` / `COMMUNICATIONS_TEST_ONLY`.
 
 ## Cloudflare Workers build
 
-The same code also builds as a Cloudflare Worker (vinext): `npm run build:vinext`. Platform-specific modules come in pairs, `name.ts` (Node) and `name.cloudflare.ts` (Worker); `vite.config.ts` swaps them for the Worker build only, and `tests/readiness.test.mjs` checks the pairs export the same names. The pairs are `blob-store` (files: disk vs R2), `db/client`, `image-processor` (sharp vs Cloudflare Images), `runtime-bindings` and `webhook-transport`. Use them (never import `sharp`, `node:fs` for uploads, or `node:dns` directly in app code). Mailgun and Twilio use `fetch`, not their SDKs. Verify Stripe webhooks with `constructEventAsync`. Env vars only reach the Worker if they are declared in `cloudflare.config.ts`. Runbook: `docs/cloudflare-migration.md`.
+The same code also builds as a Cloudflare Worker (vinext): `npm run build:vinext`. Platform-specific modules come in pairs, `name.ts` (Node) and `name.cloudflare.ts` (Worker); `vite.config.ts` swaps them for the Worker build only, and `tests/readiness.test.mjs` checks the pairs export the same names. The pairs are `blob-store` (files: disk vs R2), `db/client` (node:sqlite vs D1 binding `DB`), `image-processor` (sharp vs Cloudflare Images), `runtime-bindings` and `webhook-transport`. Use them (never import `sharp`, `node:fs` for uploads, or `node:dns` directly in app code). Mailgun and Twilio use `fetch`, not their SDKs. Verify Stripe webhooks with `constructEventAsync`. Env vars only reach the Worker if they are declared in `cloudflare.config.ts`. Runbook: `docs/cloudflare-migration.md`.
 
 ## Deployment
 
-Docker image (`Dockerfile`, Next standalone output) on a Hostinger VPS behind Coolify, with PostgreSQL 16 in its own container. Current production details, release steps and rollback targets are in `DEPLOYMENT_READINESS.md`; operational scripts are in `ops/`. An external scheduler calls the `/api/cron/*` endpoints.
+Production today: Docker image (`Dockerfile`, Next standalone output) on a Hostinger VPS behind Coolify, with PostgreSQL 16 in its own container, built from `main`. The D1 port (`docs/d1-port.md`) moves it to Cloudflare Workers + D1; the Docker build can't reach D1 and is retired at cutover. Current production details, release steps and rollback targets are in `DEPLOYMENT_READINESS.md`; operational scripts are in `ops/`. An external scheduler calls the `/api/cron/*` endpoints.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

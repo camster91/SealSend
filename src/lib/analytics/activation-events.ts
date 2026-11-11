@@ -86,7 +86,7 @@ export async function recordActivationEvent(
   const event = buildActivationEvent(input);
   await execute(
     `INSERT INTO activation_events (event_name, user_id, event_id, metadata)
-     VALUES ($1, $2, $3, $4::jsonb)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT DO NOTHING`,
     [event.name, event.userId, event.eventId, JSON.stringify(event.metadata)],
   );

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
 import { isTwilioConfigured } from "@/lib/twilio";
+import { isEmailConfigured } from "@/lib/email";
 
 export const metadata: Metadata = {
   title: "Host Sign In - SealSend",
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   const smsEnabled = isTwilioConfigured();
+  // Without an email provider no code can arrive, so start on the password form.
+  const defaultMethod = isEmailConfigured() ? "email" : "password";
   return (
     <>
       <div className="mb-8 text-center">
@@ -24,7 +27,7 @@ export default function LoginPage() {
       </div>
 
       <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-neutral-100" />}>
-        <EnhancedLoginForm defaultMethod="email" smsEnabled={smsEnabled} />
+        <EnhancedLoginForm defaultMethod={defaultMethod} smsEnabled={smsEnabled} />
       </Suspense>
 
       <div className="mt-8 border-t border-border pt-6">

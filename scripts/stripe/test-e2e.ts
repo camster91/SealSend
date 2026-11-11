@@ -14,9 +14,13 @@
  *   5. Deletes the test clock (and with it the Stripe customer and subscriptions) and
  *      the database fixtures. Test products and prices are kept for the next run.
  *
+ * Database: the local SQLite file at SQLITE_PATH (default .data/sealsend.db); the schema is
+ * applied if the file is new.
+ *
  * Safety: refuses to start unless STRIPE_SECRET_KEY starts with sk_test_, forces
- * PAYMENTS_TEST_ONLY=true, aborts on any livemode object, and refuses a non-local
- * DATABASE_URL unless STRIPE_E2E_ALLOW_REMOTE_DB=true.
+ * PAYMENTS_TEST_ONLY=true, aborts on any livemode object, and refuses D1_REMOTE=true (the
+ * real D1 over HTTP) unless STRIPE_E2E_ALLOW_REMOTE_DB=true, which is only for a disposable
+ * D1 database such as a staging copy.
  *
  * Options:
  *   --checkout=api       (default) Pays with the 4242 test card through the API and builds a
@@ -24,7 +28,7 @@
  *   --checkout=browser   Pays on the hosted Checkout page with Playwright (Chromium).
  *   --checkout=manual    Prints the hosted Checkout URL and waits for you to pay with 4242.
  *   --app-url=<url>      POST the signed events to a running app (it must use the same
- *                        DATABASE_URL and STRIPE_WEBHOOK_SECRET) instead of calling the
+ *                        SQLITE_PATH and STRIPE_WEBHOOK_SECRET) instead of calling the
  *                        webhook handler in-process.
  *   --skip-pro           Skip the Pro annual part.
  *   --keep               Keep the Stripe test clock and database fixtures for inspection.
@@ -52,7 +56,7 @@ import {
 } from "../../src/lib/billing";
 import { canWhiteLabel } from "../../src/lib/brands";
 import { ORGANIZER_PLANS, PRO_ANNUAL, type OrganizerPlan } from "../../src/lib/constants";
-import { getDb, query, queryOne } from "../../src/lib/db/client";
+import { exec, query, queryOne } from "../../src/lib/db/client";
 import { hashPassword } from "../../src/lib/password";
 
 dotenv.config({ path: [path.resolve(process.cwd(), ".env.local"), path.resolve(process.cwd(), ".env")], quiet: true });
@@ -65,11 +69,8 @@ const secretKey = assertStripeTestKey(process.env.STRIPE_SECRET_KEY);
 process.env.STRIPE_SECRET_KEY = secretKey;
 process.env.PAYMENTS_TEST_ONLY = "true";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is not set. Point it at a local, disposable SealSend database.");
-const databaseHost = new URL(databaseUrl).hostname.replace(/^\[|\]$/g, "");
-if (!["localhost", "127.0.0.1", "::1", ""].includes(databaseHost) && process.env.STRIPE_E2E_ALLOW_REMOTE_DB !== "true") {
-  throw new Error(`Refusing to write test fixtures to non-local database host "${databaseHost}". Set STRIPE_E2E_ALLOW_REMOTE_DB=true only for a disposable database.`);
+if (process.env.D1_REMOTE === "true" && process.env.STRIPE_E2E_ALLOW_REMOTE_DB !== "true") {
+  throw new Error("Refusing to write test fixtures to the remote D1 database (D1_REMOTE=true). Use a local SQLITE_PATH, or set STRIPE_E2E_ALLOW_REMOTE_DB=true only for a disposable D1 database.");
 }
 
 const args = new Map(process.argv.slice(2).map((arg) => {
@@ -281,19 +282,19 @@ async function periodEnd(subscriptionId: string): Promise<number> {
 // ---------------------------------------------------------------------------
 
 async function ensureSchema() {
-  const hasUsers = await queryOne<{ ok: boolean }>("SELECT to_regclass('public.admin_users') IS NOT NULL AS ok");
+  // Computed columns are not decoded, so these come back as 0/1.
+  const hasUsers = await queryOne<{ ok: number }>(
+    "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'admin_users') AS ok",
+  );
   if (!hasUsers?.ok) {
-    await query(await readFile(path.resolve("src/lib/db/schema.sql"), "utf8"));
+    await exec(await readFile(path.resolve("src/lib/db/schema.sql"), "utf8"));
     return "fresh schema applied";
   }
-  const hasColumn = await queryOne<{ ok: boolean }>(
-    `SELECT EXISTS (SELECT 1 FROM information_schema.columns
-       WHERE table_name = 'organization_subscriptions' AND column_name = 'cancel_at_period_end') AS ok`,
+  const hasColumn = await queryOne<{ ok: number }>(
+    "SELECT EXISTS (SELECT 1 FROM pragma_table_info('organization_subscriptions') WHERE name = 'cancel_at_period_end') AS ok",
   );
-  if (!hasColumn?.ok) {
-    await query(await readFile(path.resolve("apply-security-indexes.sql"), "utf8"));
-    return "idempotent migration applied";
-  }
+  // schema.sql is the only schema now; an older local file is recreated rather than migrated.
+  if (!hasColumn?.ok) throw new Error("The local database predates src/lib/db/schema.sql. Delete it (or point SQLITE_PATH at a new file) and rerun.");
   return "schema current";
 }
 
@@ -624,9 +625,8 @@ async function main() {
         await query("DELETE FROM activation_events WHERE user_id = $1", [userId]).catch(() => undefined);
         await query("DELETE FROM admin_users WHERE id = $1", [userId]).catch(() => undefined);
       }
-      if (delivered.size > 0) await query("DELETE FROM webhook_receipts WHERE provider = 'stripe' AND event_id = ANY($1)", [[...delivered]]).catch(() => undefined);
+      if (delivered.size > 0) await query("DELETE FROM webhook_receipts WHERE provider = 'stripe' AND event_id IN (SELECT value FROM json_each($1))", [[...delivered]]).catch(() => undefined);
     }
-    await getDb().end().catch(() => undefined);
   }
 
   const failed = results.filter((result) => !result.ok);

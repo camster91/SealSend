@@ -32,10 +32,10 @@ export async function GET(
     let plusOnes: PlusOne[] = [];
 
     if (responseIds.length > 0) {
-      const placeholders = responseIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
+      // One JSON array parameter: D1 allows 100 bound parameters per statement.
       plusOnes = await query<PlusOne>(
-        `SELECT * FROM plus_ones WHERE rsvp_response_id IN (${placeholders})`,
-        responseIds
+        'SELECT * FROM plus_ones WHERE rsvp_response_id IN (SELECT value FROM json_each($1))',
+        [responseIds]
       );
     }
 
@@ -107,7 +107,7 @@ export async function GET(
 
       await query(
         `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-         VALUES ($1, $2, 'responses_exported', $3::jsonb)`,
+         VALUES ($1, $2, 'responses_exported', $3)`,
         [eventId, auth.user.id, JSON.stringify({ count: responses.length, format: 'csv' })]
       );
 

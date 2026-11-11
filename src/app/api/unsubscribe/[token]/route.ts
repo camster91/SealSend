@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db/client";
+import { query } from "@/lib/db/client";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { handleUnsubscribe } from "@/lib/unsubscribe";
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { token } = await params;
 
   try {
-    const result = await handleUnsubscribe(token, getDb(), async () =>
+    const result = await handleUnsubscribe(token, { query }, async () =>
       (await rateLimit(`unsubscribe-invalid:${getClientIp(request)}`, { max: 20, windowSeconds: 60 })).success,
     );
     return NextResponse.json(result.body, { status: result.status });

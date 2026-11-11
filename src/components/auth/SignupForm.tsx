@@ -10,8 +10,9 @@ import { normalizeMarketingChannel } from "@/lib/analytics/marketing-attribution
 import Link from "next/link";
 import { EVENT_PASS } from "@/lib/constants";
 
-export function SignupForm() {
+export function SignupForm({ passwordSignup = false }: { passwordSignup?: boolean } = {}) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,32 @@ export function SignupForm() {
     const result = signupSchema.safeParse({ email: email.trim() });
     return result.success;
   }, [email]);
+
+  async function handlePasswordSignup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || password.length < 8) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/signup-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.success) {
+        router.push(plan ? `/dashboard?plan=${plan}` : "/dashboard");
+        router.refresh();
+      } else {
+        setError(result.error || "Could not create your account. Please try again.");
+      }
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +170,63 @@ export function SignupForm() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (passwordSignup) {
+    return (
+      <form onSubmit={handlePasswordSignup} className="space-y-4">
+        {planLabel && (
+          <div role="status" className="rounded-lg border border-border bg-neutral-50 p-3 text-sm text-ink">
+            Selected plan: <strong>{planLabel}</strong>. You&apos;ll continue after signing in.
+          </div>
+        )}
+        <Input
+          id="email"
+          label="Email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoComplete="email"
+        />
+        <Input
+          id="password"
+          label="Password"
+          type="password"
+          placeholder="At least 8 characters"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={8}
+          autoComplete="new-password"
+        />
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-error-100 bg-error-50 p-3 text-sm text-accent-red">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" disabled={!isEmailValid || password.length < 8} loading={loading} className="w-full">
+          Create account
+        </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          By creating an account you agree to the{" "}
+          <Link href="/terms" className="font-medium text-ink underline underline-offset-2">Terms</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="font-medium text-ink underline underline-offset-2">Privacy Policy</Link>.
+        </p>
+
+        <p className="text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <Link href={plan ? `/login?plan=${encodeURIComponent(plan)}` : '/login'} className="font-medium text-ink underline underline-offset-4 decoration-ink/30 hover:decoration-ink">
+            Sign in
+          </Link>
+        </p>
+      </form>
     );
   }
 

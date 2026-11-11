@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       name: string;
       password: string;
     }>(
-      'SELECT id, email, name, password FROM admin_users WHERE email = $1',
+      'SELECT id, email, name, password FROM admin_users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
 

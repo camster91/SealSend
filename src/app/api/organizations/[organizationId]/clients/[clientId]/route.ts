@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { requireOrganizationPermission } from "@/lib/auth/organization-access";
 import { CLIENT_HISTORY_CSV_HEADER, clientHistoryCsvRows, clientInputSchema, getClientEventHistory } from "@/lib/clients";
 import { toCsv } from "@/lib/csv";
@@ -42,7 +43,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   const parsed = clientInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the client details" }, { status: 400 });
   const [client] = await query(
-    `UPDATE clients SET name = $3, contact_email = $4, contact_phone = $5, notes = $6, updated_at = NOW()
+    `UPDATE clients SET name = $3, contact_email = $4, contact_phone = $5, notes = $6, updated_at = ${SQL_NOW}
       WHERE id = $1 AND organization_id = $2
       RETURNING id, name, contact_email, contact_phone, notes, created_at`,
     [clientId, organizationId, parsed.data.name, parsed.data.contactEmail ?? null, parsed.data.contactPhone ?? null, parsed.data.notes ?? null],

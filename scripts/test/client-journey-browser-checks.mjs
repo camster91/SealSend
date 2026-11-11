@@ -50,7 +50,7 @@ async function seed(db) {
         max_attendees, max_guests_per_rsvp, allow_plus_ones, tier,
         organization_id)
      VALUES ($1, $2, 'Client Journey Event', $3, 'published',
-             NOW() + INTERVAL '14 days', 'America/Toronto',
+             strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'), 'America/Toronto',
              'Client Journey Hall', 'Client Journey Owner',
              'A private client review', 'Review the invitation and response totals.',
              100, 10, TRUE, 'event_pass', $4)`,
@@ -64,12 +64,12 @@ async function seed(db) {
   await db.query(
     `INSERT INTO rsvp_responses
        (event_id, guest_id, respondent_name, respondent_email, status, headcount, response_data)
-     VALUES ($1, $2, $3, $4, 'attending', 1, '{}'::jsonb)`,
+     VALUES ($1, $2, $3, $4, 'attending', 1, '{}')`,
     [IDS.event, IDS.guest, PRIVATE_GUEST_NAME, PRIVATE_GUEST_EMAIL],
   );
   await db.query(
     `INSERT INTO user_sessions (user_id, user_role, session_token, expires_at)
-     VALUES ($1, 'admin', $2, NOW() + INTERVAL '1 hour')`,
+     VALUES ($1, 'admin', $2, strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour'))`,
     [IDS.owner, SESSION],
   );
 }
@@ -148,7 +148,7 @@ export async function clientJourneyBrowserChecks({ browser, origin, db, host }) 
     await page.getByRole("alertdialog").getByRole("button", { name: "Remove client", exact: true }).click();
     await page.getByText("Client Journey Scratch removed. Their events were kept.", { exact: true }).waitFor();
     assert.equal(
-      (await db.query("SELECT COUNT(*)::int AS count FROM clients WHERE organization_id = $1 AND name = 'Client Journey Scratch'", [IDS.organization])).rows[0].count,
+      (await db.query("SELECT COUNT(*) AS count FROM clients WHERE organization_id = $1 AND name = 'Client Journey Scratch'", [IDS.organization])).rows[0].count,
       0,
     );
 
@@ -288,7 +288,7 @@ export async function clientJourneyBrowserChecks({ browser, origin, db, host }) 
     assert.equal(expiringShare.status(), 201, await expiringShare.text());
     const expiredPath = new URL((await expiringShare.json()).url).pathname;
     const expiredUrl = new URL(expiredPath, origin).href;
-    await db.query("UPDATE event_client_shares SET expires_at = NOW() - INTERVAL '1 minute' WHERE event_id = $1 AND revoked_at IS NULL", [IDS.event]);
+    await db.query("UPDATE event_client_shares SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute') WHERE event_id = $1 AND revoked_at IS NULL", [IDS.event]);
     assert.equal((await anonymousContext.request.get(expiredUrl)).status(), 404, "expired review must not expose event content");
     const expiredApproval = await anonymousContext.request.post(`${origin}/api/client-shares/${expiredPath.split('/').pop()}/approve`, { headers: { Origin: origin }, data: { name: "Expired Attempt" } });
     assert.equal(expiredApproval.status(), 404, "expired review must not accept approval");

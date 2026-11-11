@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { query, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import type { Statement } from "@/lib/db/sqlite-dialect";
 import { guestBulkSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
@@ -97,21 +98,27 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Build bulk INSERT with parameterized values
-    const valuePlaceholders: string[] = [];
-    const queryParams: unknown[] = [];
-    let paramIndex = 1;
+    // Build bulk INSERTs with parameterized values. D1 allows 100 bound
+    // parameters per statement, so 20 guests per INSERT, all in one atomic batch.
+    const statements: Statement[] = [];
+    for (let start = 0; start < guests.length; start += 20) {
+      const valuePlaceholders: string[] = [];
+      const queryParams: unknown[] = [];
+      let paramIndex = 1;
 
-    for (const g of guests) {
-      valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
-      queryParams.push(g.event_id, g.name, g.email, g.phone, g.notes);
-      paramIndex += 5;
+      for (const g of guests.slice(start, start + 20)) {
+        valuePlaceholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
+        queryParams.push(g.event_id, g.name, g.email, g.phone, g.notes);
+        paramIndex += 5;
+      }
+
+      statements.push({
+        text: `INSERT INTO guests (event_id, name, email, phone, notes) VALUES ${valuePlaceholders.join(', ')} RETURNING id, name, email, phone`,
+        params: queryParams,
+      });
     }
 
-    const insertedGuests = await query<{ id: string; name: string; email: string | null; phone: string | null }>(
-      `INSERT INTO guests (event_id, name, email, phone, notes) VALUES ${valuePlaceholders.join(', ')} RETURNING id, name, email, phone`,
-      queryParams
-    );
+    const insertedGuests = (await batch<{ id: string; name: string; email: string | null; phone: string | null }>(statements)).flat();
     if (insertedGuests.length > 0) {
       await recordActivationEventSafely({
         name: "guest_import_completed",

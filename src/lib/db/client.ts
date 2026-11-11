@@ -1,35 +1,45 @@
-import { Pool } from 'pg';
+import type { DatabaseSync } from "node:sqlite";
+import { d1HttpConfigFromEnv, openD1Http } from "./d1-http";
+import { openSqliteDb, type SqliteDb } from "./sqlite-local";
+import type { Statement } from "./sqlite-dialect";
 
-let pool: Pool | null = null;
+/**
+ * Local SQLite (dev, tests, scripts). The Worker build swaps in client.cloudflare.ts (D1).
+ * SQLITE_PATH picks the file; ":memory:" gives a throwaway database. With D1_REMOTE=true
+ * (plus CLOUDFLARE_ACCOUNT_ID, D1_DATABASE_ID, CLOUDFLARE_API_TOKEN) scripts use the real D1 over HTTP.
+ */
+type Backend = Omit<SqliteDb, "handle"> & { handle?: DatabaseSync };
+let backend: Backend | null = null;
 
-export function getDb(): Pool {
-  if (!pool) {
-    if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not configured');
-    }
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+function current(): Backend {
+  if (!backend) {
+    const remote = d1HttpConfigFromEnv();
+    backend = remote ? openD1Http(remote) : openSqliteDb(process.env.SQLITE_PATH ?? ".data/sealsend.db");
   }
-  return pool;
+  return backend;
 }
 
-export async function query<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<T[]> {
-  const db = getDb();
-  const result = await db.query(text, params);
-  return result.rows as T[];
+/** The local node:sqlite handle. Not available with D1_REMOTE. */
+export function getDb(): DatabaseSync {
+  const { handle } = current();
+  if (!handle) throw new Error("getDb() is only available for the local SQLite database");
+  return handle;
 }
 
-export async function queryOne<T = unknown>(
-  text: string,
-  params?: unknown[]
-): Promise<T | null> {
-  const rows = await query<T>(text, params);
-  return rows[0] ?? null;
+export function query<T = unknown>(text: string, params?: unknown[]): Promise<T[]> {
+  return current().query<T>(text, params);
+}
+
+export function queryOne<T = unknown>(text: string, params?: unknown[]): Promise<T | null> {
+  return current().queryOne<T>(text, params);
+}
+
+/** Runs the statements in order, all or nothing (D1's batch semantics). Returns each statement's rows. */
+export function batch<T = unknown>(statements: Statement[]): Promise<T[][]> {
+  return current().batch<T>(statements);
+}
+
+/** Runs a script of statements without parameters (for example the schema). */
+export function exec(sql: string): Promise<void> {
+  return current().exec(sql);
 }

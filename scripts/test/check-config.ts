@@ -8,6 +8,7 @@
  */
 
 import * as dotenv from 'dotenv';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 // Load environment variables from .env.local
@@ -25,16 +26,29 @@ interface ConfigCheck {
 function checkConfig(): ConfigCheck[] {
   const checks: ConfigCheck[] = [];
 
-  // Database
-  checks.push({
-    name: 'DATABASE_URL',
-    required: true,
-    value: process.env.DATABASE_URL?.slice(0, 50) + '...',
-    valid: !!process.env.DATABASE_URL && 
-           process.env.DATABASE_URL?.startsWith('postgresql://'),
-    error: !process.env.DATABASE_URL ? 'Not set' : 
-           !process.env.DATABASE_URL?.startsWith('postgresql://') ? 'Must start with postgresql://' : undefined,
-  });
+  // Database: local SQLite file, or the production D1 over HTTP with D1_REMOTE=true
+  if (process.env.D1_REMOTE === 'true') {
+    const missing = ['CLOUDFLARE_ACCOUNT_ID', 'D1_DATABASE_ID', 'CLOUDFLARE_API_TOKEN'].filter((name) => !process.env[name]);
+    checks.push({
+      name: 'D1_REMOTE',
+      required: true,
+      value: process.env.D1_DATABASE_ID ? `D1 database ${process.env.D1_DATABASE_ID}` : 'true',
+      valid: missing.length === 0,
+      error: missing.length ? `Also needs ${missing.join(', ')}` : undefined,
+    });
+  } else {
+    const sqlitePath = process.env.SQLITE_PATH || '.data/sealsend.db';
+    checks.push({
+      name: 'SQLITE_PATH',
+      required: true,
+      value: sqlitePath,
+      isDefault: !process.env.SQLITE_PATH,
+      valid: sqlitePath === ':memory:' || existsSync(sqlitePath),
+      error: sqlitePath === ':memory:' || existsSync(sqlitePath)
+        ? undefined
+        : 'No database file yet (create it from src/lib/db/schema.sql, or set D1_REMOTE=true)',
+    });
+  }
 
   // Email (Mailgun)
   checks.push({

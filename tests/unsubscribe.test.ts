@@ -171,7 +171,7 @@ function fakeClient(error?: Error & { code?: string }) {
       async query<T>(text: string, values?: unknown[]) {
         calls.push({ text, values });
         if (error) throw error;
-        return { rows: [] as T[] };
+        return [] as T[];
       },
     },
   };
@@ -210,7 +210,7 @@ test("handleUnsubscribe rejects a bad token with 400 and records nothing", async
 });
 
 test("handleUnsubscribe treats a deleted host account as already unsubscribed", async () => {
-  const fkError = Object.assign(new Error("violates foreign key constraint"), { code: "23503" });
+  const fkError = Object.assign(new Error("FOREIGN KEY constraint failed"), { code: "ERR_SQLITE_ERROR" });
   const { client } = fakeClient(fkError);
   const token = createUnsubscribeToken(OWNER, "guest@example.com", EVENT);
   assert.deepEqual(await handleUnsubscribe(token, client, allowInvalid), { status: 200, body: { ok: true } });
@@ -248,7 +248,7 @@ test("invalid tokens are rate-limited: 400 while allowed, 429 once the limit is 
 test("the route verifies before it rate-limits, and limits only invalid tokens per IP", async () => {
   const { readFile } = await import("node:fs/promises");
   const route = await readFile("src/app/api/unsubscribe/[token]/route.ts", "utf8");
-  assert.ok(route.includes("handleUnsubscribe(token, getDb(), async () =>"), "the limiter is a callback for invalid tokens");
+  assert.ok(route.includes("handleUnsubscribe(token, { query }, async () =>"), "the limiter is a callback for invalid tokens");
   assert.ok(route.includes("rateLimit(`unsubscribe-invalid:${getClientIp(request)}`"), "invalid tokens are limited per IP");
   assert.ok(route.indexOf("rateLimit(") > route.indexOf("handleUnsubscribe("), "rateLimit only runs inside the invalid-token callback");
 });
