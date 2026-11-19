@@ -56,8 +56,11 @@ jobs:
       - name: Release automation safety tests
         run: node --test tests/coolify-release.test.mjs
 
+      # Allow only the unpatched picomatch ReDoS (GHSA-fc5q-39xc-vjpf) that
+      # arrives through vite. Remove the exception once picomatch ships a patch.
+      # Any other high or critical production advisory still fails the job.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit-production.mjs
 
       - name: Type check
         run: npm run typecheck

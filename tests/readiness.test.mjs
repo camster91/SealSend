@@ -287,7 +287,12 @@ test('CI runs automatically and failures are blocking', async () => {
   // "Build" is a required check, so every PR (docs-only too) must report it.
   assert.doesNotMatch(ci, /pull_request:\s*\n\s*paths(-ignore)?:/);
   assert.doesNotMatch(ci, /continue-on-error:\s*true/);
-  assert.match(ci, /npm audit --omit=dev --audit-level=high/);
+  assert.match(ci, /node scripts\/audit-production\.mjs/);
+  assert.doesNotMatch(ci, /npm audit --omit=dev --audit-level=high/);
+  const auditScript = await read('scripts/audit-production.mjs');
+  assert.match(auditScript, /GHSA-fc5q-39xc-vjpf/);
+  assert.match(auditScript, /Remove that allowlist entry once picomatch/);
+  assert.match(auditScript, /ships a patched release/);
 });
 
 test('package exposes unit, typecheck, and e2e test commands', async () => {
@@ -1832,4 +1837,65 @@ test('every Workers platform twin exposes the same names as the Node module', as
       if (!nodeOnly.has(name)) assert.ok(have.has(name), `${twin} is missing ${name}`);
     }
   }
+});
+
+
+test('production audit allows only the unpatched picomatch advisory', async () => {
+  const { evaluateProductionAudit } = await import('../scripts/audit-production.mjs');
+  const picomatch = {
+    source: 111,
+    name: 'picomatch',
+    dependency: 'picomatch',
+    title: 'picomatch vulnerable to ReDoS through single-branch repeated extglobs',
+    url: 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf',
+    severity: 'high',
+    range: '*',
+  };
+  const allowed = evaluateProductionAudit({
+    auditReportVersion: 2,
+    vulnerabilities: {
+      picomatch: { name: 'picomatch', severity: 'high', via: [picomatch], effects: ['vite'] },
+      vite: { name: 'vite', severity: 'high', via: ['picomatch'], effects: ['vinext'] },
+      vinext: { name: 'vinext', severity: 'high', via: ['vite'], effects: [] },
+      fflate: {
+        name: 'fflate',
+        severity: 'moderate',
+        via: [{
+          source: 222,
+          name: 'fflate',
+          title: 'fflate unzipSync infinite loop',
+          url: 'https://github.com/advisories/GHSA-px8p-9vwx-vf98',
+          severity: 'moderate',
+          range: '0.7.0 - 0.7.4',
+        }],
+        effects: [],
+      },
+    },
+  });
+  assert.equal(allowed.ok, true);
+  assert.equal(allowed.blocking.length, 0);
+  assert.equal(allowed.allowed[0].id, 'GHSA-FC5Q-39XC-VJPF');
+
+  const blocked = evaluateProductionAudit({
+    auditReportVersion: 2,
+    vulnerabilities: {
+      picomatch: { name: 'picomatch', severity: 'high', via: [picomatch], effects: [] },
+      leftpad: {
+        name: 'leftpad',
+        severity: 'critical',
+        via: [{
+          source: 333,
+          name: 'leftpad',
+          title: 'hypothetical critical',
+          url: 'https://github.com/advisories/GHSA-aaaa-bbbb-cccc',
+          severity: 'critical',
+          range: '*',
+        }],
+        effects: [],
+      },
+    },
+  });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.blocking.length, 1);
+  assert.equal(blocked.blocking[0].id, 'GHSA-AAAA-BBBB-CCCC');
 });
