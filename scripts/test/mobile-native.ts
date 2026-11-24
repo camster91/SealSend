@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startSocialQa } from './start-social-qa';
 import { hashAuthCode } from '../../src/lib/auth/code-hash';
+import { hashPassword } from '../../src/lib/password';
 
 const origin = 'http://127.0.0.1:3130';
 const secret = 'local-mobile-auth-code-secret-for-qa-only';
@@ -102,6 +103,24 @@ try {
   const simultaneous = await Promise.all([0, 1].map(() => fetch(`${origin}/api/mobile/v1/auth/verify`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', DNT: '1' }, body: JSON.stringify({ method: 'email', email: 'builder-qa@example.test', code: '789012' }) })));
   assert.deepEqual(simultaneous.map(r => r.status).sort(), [200, 401], 'concurrent OTP verification must only mint one session');
   await Promise.all(simultaneous.map(r => r.arrayBuffer())); checks += 2;
+
+  // Changing a password keeps this browser signed in and signs out every other device.
+  const passwordUser = randomUUID(), otherUser = randomUUID();
+  const here = randomUUID(), elsewhere = randomUUID(), unrelated = randomUUID();
+  await qa.db.query('INSERT INTO admin_users(id,email,password) VALUES ($1,$2,$3),($4,$5,$3)', [passwordUser, `${passwordUser}@example.test`, await hashPassword('Old-local-Password-1'), otherUser, `${otherUser}@example.test`]);
+  for (const [userId, sessionToken] of [[passwordUser, here], [passwordUser, elsewhere], [otherUser, unrelated]]) {
+    await qa.db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'admin',$2,strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))", [userId, sessionToken]);
+  }
+  const changePassword = async (currentPassword: string, status: number) => {
+    const response = await fetch(`${origin}/api/auth/change-password`, { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', DNT: '1', Cookie: `sealsend_session=${here}` }, body: JSON.stringify({ currentPassword, newPassword: 'New-local-Password-2' }) });
+    assert.equal(response.status, status); await response.arrayBuffer(); checks++;
+  };
+  const liveSessions = async () => (await qa.db.query<{ session_token: string }>('SELECT session_token FROM user_sessions WHERE user_id IN ($1,$2)', [passwordUser, otherUser])).rows.map(row => row.session_token).sort();
+  await changePassword('Wrong-local-Password-1', 401);
+  assert.deepEqual(await liveSessions(), [here, elsewhere, unrelated].sort()); checks++;
+  await changePassword('Old-local-Password-1', 200);
+  assert.deepEqual(await liveSessions(), [here, unrelated].sort()); checks++;
+  await changePassword('Old-local-Password-1', 401);
 
   // Execute the real processor only against freshly fabricated users in this throwaway database.
   const futureUser = randomUUID(), cancelledUser = randomUUID(), paidUser = randomUUID();
