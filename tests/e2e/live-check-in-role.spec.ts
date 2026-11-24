@@ -10,7 +10,6 @@ test.skip(!email || !password || !eventId || !guestId, 'Disposable check-in-only
 test('check-in-only staff can check in guests and nothing more', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Password' }).click();
   await page.getByLabel('Email Address').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();

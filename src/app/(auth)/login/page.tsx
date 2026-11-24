@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
 export default function LoginPage() {
   const smsEnabled = isTwilioConfigured();
   // Without an email provider no code can arrive, so start on the password form.
-  const defaultMethod = isEmailConfigured() ? "email" : "password";
+  const emailEnabled = isEmailConfigured();
+  const defaultMethod = emailEnabled ? "email" : "password";
   return (
     <>
       <div className="mb-8 text-center">
@@ -27,7 +28,7 @@ export default function LoginPage() {
       </div>
 
       <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-neutral-100" />}>
-        <EnhancedLoginForm defaultMethod={defaultMethod} smsEnabled={smsEnabled} />
+        <EnhancedLoginForm defaultMethod={defaultMethod} emailEnabled={emailEnabled} smsEnabled={smsEnabled} />
       </Suspense>
 
       <div className="mt-8 border-t border-border pt-6">
@@ -40,11 +41,6 @@ export default function LoginPage() {
             >
               Create an account
             </Link>
-          </p>
-          <p className="mt-2 text-xs text-neutral-600">
-            {smsEnabled
-              ? "Sign in with an email code, a text message code or a password."
-              : "Sign in with an email code or a password."}
           </p>
         </div>
       </div>

@@ -7,11 +7,20 @@ import { AuthService } from "@/lib/auth/auth-service";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { isValidRelativePath } from "@/lib/utils";
+import { loginMethods } from "@/lib/auth/login-methods";
+import Link from "next/link";
+
+const METHOD_LABELS: Record<AuthMethod, string> = {
+  email: "Email me a code instead",
+  password: "Use a password instead",
+  phone: "Text me a code instead",
+};
 
 interface EnhancedLoginFormProps {
   defaultMethod?: AuthMethod;
   eventId?: string; // For guest login
   isGuestMode?: boolean;
+  emailEnabled?: boolean; // Pass isEmailConfigured() from the server
   smsEnabled?: boolean; // Pass isTwilioConfigured() from the server; SMS options are hidden otherwise
 }
 
@@ -19,6 +28,7 @@ export function EnhancedLoginForm({
   defaultMethod = 'email',
   eventId,
   isGuestMode = false,
+  emailEnabled = true,
   smsEnabled = false,
 }: EnhancedLoginFormProps) {
   const [method, setMethod] = useState<AuthMethod>(defaultMethod);
@@ -31,6 +41,7 @@ export function EnhancedLoginForm({
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
+  const otherMethods = loginMethods({ emailEnabled, smsEnabled }).filter((option) => option !== method);
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
@@ -198,74 +209,7 @@ export function EnhancedLoginForm({
       );
     }
 
-    return (
-      <div className="space-y-3">
-        <div className="text-center">
-          <h2 className="text-lg font-semibold">Host sign in</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Choose your preferred login method
-          </p>
-        </div>
-        
-        <div className={`grid ${smsEnabled ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
-          <button
-            type="button"
-            aria-pressed={method === 'email'}
-            onClick={() => setMethod('email')}
-            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
-              method === 'email'
-                ? 'border-ink bg-primary-50 text-ink'
-                : 'border-border text-neutral-700 hover:border-primary-300'
-            }`}
-          >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
-              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium">Email</span>
-          </button>
-          
-          <button
-            type="button"
-            aria-pressed={method === 'password'}
-            onClick={() => setMethod('password')}
-            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
-              method === 'password'
-                ? 'border-ink bg-primary-50 text-ink'
-                : 'border-border text-neutral-700 hover:border-primary-300'
-            }`}
-          >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
-              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium">Admin password</span>
-          </button>
-
-          {smsEnabled && (
-          <button
-            type="button"
-            aria-pressed={method === 'phone'}
-            onClick={() => setMethod('phone')}
-            className={`p-4 rounded-lg border-2 bg-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${
-              method === 'phone'
-                ? 'border-ink bg-primary-50 text-ink'
-                : 'border-border text-neutral-700 hover:border-primary-300'
-            }`}
-          >
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100" aria-hidden="true">
-              <svg className="h-5 w-5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-              </svg>
-            </div>
-            <span className="text-sm font-medium">SMS</span>
-          </button>
-          )}
-        </div>
-      </div>
-    );
+    return null;
   };
 
   const renderInputForm = () => {
@@ -306,7 +250,7 @@ export function EnhancedLoginForm({
                 id="email"
                 label="Email Address"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -343,10 +287,25 @@ export function EnhancedLoginForm({
           {method === 'password' ? 'Sign In' : 'Send Code'}
         </Button>
 
+        {!isGuestMode && otherMethods.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-x-4">
+            {otherMethods.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => { setMethod(option); setError(null); }}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-ink underline underline-offset-4"
+              >
+                {METHOD_LABELS[option]}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!isGuestMode && (
           <p className="text-center text-xs text-muted-foreground">
             {method === 'password' 
-              ? 'Secure password login for administrators'
+              ? <Link href="/forgot-password" className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4">Forgot your password?</Link>
               : 'We\'ll send you a secure code to sign in'}
           </p>
         )}

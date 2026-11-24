@@ -8,11 +8,10 @@ import {
 type Props = {
   event: FirstEventChecklistEvent | null;
   hasGuest: boolean;
-  hasInvitation: boolean;
 };
 
-export function OnboardingChecklist({ event, hasGuest, hasInvitation }: Props) {
-  const steps = buildFirstEventChecklist({ event, hasGuest, hasInvitation });
+export function OnboardingChecklist({ event, hasGuest }: Props) {
+  const steps = buildFirstEventChecklist({ event, hasGuest });
   if (steps.every((step) => step.complete)) return null;
   const completeCount = steps.filter((step) => step.complete).length;
   return (
