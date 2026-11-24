@@ -22,6 +22,7 @@ import { EventClientPanel } from '@/components/events/EventClientPanel';
 import { HostSocial } from '@/components/social/HostSocial';
 import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
 import { formatDateTime } from '@/lib/utils';
+import { noReplyCountSql } from '@/lib/reply-counts';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -60,9 +61,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'attending') AS going_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'maybe') AS maybe_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'not_attending') AS not_going_count,
-      (SELECT COUNT(*) FROM guests g
-        WHERE g.event_id = events.id AND g.parent_guest_id IS NULL
-          AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = events.id AND r.guest_id = g.id)) AS no_reply_count,
+      ${noReplyCountSql} AS no_reply_count,
       (SELECT source.title FROM events source
         WHERE source.id = events.repeated_from_event_id AND source.user_id = events.user_id) AS repeated_from_title
      FROM events
