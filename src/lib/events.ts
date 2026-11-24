@@ -1,4 +1,5 @@
 import { query, queryOne } from '@/lib/db/client';
+import { isPasswordSignupEnabled } from '@/lib/email';
 import type { Event } from '@/types/database';
 
 /**
@@ -63,7 +64,10 @@ export async function getCollaboratingEvents(userId: string) {
   return data || [];
 }
 
-export async function getInvitedEvents(email: string | null, phone: string | null) {
+export async function getInvitedEvents(accountEmail: string | null, phone: string | null) {
+  // Password sign-up does not prove the address is theirs, so it must not reveal
+  // invitations sent to that address.
+  const email = isPasswordSignupEnabled() ? null : accountEmail;
   if (!email && !phone) {
     return [];
   }
