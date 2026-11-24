@@ -103,7 +103,7 @@ function useHostState() {
     return () => back.remove();
   }, [host, screen, scan, setScreen]);
   useEffect(() => {
-    const receive = (url: string | null) => {
+    const receive = (url: string | null | undefined) => {
       if (!url) return;
       const safe = invitationLink(url);
       if (safe) { setInvite(safe); setNotice('Your invitation is ready to open. Guests do not need an account.'); if (!host) setScreen('welcome'); }
