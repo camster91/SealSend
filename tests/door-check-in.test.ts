@@ -103,3 +103,24 @@ test("the app can sign in with a password and gets a revocable token, not cookie
   assert.equal(body.user.role, "admin");
   assert.equal(body.user.password, undefined);
 });
+
+test("someone added at the door is not counted as a missing reply", async () => {
+  const { noReplyCountSql } = await import("../src/lib/reply-counts");
+  const { host, event } = await seed();
+  const count = async () => (await queryOne<{ n: number }>(`SELECT ${noReplyCountSql} AS n FROM events WHERE id = $1`, [event]))!.n;
+  const add = async (name: string, status: string | null, parent: string | null = null) =>
+    (await queryOne<{ id: string }>("INSERT INTO guests (event_id, name, rsvp_status, parent_guest_id) VALUES ($1, $2, $3, $4) RETURNING id", [event, name, status, parent]))!.id;
+  const replied = await add("Replied", "attending");
+  await exec(`INSERT INTO rsvp_responses (event_id, guest_id, respondent_name, status) VALUES ('${event}', '${replied}', 'Replied', 'attending')`);
+  await add("Plus one", "pending", replied);
+  await add("Waiting", "pending");
+  await add("Waiting too", null);
+  assert.equal(await count(), 2);
+  const walkInId = randomUUID();
+  assert.equal((await walkIn(host, event, { walkInId, name: "Zoe" })).status, 201);
+  assert.equal(await count(), 2);
+  await exec(`UPDATE guests SET checked_in_at = NULL WHERE id = '${walkInId}'`);
+  assert.equal(await count(), 2, "undoing the check-in must not turn them into a missing reply");
+  const page = readFileSync("src/app/(dashboard)/events/[eventId]/page.tsx", "utf8");
+  assert.match(page, /\$\{noReplyCountSql\} AS no_reply_count/);
+});
