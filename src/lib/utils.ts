@@ -47,6 +47,10 @@ export function formatEventDay(date: string | Date, timeZone?: string): string {
   return formatParts(date, timeZone, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+export function formatShortDay(date: string | Date, timeZone?: string): string {
+  return formatParts(date, timeZone, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export function formatEventTime(date: string | Date, timeZone?: string): string {
   return formatParts(date, timeZone, { hour: 'numeric', minute: '2-digit', ...(timeZone ? { timeZoneName: 'short' } : {}) });
 }

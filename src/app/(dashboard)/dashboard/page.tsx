@@ -1,3 +1,4 @@
+import { formatShortDay } from '@/lib/utils';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getEventsByUser, getInvitedEvents, getCollaboratingEvents } from '@/lib/events';
 import { redirect } from 'next/navigation';
@@ -137,7 +138,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center">
-                            <p className="truncate text-sm font-semibold text-ink">
+                            <p className="break-words text-sm font-semibold text-ink">
                               {event.title}
                             </p>
                           </div>
@@ -145,7 +146,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             <div className="flex items-center text-sm text-neutral-600">
                               <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                               <span>
-                                {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'No date set'}
+                                {event.event_date ? formatShortDay(event.event_date, event.event_timezone) : 'No date set'}
                               </span>
                             </div>
                             <div className="flex min-w-0 items-center text-sm text-neutral-600">
@@ -200,7 +201,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-ink">{event.title}</p>
+                            <p className="break-words text-sm font-semibold text-ink">{event.title}</p>
                             <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
                               {COLLABORATION_ROLE_LABELS[event.access_role] ?? event.access_role}
                             </span>
@@ -208,7 +209,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
                             <div className="flex items-center text-sm text-neutral-600">
                               <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
-                              <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : "No date set"}</span>
+                              <span>{event.event_date ? formatShortDay(event.event_date, event.event_timezone) : "No date set"}</span>
                             </div>
                             <div className="flex min-w-0 items-center text-sm text-neutral-600">
                               <MapPin className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
@@ -251,7 +252,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center">
-                            <p className="truncate text-sm font-semibold text-ink">
+                            <p className="break-words text-sm font-semibold text-ink">
                               {event.title}
                             </p>
                             <span className="ml-2 inline-flex items-center rounded-md bg-success-50 px-2 py-0.5 text-xs font-medium text-success-700">
@@ -262,7 +263,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             <div className="flex items-center text-sm text-neutral-600">
                               <Calendar className="mr-1.5 h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                               <span>
-                                {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'No date set'}
+                                {event.event_date ? formatShortDay(event.event_date, event.event_timezone) : 'No date set'}
                               </span>
                             </div>
                             <div className="flex min-w-0 items-center text-sm text-neutral-600">

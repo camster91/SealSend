@@ -96,6 +96,7 @@ try {
   };
   await failNextRead(hostPage,`**/api/events/${eventId}/social`);
   await hostPage.goto(`${origin}/events/${eventId}`);
+  await hostPage.getByText('More',{ exact:true }).click();
   await hostPage.getByRole('heading',{ name:'Guest activities',exact:true }).waitFor();
   await hostPage.getByRole('button',{name:'Refresh activities',exact:true}).click();
   await hostPage.getByLabel('Reactions and excitement').waitFor();
@@ -168,7 +169,7 @@ try {
   assert.equal(await otherPage.getByText('Synthetic QA photo',{ exact:true }).count(),0);
   await host.addCookies([{name:`sealsend_social_${eventId}`,value:otherToken,domain:'localhost',path:'/api/social/social-qa',httpOnly:true,secure:true,sameSite:'Strict'}]);
   assert.equal((await host.request.get(`${origin}/api/social/social-qa/photos/${photo.id}`)).status(),200);
-  await hostPage.reload();
+  await hostPage.reload();await hostPage.getByText('More',{ exact:true }).click();
   await hostPage.getByRole('button',{ name:'Approve photo',exact:true }).click();
   await hostPage.getByText('Synthetic QA photo · Shared',{ exact:true }).waitFor();
   const approvedState = await other.request.get(`${origin}/api/social/social-qa`, { headers: { 'X-Guest-Token': otherToken } });
