@@ -1,4 +1,9 @@
-"""Verify the built AAB against Expo config before retaining an unsigned candidate."""
+"""Verify the built AAB against Expo config before retaining an unsigned candidate.
+
+The default mode preserves the original single-ABI regression guard. The native
+candidate workflow opts into Expo's checked-in/default ABI set while still
+requiring the arm64 Hermes runtime needed by supported devices.
+"""
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import argparse
@@ -10,7 +15,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 
-def verify_bundle(original, config_path, out, bundletool, env):
+def verify_bundle(original, config_path, out, bundletool, env, allow_default_abis=False):
     expo = json.loads(config_path.read_text())['expo']
     version = expo.get('version')
     code = expo.get('android', {}).get('versionCode')
@@ -43,7 +48,10 @@ def verify_bundle(original, config_path, out, bundletool, env):
         entries = archive.namelist()
         assert 'base/assets/index.android.bundle' in entries
         assert any(n.startswith('base/lib/arm64-v8a/libhermes') for n in entries)
-        assert {n.split('/')[2] for n in entries if n.startswith('base/lib/') and n.endswith('.so')} == {'arm64-v8a'}
+        abi_set = {n.split('/')[2] for n in entries if n.startswith('base/lib/') and n.endswith('.so')}
+        assert 'arm64-v8a' in abi_set
+        if not allow_default_abis:
+            assert abi_set == {'arm64-v8a'}
         out.mkdir()
         with ZipFile(out / 'SealSend-unsigned.aab', 'w', ZIP_DEFLATED) as unsigned:
             for entry in archive.infolist():
@@ -58,15 +66,18 @@ def verify_bundle(original, config_path, out, bundletool, env):
     (out / 'SHA256SUMS').write_text(''.join(
         hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n'
         for p in sorted(out.iterdir()) if p.is_file()))
-    print(f'Verified ARM64 bundle, embedded JS, identity, version {version} ({code}) and bounded permissions; '
+    architecture_summary = 'Expo/default ABI set' if allow_default_abis else 'ARM64-only'
+    print(f'Verified {architecture_summary} bundle, embedded JS, identity, version {version} ({code}) and bounded permissions; '
           'generated development signature removed.')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bundletool', type=Path, required=True)
+    parser.add_argument('--allow-default-abis', action='store_true',
+                        help="Accept Expo's default ABI set while requiring arm64-v8a Hermes.")
     args = parser.parse_args()
     verify_bundle(Path('apps/mobile/android/app/build/outputs/bundle/release/app-release.aab'),
                   Path('apps/mobile/app.json'),
                   Path(os.environ['RUNNER_TEMP']) / 'sealsend-android-artifact',
-                  args.bundletool, os.environ)
+                  args.bundletool, os.environ, args.allow_default_abis)

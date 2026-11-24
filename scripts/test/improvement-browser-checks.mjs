@@ -12,8 +12,8 @@ export async function improvementBrowserChecks({browser,origin,db}) {
   try {
     await builder.goto(`${origin}/events/new`);
     await builder.getByRole('button',{name:'Community',exact:true}).click();
-    assert.equal(await builder.getByRole('button',{name:'Start with Garden Wedding',exact:true}).count(),0);
-    await builder.getByRole('button',{name:'Start with Community Night',exact:true}).click();
+    assert.equal(await builder.getByRole('button',{name:/^Garden Wedding\b/}).count(),0);
+    await builder.getByRole('button',{name:/^Community Night\b/}).click();
     const created=builder.waitForResponse(res=>res.request().method()==='POST'&&new URL(res.url()).pathname==='/api/events');
     await builder.getByLabel('Name of your event').fill('Template attendance QA');
     await builder.getByLabel('Name of your event').press('Tab');
