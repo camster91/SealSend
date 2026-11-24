@@ -54,3 +54,28 @@ export function withDefaultInvitationCopy<T extends { invitation_headline?: stri
     invitation_body: needsBody ? defaults.body : event.invitation_body,
   };
 }
+
+/** True when the stored text is exactly what SealSend would have written for this event. */
+export function isDefaultInvitationCopy(
+  event: InvitationCopyInput & { invitation_headline?: string | null; invitation_body?: string | null },
+): { headline: boolean; body: boolean } {
+  const defaults = defaultInvitationCopy(event);
+  return {
+    headline: clean(event.invitation_headline) === defaults.headline,
+    body: clean(event.invitation_body) === defaults.body,
+  };
+}
+
+/** Rewrites only the text SealSend wrote, so a changed date, time, place or title is not left stale. */
+export function refreshDefaultInvitationCopy<T extends InvitationCopyInput & { invitation_headline?: string | null; invitation_body?: string | null }>(
+  before: T,
+  after: T,
+): T {
+  const was = isDefaultInvitationCopy(before);
+  const next = defaultInvitationCopy(after);
+  return {
+    ...after,
+    invitation_headline: was.headline && after.invitation_headline === before.invitation_headline ? next.headline : after.invitation_headline,
+    invitation_body: was.body && after.invitation_body === before.invitation_body ? next.body : after.invitation_body,
+  };
+}

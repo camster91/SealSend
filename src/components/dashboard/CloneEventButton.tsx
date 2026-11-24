@@ -1,5 +1,6 @@
 'use client';
 
+import { canSubmitRepeat } from '@/lib/repeat-event-choice';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { zonedLocalDateTimeToInstant } from '@/lib/datetime';
@@ -34,7 +35,7 @@ export function CloneEventButton({
   const [rsvpDeadline, setRsvpDeadline] = useState('');
   const [includeGuests, setIncludeGuests] = useState(false);
   const mustArchiveSource = eventStatus !== 'archived' && !canKeepCurrentActive;
-  const [archiveSource, setArchiveSource] = useState(mustArchiveSource);
+  const [archiveSource, setArchiveSource] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -163,16 +164,16 @@ export function CloneEventButton({
                   <input
                     type="checkbox"
                     checked={archiveSource}
-                    disabled={mustArchiveSource}
                     onChange={(event) => setArchiveSource(event.target.checked)}
                     className="mt-1 h-4 w-4"
                   />
                   <span>
                     <span className="block text-sm font-medium text-amber-950">Archive the current event</span>
                     <span className="block text-xs text-amber-800">
+                      {eventStatus === 'published' ? 'Its invitation link will stop working for guests. ' : ''}
                       {mustArchiveSource
-                        ? "Required by the free beta's one-active-event limit. The finished event remains available in your history."
-                        : 'Optional. The finished event remains available in your history.'}
+                        ? 'The free beta has a one-active-event limit, so this one must be archived first. It stays in your history.'
+                        : 'Optional. It stays in your history.'}
                     </span>
                   </span>
                 </label>
@@ -185,7 +186,7 @@ export function CloneEventButton({
               {cloneError && <p role="alert" className="text-sm text-red-700">{cloneError}</p>}
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={closeModal} disabled={isCloning} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50">Cancel</button>
-                <button type="submit" disabled={isCloning} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+                <button type="submit" disabled={isCloning || !canSubmitRepeat({ mustArchiveSource, archiveSource })} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
                   {isCloning ? 'Creating draft...' : 'Create next event draft'}
                 </button>
               </div>

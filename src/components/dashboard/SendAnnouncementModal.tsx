@@ -1,8 +1,9 @@
 'use client';
 
+import { announcementOutcome } from "@/lib/announcement-outcome";
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface Props { open: boolean; onClose: () => void; eventId: string; onSuccess: () => void; smsEnabled?: boolean }
 type Audience = { rsvpStatuses: string[]; invitationStatuses: string[]; tagIds: string[]; unansweredOnly: boolean };
@@ -19,6 +20,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ status: string; sent_to_count: number; scheduled_at: string } | null>(null);
+  const outcome = result ? announcementOutcome(result.status, result.sent_to_count ?? 0) : null;
   const [tags, setTags] = useState<Array<{ id: string; tag_name: string; color: string }>>([]);
   const [draftIntent, setDraftIntent] = useState('');
   const [aiDraft, setAiDraft] = useState<{ generationId: string; subject: string; message: string; cautions: string[]; fallback: boolean } | null>(null);
@@ -75,7 +77,7 @@ export function SendAnnouncementModal({ open, onClose, eventId, onSuccess, smsEn
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
     <div role="dialog" aria-modal="true" aria-labelledby="announcement-title" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
       <div className="flex items-center justify-between border-b px-6 py-4"><h2 id="announcement-title" className="text-lg font-semibold">Plan announcement</h2><button aria-label="Close announcement modal" onClick={handleClose} className="min-h-11 min-w-11 rounded-lg p-2"><X className="h-5 w-5" /></button></div>
-      <div className="p-6">{result ? <div className="text-center"><CheckCircle2 className="mx-auto h-10 w-10 text-green-500" /><p className="mt-3 text-lg font-semibold">{result.status === 'queued' ? 'Announcement scheduled' : 'Dispatch completed'}</p><p className="mt-1 text-sm text-gray-600">Status: {result.status}. Accepted deliveries: {result.sent_to_count ?? 0}.</p><Button className="mt-5" onClick={handleClose}>Done</Button></div> :
+      <div className="p-6">{result && outcome ? <div className="text-center" role="status">{outcome.ok ? <CheckCircle2 className="mx-auto h-10 w-10 text-green-500" aria-hidden /> : <AlertTriangle className="mx-auto h-10 w-10 text-accent-red" aria-hidden />}<p className="mt-3 text-lg font-semibold">{outcome.title}</p><p className="mt-1 text-sm text-gray-600">{outcome.detail}</p><Button className="mt-5" onClick={handleClose}>Done</Button></div> :
       <form onSubmit={submit} className="space-y-5">
         <section aria-labelledby="ai-message-heading" className="rounded-xl border border-brand-200 bg-brand-50 p-4">
           <h3 id="ai-message-heading" className="font-semibold">AI-assisted message draft <span className="text-xs text-brand-700">Beta</span></h3>

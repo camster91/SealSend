@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/Input";
@@ -155,6 +156,7 @@ export default function SettingsPage() {
               value={email}
               disabled
             />
+            <SignOutButton />
           </CardContent>
         </Card>
 

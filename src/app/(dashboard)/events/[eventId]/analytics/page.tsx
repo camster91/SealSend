@@ -1,5 +1,6 @@
 "use client";
 
+import { summarizeDietary } from "@/lib/dietary-summary";
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -167,39 +168,7 @@ export default function AnalyticsPage() {
     .filter((r) => r.status === "attending")
     .reduce((sum, r) => sum + (r.headcount || 1), 0);
 
-  // Dietary restrictions breakdown
-  const dietaryRestrictions: Record<string, number> = {};
-  responses.forEach((r) => {
-    const dietary = r.response_data?.dietary_restrictions || r.response_data?.dietary;
-    if (dietary && typeof dietary === "string" && dietary.trim()) {
-      const key = dietary.trim();
-      dietaryRestrictions[key] = (dietaryRestrictions[key] || 0) + 1;
-    }
-  });
-
-  // Common dietary restriction keywords
-  const commonDietary = ["vegetarian", "vegan", "gluten-free", "gluten free", "dairy-free", "dairy free", "nut-free", "nut free", "kosher", "halal"];
-  const categorizedDietary: Record<string, number> = {};
-  
-  responses.forEach((r) => {
-    const dietary = r.response_data?.dietary_restrictions || r.response_data?.dietary;
-    if (dietary && typeof dietary === "string") {
-      const lowerDietary = dietary.toLowerCase();
-      let matched = false;
-      
-      for (const keyword of commonDietary) {
-        if (lowerDietary.includes(keyword)) {
-          const normalized = keyword.replace("-", " ");
-          categorizedDietary[normalized] = (categorizedDietary[normalized] || 0) + 1;
-          matched = true;
-        }
-      }
-      
-      if (!matched && dietary.trim()) {
-        categorizedDietary["Other"] = (categorizedDietary["Other"] || 0) + 1;
-      }
-    }
-  });
+  const dietaryNotes = summarizeDietary(responses);
 
   // Custom question responses
   const customQuestions: Record<string, Record<string, number>> = {};
@@ -236,7 +205,6 @@ export default function AnalyticsPage() {
 
   // Colors for charts
   const statusColors = ["#22c55e", "#ef4444", "#f59e0b", "#6b7280"];
-  const dietaryColors = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#14b8a6", "#6366f1", "#84cc16"];
 
   if (loading) {
     return (
@@ -386,30 +354,15 @@ export default function AnalyticsPage() {
               <Utensils className="h-5 w-5 text-brand-500" />
               Dietary Restrictions
             </h2>
-            {Object.keys(categorizedDietary).length > 0 ? (
-              <div className="flex items-center gap-6">
-                <PieChart
-                  data={Object.values(categorizedDietary)}
-                  colors={dietaryColors}
-                  size={140}
-                />
-                <div className="flex-1 space-y-2">
-                  {Object.entries(categorizedDietary)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([restriction, count], i) => (
-                      <div key={restriction} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="h-3 w-3 rounded-full"
-                            style={{ backgroundColor: dietaryColors[i % dietaryColors.length] }}
-                          />
-                          <span className="text-sm capitalize">{restriction}</span>
-                        </div>
-                        <span className="text-sm font-medium">{count}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
+            {dietaryNotes.length > 0 ? (
+              <ul className="space-y-2">
+                {dietaryNotes.map(({ note, count }) => (
+                  <li key={note} className="flex items-start justify-between gap-4 text-sm">
+                    <span className="min-w-0 break-words">{note}</span>
+                    <span className="font-medium">{count}</span>
+                  </li>
+                ))}
+              </ul>
             ) : (
               <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
                 No dietary restrictions reported
