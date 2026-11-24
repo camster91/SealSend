@@ -324,6 +324,7 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect((await checkout.json()).error).toContain('controlled beta');
 
     await page.goto(`/events/${eventId}`);
+    await page.getByText('More', { exact: true }).click();
     await page.getByRole('button', { name: 'Repeat event' }).click();
     const repeatDialog = page.getByRole('dialog', { name: 'Repeat event' });
     await expect(repeatDialog).toBeVisible();
