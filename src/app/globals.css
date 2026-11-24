@@ -231,8 +231,10 @@
    BASE STYLES
    ======================================== */
 
-* {
-  @apply border-border;
+@layer base {
+  * {
+    @apply border-border;
+  }
 }
 
 html {

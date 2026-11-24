@@ -75,6 +75,7 @@ export async function proxy(request: NextRequest) {
     '/robots.txt',
     '/sitemap.xml',
     '/invite/accept',
+    '/invite/problem',
     '/client',
     '/guest/update',
     '/unsubscribe',
