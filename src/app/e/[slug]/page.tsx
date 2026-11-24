@@ -75,12 +75,12 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   let spotsRemaining: number | null = null;
   const maxAttendees = (event.max_attendees as number) || null;
   if (maxAttendees) {
-    const sumResult = await queryOne<{ total: string }>(
-      `SELECT COALESCE(SUM(headcount), 0)::text AS total
+    const sumResult = await queryOne<{ total: number }>(
+      `SELECT COALESCE(SUM(headcount), 0) AS total
        FROM rsvp_responses WHERE event_id = $1 AND status = $2`,
       [event.id, 'attending']
     );
-    const currentTotal = parseInt(sumResult?.total || '0', 10);
+    const currentTotal = Number(sumResult?.total ?? 0);
     spotsRemaining = Math.max(0, maxAttendees - currentTotal);
   }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
-import { sendEmail } from '@/lib/email';
+import { isEmailConfigured, sendEmail } from '@/lib/email';
 import { validateAndFormatPhone } from '@/lib/phone-validation';
 import { getTwilioClient, getTwilioSendOptions, isTwilioConfigured } from '@/lib/twilio';
 import { sendCodeSchema } from '@/lib/validations';
@@ -44,6 +44,13 @@ export async function POST(request: NextRequest) {
     if (method === 'phone' && !isTwilioConfigured()) {
       return NextResponse.json(
         { error: 'Text message sign-in is turned off right now. Please use your email.' },
+        { status: 400 }
+      );
+    }
+
+    if (method === 'email' && !isEmailConfigured()) {
+      return NextResponse.json(
+        { error: eventId ? 'Email codes are turned off right now. Use the link in your invitation.' : 'Email codes are turned off right now. Please sign in with your password.' },
         { status: 400 }
       );
     }

@@ -1,8 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
-  recordCommunicationSuppression,
-  type CommunicationSuppressionClient,
+  communicationSuppressionStatement,
+  isForeignKeyViolation,
 } from "@/lib/communication-suppressions";
+
+/** The database client shape this needs; routes pass `{ query }` from @/lib/db/client. */
+export type UnsubscribeDb = { query(text: string, params?: unknown[]): Promise<unknown> };
 
 /**
  * Signed one-click unsubscribe links for guest emails.
@@ -116,7 +119,7 @@ export type UnsubscribeResult =
  */
 export async function handleUnsubscribe(
   token: string,
-  client: CommunicationSuppressionClient,
+  db: UnsubscribeDb,
   allowInvalidAttempt: () => Promise<boolean>,
 ): Promise<UnsubscribeResult> {
   const target = verifyUnsubscribeToken(token);
@@ -127,7 +130,7 @@ export async function handleUnsubscribe(
     return { status: 400, body: { ok: false, error: "This link isn't valid." } };
   }
   try {
-    await recordCommunicationSuppression(client, {
+    const { text, params } = communicationSuppressionStatement({
       userId: target.ownerUserId,
       channel: "email",
       recipient: target.email,
@@ -136,9 +139,10 @@ export async function handleUnsubscribe(
       // An existing bounce or complaint row stays as it is: the guest is already suppressed.
       keepExisting: true,
     });
+    await db.query(text, params);
   } catch (error) {
     // The host's account is gone (foreign key violation), so nothing can email this guest any more.
-    if ((error as { code?: string } | null)?.code !== "23503") throw error;
+    if (!isForeignKeyViolation(error)) throw error;
   }
   return { status: 200, body: { ok: true } };
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, query } from "@/lib/db/client";
+import { batch, query } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { TIERS } from "@/lib/constants";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
@@ -14,7 +15,7 @@ import {
   type StoredSubscriptionStatus,
 } from "@/lib/billing";
 import type { OrganizerPlan } from "@/lib/constants";
-import { EVENT_PASS, SMS_TOP_UP } from "@/lib/constants";
+import { EVENT_PASS, ORGANIZER_PLANS, SMS_TOP_UP } from "@/lib/constants";
 import { grantSmsSegments } from "@/lib/sms-allowance";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -104,10 +105,11 @@ function idOf(value: string | { id: string } | null | undefined): string | null 
 }
 
 /**
- * Stores the workspace subscription and applies the matching organizations.plan in one transaction.
+ * Stores the workspace subscription and applies the matching organizations.plan in one batch.
  * A workspace holds one subscription at a time: an event for a different subscription only replaces
  * the stored one after that was cancelled, so a late event for an old subscription can't overwrite
- * the plan the workspace pays for now.
+ * the plan the workspace pays for now. After the upsert the stored subscription is this one exactly
+ * when the upsert wrote it, so the plan only changes in that case.
  */
 async function syncOrganizationSubscription(input: {
   organizationId: string;
@@ -118,12 +120,10 @@ async function syncOrganizationSubscription(input: {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
 }) {
-  const client = await getDb().connect();
-  try {
-    await client.query("BEGIN");
-    const stored = await client.query(
-      `INSERT INTO organization_subscriptions (organization_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, cancel_at_period_end, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+  await batch([
+    {
+      text: `INSERT INTO organization_subscriptions (organization_id, stripe_customer_id, stripe_subscription_id, plan, status, current_period_end, cancel_at_period_end, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, ${SQL_NOW})
        ON CONFLICT (organization_id) DO UPDATE SET
          stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, organization_subscriptions.stripe_customer_id),
          stripe_subscription_id = EXCLUDED.stripe_subscription_id,
@@ -131,25 +131,18 @@ async function syncOrganizationSubscription(input: {
          status = EXCLUDED.status,
          current_period_end = COALESCE(EXCLUDED.current_period_end, organization_subscriptions.current_period_end),
          cancel_at_period_end = EXCLUDED.cancel_at_period_end,
-         updated_at = NOW()
+         updated_at = ${SQL_NOW}
        WHERE organization_subscriptions.stripe_subscription_id = EXCLUDED.stripe_subscription_id
-          OR organization_subscriptions.status = 'canceled'
-       RETURNING organization_id`,
-      [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd, input.cancelAtPeriodEnd]
-    );
-    if (stored.rowCount) {
-      await client.query(
-        "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
-        [organizationPlanForSubscription(input.plan, input.status), input.organizationId]
-      );
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+          OR organization_subscriptions.status = 'canceled'`,
+      params: [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null, input.cancelAtPeriodEnd],
+    },
+    {
+      text: `UPDATE organizations SET plan = $1, updated_at = ${SQL_NOW}
+       WHERE id = $2 AND is_personal = 0
+         AND EXISTS (SELECT 1 FROM organization_subscriptions WHERE organization_id = $2 AND stripe_subscription_id = $3)`,
+      params: [organizationPlanForSubscription(input.plan, input.status), input.organizationId, input.stripeSubscriptionId],
+    },
+  ]);
 }
 
 async function handleOrganizerCheckout(session: Stripe.Checkout.Session) {
@@ -191,28 +184,23 @@ async function handleOrganizerSubscriptionChange(subscription: Stripe.Subscripti
 
 /** Invoice outcomes for workspace subscriptions; a no-op for subscriptions that aren't organizer plans. */
 async function handleOrganizerInvoice(subscriptionId: string, status: "active" | "past_due") {
-  const client = await getDb().connect();
-  try {
-    await client.query("BEGIN");
-    const row = (await client.query<{ organization_id: string; plan: OrganizerPlan }>(
-      `UPDATE organization_subscriptions SET status = $1, updated_at = NOW()
-        WHERE stripe_subscription_id = $2 AND status <> 'canceled'
-        RETURNING organization_id, plan`,
-      [status, subscriptionId]
-    )).rows[0];
-    if (row) {
-      await client.query(
-        "UPDATE organizations SET plan = $1, updated_at = NOW() WHERE id = $2 AND NOT is_personal",
-        [organizationPlanForSubscription(row.plan, status), row.organization_id]
-      );
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  // The new workspace plan depends on the stored plan; the CASE reads it inside the same batch.
+  const plans = Object.keys(ORGANIZER_PLANS) as OrganizerPlan[];
+  const planCase = plans.map((_, index) => `WHEN $${index + 3} THEN $${index + 3 + plans.length}`).join(" ");
+  await batch([
+    {
+      text: `UPDATE organization_subscriptions SET status = $1, updated_at = ${SQL_NOW}
+        WHERE stripe_subscription_id = $2 AND status <> 'canceled'`,
+      params: [status, subscriptionId],
+    },
+    {
+      text: `UPDATE organizations SET updated_at = ${SQL_NOW},
+          plan = CASE (SELECT plan FROM organization_subscriptions WHERE organization_id = organizations.id) ${planCase} END
+        WHERE is_personal = 0
+          AND id = (SELECT organization_id FROM organization_subscriptions WHERE stripe_subscription_id = $2 AND status = $1)`,
+      params: [status, subscriptionId, ...plans, ...plans.map((plan) => organizationPlanForSubscription(plan, status))],
+    },
+  ]);
 }
 
 async function handleSubscriptionUpdated(

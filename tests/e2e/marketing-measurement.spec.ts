@@ -10,17 +10,16 @@ test.describe('anonymous marketing attribution', () => {
     await expect(page.getByRole('link', {name:'Create a free event',exact:true}).first()).toHaveAttribute('href', '/signup?source=email');
     await page.getByRole('link', {name:'Create a free event',exact:true}).first().click();
     await expect(page).toHaveURL(/\/signup\?source=email$/);
-    await page.route('**/api/auth/send-code', route => route.fulfill({json:{success:true,message:'Fixture only'}}));
-    await page.route('**/api/auth/verify-code', async route => {
-      expect(route.request().postDataJSON()).toMatchObject({channel:'email',method:'email'});
+    // The QA server has no email provider, so sign-up uses a password.
+    await page.route('**/api/auth/signup-password', async route => {
+      expect(route.request().postDataJSON()).toMatchObject({channel:'email'});
       expect(route.request().postData()).not.toContain('private-person');
-      await route.fulfill({status:400,json:{success:false,error:'Fixture verification stopped'}});
+      await route.fulfill({status:400,json:{success:false,error:'Fixture sign-up stopped'}});
     });
     await page.getByLabel('Email', {exact:true}).fill('synthetic-marketing@example.test');
-    await page.getByRole('button', {name:/email my sign-in code/i}).click();
-    await page.getByLabel(/verification code/i).fill('123456');
-    await page.getByRole('button', {name:/verify|create account/i}).click();
-    await expect(page.getByText('Fixture verification stopped')).toBeVisible();
+    await page.getByLabel('Password', {exact:true}).fill('fixture-password-1');
+    await page.getByRole('button', {name:'Create account'}).click();
+    await expect(page.getByText('Fixture sign-up stopped')).toBeVisible();
   });
 });
 

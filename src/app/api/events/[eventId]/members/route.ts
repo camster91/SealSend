@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getDb, query } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import { abortCode, guard, SQL_NOW, type Statement } from "@/lib/db/sqlite-dialect";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { getEventAccess, resolveEventAccessRole, roleCan } from "@/lib/auth/event-access";
 import { eventMemberInviteSchema } from "@/lib/validations";
@@ -34,7 +35,7 @@ export async function GET(_request: Request, { params }: Params) {
     query(
       `SELECT id, email, role, token_preview, expires_at, created_at
        FROM event_member_invites
-       WHERE event_id = $1 AND accepted_at IS NULL AND expires_at > NOW()
+       WHERE event_id = $1 AND accepted_at IS NULL AND expires_at > ${SQL_NOW}
        ORDER BY created_at DESC`,
       [eventId],
     ),
@@ -60,101 +61,117 @@ export async function POST(request: Request, { params }: Params) {
   const token = generateMagicToken();
   const tokenHash = hashMagicToken(token);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const client = await getDb().connect();
-  let eventTitle = "your event";
-  try {
-    await client.query("BEGIN");
-    // Re-check the resolved permission while the event row is locked. A role
-    // can be removed after the initial lookup but before this transaction
-    // starts; the UI permission must never outlive that membership change.
-    const eventResult = await client.query<{
-      id: string;
-      user_id: string;
-      title: string;
-      tier: string;
-      role: string | null;
-      organization_role: string | null;
-    }>(
-      `SELECT e.id, e.user_id, e.title, e.tier,
-              CASE WHEN e.user_id = $2 THEN 'owner'
-                   ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
-              END AS role,
-              (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) AS organization_role
-         FROM events e
-        WHERE e.id = $1
-          AND (e.user_id = $2
-               OR EXISTS (SELECT 1 FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2)
-               OR EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2))
-        FOR UPDATE OF e`,
-      [eventId, auth.user.id],
-    );
-    const event = eventResult.rows[0];
-    const transactionRole = event
-      ? resolveEventAccessRole(event.role, event.organization_role)
-      : null;
-    if (!event || !transactionRole || !roleCan(transactionRole, "manage_members")) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    eventTitle = event.title;
+  // Re-check the resolved permission at write time. A role can be removed
+  // after the initial lookup; the UI permission must never outlive that
+  // membership change. D1 has no row locks, so the batch below re-checks the
+  // roles read here, the seat count and the membership before it writes.
+  const event = await queryOne<{
+    id: string;
+    user_id: string;
+    title: string;
+    tier: string;
+    role: string | null;
+    organization_role: string | null;
+  }>(
+    `SELECT e.id, e.user_id, e.title, e.tier,
+            CASE WHEN e.user_id = $2 THEN 'owner'
+                 ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
+            END AS role,
+            (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) AS organization_role
+       FROM events e
+      WHERE e.id = $1
+        AND (e.user_id = $2
+             OR EXISTS (SELECT 1 FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2)
+             OR EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2))`,
+    [eventId, auth.user.id],
+  );
+  const transactionRole = event
+    ? resolveEventAccessRole(event.role, event.organization_role)
+    : null;
+  if (!event || !transactionRole || !roleCan(transactionRole, "manage_members")) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const eventTitle = event.title;
 
-    // Seat entitlement belongs to the event owner, even when a workspace
-    // owner or admin performs the invite on a planner-created event.
-    const accountPlan = await getUserTier(event.user_id);
-    const teamLimit = getTeamMemberLimit(accountPlan, event.tier as EventTier);
-    const countResult = await client.query<{ count: string }>(
-      `SELECT (
-         (SELECT COUNT(*) FROM event_members WHERE event_id = $1) +
-         (SELECT COUNT(*) FROM event_member_invites WHERE event_id = $1 AND accepted_at IS NULL AND expires_at > NOW())
-       )::text AS count`,
-      [eventId],
-    );
-    const occupiedSeats = 1 + Number(countResult.rows[0]?.count ?? 0);
-    if (occupiedSeats >= teamLimit) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: `This event supports ${teamLimit} team member${teamLimit === 1 ? "" : "s"}, including the owner.` }, { status: 403 });
-    }
+  // Seat entitlement belongs to the event owner, even when a workspace
+  // owner or admin performs the invite on a planner-created event.
+  const accountPlan = await getUserTier(event.user_id);
+  const teamLimit = getTeamMemberLimit(accountPlan, event.tier as EventTier);
+  const seatLimitResponse = () => NextResponse.json({ error: `This event supports ${teamLimit} team member${teamLimit === 1 ? "" : "s"}, including the owner.` }, { status: 403 });
+  const occupiedSeatsSql = `1 + (SELECT COUNT(*) FROM event_members WHERE event_id = $1) +
+       (SELECT COUNT(*) FROM event_member_invites WHERE event_id = $1 AND accepted_at IS NULL AND expires_at > ${SQL_NOW})`;
+  const countResult = await queryOne<{ count: number }>(
+    `SELECT ${occupiedSeatsSql} AS count`,
+    [eventId],
+  );
+  const occupiedSeats = Number(countResult?.count ?? 1);
+  if (occupiedSeats >= teamLimit) {
+    return seatLimitResponse();
+  }
 
-    const existingUser = await client.query<{ id: string }>(
-      "SELECT id FROM admin_users WHERE LOWER(email) = LOWER($1)",
-      [parsed.data.email],
+  const existingUser = await queryOne<{ id: string }>(
+    "SELECT id FROM admin_users WHERE LOWER(email) = LOWER($1)",
+    [parsed.data.email],
+  );
+  if (existingUser?.id === auth.user.id) {
+    return NextResponse.json({ error: "You are already the event owner." }, { status: 409 });
+  }
+  const alreadyMemberResponse = () => NextResponse.json({ error: "This person is already a team member." }, { status: 409 });
+  if (existingUser) {
+    const existingMember = await queryOne(
+      "SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2",
+      [eventId, existingUser.id],
     );
-    if (existingUser.rows[0]?.id === auth.user.id) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "You are already the event owner." }, { status: 409 });
+    if (existingMember) {
+      return alreadyMemberResponse();
     }
-    if (existingUser.rows[0]) {
-      const existingMember = await client.query(
-        "SELECT id FROM event_members WHERE event_id = $1 AND user_id = $2",
-        [eventId, existingUser.rows[0].id],
-      );
-      if (existingMember.rows[0]) {
-        await client.query("ROLLBACK");
-        return NextResponse.json({ error: "This person is already a team member." }, { status: 409 });
-      }
-    }
+  }
 
-    await client.query(
-      "DELETE FROM event_member_invites WHERE event_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
-      [eventId, parsed.data.email],
-    );
-    await client.query(
-      `INSERT INTO event_member_invites
+  const statements: Statement[] = [
+    // The roles that granted manage_members are unchanged.
+    guard(
+      `EXISTS (SELECT 1 FROM events e WHERE e.id = $1
+          AND (CASE WHEN e.user_id = $2 THEN 'owner'
+                    ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
+               END) IS $3
+          AND (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) IS $4)`,
+      [eventId, auth.user.id, event.role, event.organization_role],
+      "access_changed",
+    ),
+    guard(`${occupiedSeatsSql} < $2`, [eventId, teamLimit], "seat_limit"),
+  ];
+  if (existingUser) {
+    statements.push(guard(
+      "NOT EXISTS (SELECT 1 FROM event_members WHERE event_id = $1 AND user_id = $2)",
+      [eventId, existingUser.id],
+      "already_member",
+    ));
+  }
+  statements.push(
+    {
+      text: "DELETE FROM event_member_invites WHERE event_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
+      params: [eventId, parsed.data.email],
+    },
+    {
+      text: `INSERT INTO event_member_invites
         (event_id, email, role, token_hash, token_preview, invited_by, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [eventId, parsed.data.email, parsed.data.role, tokenHash, previewMagicToken(token), auth.user.id, expiresAt.toISOString()],
-    );
-    await client.query(
-      `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-       VALUES ($1, $2, 'member_invited', $3::jsonb)`,
-      [eventId, auth.user.id, JSON.stringify({ role: parsed.data.role })],
-    );
-    await client.query("COMMIT");
+      params: [eventId, parsed.data.email, parsed.data.role, tokenHash, previewMagicToken(token), auth.user.id, expiresAt],
+    },
+    {
+      text: `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
+       VALUES ($1, $2, 'member_invited', $3)`,
+      params: [eventId, auth.user.id, JSON.stringify({ role: parsed.data.role })],
+    },
+  );
+  try {
+    await batch(statements);
   } catch (error) {
-    await client.query("ROLLBACK");
+    const code = abortCode(error);
+    if (code === "access_changed") return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (code === "seat_limit") return seatLimitResponse();
+    if (code === "already_member") return alreadyMemberResponse();
     throw error;
-  } finally {
-    client.release();
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app").replace(/\/$/, "");

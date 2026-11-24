@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { Pool } from "pg";
+import { openSqliteDb } from "../../src/lib/db/sqlite-local";
 
 const email = process.env.SEALSEND_ACCOUNT_QA_EMAIL;
 const password = process.env.SEALSEND_ACCOUNT_QA_PASSWORD;
@@ -50,11 +50,12 @@ test("host can export data, schedule deletion, and cancel during cooling off", a
   if (process.env.SEALSEND_ACCOUNT_QA_EXECUTE === "true") {
     const scheduled = await page.context().request.post("/api/account/deletion");
     expect(scheduled.status()).toBe(202);
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    // The same local SQLite file the app under test uses.
+    const db = openSqliteDb(process.env.SQLITE_PATH ?? ".data/sealsend.db");
     try {
-      await pool.query("UPDATE account_deletion_requests SET scheduled_for = NOW() - INTERVAL '1 minute' WHERE user_id = $1", [exported.account.id]);
+      await db.query("UPDATE account_deletion_requests SET scheduled_for = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minutes') WHERE user_id = $1", [exported.account.id]);
     } finally {
-      await pool.end();
+      db.handle.close();
     }
     const execute = await page.context().request.post("/api/cron/delete-accounts", {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },

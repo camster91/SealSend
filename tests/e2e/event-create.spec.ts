@@ -16,7 +16,7 @@ test.describe('Protected event creation', () => {
       page.waitForURL(/\/signup$/, { timeout: 15_000 }),
       cta.click(),
     ]);
-    await expect(page.getByRole('button', { name: 'Email my sign-in code' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
   });
 });
 
@@ -30,5 +30,5 @@ test('sample invitation leads naturally to a free event', async ({ page }) => {
   await expect(demo.getByRole('status')).toContainText('No RSVP was sent.');
   await demo.getByRole('link', { name: 'Make your own invitation', exact: true }).click();
   await expect(page).toHaveURL(/\/signup$/);
-  await expect(page.getByRole('button', { name: 'Email my sign-in code' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
 });

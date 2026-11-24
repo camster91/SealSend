@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { query, queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -20,7 +21,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     : [];
   const shares = await query(
     `SELECT id, token_preview, expires_at, approved_at, approver_name, created_at
-       FROM event_client_shares WHERE event_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+       FROM event_client_shares WHERE event_id = $1 AND revoked_at IS NULL AND expires_at > ${SQL_NOW}
        ORDER BY created_at DESC`,
     [eventId],
   );
@@ -39,15 +40,15 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
   // The client must belong to the same workspace as the event.
   const updated = await query(
-    `UPDATE events e SET client_id = $2, updated_at = NOW()
-      WHERE e.id = $1
-        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM clients c WHERE c.id = $2 AND c.organization_id = e.organization_id))
-      RETURNING e.id`,
+    `UPDATE events SET client_id = $2, updated_at = ${SQL_NOW}
+      WHERE id = $1
+        AND ($2 IS NULL OR EXISTS (SELECT 1 FROM clients c WHERE c.id = $2 AND c.organization_id = events.organization_id))
+      RETURNING id`,
     [eventId, parsed.data.clientId],
   );
   if (updated.length === 0) return NextResponse.json({ error: "That client isn't in this event's workspace." }, { status: 400 });
   await query(
-    `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata) VALUES ($1, $2, 'client_assigned', $3::jsonb)`,
+    `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata) VALUES ($1, $2, 'client_assigned', $3)`,
     [eventId, auth.user.id, JSON.stringify({ clientId: parsed.data.clientId })],
   );
   return NextResponse.json({ clientId: parsed.data.clientId });

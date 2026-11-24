@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
+import { sqlNowPlus } from "@/lib/db/sqlite-dialect";
 import { sendEmail } from "@/lib/email";
 import { buildHostLifecycleMessage, type HostLifecycleCandidate } from "@/lib/host-lifecycle";
 import { resolveStaleDraftPolicy } from "@/lib/retention";
@@ -13,44 +14,50 @@ export async function GET(request: NextRequest) {
     process.env.STALE_DRAFT_RETENTION_DAYS,
     process.env.STALE_DRAFT_WARNING_DAYS,
   );
+  const day = 24 * 60 * 60 * 1000;
+  const warnFrom = new Date(Date.now() - warningAgeDays * day);
+  const retentionCutoff = new Date(Date.now() - retentionDays * day);
+  // The stale-draft scope key's epoch is whole seconds of updated_at, rounded like Postgres
+  // EXTRACT(EPOCH ...)::bigint so keys written before the move to D1 still match. cleanup-drafts
+  // builds the same key.
   const candidates = await query<HostLifecycleCandidate>(
     `SELECT * FROM (
-      SELECT a.id AS user_id, a.email, NULL::uuid AS event_id, NULL::text AS title,
-             'getting_started'::text AS notification_type, 'getting_started:' || a.id::text AS scope_key,
-             NULL::timestamptz AS action_at
+      SELECT a.id AS user_id, a.email, NULL AS event_id, NULL AS title,
+             'getting_started' AS notification_type, 'getting_started:' || a.id AS scope_key,
+             NULL AS action_at
         FROM admin_users a
-       WHERE a.created_at < NOW() - INTERVAL '24 hours'
+       WHERE a.created_at < ${sqlNowPlus("-24 hours")}
          AND NOT EXISTS (SELECT 1 FROM events e WHERE e.user_id = a.id)
       UNION ALL
-      SELECT a.id, a.email, e.id, e.title, 'finish_draft', 'finish_draft:' || e.id::text, NULL::timestamptz
+      SELECT a.id, a.email, e.id, e.title, 'finish_draft', 'finish_draft:' || e.id, NULL
         FROM admin_users a JOIN events e ON e.user_id = a.id
-       WHERE e.status = 'draft' AND e.updated_at < NOW() - INTERVAL '48 hours'
+       WHERE e.status = 'draft' AND e.updated_at < ${sqlNowPlus("-48 hours")}
       UNION ALL
-      SELECT a.id, a.email, e.id, e.title, 'event_approaching', 'event_approaching:' || e.id::text, NULL::timestamptz
+      SELECT a.id, a.email, e.id, e.title, 'event_approaching', 'event_approaching:' || e.id, NULL
         FROM admin_users a JOIN events e ON e.user_id = a.id
-       WHERE e.status = 'published' AND e.event_date > NOW() + INTERVAL '2 days'
-         AND e.event_date <= NOW() + INTERVAL '3 days'
+       WHERE e.status = 'published' AND e.event_date > ${sqlNowPlus("+2 days")}
+         AND e.event_date <= ${sqlNowPlus("+3 days")}
       UNION ALL
-      SELECT a.id, a.email, e.id, e.title, 'post_event_repeat', 'post_event_repeat:' || e.id::text, NULL::timestamptz
+      SELECT a.id, a.email, e.id, e.title, 'post_event_repeat', 'post_event_repeat:' || e.id, NULL
         FROM admin_users a JOIN events e ON e.user_id = a.id
        WHERE e.status = 'published'
-         AND COALESCE(e.event_end_date, e.event_date) <= NOW() - INTERVAL '24 hours'
-         AND COALESCE(e.event_end_date, e.event_date) >= NOW() - INTERVAL '7 days'
+         AND COALESCE(e.event_end_date, e.event_date) <= ${sqlNowPlus("-24 hours")}
+         AND COALESCE(e.event_end_date, e.event_date) >= ${sqlNowPlus("-7 days")}
          AND EXISTS (SELECT 1 FROM rsvp_responses responses WHERE responses.event_id = e.id)
          AND NOT EXISTS (
            SELECT 1 FROM events repeated WHERE repeated.repeated_from_event_id = e.id
          )
       UNION ALL
       SELECT a.id, a.email, e.id, e.title, 'stale_draft_warning',
-             'stale_draft_warning:' || e.id::text || ':' || EXTRACT(EPOCH FROM e.updated_at)::bigint::text || ':' || $2::text,
-             e.updated_at + ($2::int * INTERVAL '1 day') AS action_at
+             'stale_draft_warning:' || e.id || ':' || CAST(round(unixepoch(e.updated_at, 'subsec')) AS INTEGER) || ':' || $2,
+             strftime('%Y-%m-%dT%H:%M:%fZ', e.updated_at, '+' || $2 || ' days') AS action_at
         FROM admin_users a JOIN events e ON e.user_id = a.id
        WHERE e.status = 'draft'
-         AND e.updated_at <= NOW() - ($1::int * INTERVAL '1 day')
-         AND e.updated_at > NOW() - ($2::int * INTERVAL '1 day')
+         AND e.updated_at <= $1
+         AND e.updated_at > $3
     ) c WHERE NOT EXISTS (SELECT 1 FROM host_lifecycle_notifications n WHERE n.scope_key = c.scope_key)
     ORDER BY notification_type, scope_key LIMIT 25`,
-    [warningAgeDays, retentionDays],
+    [warnFrom, retentionDays, retentionCutoff],
   );
   if (process.env.ENABLE_HOST_LIFECYCLE_EMAILS !== "true") {
     return NextResponse.json({ enabled: false, candidates: candidates.length, sent: 0 });

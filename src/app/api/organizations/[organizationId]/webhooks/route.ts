@@ -13,7 +13,7 @@ import {
 type RouteParams = { params: Promise<{ organizationId: string }> };
 
 const WEBHOOK_COLUMNS = `id, url, events, description, active, last_success_at, last_failure_at, consecutive_failures, created_at,
-  'whsec_…' || right(secret, 4) AS secret_preview`;
+  'whsec_…' || substr(secret, -4) AS secret_preview`;
 
 async function loadPlan(organizationId: string) {
   return (await queryOne<{ plan: string }>("SELECT plan FROM organizations WHERE id = $1", [organizationId]))?.plan ?? "personal";

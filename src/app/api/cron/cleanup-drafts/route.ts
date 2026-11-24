@@ -19,24 +19,27 @@ export async function GET(request: NextRequest) {
       process.env.STALE_DRAFT_RETENTION_DAYS,
       process.env.STALE_DRAFT_WARNING_DAYS,
     );
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    const warningCutoff = new Date(Date.now() - warningDays * 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const warningCutoff = new Date(Date.now() - warningDays * 24 * 60 * 60 * 1000);
     const enabled = process.env.ENABLE_STALE_DRAFT_CLEANUP === "true";
 
-    const counts = await query<{ candidates: string; warned_candidates: string }>(
+    // The scope key's epoch is whole seconds of updated_at, rounded like Postgres
+    // EXTRACT(EPOCH ...)::bigint so warnings sent before the move to D1 still match.
+    // send-host-lifecycle builds the same key.
+    const counts = await query<{ candidates: number; warned_candidates: number }>(
       `SELECT
-         COUNT(*) FILTER (WHERE events.updated_at < $2)::text AS candidates,
+         COUNT(*) FILTER (WHERE events.updated_at < $2) AS candidates,
          COUNT(*) FILTER (
            WHERE events.updated_at < $2
              AND EXISTS (
                SELECT 1 FROM host_lifecycle_notifications notifications
                 WHERE notifications.event_id = events.id
                   AND notifications.notification_type = 'stale_draft_warning'
-                  AND notifications.scope_key = 'stale_draft_warning:' || events.id::text || ':' ||
-                      EXTRACT(EPOCH FROM events.updated_at)::bigint::text || ':' || $4::text
+                  AND notifications.scope_key = 'stale_draft_warning:' || events.id || ':' ||
+                      CAST(round(unixepoch(events.updated_at, 'subsec')) AS INTEGER) || ':' || $4
                   AND notifications.sent_at <= $3
              )
-         )::text AS warned_candidates
+         ) AS warned_candidates
        FROM events WHERE events.status = $1`,
       ["draft", cutoff, warningCutoff, retentionDays],
     );
@@ -61,8 +64,8 @@ export async function GET(request: NextRequest) {
             SELECT 1 FROM host_lifecycle_notifications notifications
              WHERE notifications.event_id = events.id
                AND notifications.notification_type = 'stale_draft_warning'
-               AND notifications.scope_key = 'stale_draft_warning:' || events.id::text || ':' ||
-                   EXTRACT(EPOCH FROM events.updated_at)::bigint::text || ':' || $4::text
+               AND notifications.scope_key = 'stale_draft_warning:' || events.id || ':' ||
+                   CAST(round(unixepoch(events.updated_at, 'subsec')) AS INTEGER) || ':' || $4
                AND notifications.sent_at <= $3
           )
         RETURNING id`,

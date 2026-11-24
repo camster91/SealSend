@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { sendEmail } from "@/lib/email";
 import { reserveEmailQuota } from "@/lib/email-quota";
 import { buildReminderEmail } from "@/lib/email-templates";
@@ -93,10 +94,10 @@ export async function GET(request: NextRequest) {
     const events = await query<EventRow>(
       `SELECT id, title, event_date, location_name, slug, tier, user_id, host_name
        FROM events
-       WHERE status = $1 AND auto_reminders = true
+       WHERE status = $1 AND auto_reminders = 1
          AND event_date >= $2 AND event_date <= $3
        ORDER BY event_date ASC`,
-      ["published", windowStart.toISOString(), windowEnd.toISOString()]
+      ["published", windowStart, windowEnd]
     );
 
     if (!events || events.length === 0) {
@@ -139,12 +140,13 @@ export async function GET(request: NextRequest) {
         `SELECT g.id, g.name, g.email, g.phone, g.phone_invalid_at, g.invite_token, g.reminder_sent_at,
                 r.status as rsvp_status
          FROM guests g
-         LEFT JOIN LATERAL (
-           SELECT status FROM rsvp_responses
-           WHERE guest_id = g.id
-           ORDER BY updated_at DESC NULLS LAST, created_at DESC
-           LIMIT 1
-         ) r ON TRUE
+         LEFT JOIN (
+           -- Each guest's latest response only.
+           SELECT guest_id, status,
+                  ROW_NUMBER() OVER (PARTITION BY guest_id ORDER BY updated_at DESC NULLS LAST, created_at DESC) AS response_rank
+           FROM rsvp_responses
+           WHERE guest_id IN (SELECT id FROM guests WHERE event_id = $1)
+         ) r ON r.guest_id = g.id AND r.response_rank = 1
          WHERE g.event_id = $1
            AND ${REMINDER_TARGET_SQL}
            AND (g.email IS NOT NULL OR g.phone IS NOT NULL)`,
@@ -320,7 +322,7 @@ export async function GET(request: NextRequest) {
                   }
                 }
               } else {
-                await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);
+                await query(`UPDATE guests SET phone_invalid_at = ${SQL_NOW}, updated_at = ${SQL_NOW} WHERE id = $1`, [guest.id]);
                 const errorMsg = phoneValidation.error || "Invalid phone number";
                 console.error(`[CRON] Invalid phone for guest ${guest.id}:`, errorMsg);
                 await logSendFailure(event.id, "sms", guest.phone, errorMsg, {
@@ -352,8 +354,8 @@ export async function GET(request: NextRequest) {
       if (successIds.length > 0) {
         try {
           await query(
-            'UPDATE guests SET reminder_sent_at = $1 WHERE id = ANY($2)',
-            [new Date().toISOString(), successIds]
+            'UPDATE guests SET reminder_sent_at = $1 WHERE id IN (SELECT value FROM json_each($2))',
+            [new Date(), successIds]
           );
         } catch (updateError: unknown) {
           console.error(`[CRON] Error updating reminder_sent_at for event ${event.id}:`, updateError);

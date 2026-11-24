@@ -9,15 +9,11 @@ import { saveImageForUser, type UploadStoreDb } from "../src/lib/upload-store";
 function fakeDb(usedBytes = 0) {
   const calls: { text: string; params?: unknown[] }[] = [];
   const db: UploadStoreDb = {
-    async connect() {
-      return {
-        async query(text: string, params?: unknown[]) {
-          calls.push({ text, params });
-          if (text.includes("SUM(byte_size)")) return { rows: [{ used: String(usedBytes) }], rowCount: 1 };
-          return { rows: [], rowCount: 0 };
-        },
-        release() {},
-      };
+    async query<T>(text: string, params?: unknown[]) {
+      calls.push({ text, params });
+      if (text.startsWith("SELECT COALESCE(SUM(byte_size)")) return [{ used: usedBytes }] as T[];
+      if (text.startsWith("INSERT INTO upload_assets")) return [{ id: "asset-1" }] as T[];
+      return [] as T[];
     },
   };
   return { db, calls };
@@ -58,7 +54,6 @@ test("refuses when over quota and writes nothing", async () => {
     );
     assert.deepEqual(result, { error: "quota", usedBytes: 250 * 1024 * 1024, quotaBytes: 250 * 1024 * 1024 });
     assert.equal(calls.some((c) => c.text.startsWith("INSERT")), false);
-    assert.ok(calls.some((c) => c.text === "ROLLBACK"));
     const entries = await readdir(path.join(dir, "user-1")).catch(() => []);
     assert.equal(entries.length, 0);
   } finally {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { sendEmail } from "@/lib/email";
 import { buildInvitationEmail } from "@/lib/email-templates";
 import { buildInviteSms } from "@/lib/sms-templates";
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             const phoneValidation = validateAndFormatPhone(guest.phone);
 
             if (!phoneValidation.valid) {
-              await query('UPDATE guests SET phone_invalid_at = NOW(), updated_at = NOW() WHERE id = $1', [guest.id]);
+              await query(`UPDATE guests SET phone_invalid_at = ${SQL_NOW}, updated_at = ${SQL_NOW} WHERE id = $1`, [guest.id]);
               errors.push({ type: 'sms', message: phoneValidation.error || 'Invalid phone number' });
               console.error(`[SMS INVALID] guest=${guest.id}:`, phoneValidation.error);
 
@@ -307,10 +308,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Batch update statuses
     if (successIds.length > 0) {
-      const placeholders = successIds.map((_, i) => `$${i + 3}`).join(', ');
+      // One JSON array parameter: D1 allows 100 bound parameters per statement.
       await query(
-        `UPDATE guests SET invite_status = $1, invite_sent_at = $2 WHERE id IN (${placeholders})`,
-        ['sent', new Date().toISOString(), ...successIds]
+        'UPDATE guests SET invite_status = $1, invite_sent_at = $2 WHERE id IN (SELECT value FROM json_each($3))',
+        ['sent', new Date(), successIds]
       );
     }
     if (failedGuests.length > 0) {
@@ -334,7 +335,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     await query(
       `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-       VALUES ($1, $2, 'invitations_sent', $3::jsonb)`,
+       VALUES ($1, $2, 'invitations_sent', $3)`,
       [eventId, user.id, JSON.stringify({ emailAccepted: sent, emailFailed: failed, smsAccepted: smsSent, smsFailed })]
     );
 

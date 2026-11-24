@@ -1,9 +1,8 @@
 import { toWebp } from '@/lib/image-processor';
-import { query } from '@/lib/db/client';
+import { batch, query } from '@/lib/db/client';
+import { abortCode, guard } from '@/lib/db/sqlite-dialect';
 import { saveImageForUser, validateMagicBytes } from '@/lib/upload-store';
 import { blobKeyFromUploadPath, getBlobStore } from '@/lib/blob-store';
-import { socialTransaction } from './actions';
-import { ensureSocialSchema } from './access';
 import type { SocialAccess } from './access';
 import { getSocialSettings } from './store';
 export const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -32,22 +31,29 @@ export async function normalizePhoto(bytes: Buffer, contentType: string): Promis
   } catch { return null; }
 }
 export async function saveSocialPhoto(access: SocialAccess, bytes: Buffer, caption: string): Promise<{ status: number; error?: string; id?: string }> {
-  // Reserve the owner's quota before taking the event lock; never hold two
-  // database transactions while waiting on separate pool connections.
+  // Reserve the owner's quota first, then attach the photo in one batch whose
+  // guards re-check the album and the photo limits when the insert runs.
   const settings = await getSocialSettings(access.event.id);
   if (!settings.photos_enabled) return { status:409,error:'The album is closed.' };
   const saved = await saveImageForUser(access.event.user_id,bytes,{ mediaType:'image',contentType:'image/webp',originalName:'guest-photo.webp' },{ privateFolder:'social-private' });
   if ('error' in saved) return { status:413,error:'The host’s upload space is full.' };
   let attached = false;
   try {
-    const result = await socialTransaction(access.event.id, async db => {
-      const current = await getSocialSettings(access.event.id, db);
-      if (!current.photos_enabled) return { status:409,error:'The album is closed.' };
-      const [counts] = await db<{ total: number; own: number }>('SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE guest_id=$2)::int AS own FROM event_social_photos WHERE event_id=$1',[access.event.id,access.guest.id]);
-      if (counts.total >= 200 || counts.own >= 10) return { status:413,error:'The photo limit has been reached.' };
-      const [photo] = await db<{ id: string }>('INSERT INTO event_social_photos(event_id,guest_id,storage_path,caption,approved) VALUES ($1,$2,$3,$4,$5) RETURNING id',[access.event.id,access.guest.id,saved.url,caption,!current.photo_approval]);
-      return { status:201,id:photo.id };
-    });
+    let result: { status: number; error?: string; id?: string };
+    try {
+      const results = await batch<{ id: string }>([
+        guard('COALESCE((SELECT photos_enabled FROM event_social_settings WHERE event_id=$1),0) = 1',[access.event.id],'album_closed'),
+        guard('(SELECT COUNT(*) FROM event_social_photos WHERE event_id=$1) < 200 AND (SELECT COUNT(*) FROM event_social_photos WHERE event_id=$1 AND guest_id=$2) < 10',[access.event.id,access.guest.id],'photo_limit'),
+        // Approval follows the current settings row (the guard above ensures it exists).
+        { text:'INSERT INTO event_social_photos(event_id,guest_id,storage_path,caption,approved) SELECT $1,$2,$3,$4,(photo_approval = 0) FROM event_social_settings WHERE event_id=$1 RETURNING id',params:[access.event.id,access.guest.id,saved.url,caption] },
+      ]);
+      result = { status:201,id:results[2][0].id };
+    } catch (error) {
+      const code = abortCode(error);
+      if (code === 'album_closed') result = { status:409,error:'The album is closed.' };
+      else if (code === 'photo_limit') result = { status:413,error:'The photo limit has been reached.' };
+      else throw error;
+    }
     attached = result.status === 201;
     return result;
   } finally {
@@ -67,10 +73,7 @@ export async function removePrivateFile(storagePath: string): Promise<void> {
   await query('DELETE FROM event_social_file_cleanup WHERE storage_path=$1',[storagePath]);
 }
 export async function deleteSocialPhoto(eventId: string, id: string, guestId: string | null, host: boolean): Promise<boolean> {
-  const deleted = await socialTransaction(eventId, async db => {
-    const [photo] = await db<{ storage_path: string }>('DELETE FROM event_social_photos WHERE event_id=$1 AND id=$2 AND (guest_id=$3 OR $4) RETURNING storage_path',[eventId,id,guestId,host]);
-    return photo;
-  });
+  const [deleted] = await query<{ storage_path: string }>('DELETE FROM event_social_photos WHERE event_id=$1 AND id=$2 AND (guest_id=$3 OR $4 = 1) RETURNING storage_path',[eventId,id,guestId,host]);
   if (!deleted) return false;
   // An interrupted unlink leaves a quota-accounted orphan for the existing cleanup job.
   await removePrivateFile(deleted.storage_path).catch(() => undefined);
@@ -79,14 +82,13 @@ export async function deleteSocialPhoto(eventId: string, id: string, guestId: st
 
 /** Snapshot only authorized scope; database triggers preserve any concurrent deletes. */
 export async function captureSocialPhotoPaths(eventId: string, guestId?: string): Promise<string[]> {
-  await ensureSocialSchema();
-  const rows = await query<{ storage_path:string }>('SELECT storage_path FROM event_social_photos WHERE event_id=$1 AND ($2::uuid IS NULL OR guest_id=$2)',[eventId,guestId ?? null]);
+  const rows = await query<{ storage_path:string }>('SELECT storage_path FROM event_social_photos WHERE event_id=$1 AND ($2 IS NULL OR guest_id=$2)',[eventId,guestId ?? null]);
   return rows.map(row=>row.storage_path);
 }
 /** Explicit deletion retries run independently of optional orphan garbage collection. */
 export async function purgeQueuedSocialPhotos(paths?: string[]): Promise<number> {
   const rows = await query<{ storage_path:string }>(`SELECT q.storage_path FROM event_social_file_cleanup q
-    WHERE ($1::text[] IS NULL OR q.storage_path=ANY($1))
+    WHERE ($1 IS NULL OR q.storage_path IN (SELECT value FROM json_each($1)))
       AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path=q.storage_path)
     ORDER BY queued_at LIMIT 200`,[paths ?? null]);
   let deleted = 0;

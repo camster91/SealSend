@@ -1,6 +1,6 @@
-import { getDb, queryOne } from "@/lib/db/client";
+import { query, queryOne } from "@/lib/db/client";
 import { emailSendOptions, getEventBranding, type EventBranding } from "@/lib/brands";
-import { communicationSuppressionKey, type CommunicationSuppressionClient } from "@/lib/communication-suppressions";
+import { communicationSuppressionKey } from "@/lib/communication-suppressions";
 import type { EmailCompliance } from "@/lib/email-templates";
 import { listUnsubscribeHeaders, unsubscribeUrl, type UnsubscribeTarget } from "@/lib/unsubscribe";
 
@@ -94,8 +94,8 @@ export async function getUnsubscribeHostName(target: UnsubscribeTarget): Promise
   const row = await queryOne<{ account_name: string | null; brand_name: string | null }>(
     `SELECT u.name AS account_name, COALESCE(NULLIF(TRIM(b.sender_name), ''), b.name) AS brand_name
        FROM admin_users u
-       LEFT JOIN organizations o ON o.created_by = u.id AND o.is_personal
-       LEFT JOIN brands b ON b.organization_id = o.id AND b.is_default
+       LEFT JOIN organizations o ON o.created_by = u.id AND o.is_personal = 1
+       LEFT JOIN brands b ON b.organization_id = o.id AND b.is_default = 1
       WHERE u.id = $1
       LIMIT 1`,
     [target.ownerUserId],
@@ -103,11 +103,22 @@ export async function getUnsubscribeHostName(target: UnsubscribeTarget): Promise
   return resolveUnsubscribeHostName({ event: null, branding: null, accountName: row?.account_name, personalBrandName: row?.brand_name });
 }
 
+/** Runs a lookup and returns its rows in a { rows } wrapper (tests pass their own). */
+export type SuppressionLookupClient = {
+  query<T>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
+};
+
+const defaultLookupClient: SuppressionLookupClient = {
+  async query<T>(text: string, values?: unknown[]) {
+    return { rows: await query<T>(text, values) };
+  },
+};
+
 /** Whether this host already has any email suppression for this address (unsubscribed, bounced, complained or manual). */
 export async function hasEmailSuppression(
   ownerUserId: string,
   email: string,
-  client: CommunicationSuppressionClient = getDb(),
+  client: SuppressionLookupClient = defaultLookupClient,
 ): Promise<boolean> {
   const [, recipientHash] = communicationSuppressionKey("email", email).split(":");
   const result = await client.query<{ found: number }>(

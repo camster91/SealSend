@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
+import { isEmailConfigured } from '@/lib/email';
 import { cookies } from 'next/headers';
 
 const DUMMY_PASSWORD_HASH = '$2b$14$EmYXdS/qveDgpqxhzH3PZuw.EJjyipeQQnabiAxhvSttfmLAFUGGu';
@@ -21,13 +22,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { email, password } = body;
+    const body: unknown = await request.json().catch(() => null);
+    const { email, password } = (body && typeof body === 'object' ? body : {}) as { email?: unknown; password?: unknown };
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
+      );
+    }
+
+    // Attempts from many addresses against one account share this limit.
+    const accountLimit = await rateLimit(`login-password-account:${email.trim().toLowerCase()}`, {
+      max: 20,
+      windowSeconds: 900,
+    });
+    if (!accountLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429 }
       );
     }
 
@@ -37,9 +50,10 @@ export async function POST(request: NextRequest) {
       email: string;
       name: string;
       password: string;
+      email_verified_at: string | null;
     }>(
-      'SELECT id, email, name, password FROM admin_users WHERE email = $1',
-      [email]
+      'SELECT id, email, name, password, email_verified_at FROM admin_users WHERE LOWER(email) = LOWER($1)',
+      [email.trim()]
     );
 
     // Always perform the same expensive password check to reduce account enumeration timing.
@@ -49,6 +63,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
+      );
+    }
+
+    // Once codes can be delivered, the address must be proven before its password works.
+    if (!adminUser.email_verified_at && isEmailConfigured()) {
+      return NextResponse.json(
+        { error: 'Please sign in with an email code to confirm this address is yours.' },
+        { status: 403 }
       );
     }
 

@@ -7,7 +7,7 @@ export async function reviewBrowserChecks({ browser, origin, db, host }) {
   const event = '00000000-0000-4000-8000-000000000031';
   const guest = '00000000-0000-4000-8000-000000000032';
   const token = 'r'.repeat(24), slug = 'review-qa';
-  await db.query("INSERT INTO events(id,user_id,title,slug,status,max_attendees,event_date) VALUES ($1,$2,'Review QA', $3,'published',2,NOW()+INTERVAL '14 days')",[event,owner,slug]);
+  await db.query("INSERT INTO events(id,user_id,title,slug,status,max_attendees,event_date) VALUES ($1,$2,'Review QA', $3,'published',2,strftime('%Y-%m-%dT%H:%M:%fZ','now','+14 days'))",[event,owner,slug]);
   await db.query("INSERT INTO guests(id,event_id,name,email,invite_token) VALUES ($1,$2,'Review Guest','review-guest@example.test',$3)",[guest,event,token]);
   await db.query("INSERT INTO rsvp_fields(event_id,field_name,field_label,field_type,is_enabled,is_required,sort_order) VALUES ($1,'attendance','Will you attend?','attendance',true,true,0),($1,'headcount','Guest count','number',true,true,1),($1,'email','Email','email',true,false,2)",[event]);
   await db.query('INSERT INTO event_social_settings(event_id,guests_enabled) VALUES ($1,true)',[event]);
@@ -44,7 +44,7 @@ export async function reviewBrowserChecks({ browser, origin, db, host }) {
   await page.getByText('Your response has been recorded.',{exact:true}).waitFor();
   const rows=(await db.query('SELECT status,headcount FROM rsvp_responses WHERE event_id=$1 AND guest_id=$2',[event,guest])).rows;
   assert.equal(rows.length,1);assert.equal(rows[0].status,'not_attending');
-  assert.equal((await db.query("SELECT COALESCE(SUM(headcount),0)::int AS total FROM rsvp_responses WHERE event_id=$1 AND status='attending'",[event])).rows[0].total,0);
+  assert.equal((await db.query("SELECT COALESCE(SUM(headcount),0) AS total FROM rsvp_responses WHERE event_id=$1 AND status='attending'",[event])).rows[0].total,0);
   const spoof=await stranger.request.post(`${origin}/api/rsvp/${slug}`,{headers:{Origin:origin},data:{respondent_name:'Forged',status:'attending',guest_id:guest}});
   assert.equal(spoof.status(),403);
   assert.equal((await stranger.request.get(`${origin}/api/rsvp/${slug}`,{headers:{'X-Guest-Token':'z'.repeat(24)}})).status(),403);
@@ -134,7 +134,7 @@ export async function reviewBrowserChecks({ browser, origin, db, host }) {
   await builder.close();
   console.log('PASS external HTTPS artwork/logo/background render; RSVP layout/accessibility at 375/768/1440px');
 
-  await db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'guest','review-guest-session',NOW()+INTERVAL '1 day')",[guest]);
+  await db.query("INSERT INTO user_sessions(user_id,user_role,session_token,expires_at) VALUES ($1,'guest','review-guest-session',strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 day'))",[guest]);
   const guestSession=await browser.newContext({ignoreHTTPSErrors:true});
   await guestSession.addCookies([{name:'sealsend_session',value:'review-guest-session',url:origin}]);
   assert.equal((await (await guestSession.request.get(`${origin}/api/rsvp/${slug}`)).json()).response.guest_id,guest);

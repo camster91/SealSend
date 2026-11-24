@@ -67,7 +67,9 @@ test("routes wire the confirmation and targeting rule", async () => {
 test("fix round: cron uses latest response, trap includes inputs, UI counts with the rule, scripts send the flag", async () => {
   const read = (p: string) => readFile(new URL(`../${p}`, import.meta.url), "utf8");
   const cron = await read("src/app/api/cron/send-reminders/route.ts");
-  assert.ok(cron.includes("LEFT JOIN LATERAL") && cron.includes("LIMIT 1"));
+  // SQLite has no LATERAL: the latest response per guest is the ROW_NUMBER() = 1 row of a window.
+  assert.match(cron, /ROW_NUMBER\(\) OVER \(PARTITION BY guest_id ORDER BY updated_at DESC NULLS LAST, created_at DESC\) AS response_rank/);
+  assert.match(cron, /\) r ON r\.guest_id = g\.id AND r\.response_rank = 1/);
   assert.ok(!cron.includes("LEFT JOIN rsvp_responses"));
   const feedback = await read("src/components/ui/Feedback.tsx");
   assert.ok(feedback.includes('"input:not([disabled]), button:not([disabled])"'));

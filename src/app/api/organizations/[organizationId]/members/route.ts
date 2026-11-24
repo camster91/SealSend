@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb, query, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import { SQL_NOW, abortCode, guard } from "@/lib/db/sqlite-dialect";
 import {
   INVITABLE_ORGANIZATION_ROLES,
+  ORGANIZATION_SEAT_LIMITS,
   canManageMemberRole,
   organizationSeatLimit,
   requireOrganizationPermission,
@@ -39,7 +41,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const invites = canManage
     ? await query<{ id: string; email: string; role: string; expires_at: string }>(
         `SELECT id, email, role, expires_at FROM organization_invites
-          WHERE organization_id = $1 AND accepted_at IS NULL AND expires_at > NOW()
+          WHERE organization_id = $1 AND accepted_at IS NULL AND expires_at > ${SQL_NOW}
           ORDER BY created_at DESC`,
         [organizationId],
       )
@@ -67,62 +69,51 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const token = generateMagicToken();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const client = await getDb().connect();
-  let organizationName = "a workspace";
-  try {
-    await client.query("BEGIN");
-    const organization = (await client.query<{ name: string; plan: string; is_personal: boolean }>(
-      "SELECT name, plan, is_personal FROM organizations WHERE id = $1 FOR UPDATE",
-      [organizationId],
-    )).rows[0];
-    if (!organization) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (organization.is_personal) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "Create a team workspace to invite people. Personal workspaces have one member." }, { status: 400 });
-    }
-    organizationName = organization.name;
+  const organization = await queryOne<{ name: string; plan: string; is_personal: boolean }>(
+    "SELECT name, plan, is_personal FROM organizations WHERE id = $1",
+    [organizationId],
+  );
+  if (!organization) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (organization.is_personal) {
+    return NextResponse.json({ error: "Create a team workspace to invite people. Personal workspaces have one member." }, { status: 400 });
+  }
+  const organizationName = organization.name;
+  const limit = organizationSeatLimit(organization.plan);
 
-    const seats = await client.query<{ count: string }>(
-      `SELECT (
-         (SELECT COUNT(*) FROM organization_members WHERE organization_id = $1) +
-         (SELECT COUNT(*) FROM organization_invites WHERE organization_id = $1 AND accepted_at IS NULL AND expires_at > NOW() AND LOWER(email) <> LOWER($2))
-       )::text AS count`,
-      [organizationId, parsed.data.email],
-    );
-    const limit = organizationSeatLimit(organization.plan);
-    if (Number(seats.rows[0]?.count ?? 0) >= limit) {
-      await client.query("ROLLBACK");
+  // The seat and membership checks run inside the batch, so parallel invites can't overfill the
+  // workspace. The seat limit is looked up from the plan as it is when the batch runs.
+  try {
+    await batch([
+      guard(
+        `(SELECT COUNT(*) FROM organization_members WHERE organization_id = $1) +
+         (SELECT COUNT(*) FROM organization_invites WHERE organization_id = $1 AND accepted_at IS NULL AND expires_at > ${SQL_NOW} AND LOWER(email) <> LOWER($2))
+         < (SELECT COALESCE(json_extract($3, '$.' || plan), $4) FROM organizations WHERE id = $1 AND is_personal = 0)`,
+        [organizationId, parsed.data.email, ORGANIZATION_SEAT_LIMITS, organizationSeatLimit("personal")],
+        "seat_limit",
+      ),
+      guard(
+        `NOT EXISTS (SELECT 1 FROM organization_members m JOIN admin_users u ON u.id = m.user_id
+                      WHERE m.organization_id = $1 AND LOWER(u.email) = LOWER($2))`,
+        [organizationId, parsed.data.email],
+        "already_member",
+      ),
+      {
+        text: "DELETE FROM organization_invites WHERE organization_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
+        params: [organizationId, parsed.data.email],
+      },
+      {
+        text: `INSERT INTO organization_invites (organization_id, email, role, token_hash, token_preview, invited_by, expires_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        params: [organizationId, parsed.data.email, parsed.data.role, hashMagicToken(token), previewMagicToken(token), auth.user.id, expiresAt],
+      },
+    ]);
+  } catch (error) {
+    const code = abortCode(error);
+    if (code === "seat_limit") {
       return NextResponse.json({ error: `This workspace has ${limit} seats, including pending invitations.` }, { status: 403 });
     }
-
-    const existingMember = await client.query(
-      `SELECT 1 FROM organization_members m JOIN admin_users u ON u.id = m.user_id
-        WHERE m.organization_id = $1 AND LOWER(u.email) = LOWER($2)`,
-      [organizationId, parsed.data.email],
-    );
-    if (existingMember.rowCount) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ error: "This person is already a member." }, { status: 409 });
-    }
-
-    await client.query(
-      "DELETE FROM organization_invites WHERE organization_id = $1 AND LOWER(email) = LOWER($2) AND accepted_at IS NULL",
-      [organizationId, parsed.data.email],
-    );
-    await client.query(
-      `INSERT INTO organization_invites (organization_id, email, role, token_hash, token_preview, invited_by, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [organizationId, parsed.data.email, parsed.data.role, hashMagicToken(token), previewMagicToken(token), auth.user.id, expiresAt.toISOString()],
-    );
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
+    if (code === "already_member") return NextResponse.json({ error: "This person is already a member." }, { status: 409 });
     throw error;
-  } finally {
-    client.release();
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app").replace(/\/$/, "");

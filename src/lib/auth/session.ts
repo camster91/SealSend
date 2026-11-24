@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { AuthUser } from './types';
 
 /**
@@ -47,7 +48,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   try {
     const session = await queryOne<{ user_id: string; user_role: string }>(
-      'SELECT user_id, user_role FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
+      `SELECT user_id, user_role FROM user_sessions WHERE session_token = $1 AND expires_at > ${SQL_NOW}`,
       [sessionToken]
     );
 
@@ -125,7 +126,7 @@ export async function validateSessionToken(token: string): Promise<{
 }> {
   try {
     const session = await queryOne<{ user_id: string; user_role: string; expires_at: string }>(
-      'SELECT user_id, user_role, expires_at FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()',
+      `SELECT user_id, user_role, expires_at FROM user_sessions WHERE session_token = $1 AND expires_at > ${SQL_NOW}`,
       [token]
     );
 

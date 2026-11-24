@@ -32,10 +32,10 @@ test('daily counter is parameterized, canonicalized and fails open', async () =>
   assert.equal(await recordMarketingViewSafely('/', 'private@example.test', execute), true);
   assert.deepEqual(calls[0].params, ['/', 'unknown']);
   assert.match(calls[0].sql, /ON CONFLICT[\s\S]*DO UPDATE/);
-  assert.match(calls[0].sql, /DELETE FROM marketing_pageviews/);
-  assert.equal(calls[0].sql.includes('private@example.test'), false);
+  assert.match(calls[1].sql, /DELETE FROM marketing_pageviews/);
+  assert.equal(calls.some((call) => call.sql.includes('private@example.test')), false);
   assert.equal(await recordMarketingViewSafely('/e/private', 'email', execute), false);
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(await recordMarketingViewSafely('/', 'direct', async () => { throw new Error('unavailable'); }), false);
 });
 test('invalid optional analytics data cannot block valid authentication', () => {

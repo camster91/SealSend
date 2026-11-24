@@ -1,34 +1,58 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb, queryOne } from "@/lib/db/client";
+import { batch, queryOne } from "@/lib/db/client";
+import { abortCode, guard, type Statement } from "@/lib/db/sqlite-dialect";
 import { ORGANIZATION_ROLES } from "@/lib/auth/event-access";
 import { canManageMemberRole, requireOrganizationPermission } from "@/lib/auth/organization-access";
 
 type RouteParams = { params: Promise<{ organizationId: string; userId: string }> };
 const roleSchema = z.object({ role: z.enum(ORGANIZATION_ROLES) }).strict();
 
-/** Runs a membership change and rolls back if it would leave the workspace without an owner. */
-async function changeMembership(organizationId: string, change: (client: import("pg").PoolClient) => Promise<void>) {
-  const client = await getDb().connect();
+/** Roles an actor may change or remove (see canManageMemberRole). */
+function manageableRoles(actorRole: string): string[] {
+  return ORGANIZATION_ROLES.filter((role) => canManageMemberRole(actorRole, role));
+}
+
+/**
+ * Runs a membership change as one batch. Guards re-check, when the batch runs, that the actor
+ * still has their role and that the target's role is one the actor may manage (unless the actor
+ * is leaving), and roll the change back if it would leave the workspace without an owner.
+ */
+async function changeMembership(
+  input: { organizationId: string; userId: string; actorId: string; actorRole: string; leavingSelf: boolean },
+  change: Statement,
+): Promise<"ok" | "forbidden" | "no_owner"> {
+  const { organizationId, userId, actorId, actorRole, leavingSelf } = input;
+  const permissionGuards = [
+    guard(
+      "EXISTS (SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2 AND role = $3)",
+      [organizationId, actorId, actorRole],
+      "forbidden",
+    ),
+  ];
+  if (!leavingSelf) {
+    permissionGuards.push(guard(
+      `NOT EXISTS (SELECT 1 FROM organization_members
+                    WHERE organization_id = $1 AND user_id = $2 AND role NOT IN (SELECT value FROM json_each($3)))`,
+      [organizationId, userId, manageableRoles(actorRole)],
+      "forbidden",
+    ));
+  }
   try {
-    await client.query("BEGIN");
-    await client.query("SELECT id FROM organizations WHERE id = $1 FOR UPDATE", [organizationId]);
-    await change(client);
-    const owners = await client.query<{ count: string }>(
-      "SELECT COUNT(*)::text AS count FROM organization_members WHERE organization_id = $1 AND role = 'owner'",
-      [organizationId],
-    );
-    if (Number(owners.rows[0]?.count ?? 0) === 0) {
-      await client.query("ROLLBACK");
-      return false;
-    }
-    await client.query("COMMIT");
-    return true;
+    await batch([
+      ...permissionGuards,
+      change,
+      guard(
+        "EXISTS (SELECT 1 FROM organization_members WHERE organization_id = $1 AND role = 'owner')",
+        [organizationId],
+        "no_owner",
+      ),
+    ]);
+    return "ok";
   } catch (error) {
-    await client.query("ROLLBACK");
+    const code = abortCode(error);
+    if (code === "forbidden" || code === "no_owner") return code;
     throw error;
-  } finally {
-    client.release();
   }
 }
 
@@ -54,13 +78,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Only workspace owners can change owners and admins." }, { status: 403 });
   }
 
-  const ok = await changeMembership(organizationId, async (client) => {
-    await client.query(
-      "UPDATE organization_members SET role = $3 WHERE organization_id = $1 AND user_id = $2",
-      [organizationId, userId, parsed.data.role],
-    );
-  });
-  if (!ok) return NextResponse.json({ error: "A workspace needs at least one owner." }, { status: 409 });
+  const result = await changeMembership(
+    { organizationId, userId, actorId: auth.user.id, actorRole: auth.role, leavingSelf: false },
+    {
+      text: "UPDATE organization_members SET role = $3 WHERE organization_id = $1 AND user_id = $2",
+      params: [organizationId, userId, parsed.data.role],
+    },
+  );
+  if (result === "forbidden") {
+    return NextResponse.json({ error: "Only workspace owners can change owners and admins." }, { status: 403 });
+  }
+  if (result === "no_owner") return NextResponse.json({ error: "A workspace needs at least one owner." }, { status: 409 });
   return NextResponse.json({ success: true });
 }
 
@@ -76,9 +104,13 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "You can't remove this member." }, { status: 403 });
   }
 
-  const ok = await changeMembership(organizationId, async (client) => {
-    await client.query("DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2", [organizationId, userId]);
-  });
-  if (!ok) return NextResponse.json({ error: "A workspace needs at least one owner. Make someone else an owner first." }, { status: 409 });
+  const result = await changeMembership(
+    { organizationId, userId, actorId: auth.user.id, actorRole: auth.role, leavingSelf },
+    { text: "DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2", params: [organizationId, userId] },
+  );
+  if (result === "forbidden") return NextResponse.json({ error: "You can't remove this member." }, { status: 403 });
+  if (result === "no_owner") {
+    return NextResponse.json({ error: "A workspace needs at least one owner. Make someone else an owner first." }, { status: 409 });
+  }
   return NextResponse.json({ success: true });
 }

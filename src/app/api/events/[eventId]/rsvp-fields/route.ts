@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { getDb, query } from '@/lib/db/client';
+import { batch, query } from '@/lib/db/client';
+import type { Statement } from '@/lib/db/sqlite-dialect';
 import { rsvpFieldSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -69,51 +70,44 @@ export async function PUT(
       });
     }
 
-    const client = await getDb().connect();
-    try {
-      await client.query('BEGIN');
-      // Serialize field-definition replacement with public RSVP validation and
-      // saves so a response cannot be checked against a half-replaced form.
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [eventId]);
-      await client.query('DELETE FROM rsvp_fields WHERE event_id = $1', [eventId]);
+    // One batch replaces the field definitions atomically. Batches run one at a
+    // time, so public RSVP validation and saves never see a half-replaced form.
+    const statements: Statement[] = [
+      { text: 'DELETE FROM rsvp_fields WHERE event_id = $1', params: [eventId] },
+    ];
 
-      if (fields.length > 0) {
-        const valueClauses: string[] = [];
-        const allParams: unknown[] = [];
-        let paramIndex = 1;
+    // D1 allows 100 bound parameters per statement: 11 rows of 9 per INSERT.
+    for (let start = 0; start < fields.length; start += 11) {
+      const valueClauses: string[] = [];
+      const allParams: unknown[] = [];
+      let paramIndex = 1;
 
-        for (const f of fields) {
-          valueClauses.push(
-            `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8})`
-          );
-          allParams.push(
-            f.event_id, f.field_name, f.field_type, f.field_label,
-            f.is_required, f.is_enabled, f.sort_order,
-            f.options ? JSON.stringify(f.options) : null,
-            f.placeholder
-          );
-          paramIndex += 9;
-        }
-
-        await client.query(
-          `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
-           VALUES ${valueClauses.join(', ')}`,
-          allParams
+      for (const f of fields.slice(start, start + 11)) {
+        valueClauses.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8})`
         );
+        allParams.push(
+          f.event_id, f.field_name, f.field_type, f.field_label,
+          f.is_required, f.is_enabled, f.sort_order,
+          f.options ? JSON.stringify(f.options) : null,
+          f.placeholder
+        );
+        paramIndex += 9;
       }
 
-      const updatedFields = await client.query(
-        'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
-        [eventId]
-      );
-      await client.query('COMMIT');
-      return NextResponse.json(updatedFields.rows);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
+      statements.push({
+        text: `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
+         VALUES ${valueClauses.join(', ')}`,
+        params: allParams,
+      });
     }
+
+    statements.push({
+      text: 'SELECT * FROM rsvp_fields WHERE event_id = $1 ORDER BY sort_order ASC',
+      params: [eventId],
+    });
+    const results = await batch(statements);
+    return NextResponse.json(results[results.length - 1]);
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },

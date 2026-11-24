@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db/client";
+import { batch, query } from "@/lib/db/client";
 
 interface RateLimitOptions {
   /** Max requests allowed in the window */
@@ -36,52 +36,38 @@ export async function consumeQuota(
   const now = new Date();
   const windowStart = new Date(now.getTime() - options.windowSeconds * 1000);
   const resetAt = now.getTime() + options.windowSeconds * 1000;
-  const client = await getDb().connect();
 
-  try {
-    await client.query('BEGIN');
+  // One batch, so no other attempt for this key runs between the count and the insert
+  // (D1 runs batches one at a time). The insert only happens if the units still fit.
+  const [, counted] = await batch<{ count: number }>([
+    {
+      text: 'DELETE FROM rate_limit_attempts WHERE key = $1 AND created_at < $2',
+      params: [key, windowStart],
+    },
+    {
+      text: 'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
+      params: [key, windowStart],
+    },
+    {
+      text: `WITH RECURSIVE units(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM units WHERE n < $2)
+             INSERT INTO rate_limit_attempts (key)
+             SELECT $1 FROM units
+              WHERE (SELECT COUNT(*) FROM rate_limit_attempts WHERE key = $1 AND created_at >= $3) + $2 <= $4`,
+      params: [key, units, windowStart, options.max],
+    },
+  ]);
 
-    // Serialize only attempts for this key. This closes the race where parallel
-    // requests could all count below the limit before any of them inserted.
-    await client.query(
-      'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
-      [key]
-    );
+  const currentCount = Number(counted[0]?.count ?? 0);
 
-    await client.query(
-      'DELETE FROM rate_limit_attempts WHERE key = $1 AND created_at < $2',
-      [key, windowStart.toISOString()]
-    );
-
-    const result = await client.query<{ count: string }>(
-      'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
-      [key, windowStart.toISOString()]
-    );
-
-    const currentCount = parseInt(result.rows[0]?.count ?? '0', 10);
-
-    if (currentCount + units > options.max) {
-      await client.query('COMMIT');
-      return { success: false, remaining: Math.max(0, options.max - currentCount), resetAt };
-    }
-
-    await client.query(
-      'INSERT INTO rate_limit_attempts (key) SELECT $1 FROM generate_series(1, $2::int)',
-      [key, units]
-    );
-    await client.query('COMMIT');
-
-    return {
-      success: true,
-      remaining: options.max - currentCount - units,
-      resetAt,
-    };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
+  if (currentCount + units > options.max) {
+    return { success: false, remaining: Math.max(0, options.max - currentCount), resetAt };
   }
+
+  return {
+    success: true,
+    remaining: options.max - currentCount - units,
+    resetAt,
+  };
 }
 
 const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
@@ -137,13 +123,15 @@ export async function remainingQuota(
   key: string,
   max: number,
   windowSeconds: number,
-  db: { query: (text: string, params?: unknown[]) => Promise<{ rows: Array<{ count: string }> }> } = getDb(),
+  db: { query: (text: string, params?: unknown[]) => Promise<{ rows: Array<{ count: number | string }> }> } = {
+    query: async (text, params) => ({ rows: await query<{ count: number }>(text, params) }),
+  },
 ): Promise<number> {
   const windowStart = new Date(Date.now() - windowSeconds * 1000);
   const result = await db.query(
     'SELECT COUNT(*) AS count FROM rate_limit_attempts WHERE key = $1 AND created_at >= $2',
-    [key, windowStart.toISOString()],
+    [key, windowStart],
   );
-  const used = parseInt(result.rows[0]?.count ?? '0', 10);
+  const used = Number(result.rows[0]?.count ?? 0);
   return Math.max(0, max - used);
 }

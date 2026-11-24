@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queryOne, query } from '@/lib/db/client';
+import { cookies } from 'next/headers';
+import { batch, queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { requireApiHost } from '@/lib/auth/api-auth';
 import { verifyPassword, hashPassword, checkPasswordStrength } from '@/lib/password';
 
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    if (!currentPassword || !newPassword) {
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
       return NextResponse.json(
         { error: 'Current password and new password are required' },
         { status: 400 }
@@ -64,10 +66,12 @@ export async function POST(request: NextRequest) {
 
     // Hash and save new password
     const hashedPassword = await hashPassword(newPassword);
-    await query(
-      'UPDATE admin_users SET password = $1, updated_at = NOW() WHERE id = $2',
-      [hashedPassword, user.id]
-    );
+    const currentSession = (await cookies()).get('sealsend_session')?.value ?? '';
+    // Sign out every other device, so a stolen session does not outlive the password.
+    await batch([
+      { text: `UPDATE admin_users SET password = $1, updated_at = ${SQL_NOW} WHERE id = $2`, params: [hashedPassword, user.id] },
+      { text: "DELETE FROM user_sessions WHERE user_id = $1 AND user_role = 'admin' AND session_token <> $2", params: [user.id, currentSession] },
+    ]);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { toWebp } from '@/lib/image-processor';
-import { getDb } from '@/lib/db/client';
+import { query } from '@/lib/db/client';
 import { getBlobStore } from '@/lib/blob-store';
 import { canReserveStorage, storageQuotaBytes } from '@/lib/storage';
 
@@ -46,13 +46,9 @@ async function compressImage(buffer: Buffer<ArrayBuffer>, contentType: string): 
   return { data: buffer, ext: contentType.split('/')[1] || 'bin', mime: contentType };
 }
 
-export interface UploadStoreClient {
-  query: (text: string, params?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }>; // eslint-disable-line @typescript-eslint/no-explicit-any
-  release: () => void;
-}
-
+/** Defaults to `{ query }` from @/lib/db/client; tests inject a fake. */
 export interface UploadStoreDb {
-  connect: () => Promise<UploadStoreClient>;
+  query: <T = unknown>(text: string, params?: unknown[]) => Promise<T[]>;
 }
 
 export type SaveImageResult =
@@ -101,35 +97,38 @@ export async function storeBufferForUser(
 
   const urlPath = `/uploads/${userId}/${deps.privateFolder ? deps.privateFolder + "/" : ""}${finalFileName}`;
 
-  const db: UploadStoreDb = deps.db ?? (getDb() as unknown as UploadStoreDb);
-  const client = await db.connect();
+  const db: UploadStoreDb = deps.db ?? { query };
+  const usedSql = 'SELECT COALESCE(SUM(byte_size), 0) AS used FROM upload_assets WHERE user_id = $1';
+  const [usageRows, planRows, paidEventRows] = await Promise.all([
+    db.query<{ used: number }>(usedSql, [userId]),
+    db.query<{ tier: string }>("SELECT tier FROM user_subscriptions WHERE user_id = $1 AND status IN ('active','trialing') ORDER BY updated_at DESC LIMIT 1", [userId]),
+    db.query("SELECT 1 FROM events WHERE user_id = $1 AND tier <> 'free' LIMIT 1", [userId]),
+  ]);
+  const usedBytes = Number(usageRows[0]?.used ?? 0);
+  const quotaBytes = storageQuotaBytes(planRows[0]?.tier ?? 'free', paidEventRows.length > 0);
+  if (!canReserveStorage(usedBytes, buffer.length, quotaBytes)) {
+    return { error: 'quota', usedBytes, quotaBytes };
+  }
   try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`upload:${userId}`]);
-    const [usageResult, planResult, paidEventResult] = await Promise.all([
-      client.query('SELECT COALESCE(SUM(byte_size), 0)::text AS used FROM upload_assets WHERE user_id = $1', [userId]),
-      client.query("SELECT tier FROM user_subscriptions WHERE user_id = $1 AND status IN ('active','trialing') ORDER BY updated_at DESC LIMIT 1", [userId]),
-      client.query("SELECT 1 FROM events WHERE user_id = $1 AND tier <> 'free' LIMIT 1", [userId]),
-    ]);
-    const usedBytes = Number(usageResult.rows[0]?.used ?? 0);
-    const quotaBytes = storageQuotaBytes(planResult.rows[0]?.tier ?? 'free', Boolean(paidEventResult.rowCount));
-    if (!canReserveStorage(usedBytes, buffer.length, quotaBytes)) {
-      await client.query('ROLLBACK');
-      return { error: 'quota', usedBytes, quotaBytes };
-    }
     await store.put(blobKey, buffer);
-    await client.query(
-      'INSERT INTO upload_assets (user_id, path, byte_size, media_type) VALUES ($1, $2, $3, $4)',
-      [userId, urlPath, buffer.length, mediaType],
+    // The quota is re-checked in the insert itself (no lock on D1): no row means a
+    // concurrent upload used the space first.
+    const inserted = await db.query(
+      `INSERT INTO upload_assets (user_id, path, byte_size, media_type)
+       SELECT $1, $2, $3, $4
+       WHERE (SELECT COALESCE(SUM(byte_size), 0) FROM upload_assets WHERE user_id = $1) + $3 <= $5
+       RETURNING id`,
+      [userId, urlPath, buffer.length, mediaType, quotaBytes],
     );
-    await client.query('COMMIT');
+    if (inserted.length === 0) {
+      await store.delete(blobKey).catch(() => undefined);
+      const nowUsed = Number((await db.query<{ used: number }>(usedSql, [userId]))[0]?.used ?? 0);
+      return { error: 'quota', usedBytes: nowUsed, quotaBytes };
+    }
     return { url: urlPath, usedBytes: usedBytes + buffer.length, quotaBytes };
   } catch (error) {
-    await client.query('ROLLBACK');
     await store.delete(blobKey).catch(() => undefined);
     console.error('[upload] Failed to reserve storage', error);
     throw error;
-  } finally {
-    client.release();
   }
 }

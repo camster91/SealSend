@@ -68,7 +68,7 @@ export async function GET(
 
       await query(
         `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-         VALUES ($1, $2, 'guest_check_in_fallback_exported', $3::jsonb)`,
+         VALUES ($1, $2, 'guest_check_in_fallback_exported', $3)`,
         [eventId, auth.user.id, JSON.stringify({ count: guests.length, format: "check-in-csv" })],
       );
 
@@ -97,15 +97,15 @@ export async function GET(
       [eventId, limit, offset]
     );
 
-    const countRow = await queryOne<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM guests WHERE event_id = $1',
+    const countRow = await queryOne<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM guests WHERE event_id = $1',
       [eventId]
     );
 
     // Keep array response for existing clients; expose pagination via headers
     return NextResponse.json(guests, {
       headers: {
-        'X-Total-Count': countRow?.count || '0',
+        'X-Total-Count': String(countRow?.count ?? 0),
         'X-Limit': String(limit),
         'X-Offset': String(offset),
       },
@@ -135,7 +135,7 @@ export async function POST(
 
     const [accountPlan, countRow] = await Promise.all([
       getUserTier(event.user_id),
-      queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE event_id = $1', [eventId]),
+      queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM guests WHERE event_id = $1', [eventId]),
     ]);
     const guestLimit = getEffectiveEventLimits(accountPlan, event.tier as EventTier).guests;
     if (Number(countRow?.count ?? 0) >= guestLimit) {

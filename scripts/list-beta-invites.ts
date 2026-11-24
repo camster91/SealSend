@@ -1,61 +1,49 @@
 #!/usr/bin/env tsx
 
-import { Pool } from "pg";
-
 import { classifyBetaInvite } from "../src/lib/beta-invite-operations";
+import { query } from "../src/lib/db/client";
 import betaAcceptancePolicy from "../config/beta-acceptance-policy.json";
+import { isoText, requireCliDatabase } from "./lib/cli-database";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  console.error("Error: Missing DATABASE_URL environment variable");
-  process.exit(1);
-}
-
-const pool = new Pool({
-  connectionString: databaseUrl,
-  max: 1,
-  idleTimeoutMillis: 10000,
-  connectionTimeoutMillis: 5000,
-});
+requireCliDatabase();
 
 interface InviteRow {
   participant_label: string;
   segment: string;
   cohort_version: string;
   token_preview: string;
-  expires_at: string;
-  accepted_at: string | null;
-  revoked_at: string | null;
-  created_at: string;
+  expires_at: Date;
+  accepted_at: Date | null;
+  revoked_at: Date | null;
+  created_at: Date;
 }
 
 async function listBetaInvites() {
   try {
-    const result = await pool.query<InviteRow>(
+    const rows = await query<InviteRow>(
       `SELECT participant_label,
               segment,
               cohort_version,
               token_preview,
-              expires_at::text,
-              accepted_at::text,
-              revoked_at::text,
-              created_at::text
+              expires_at,
+              accepted_at,
+              revoked_at,
+              created_at
          FROM beta_enrollment_invites
         WHERE cohort_version = $1
         ORDER BY created_at DESC
         LIMIT 100`,
       [betaAcceptancePolicy.cohortVersion],
     );
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       console.log("No beta invitations found.");
       return;
     }
-    for (const row of result.rows) {
+    for (const row of rows) {
       const status = classifyBetaInvite({
-        acceptedAt: row.accepted_at,
-        revokedAt: row.revoked_at,
-        expiresAt: row.expires_at,
+        acceptedAt: isoText(row.accepted_at),
+        revokedAt: isoText(row.revoked_at),
+        expiresAt: isoText(row.expires_at),
       });
       console.log([
         row.participant_label,
@@ -63,15 +51,13 @@ async function listBetaInvites() {
         `cohort=${row.cohort_version}`,
         `preview=...${row.token_preview}`,
         `status=${status}`,
-        `expires=${row.expires_at}`,
-        `created=${row.created_at}`,
+        `expires=${isoText(row.expires_at)}`,
+        `created=${isoText(row.created_at)}`,
       ].join(" | "));
     }
   } catch (error) {
     console.error("Error listing beta invitations:", error);
     process.exitCode = 1;
-  } finally {
-    await pool.end();
   }
 }
 

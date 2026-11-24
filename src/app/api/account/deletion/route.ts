@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { queryOne } from "@/lib/db/client";
+import { SQL_NOW, sqlNowPlus } from "@/lib/db/sqlite-dialect";
 
 type DeletionRequest = { status: "pending" | "cancelled" | "completed"; requested_at: string; scheduled_for: string };
 
@@ -27,10 +28,10 @@ export async function POST() {
   }
   const request = await queryOne<DeletionRequest>(
     `INSERT INTO account_deletion_requests (user_id, status, requested_at, scheduled_for, cancelled_at, completed_at)
-     VALUES ($1, 'pending', NOW(), NOW() + INTERVAL '7 days', NULL, NULL)
+     VALUES ($1, 'pending', ${SQL_NOW}, ${sqlNowPlus("+7 days")}, NULL, NULL)
      ON CONFLICT (user_id) DO UPDATE SET status = 'pending',
-       requested_at = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.requested_at ELSE NOW() END,
-       scheduled_for = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.scheduled_for ELSE NOW() + INTERVAL '7 days' END,
+       requested_at = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.requested_at ELSE ${SQL_NOW} END,
+       scheduled_for = CASE WHEN account_deletion_requests.status = 'pending' THEN account_deletion_requests.scheduled_for ELSE ${sqlNowPlus("+7 days")} END,
        cancelled_at = NULL, completed_at = NULL
      RETURNING status, requested_at, scheduled_for`,
     [auth.user.id],
@@ -42,7 +43,7 @@ export async function DELETE() {
   const auth = await requireApiHost();
   if (auth.error) return auth.error;
   const request = await queryOne<DeletionRequest>(
-    `UPDATE account_deletion_requests SET status = 'cancelled', cancelled_at = NOW()
+    `UPDATE account_deletion_requests SET status = 'cancelled', cancelled_at = ${SQL_NOW}
       WHERE user_id = $1 AND status = 'pending'
       RETURNING status, requested_at, scheduled_for`,
     [auth.user.id],

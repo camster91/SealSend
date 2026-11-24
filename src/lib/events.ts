@@ -1,5 +1,18 @@
 import { query, queryOne } from '@/lib/db/client';
+import type { AuthUser } from '@/lib/auth/types';
 import type { Event } from '@/types/database';
+
+/**
+ * Timestamps are stored as ISO-8601 UTC text and compared as text, so a timestamp from a request
+ * body is bound as a Date (encoded to that exact format). An unparseable string still fails, as it
+ * did in Postgres.
+ */
+export function toTimestamp(value: string | Date | null | undefined): Date | null {
+  if (value === null || value === undefined) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new RangeError(`Invalid timestamp: ${String(value)}`);
+  return date;
+}
 
 export async function getEvent(eventId: string, options?: { publishedOnly?: boolean }) {
   const data = options?.publishedOnly
@@ -51,7 +64,14 @@ export async function getCollaboratingEvents(userId: string) {
   return data || [];
 }
 
-export async function getInvitedEvents(email: string | null, phone: string | null) {
+export async function getInvitedEvents(user: Pick<AuthUser, 'id' | 'role' | 'email' | 'phone'>) {
+  const phone = user.phone ?? null;
+  let email = user.email ?? null;
+  if (user.role === 'admin' && email) {
+    // A host who never proved the address must not see invitations sent to it.
+    const verified = await queryOne('SELECT 1 AS ok FROM admin_users WHERE id = $1 AND email_verified_at IS NOT NULL', [user.id]);
+    if (!verified) email = null;
+  }
   if (!email && !phone) {
     return [];
   }

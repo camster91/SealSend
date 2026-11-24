@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { AI_EVENT_DRAFT_SCHEMA_VERSION } from "@/lib/ai/event-draft-schema";
 
@@ -14,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ gen
   const parsed = outcomeSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid outcome" }, { status: 400 });
   const result = await queryOne<{ id: string }>(
-    `UPDATE ai_generations SET outcome = $1, accepted_at = CASE WHEN $1 = 'accepted' THEN NOW() ELSE NULL END
+    `UPDATE ai_generations SET outcome = $1, accepted_at = CASE WHEN $1 = 'accepted' THEN ${SQL_NOW} ELSE NULL END
      WHERE id = $2 AND user_id = $3 AND outcome = 'generated' RETURNING id`,
     [parsed.data.outcome, generationId, auth.user.id],
   );

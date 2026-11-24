@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireApiHost } from "@/lib/auth/api-auth";
 import { query, queryOne } from "@/lib/db/client";
+import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { rateLimit } from "@/lib/rate-limit";
 import { announcementSchema } from "@/lib/validations";
 import { canUseFeature, type EventTier } from "@/lib/entitlements";
@@ -22,8 +23,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
   if (!access || !roleCan(access.role, "send_messages")) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const announcements = await query(
     `SELECT a.*,
-       (SELECT COUNT(*)::int FROM announcement_deliveries d WHERE d.announcement_id = a.id AND d.status IN ('accepted','delivered')) AS accepted_count,
-       (SELECT COUNT(*)::int FROM announcement_deliveries d WHERE d.announcement_id = a.id AND d.status IN ('failed','bounced')) AS failed_count
+       (SELECT COUNT(*) FROM announcement_deliveries d WHERE d.announcement_id = a.id AND d.status IN ('accepted','delivered')) AS accepted_count,
+       (SELECT COUNT(*) FROM announcement_deliveries d WHERE d.announcement_id = a.id AND d.status IN ('failed','bounced')) AS failed_count
      FROM event_announcements a WHERE a.event_id = $1 ORDER BY a.created_at DESC`, [eventId],
   );
   return NextResponse.json(announcements);
@@ -68,13 +69,13 @@ export async function POST(request: Request, { params }: RouteParams) {
   const announcement = await queryOne<{ id: string }>(
     `INSERT INTO event_announcements
       (event_id, subject, message, audience, channels, scheduled_at, approved_at, created_by, status)
-     VALUES ($1, $2, $3, $4::jsonb, $5::text[], $6, NOW(), $7, 'queued') RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6, ${SQL_NOW}, $7, 'queued') RETURNING id`,
     [eventId, parsed.data.subject, parsed.data.message, JSON.stringify(parsed.data.audience), parsed.data.channels, scheduledAt.toISOString(), auth.user.id],
   );
   if (!announcement) return NextResponse.json({ error: "Could not queue announcement" }, { status: 500 });
   await query(
     `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
-     VALUES ($1, $2, 'announcement_approved', $3::jsonb)`,
+     VALUES ($1, $2, 'announcement_approved', $3)`,
     [eventId, auth.user.id, JSON.stringify({ announcementId: announcement.id, scheduledAt: scheduledAt.toISOString(), channels: parsed.data.channels })],
   );
   const audienceQuery = buildAudienceQuery(eventId, parsed.data.audience);
