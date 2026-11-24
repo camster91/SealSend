@@ -19,6 +19,7 @@ test('future announcements remain queued, can be cancelled, and calendars are us
   expect(ics).toContain('END:VCALENDAR');
 
   await page.goto(`/e/${slug}`);
+  await page.getByText('Add to calendar', { exact: true }).click();
   await expect(page.getByRole('link', { name: 'Google' })).toHaveAttribute('href', /calendar\.google\.com/);
   await expect(page.getByRole('link', { name: 'Apple / iCal' })).toHaveAttribute('href', `/api/calendar/${slug}`);
   await expect(page.getByRole('link', { name: 'Outlook' })).toHaveAttribute('href', /outlook\.live\.com/);

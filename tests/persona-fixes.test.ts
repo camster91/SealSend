@@ -89,7 +89,7 @@ test("a wrong invite link creates no session", async () => {
   await query("DELETE FROM user_sessions");
   for (const search of ["token=nope&event=invite", "token=tok-ana&event=other", "token=tok-ana", ""]) {
     const response = await GET(new NextRequest(`https://sealsend.test/invite/accept?${search}`));
-    assert.equal(response.headers.get("location"), "https://sealsend.test/login?error=invalid_invite");
+    assert.equal(response.headers.get("location"), "https://sealsend.test/invite/problem");
     assert.equal(response.cookies.get("sealsend_session"), undefined);
   }
   assert.equal((await query("SELECT id FROM user_sessions")).length, 0);

@@ -20,6 +20,7 @@ function isVideo(event: Event): boolean {
 
 export function EventHero({ event }: EventHeroProps) {
   const [copied, setCopied] = useState(false);
+  const [shareError, setShareError] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -51,7 +52,13 @@ export function EventHero({ event }: EventHeroProps) {
       }
     } else {
       // Fallback to copy link
-      await navigator.clipboard.writeText(url);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        setShareError(true);
+        return;
+      }
+      setShareError(false);
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 2000);
@@ -73,10 +80,11 @@ export function EventHero({ event }: EventHeroProps) {
       )}
 
       {/* Share Action Bar */}
-      <div className="flex justify-end mb-2">
+      <div className="mb-2 flex items-center justify-end gap-3">
+        {shareError && <p role="alert" className="rounded-full bg-white px-3 py-1 text-sm text-ink">Couldn&apos;t copy. Use the address bar instead.</p>}
         <button
           onClick={handleShare}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors shadow-sm bg-white/90 hover:bg-white text-gray-800 backdrop-blur-sm border border-gray-200"
+          className="flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors shadow-sm bg-white/90 hover:bg-white text-gray-800 backdrop-blur-sm border border-gray-200"
         >
           {copied ? <Check className="h-4 w-4 text-green-500" /> : <Share2 className="h-4 w-4" />}
           {copied ? "Link Copied!" : "Share Invite"}
@@ -86,7 +94,7 @@ export function EventHero({ event }: EventHeroProps) {
       {/* Design */}
       {!designUrl ? (
         <div
-          className="flex h-64 items-center justify-center rounded-xl"
+          className="flex min-h-32 items-center justify-center rounded-xl p-6 text-center sm:min-h-48"
           style={{ backgroundColor: primaryColor + "20" }}
         >
           <h1

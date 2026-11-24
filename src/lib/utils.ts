@@ -35,6 +35,22 @@ export function formatDateTime(date: string | Date, timeZone?: string): string {
   }
 }
 
+function formatParts(date: string | Date, timeZone: string | undefined, options: Intl.DateTimeFormatOptions): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { ...options, ...(timeZone ? { timeZone } : {}) }).format(new Date(date));
+  } catch {
+    return new Intl.DateTimeFormat('en-US', options).format(new Date(date));
+  }
+}
+
+export function formatEventDay(date: string | Date, timeZone?: string): string {
+  return formatParts(date, timeZone, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+export function formatEventTime(date: string | Date, timeZone?: string): string {
+  return formatParts(date, timeZone, { hour: 'numeric', minute: '2-digit', ...(timeZone ? { timeZoneName: 'short' } : {}) });
+}
+
 export function formatRelative(date: string | Date): string {
   return formatDistanceToNow(new Date(date), { addSuffix: true });
 }

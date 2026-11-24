@@ -1,23 +1,29 @@
 import { Calendar, MapPin, Clock, User, Shirt, CalendarClock, Gift, ExternalLink } from "lucide-react";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatEventDay, formatEventTime } from "@/lib/utils";
+import { isDefaultInvitationCopy } from "@/lib/invitation-defaults";
 import { AddToCalendar } from "@/components/public-event/AddToCalendar";
 import { sanitizeUrl } from "@/lib/sanitize";
 import type { Event } from "@/types/database";
 
 interface EventDetailsProps {
   event: Event;
+  /** False when the hero above already shows the title. */
+  showTitle?: boolean;
 }
 
-export function EventDetails({ event }: EventDetailsProps) {
+export function EventDetails({ event, showTitle = true }: EventDetailsProps) {
+  // Wording SealSend wrote only repeats the details below.
+  const generated = isDefaultInvitationCopy(event);
+  const mapsQuery = [event.location_name, event.location_address].filter(Boolean).join(", ");
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">{event.title}</h1>
+      {showTitle && <h1 className="text-2xl font-bold">{event.title}</h1>}
 
-      {event.invitation_headline && event.invitation_headline !== event.title && (
+      {event.invitation_headline && !generated.headline && event.invitation_headline !== event.title && (
         <h2 className="text-lg font-semibold text-gray-800">{event.invitation_headline}</h2>
       )}
 
-      {event.invitation_body && (
+      {event.invitation_body && !generated.body && (
         <p className="whitespace-pre-wrap text-muted-foreground">{event.invitation_body}</p>
       )}
 
@@ -27,30 +33,33 @@ export function EventDetails({ event }: EventDetailsProps) {
 
       <div className="space-y-3">
         {event.event_date && (
-          <div className="flex items-center gap-3 text-sm">
-            <Calendar className="h-5 w-5 text-brand-600" />
+          <div className="flex items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true" />
             <div>
-              <p className="font-medium">
-                {formatDateTime(event.event_date, event.event_timezone)}
+              <p className="text-base font-semibold">{formatEventDay(event.event_date, event.event_timezone)}</p>
+              <p className="text-sm text-neutral-700">
+                {formatEventTime(event.event_date, event.event_timezone)}
+                {event.event_end_date && ` to ${formatDateTime(event.event_end_date, event.event_timezone)}`}
               </p>
-              {event.event_end_date && (
-                <p className="text-muted-foreground">
-                  to {formatDateTime(event.event_end_date, event.event_timezone)}
-                </p>
-              )}
             </div>
           </div>
         )}
 
-        {event.location_name && (
-          <div className="flex items-center gap-3 text-sm">
-            <MapPin className="h-5 w-5 text-brand-600" />
-            <div>
-              <p className="font-medium">{event.location_name}</p>
+        {mapsQuery && (
+          <div className="flex items-start gap-3">
+            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true" />
+            <div className="min-w-0">
+              {event.location_name && <p className="text-base font-semibold">{event.location_name}</p>}
+              {event.location_address && <p className="break-words text-sm text-neutral-700">{event.location_address}</p>}
               {event.location_address && (
-                <p className="text-muted-foreground">
-                  {event.location_address}
-                </p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center text-sm font-medium text-ink underline underline-offset-4"
+                >
+                  Get directions
+                </a>
               )}
             </div>
           </div>

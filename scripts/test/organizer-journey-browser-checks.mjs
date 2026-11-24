@@ -332,6 +332,7 @@ export async function organizerJourneyBrowserChecks({ browser, origin, db }) {
     assert.match(ics, new RegExp(`UID:${IDS.event}@sealsend\\.app`));
     assert.match(ics, /DTSTART:/);
     assert.match(ics, /END:VCALENDAR/);
+    await publicPage.getByText("Add to calendar", { exact: true }).click();
     await publicPage.getByRole("link", { name: "Google", exact: true }).waitFor();
     await publicPage.getByRole("link", { name: "Google", exact: true }).getAttribute("href").then((href) => assert.match(href ?? "", /calendar\.google\.com/));
     assert.equal(

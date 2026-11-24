@@ -29,6 +29,6 @@ test.describe('Authentication', () => {
 
   test('rejects a malformed guest magic token', async ({ page }) => {
     await page.goto('/guest/update/not-a-valid-token');
-    await expect(page).toHaveURL(/\/login\?error=invalid_invite/);
+    await expect(page).toHaveURL(/\/invite\/problem$/);
   });
 });

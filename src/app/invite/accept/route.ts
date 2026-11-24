@@ -19,7 +19,7 @@ function redirectTo(request: NextRequest, path: string) {
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   const eventSlug = request.nextUrl.searchParams.get("event");
-  const invalid = () => redirectTo(request, "/login?error=invalid_invite");
+  const invalid = () => redirectTo(request, "/invite/problem");
   if (!token || !eventSlug) return invalid();
 
   try {
@@ -52,6 +52,6 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Invite link failed:", error);
-    return redirectTo(request, "/login?error=session_failed");
+    return redirectTo(request, "/invite/problem");
   }
 }
