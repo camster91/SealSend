@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/Badge";
 import { Trash2, Edit2 } from "lucide-react";
 import type { Guest, InviteStatus } from "@/types/database";
 import { useConfirm, useToast } from "@/components/ui/Feedback";
+import { replyGroup } from "@/lib/reply-groups";
+
+const REPLY_BADGE = {
+  yes: { label: "Yes", variant: "success" },
+  no: { label: "No", variant: "destructive" },
+  maybe: { label: "Maybe", variant: "secondary" },
+  waiting: { label: "Waiting", variant: "secondary" },
+} as const;
 
 const inviteBadge: Record<InviteStatus, { label: string; variant: "secondary" | "success" | "destructive" }> = {
   not_sent: { label: "Not Sent", variant: "secondary" },
@@ -14,13 +22,14 @@ const inviteBadge: Record<InviteStatus, { label: string; variant: "secondary" | 
 };
 
 interface GuestTableProps {
-  guests: Guest[];
+  guests: Array<Guest & { reply_status?: string | null }>;
+  emptyMessage?: string;
   eventId: string;
   onEdit: (guest: Guest) => void;
   onRefresh: () => void;
 }
 
-export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTableProps) {
+export function GuestTable({ guests, emptyMessage = "No guests added yet", eventId, onEdit, onRefresh }: GuestTableProps) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
@@ -51,6 +60,15 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
     () => [
       { key: "name", header: "Name", sortable: true },
       {
+        key: "reply_status",
+        header: "Reply",
+        sortable: true,
+        render: (item) => {
+          const badge = REPLY_BADGE[replyGroup(item.reply_status as string | null)];
+          return <Badge variant={badge.variant}>{badge.label}</Badge>;
+        },
+      },
+      {
         key: "email",
         header: "Email",
         sortable: true,
@@ -70,7 +88,7 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
         header: "Invite",
         render: (item) => {
           const guest = item as Guest;
-          if (!guest.email && !guest.phone) return <span className="text-muted-foreground">\u2014</span>;
+          if (!guest.email && !guest.phone) return <span className="text-muted-foreground">—</span>;
           const badge = inviteBadge[guest.invite_status] || inviteBadge.not_sent;
           return <Badge variant={badge.variant}>{badge.label}</Badge>;
         },
@@ -120,7 +138,7 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
         columns={columns}
         data={guests as (Guest & Record<string, unknown>)[]}
         keyExtractor={(item) => item.id}
-        emptyMessage="No guests added yet"
+        emptyMessage={emptyMessage}
       />
     </div>
   );

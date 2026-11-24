@@ -45,7 +45,8 @@ function GuestActivities({ slug, token }: { slug: string; token?: string }) {
     void reload().then(() => setMessage('')).catch(() => setMessage('Event activities are unavailable right now. Please try again.'))
       .finally(() => { pending.current = false; setBusy(false); });
   }}>Refresh activities</button>;
-  if (!state) return <div className="space-y-3"><p className="text-sm text-muted-foreground" role="status">{message || 'Open your personal invitation to join event activities.'}</p>{retry}</div>;
+  if (!state && !message && !refreshNeeded) return null;
+  if (!state) return <div className="space-y-3"><p className="text-sm text-muted-foreground" role="status">{message}</p>{retry}</div>;
   const s = state.settings;
   if (!s.guests_enabled && !s.reactions_enabled && !s.polls_enabled && !s.photos_enabled && !s.countdown_enabled) return null;
   return <section aria-label="Event activities" className="space-y-6 rounded-xl border border-border bg-white p-5 text-ink">

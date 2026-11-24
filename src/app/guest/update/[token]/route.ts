@@ -20,7 +20,7 @@ function appUrl(request: NextRequest, pathname: string) {
 }
 
 function errorRedirect(request: NextRequest) {
-  return NextResponse.redirect(appUrl(request, '/login?error=invalid_invite'));
+  return NextResponse.redirect(appUrl(request, '/invite/problem'));
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -95,6 +95,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return response;
   } catch (error) {
     console.error('Magic link acceptance failed:', error);
-    return NextResponse.redirect(appUrl(request, '/login?error=session_failed'));
+    return NextResponse.redirect(appUrl(request, '/invite/problem'));
   }
 }

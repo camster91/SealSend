@@ -34,14 +34,13 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
   let betaJoined = false;
   try {
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Password' }).click();
     await page.getByLabel('Email Address').fill(qaEmail!);
     await page.getByLabel('Password').fill(qaPassword!);
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
     const origin = new URL(page.url()).origin;
     await page.context().setExtraHTTPHeaders({ Origin: origin });
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your events' })).toBeVisible();
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
     const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {
@@ -325,13 +324,20 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     expect((await checkout.json()).error).toContain('controlled beta');
 
     await page.goto(`/events/${eventId}`);
+    await page.getByText('More', { exact: true }).click();
     await page.getByRole('button', { name: 'Repeat event' }).click();
     const repeatDialog = page.getByRole('dialog', { name: 'Repeat event' });
     await expect(repeatDialog).toBeVisible();
     await repeatDialog.getByLabel('New event title').fill('SealSend Production QA Repeat');
     const repeatStart = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
     await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
-    await expect(repeatDialog.getByLabel('Archive the current event')).toBeChecked();
+    // Taking the live event offline must be the host's choice.
+    const archiveCurrent = repeatDialog.getByLabel('Archive the current event');
+    const createDraft = repeatDialog.getByRole('button', { name: 'Create next event draft' });
+    await expect(archiveCurrent).not.toBeChecked();
+    await expect(createDraft).toBeDisabled();
+    await archiveCurrent.check();
+    await expect(createDraft).toBeEnabled();
     await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
     await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);

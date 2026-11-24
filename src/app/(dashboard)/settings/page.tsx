@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/Input";
@@ -155,46 +156,7 @@ export default function SettingsPage() {
               value={email}
               disabled
             />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Brand kit</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>Put your logo, colours, sender name and text signature on every event page, email and text.</p>
-            <Link href="/settings/brand" className="inline-flex font-medium text-brand-700 hover:underline">Edit brand kit →</Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Team</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>Create a team workspace and invite planners and check-in staff to work on your events.</p>
-            <Link href="/settings/team" className="inline-flex font-medium text-brand-700 hover:underline">Manage team →</Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Clients</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>Keep a record of who you run events for and send them read-only review links.</p>
-            <Link href="/settings/clients" className="inline-flex font-medium text-brand-700 hover:underline">Manage clients →</Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Integrations</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>Send RSVPs, check-ins and client approvals to your CRM, Zapier or Make with signed webhooks.</p>
-            <Link href="/settings/integrations" className="inline-flex font-medium text-brand-700 hover:underline">Manage webhooks →</Link>
+            <SignOutButton />
           </CardContent>
         </Card>
 
@@ -251,6 +213,51 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+
+        <details className="rounded-2xl border border-border bg-white">
+          <summary className="flex min-h-12 cursor-pointer items-center px-5 font-medium text-ink">Tools for event planners</summary>
+          <div className="space-y-4 border-t border-border p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Brand kit</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Put your logo, colours, sender name and text signature on every event page, email and text.</p>
+            <Link href="/settings/brand" className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline">Edit brand kit →</Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Team</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Create a team workspace and invite planners and check-in staff to work on your events.</p>
+            <Link href="/settings/team" className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline">Manage team →</Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Clients</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Keep a record of who you run events for and send them read-only review links.</p>
+            <Link href="/settings/clients" className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline">Manage clients →</Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-gray-600">
+            <p>Send RSVPs, check-ins and client approvals to your CRM, Zapier or Make with signed webhooks.</p>
+            <Link href="/settings/integrations" className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline">Manage webhooks →</Link>
+          </CardContent>
+        </Card>
+          </div>
+        </details>
 
         <Card>
           <CardHeader>

@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { GuestTable } from "@/components/guests/GuestTable";
+import { UnmatchedReplies } from "@/components/guests/UnmatchedReplies";
+import { replyCounts, replyGroup, type ReplyGroup } from "@/lib/reply-groups";
 import { AddGuestModal } from "@/components/guests/AddGuestModal";
 import { ImportCSVModal } from "@/components/guests/ImportCSVModal";
 import { Button } from "@/components/ui/Button";
@@ -26,7 +28,10 @@ export default function GuestsPage() {
   const [sending, setSending] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "success"; message: string } | null>(null);
+  const [filter, setFilter] = useState<ReplyGroup | "all">("all");
   const confirm = useConfirm();
+  const counts = replyCounts(guests.map((guest) => guest.reply_status));
+  const shownGuests = filter === "all" ? guests : guests.filter((guest) => replyGroup(guest.reply_status) === filter);
 
   const fetchGuests = useCallback(async () => {
     setLoading(true);
@@ -173,7 +178,7 @@ export default function GuestsPage() {
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Guest List</h1>
+            <h1 className="font-display text-3xl text-ink">Who&apos;s coming</h1>
             <p className="text-sm text-muted-foreground">
               {guests.length} guest{guests.length !== 1 ? "s" : ""}
             </p>
@@ -228,11 +233,28 @@ export default function GuestsPage() {
         </div>
       )}
 
+      <UnmatchedReplies eventId={eventId} onChange={fetchGuests} />
+
+      <div role="group" aria-label="Show guests" className="mb-4 flex flex-wrap gap-2">
+        {([["all", "Everyone"], ["yes", "Yes"], ["no", "No"], ["maybe", "Maybe"], ["waiting", "Waiting"]] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={filter === value}
+            onClick={() => setFilter(value)}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 ${filter === value ? "border-ink bg-ink text-white" : "border-input bg-white text-ink"}`}
+          >
+            {label} <span className="tabular-nums">{counts[value]}</span>
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <TableSkeleton label="Loading guests" columns={4} />
       ) : (
         <GuestTable
-          guests={guests}
+          guests={shownGuests}
+          emptyMessage={guests.length > 0 ? "No one here yet" : undefined}
           eventId={eventId}
           onEdit={handleEdit}
           onRefresh={fetchGuests}

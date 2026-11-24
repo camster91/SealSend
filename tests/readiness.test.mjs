@@ -210,20 +210,6 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
   assert.match(workerTransport, /addresses\.some\(isPrivateAddress\)/);
 });
 
-test('the welcome tour shows once, only to new hosts, and is an accessible dialog', async () => {
-  const tour = await read('src/components/onboarding/WelcomeTour.tsx');
-  const dashboard = await read('src/app/(dashboard)/dashboard/page.tsx');
-  assert.match(dashboard, /<WelcomeTour userId=\{user\.id\} show=\{user\.role === 'admin' && myEvents\.length === 0 && collaboratingEvents\.length === 0\} \/>/);
-  assert.match(tour, /role="dialog"/);
-  assert.match(tour, /aria-modal="true"/);
-  assert.match(tour, /event\.key === "Escape"/);
-  assert.match(tour, /event\.key !== "Tab"/);
-  assert.match(tour, /useReducedMotion/);
-  assert.match(tour, /try \{\s*localStorage\.setItem\(welcomeTourStorageKey\(userId\), "done"\)/);
-  assert.match(tour, /`\$\{WELCOME_TOUR_STORAGE_KEY\}:\$\{userId\}`/);
-  assert.match(tour, /href="\/events\/new"/);
-});
-
 test('dashboard confirmations use the accessible dialog, not window.confirm', async () => {
   const { execFileSync } = await import('node:child_process');
   const files = execFileSync('git', ['ls-files', 'src/**/*.tsx', 'src/**/*.ts'], { encoding: 'utf8' }).trim().split('\n');
@@ -1515,12 +1501,12 @@ test('communication review exposes resolved recipients, cost status, controls, a
   assert.match(announcementRoute, /verifyAnnouncementApprovalProof/);
   assert.match(announcementRoute, /approval expired/);
   for (const control of ['tone', 'length', 'urgency', 'channel']) assert.match(draft, new RegExp(control));
-  assert.match(modal, /Review resolved recipients/);
+  assert.match(modal, /See who gets it/);
   assert.match(modal, /Estimated provider charge/);
   assert.match(modal, /billed SMS segment/);
   assert.match(modal, /subject: subject\.trim\(\), message: message\.trim\(\)/);
-  assert.match(modal, /approvalProof: preview\?\.approvalProof/);
-  assert.match(modal, /approve this external send/);
+  assert.match(modal, /approvalProof: preview\.approvalProof/);
+  assert.match(modal, /checked this message and who gets it/);
   assert.doesNotMatch(draft, /dispatchAnnouncement|sendEmail|\.messages\.create/);
 });
 

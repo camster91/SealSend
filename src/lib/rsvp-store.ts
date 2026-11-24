@@ -22,7 +22,8 @@ export async function findRsvp(db: RsvpDb, eventId: string, guestId: string | nu
   }
   if (!editToken) return null;
   const row = (await db.query<RSVPResponse>(`SELECT ${responseColumns} FROM rsvp_responses WHERE edit_token_hash = $1`, [hashMagicToken(editToken)]))[0];
-  if (row && (row.event_id !== eventId || row.guest_id)) throw new RsvpError('Invalid response access.');
+  // A reply the host matched to a guest keeps its edit token, so the person who wrote it can still change it.
+  if (row && row.event_id !== eventId) throw new RsvpError('Invalid response access.');
   return row ?? null;
 }
 
@@ -92,7 +93,7 @@ async function attemptSaveRsvp(db: RsvpDb, eventId: string, guestId: string | nu
     ),
     previous
       // The response being edited still exists (a host may have deleted it).
-      ? guard('EXISTS (SELECT 1 FROM rsvp_responses WHERE id = $1 AND event_id = $2)', [previous.id, eventId], RSVP_CHANGED)
+      ? guard('EXISTS (SELECT 1 FROM rsvp_responses WHERE id = $1 AND event_id = $2 AND guest_id IS $3)', [previous.id, eventId, previous.guest_id ?? null], RSVP_CHANGED)
       // No response appeared for this guest or edit token since the read (that one is edited instead).
       : guard(
         `NOT EXISTS (SELECT 1 FROM rsvp_responses WHERE (event_id = $1 AND guest_id = $2) OR edit_token_hash = $3)
@@ -118,7 +119,8 @@ async function attemptSaveRsvp(db: RsvpDb, eventId: string, guestId: string | nu
   for (const po of input.plus_ones) {
     statements.push({ text: 'INSERT INTO plus_ones (event_id, rsvp_response_id, name, email, status) VALUES ($1,$2,$3,$4,$5)', params: [eventId, responseId, po.name, po.email || null, input.status] });
   }
-  if (guestId) statements.push({ text: `UPDATE guests SET rsvp_status = $1, updated_at = ${SQL_NOW} WHERE id = $2 AND event_id = $3`, params: [input.status, guestId, eventId] });
+  const replyGuestId = guestId ?? previous?.guest_id ?? null;
+  if (replyGuestId) statements.push({ text: `UPDATE guests SET rsvp_status = $1, updated_at = ${SQL_NOW} WHERE id = $2 AND event_id = $3`, params: [input.status, replyGuestId, eventId] });
 
   let results: unknown[][];
   try {

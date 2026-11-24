@@ -115,6 +115,7 @@ export function AutoRemindersToggle({
                 ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               `}
               role="switch"
+              aria-label="Automatic reminders"
               aria-checked={enabled}
             >
               <span

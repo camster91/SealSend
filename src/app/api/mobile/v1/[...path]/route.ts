@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { POST as sendCode } from '@/app/api/auth/send-code/route';
 import { POST as verifyCode } from '@/app/api/auth/verify-code/route';
+import { POST as passwordLogin } from '@/app/api/auth/login-password/route';
 import { GET as events, POST as createEvent } from '@/app/api/events/route';
 import { GET as event, PATCH as updateEvent } from '@/app/api/events/[eventId]/route';
-import { GET as checkInList, PATCH as checkIn } from '@/app/api/events/[eventId]/check-in/route';
+import { GET as checkInList, PATCH as checkIn, POST as walkIn } from '@/app/api/events/[eventId]/check-in/route';
 import { GET as deletionStatus, POST as requestDeletion, DELETE as cancelDeletion } from '@/app/api/account/deletion/route';
 import { invalidateSession, validateSessionToken } from '@/lib/auth/session';
 import { withMobileContext } from '@/lib/auth/mobile-context';
@@ -22,6 +23,8 @@ async function dispatch(request: NextRequest, { params }: Context) {
       const payload = await request.clone().json().catch(() => null);
       if (!payload || payload.method !== 'email' || payload.eventId) return NextResponse.json({ error: 'Use email host sign-in.' }, { status: 400 });
       result = await withMobileContext({ user: null, sessionToken: null }, () => selected.operation === 'sendCode' ? sendCode(request) : verifyCode(request));
+    } else if (selected.operation === 'passwordLogin') {
+      result = await withMobileContext({ user: null, sessionToken: null }, () => passwordLogin(request));
     } else {
       const token = mobileBearer(request.headers.get('authorization'));
       const identity = token ? await validateSessionToken(token) : null;
@@ -39,6 +42,7 @@ async function dispatch(request: NextRequest, { params }: Context) {
           case 'updateEvent': return updateEvent(request, eventParams);
           case 'checkInList': return checkInList(request, eventParams);
           case 'checkIn': return checkIn(request, eventParams);
+          case 'walkIn': return walkIn(request, eventParams);
           case 'deletionStatus': return deletionStatus();
           case 'requestDeletion': return requestDeletion();
           case 'cancelDeletion': return cancelDeletion();

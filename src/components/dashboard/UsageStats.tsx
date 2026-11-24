@@ -18,17 +18,17 @@ export function UsageStats({ tier, eventsUsed, eventsLimit, guestsUsed, guestsLi
     pro: 'bg-brand-100 text-brand-700',
     business: 'bg-amber-100 text-amber-700',
     'SealSend Pro': 'bg-brand-100 text-brand-700',
-    'Controlled Beta': 'bg-emerald-100 text-emerald-700',
+    'Free beta': 'bg-emerald-100 text-emerald-700',
     'Business (Beta)': 'bg-emerald-100 text-emerald-700',
   };
 
   const badgeClass = tierColors[tier] || tierColors.free;
 
   return (
-    <div className="bg-white overflow-hidden shadow rounded-lg">
+    <div className="border-t border-border">
       <div className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-gray-500">Plan Usage</h3>
+          <h2 className="text-sm font-medium text-gray-600">Plan usage</h2>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}>
             {tier.charAt(0).toUpperCase() + tier.slice(1)}
           </span>

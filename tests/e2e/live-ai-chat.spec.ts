@@ -16,7 +16,6 @@ const MESSAGE = 'Dinner on 2026-10-11 at 18:00 at the Hall';
 
 async function signIn(page: Page) {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Password' }).click();
   await page.getByLabel('Email Address').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();

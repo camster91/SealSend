@@ -6,7 +6,7 @@ import type { Event } from '@/types/database';
 import { AnnouncementSection } from '@/components/dashboard/AnnouncementSection';
 import { isTwilioConfigured } from '@/lib/twilio';
 import { DeleteEventButton } from '@/components/dashboard/DeleteEventButton';
-import { CopyLinkButton } from '@/components/dashboard/CopyLinkButton';
+import { ShareEventButton } from '@/components/dashboard/ShareEventButton';
 import { CloneEventButton } from '@/components/dashboard/CloneEventButton';
 import { UpgradeButton } from '@/components/events/UpgradeButton';
 import { SmsTopUpButton } from '@/components/events/SmsTopUpButton';
@@ -94,6 +94,10 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
   const canManageGuests = roleCan(access.role, 'manage_guests');
   const canExport = roleCan(access.role, 'export_responses');
   const canManageMembers = roleCan(access.role, 'manage_members');
+  const canSendMessages = roleCan(access.role, 'send_messages');
+  // Door staff, and everyone around event day, need check-in without opening More.
+  const showCheckInFirst = !isArchived && roleCan(access.role, 'check_in_guests')
+    && (access.role === 'check_in' || isNearEvent(event.event_date as string | null));
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -134,38 +138,31 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
               {statusLabel}
             </span>
             <h1 className="mt-3 break-words font-display text-3xl text-ink sm:text-4xl">{event.title as string}</h1>
-          </div>
-
-          {/* Tier + Upgrade */}
-          <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3 sm:px-6">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              ['free'].includes(event.tier as string)
-                ? 'bg-neutral-100 text-neutral-700'
-                : 'border border-primary-200 bg-primary-50 text-ink'
-            }`}>
-              {event.tier === 'event_pass' ? 'Event Pass' : `${(event.tier as string).charAt(0).toUpperCase() + (event.tier as string).slice(1)} tier`}
-            </span>
-            {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
-            {smsBalance !== null && roleCan(access.role, 'manage_billing') && !isArchived && <SmsTopUpButton eventId={eventId} balance={smsBalance} />}
-          </div>
-
-          {/* Quick actions */}
-          <div className="grid grid-cols-2 gap-2 border-t border-border p-4 sm:flex sm:flex-wrap sm:gap-2 sm:px-6">
-            {!isArchived && canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
-            {canExport && <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />}
-            {canManageGuests && <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Guests" count={guestCount} />}
-            {canManageGuests && <ActionLink href={`/events/${eventId}/signups`} icon="signups" label="Sign-ups" />}
-            <ActionLink href={`/events/${eventId}/comments`} icon="comments" label="Comments" />
-            {canExport && <ActionLink href={`/events/${eventId}/analytics`} icon="analytics" label="Analytics" />}
-            {roleCan(access.role, 'check_in_guests') && <ActionLink href={`/events/${eventId}/check-in`} icon="checkin" label="Check-in" />}
+            {(event.event_date || event.location_name) && (
+              <p className="mt-2 text-neutral-700">
+                {[event.event_date && formatDate(event.event_date as string), event.location_name].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            <div className="mt-5 space-y-3">
+              {isArchived && (
+                <div className="rounded-2xl border border-border bg-neutral-50 p-4 text-sm text-neutral-700">
+                  <p className="font-semibold text-ink">Archived event history</p>
+                  <p className="mt-1">This event cannot be republished directly. Use Repeat event to create a reviewed new draft.</p>
+                </div>
+              )}
+              {!isArchived && !isPublished && canEdit && <PublishEventButton eventId={eventId} isPublished={false} />}
+              {isPublished && <ShareEventButton url={publicUrl} title={event.title as string} />}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {showCheckInFirst && <ActionLink href={`/events/${eventId}/check-in`} icon="checkin" label="Check-in" />}
+                {canManageGuests && <ActionLink href={`/events/${eventId}/guests`} icon="guests" label="Who&apos;s coming" count={guestCount} />}
+                {isPublished && canSendMessages && <ActionLink href="#updates" icon="comments" label="Send update" />}
+                {!isArchived && canEdit && <ActionLink href={`/events/${eventId}/edit`} icon="edit" label="Edit" />}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Stats + Details grid */}
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Stats */}
-          <div className="space-y-4 lg:col-span-1">
-            {/* RSVP summary: large, readable counts. No reply = invited guests without a response. */}
+        <div className="mt-6">
             <section aria-labelledby="rsvp-summary-heading" className="rounded-2xl border border-border bg-white p-5">
               <h2 id="rsvp-summary-heading" className="text-sm font-semibold text-ink">RSVP summary</h2>
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5">
@@ -179,63 +176,24 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
               </p>
             </section>
 
-            {/* Public link */}
-            {isPublished && (
-              <div className="rounded-2xl border border-border bg-white p-5">
-                <h2 className="text-sm font-semibold text-ink">Public link</h2>
-                <div className="mt-2 flex items-center gap-2">
-                  <Link
-                    href={publicUrl}
-                    target="_blank"
-                    className="min-w-0 flex-1 truncate rounded-lg bg-neutral-50 px-3 py-2 text-sm font-mono text-ink underline-offset-4 hover:underline"
-                  >
-                    /e/{event.slug as string}
-                  </Link>
-                  <CopyLinkButton url={publicUrl} />
-                </div>
-                <a
-                  href={`/api/events/${eventId}/qr`}
-                  download={`${event.slug}-qr.png`}
-                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-input bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-neutral-50"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4v4H3V4zm0 8h4v4H3v-4zm8-8h4v4h-4V4zm8 0h4v4h-4V4zm0 8h4v4h-4v-4zm-8 8h4v4h-4v-4z" />
-                  </svg>
-                  Download QR Code
-                </a>
-              </div>
-            )}
+        </div>
 
-            {/* Auto Reminders */}
-            {!isArchived && roleCan(access.role, 'send_messages') && <AutoRemindersToggle
-              eventId={eventId}
-              initialEnabled={!!event.auto_reminders}
-              eventDate={event.event_date as string | null}
-              isPublished={isPublished}
-            />}
-
-            {/* Publish / delete / clone */}
-            <div className="space-y-2">
-              {isArchived && (
-                <div className="rounded-2xl border border-border bg-neutral-50 p-4 text-sm text-neutral-700">
-                  <p className="font-semibold text-ink">Archived event history</p>
-                  <p className="mt-1">This event cannot be republished directly. Use Repeat event to create a reviewed new draft.</p>
-                </div>
-              )}
-              {!isArchived && canEdit && <PublishEventButton eventId={eventId} isPublished={isPublished} />}
-              {access.role === 'owner' && <CloneEventButton
-                eventId={eventId}
-                eventTitle={event.title as string}
-                eventTimezone={event.event_timezone}
-                eventStatus={event.status}
-                canKeepCurrentActive={accountPlan === 'pro_annual'}
-              />}
-              {access.role === 'owner' && <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />}
-            </div>
+        {isPublished && canSendMessages && (
+          <div id="updates" className="mt-6 scroll-mt-20">
+            <AnnouncementSection eventId={eventId} hasAccess={canSendAnnouncements} smsEnabled={isTwilioConfigured()} />
           </div>
+        )}
 
-          {/* Details */}
-          <div className="space-y-6 lg:col-span-2">
+        <details className="mt-6">
+          <summary className="flex min-h-12 cursor-pointer items-center rounded-2xl border border-border bg-white px-5 font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink">More</summary>
+          <div className="mt-4 space-y-6">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              {!showCheckInFirst && roleCan(access.role, 'check_in_guests') && <ActionLink href={`/events/${eventId}/check-in`} icon="checkin" label="Check-in" />}
+              {canExport && <ActionLink href={`/events/${eventId}/responses`} icon="responses" label="Responses" count={responseCount} />}
+              {canManageGuests && <ActionLink href={`/events/${eventId}/signups`} icon="signups" label="Sign-ups" />}
+              <ActionLink href={`/events/${eventId}/comments`} icon="comments" label="Messages" />
+              {canExport && <ActionLink href={`/events/${eventId}/analytics`} icon="analytics" label="Analytics" />}
+            </div>
             <div className="overflow-hidden rounded-2xl border border-border bg-white">
               <div className="border-b border-border px-6 py-3.5">
                 <h2 className="text-sm font-semibold text-ink">Event details</h2>
@@ -263,31 +221,37 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
                 <DetailRow icon="capacity" label="Max Attendees" value={event.max_attendees ? `${event.max_attendees}` : null} />
                 <DetailRow icon="capacity" label="Max per RSVP" value={event.max_guests_per_rsvp ? `${event.max_guests_per_rsvp}` : null} />
                 <DetailRow icon="capacity" label="+1s Allowed" value={event.allow_plus_ones === false ? 'No' : event.allow_plus_ones === true ? 'Yes' : null} />
-                <DetailRow icon="slug" label="Slug" value={event.slug as string | null} mono />
-                <DetailRow
-                  icon="created"
-                  label="Created"
-                  value={new Date(event.created_at as string).toLocaleDateString('en-US', {
-                    year: 'numeric', month: 'long', day: 'numeric',
-                  })}
-                />
               </div>
             </div>
 
-            {/* Description */}
             {event.description && (
               <div className="rounded-2xl border border-border bg-white p-6">
                 <h2 className="text-sm font-semibold text-ink">Description</h2>
                 <p className="mt-3 text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap">{event.description as string}</p>
               </div>
             )}
-          </div>
-        </div>
+            {isPublished && (
+                <a
+                  href={`/api/events/${eventId}/qr`}
+                  download={`${event.slug}-qr.png`}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-input bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-neutral-50"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h4v4H3V4zm0 8h4v4H3v-4zm8-8h4v4h-4V4zm8 0h4v4h-4V4zm0 8h4v4h-4v-4zm-8 8h4v4h-4v-4z" />
+                  </svg>
+                  Download QR Code
+                </a>
+            )}
+            {!isArchived && roleCan(access.role, 'send_messages') && <AutoRemindersToggle
+              eventId={eventId}
+              initialEnabled={!!event.auto_reminders}
+              eventDate={event.event_date as string | null}
+              isPublished={isPublished}
+            />}
 
-        {canEdit && !isArchived && <div className="mt-6"><HostSocial eventId={eventId} slug={event.slug as string} /></div>}
+        {canEdit && !isArchived && <div><HostSocial eventId={eventId} slug={event.slug as string} /></div>}
 
-        {/* Marketing Tools */}
-        {canExport && <div className="mt-6">
+        {canExport && <div>
           <ExportTools
             eventTitle={event.title as string}
             eventDate={event.event_date as string}
@@ -297,20 +261,37 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
           />
         </div>}
 
-        {/* Announcements */}
-        {isPublished && roleCan(access.role, 'send_messages') && (
-          <div className="mt-6">
-            <AnnouncementSection eventId={eventId} hasAccess={canSendAnnouncements} smsEnabled={isTwilioConfigured()} />
-          </div>
-        )}
-
         {canManageMembers && <EventTeamPanel eventId={eventId} />}
         {canEdit && !isArchived && <div className="mt-6"><EventClientPanel eventId={eventId} /></div>}
+
+            <div className="flex flex-wrap items-center gap-3">
+            {access.role === 'owner' && !isArchived && <UpgradeButton eventId={eventId} currentTier={event.tier as string} />}
+            {smsBalance !== null && roleCan(access.role, 'manage_billing') && !isArchived && <SmsTopUpButton eventId={eventId} balance={smsBalance} />}
+            </div>
+            <div className="space-y-2">
+              {isPublished && canEdit && <PublishEventButton eventId={eventId} isPublished />}
+              {access.role === 'owner' && <CloneEventButton
+                eventId={eventId}
+                eventTitle={event.title as string}
+                eventTimezone={event.event_timezone}
+                eventStatus={event.status}
+                canKeepCurrentActive={accountPlan === 'pro_annual'}
+              />}
+              {access.role === 'owner' && <DeleteEventButton eventId={eventId} eventTitle={event.title as string} />}
+            </div>
+          </div>
+        </details>
 
         {upgraded === 'true' && <UpgradeSuccessToast />}
       </div>
     </div>
   );
+}
+
+function isNearEvent(date: string | null): boolean {
+  if (!date) return false;
+  const hours = (new Date(date).getTime() - Date.now()) / 3_600_000;
+  return hours < 24 && hours > -24;
 }
 
 // ── Sub-components ──────────────────────────────────
@@ -363,8 +344,6 @@ function DetailRow({ icon, label, value, subtitle, mono }: { icon: string; label
     dress: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>,
     deadline: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" /></svg>,
     capacity: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>,
-    slug: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.886-3.497l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" /></svg>,
-    created: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
   };
 
   return (

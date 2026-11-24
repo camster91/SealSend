@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Select } from "@/components/ui/Select";
@@ -10,6 +10,7 @@ import type { RSVPField, PlusOneData, RSVPResponse } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
 import { normalizeRsvpFields, validateRsvpResponseData } from "@/lib/rsvp-fields";
+import { rsvpSubmission, showsField, withAttendanceQuestion } from "@/lib/rsvp-form";
 
 type RsvpFormValue = string | string[];
 type RsvpFormData = Record<string, RsvpFormValue>;
@@ -38,7 +39,7 @@ interface RSVPFormProps {
 }
 
 export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "rounded", allowPlusOnes = true, maxGuestsPerRsvp = 10, spotsRemaining = null, inviteToken, inviteGuestId, inviteGuestName, inviteGuestEmail }: RSVPFormProps) {
-  const questions = useMemo(() => normalizeRsvpFields(fields), [fields]);
+  const questions = useMemo(() => withAttendanceQuestion(normalizeRsvpFields(fields)), [fields]);
   const [formData, setFormData] = useState<RsvpFormData>({});
   const [plusOnes, setPlusOnes] = useState<PlusOneData[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -50,6 +51,12 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   const [customFieldErrors, setCustomFieldErrors] = useState<Record<string, string>>({});
   const [savedResponse, setSavedResponse] = useState<RSVPResponse | null>(null);
   const [deadlinePassed, setDeadlinePassed] = useState(false);
+
+  const thanksRef = useRef<HTMLHeadingElement>(null);
+  const focusThanks = useRef(false);
+  useEffect(() => {
+    if (submitted && focusThanks.current) { focusThanks.current = false; thanksRef.current?.focus(); }
+  }, [submitted]);
 
   // Calculate current headcount
   const headcount = parseInt(scalarValue(formData["headcount"]) || "1", 10) || 1;
@@ -117,8 +124,11 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   const enabledFields = questions
     .filter((f) => f.is_enabled)
     .sort((a, b) => a.sort_order - b.sort_order);
+  const attendanceQuestion = enabledFields.find((f) => f.field_type === "attendance");
+  const currentStatus = scalarValue(formData[attendanceQuestion?.field_name ?? ""]);
 
   function updateField(name: string, value: RsvpFormValue) {
+    if (name === attendanceQuestion?.field_name) setError(null);
     setFormData((prev) => ({ ...prev, [name]: value }));
     setCustomFieldErrors((prev) => {
       if (!prev[name]) return prev;
@@ -183,8 +193,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       return;
     }
 
-    // Filter out empty plus ones
-    const validPlusOnes = plusOnes.filter((po) => po.name.trim() !== "");
+    const replyStatus = typeof status === "string" ? status : "attending";
 
     try {
       const res = await fetch(`/api/rsvp/${eventSlug}`, {
@@ -193,10 +202,9 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         body: JSON.stringify({
           respondent_name: scalarValue(formData["respondent_name"]) || "Guest",
           respondent_email: scalarValue(formData["email"]),
-          status: typeof status === "string" ? status : "attending",
-          headcount,
+          status: replyStatus,
+          ...rsvpSubmission(replyStatus, headcount, plusOnes),
           response_data: responseData,
-          plus_ones: validPlusOnes,
           ...(inviteGuestId && { guest_id: inviteGuestId }),
         }),
       });
@@ -207,6 +215,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
         return;
       }
 
+      focusThanks.current = true;
       setSubmitted(true);
       setSavedResponse(data.response);
       // A confirmed save stays successful even if the follow-up capacity read fails.
@@ -221,82 +230,8 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="rounded-xl border border-green-200 bg-green-50 p-8 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-          <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-green-800">
-          Thank you for your RSVP!
-        </h3>
-        <p className="mt-1 text-sm text-green-700">
-          Your response has been recorded.
-        </p>
-        {savedResponse && <p className="mt-3 font-semibold text-green-900">
-          {savedResponse.status === 'attending' ? `Attending · ${savedResponse.headcount} ${savedResponse.headcount === 1 ? 'guest' : 'guests'}` : savedResponse.status === 'not_attending' ? 'Not attending' : 'Maybe attending'}
-        </p>}
-        {!inviteToken && <p className="mt-3 text-xs text-green-900">Return in this browser to update your reply. Clearing your browser cookies removes that access.</p>}
-        <button
-          type="button"
-          onClick={() => { setSubmitted(false); setError(null); }}
-          className="mt-4 text-sm font-medium text-green-700 underline underline-offset-2 hover:text-green-800"
-        >
-          Update your response
-        </button>
-      </div>
-    );
-  }
-
-  if (!loading && deadlinePassed && !savedResponse) {
-    return <section aria-label="RSVP closed" className="rounded-xl border border-amber-200 bg-amber-50 p-6">
-      <h2 className="text-xl font-semibold text-amber-950">RSVPs are closed</h2>
-      <p className="mt-2 text-sm text-amber-950">The RSVP deadline has passed. Contact the host if you need to join.</p>
-    </section>;
-  }
-
-  return (
-    <form aria-label="RSVP" onSubmit={handleSubmit} className="space-y-4">
-      {deadlinePassed && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">The deadline has passed. You can still update your existing response.</p>}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">RSVP</h2>
-        {availableSpots !== null && (
-          <span className={cn(
-            "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-            availableSpots > 10
-              ? "bg-green-100 text-green-700"
-              : availableSpots > 0
-                ? "bg-amber-100 text-amber-700"
-                : "bg-red-100 text-red-700"
-          )}>
-            {availableSpots > 0 ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} left` : "Event full"}
-          </span>
-        )}
-      </div>
-
-      {inviteGuestName && (
-        <div className="rounded-lg bg-brand-50 border border-brand-100 px-4 py-2.5">
-          <p className="text-sm text-brand-700">
-            Welcome, <strong>{inviteGuestName}</strong>! Your details have been pre-filled.
-          </p>
-        </div>
-      )}
-
-      {/* Always show name field */}
-      <Input
-        id="rsvp-name"
-        label="Your Name *"
-        placeholder="Enter your name"
-        value={scalarValue(formData["respondent_name"])}
-        onChange={(e) => updateField("respondent_name", e.target.value)}
-        required
-        autoComplete="name"
-      />
-
-      {enabledFields.map((field) => {
-        if (field.field_name === "respondent_name") return null;
+  function renderField(field: RSVPField) {
+        if (field.field_name === "respondent_name" || !showsField(field, currentStatus)) return null;
 
         switch (field.field_type) {
           case "attendance":
@@ -306,7 +241,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   {field.field_label}
                   {field.is_required && " *"}
                 </p>
-                <div role="group" aria-labelledby={`rsvp-${field.id}-label`} className="flex gap-2">
+                <div role="group" aria-labelledby={`rsvp-${field.id}-label`} className="grid grid-cols-3 gap-2">
                   {["attending", "not_attending", "maybe"].map((opt) => {
                     const btnRadius = buttonStyle === "pill" ? "9999px" : buttonStyle === "square" ? "0px" : "8px";
                     return (
@@ -316,10 +251,10 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                       aria-pressed={formData[field.field_name] === opt}
                       onClick={() => updateField(field.field_name, opt)}
                       className={cn(
-                        "flex-1 border px-3 py-2 text-sm font-medium transition-colors",
+                        "min-h-12 border px-2 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2",
                         formData[field.field_name] === opt
                           ? "text-white"
-                          : "border-neutral-200 bg-white hover:bg-neutral-50"
+                          : "border-neutral-500 bg-white hover:bg-neutral-50"
                       )}
                       style={{
                         borderRadius: btnRadius,
@@ -378,6 +313,8 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                   type="number"
                   min="1"
                   max={String(effectiveMax)}
+                  inputMode="numeric"
+                  onFocus={(e) => e.currentTarget.select()}
                   placeholder={field.placeholder || "1"}
                   value={scalarValue(formData[field.field_name])}
                   onChange={(e) => updateField(field.field_name, e.target.value)}
@@ -495,10 +432,88 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             );
           }
         }
-      })}
+  }
+
+  if (submitted) {
+    return (
+      <div className="rounded-xl border border-green-200 bg-green-50 p-8 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+          <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        </div>
+        <h3 ref={thanksRef} tabIndex={-1} className="text-lg font-semibold text-green-800 outline-none">
+          Thank you for your RSVP!
+        </h3>
+        <p className="mt-1 text-sm text-green-700">
+          Your response has been recorded.
+        </p>
+        {savedResponse && <p className="mt-3 font-semibold text-green-900">
+          {savedResponse.status === 'attending' ? `Attending · ${savedResponse.headcount} ${savedResponse.headcount === 1 ? 'guest' : 'guests'}` : savedResponse.status === 'not_attending' ? 'Not attending' : 'Maybe attending'}
+        </p>}
+        {!inviteToken && <p className="mt-3 text-xs text-green-900">Plans changed? Open this page again on this device to update your reply.</p>}
+        <button
+          type="button"
+          onClick={() => { setSubmitted(false); setError(null); }}
+          className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-green-700 underline underline-offset-2 hover:text-green-800"
+        >
+          Update your response
+        </button>
+      </div>
+    );
+  }
+
+  if (!loading && deadlinePassed && !savedResponse) {
+    return <section aria-label="RSVP closed" className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+      <h2 className="text-xl font-semibold text-amber-950">RSVPs are closed</h2>
+      <p className="mt-2 text-sm text-amber-950">The RSVP deadline has passed. Contact the host if you need to join.</p>
+    </section>;
+  }
+
+  return (
+    <form aria-label="RSVP" onSubmit={handleSubmit} className="space-y-4">
+      {deadlinePassed && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">The deadline has passed. You can still update your existing response.</p>}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">RSVP</h2>
+        {availableSpots !== null && (
+          <span className={cn(
+            "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+            availableSpots > 10
+              ? "bg-green-100 text-green-700"
+              : availableSpots > 0
+                ? "bg-amber-100 text-amber-700"
+                : "bg-red-100 text-red-700"
+          )}>
+            {availableSpots > 0 ? `${availableSpots} ${availableSpots === 1 ? 'spot' : 'spots'} left` : "Event full"}
+          </span>
+        )}
+      </div>
+
+      {inviteGuestName && (
+        <div className="rounded-lg bg-brand-50 border border-brand-100 px-4 py-2.5">
+          <p className="text-sm text-brand-700">
+            Welcome, <strong>{inviteGuestName}</strong>! Your details have been pre-filled.
+          </p>
+        </div>
+      )}
+
+      {attendanceQuestion && renderField(attendanceQuestion)}
+
+      {/* Always show name field */}
+      <Input
+        id="rsvp-name"
+        label="Your Name *"
+        placeholder="Enter your name"
+        value={scalarValue(formData["respondent_name"])}
+        onChange={(e) => updateField("respondent_name", e.target.value)}
+        required
+        autoComplete="name"
+      />
+
+      {enabledFields.map((field) => field === attendanceQuestion ? null : renderField(field))}
 
       {/* Plus One Names Section */}
-      {allowPlusOnes && expectedPlusOnes > 0 && (
+      {allowPlusOnes && expectedPlusOnes > 0 && currentStatus !== "not_attending" && (
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-neutral-500" />
@@ -507,7 +522,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
             </h3>
           </div>
           <p className="text-xs text-neutral-500">
-            Please provide the name{expectedPlusOnes !== 1 ? "s" : ""} of your additional guest{expectedPlusOnes !== 1 ? "s" : ""}.
+            Add names if you know them.
           </p>
           
           {plusOnes.map((plusOne, index) => (
@@ -517,7 +532,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 <button
                   type="button"
                   onClick={() => removePlusOne(index)}
-                  className="text-neutral-400 hover:text-red-500 transition-colors"
+                  className="inline-flex h-11 w-11 items-center justify-center text-neutral-600 hover:text-red-600 transition-colors"
                   title="Remove guest"
                   aria-label={`Remove guest ${index + 1}`}
                 >
@@ -530,7 +545,6 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 placeholder="Enter guest name"
                 value={plusOne.name}
                 onChange={(e) => updatePlusOne(index, "name", e.target.value)}
-                required
                 className="text-sm"
               />
               <Input

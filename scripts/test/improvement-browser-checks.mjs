@@ -55,13 +55,13 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     rows=(await db.query('SELECT * FROM rsvp_responses WHERE event_id=$1',[eventId])).rows;assert.equal(rows.length,1);assert.equal(rows[0].id,rid);assert.equal(rows[0].status,'attending');assert.equal(rows[0].headcount,2);
     const summary=await (await host.request.get(`${origin}/api/events/${eventId}/responses/summary`)).json();assert.equal(summary.attendingHeadcount,2);assert.equal(summary.fields.find(f=>f.fieldName==='email').answered,1);
     await builder.goto(`${origin}/events/${eventId}`);
-    await builder.getByText(/6:00\s*PM E[SD]T/).waitFor();
+    await builder.getByText(/6:00\s*PM E[SD]T/).first().waitFor();
     await builder.getByText('0 invited-list replies · 1 public-link replies',{exact:true}).waitFor();
-    await builder.getByRole('link',{name:'Check-in',exact:true}).click();
+    await builder.getByText('More',{exact:true}).click();await builder.getByRole('link',{name:'Check-in',exact:true}).click();
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('Template Guest');
     await builder.getByRole('button',{name:/Template Guest.*Check in/}).click();
-    await builder.getByRole('button',{name:/Template Guest.*Checked in/}).waitFor();
-    await builder.reload();await builder.getByRole('button',{name:/Template Guest.*Checked in/}).waitFor();
+    await builder.getByRole('button',{name:'Undo check-in for Template Guest'}).waitFor();
+    await builder.reload();await builder.getByRole('button',{name:'Undo check-in for Template Guest'}).waitFor();
     assert.ok((await db.query('SELECT checked_in_at FROM rsvp_responses WHERE id=$1',[rid])).rows[0].checked_in_at);
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('No such guest');await builder.getByText('No guests match your search. Try another name or clear the search.',{exact:true}).waitFor();
     assert.equal((await host.request.patch(`${origin}/api/events/00000000-0000-4000-8000-000000000011/check-in`,{headers:{Origin:origin},data:{rsvpResponseId:rid,checkedIn:false}})).status(),404);
@@ -75,7 +75,7 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     await db.query("UPDATE rsvp_fields SET field_name='name' WHERE event_id=$1 AND field_name='respondent_name'",[eventId]);
     await db.query("UPDATE rsvp_fields SET field_name='guests' WHERE event_id=$1 AND field_name='headcount'",[eventId]);
     await db.query("UPDATE rsvp_fields SET field_type='select',options='[\"Joyfully Accepts\",\"Regretfully Declines\"]' WHERE event_id=$1 AND field_name='attending'",[eventId]);
-    await fresh.reload();await fresh.getByRole('button',{name:'Submit RSVP',exact:true}).waitFor();await fresh.getByLabel('Your Name *',{exact:true}).fill('Legacy Template Guest');await fresh.getByLabel('Email Address *',{exact:true}).fill('legacy-template@example.test');await fresh.getByRole('button',{name:'Not Attending',exact:true}).click();await fresh.getByLabel('Number of Guests',{exact:true}).fill('2');await fresh.getByLabel('Name',{exact:true}).fill('Legacy Plus One');
+    await fresh.reload();await fresh.getByRole('button',{name:'Submit RSVP',exact:true}).waitFor();await fresh.getByLabel('Your Name *',{exact:true}).fill('Legacy Template Guest');await fresh.getByLabel('Email Address *',{exact:true}).fill('legacy-template@example.test');await fresh.getByRole('button',{name:'Not Attending',exact:true}).click();assert.equal(await fresh.getByLabel('Number of Guests',{exact:true}).count(),0,'Declining hides the guest count');await fresh.getByRole('button',{name:'Attending',exact:true}).click();await fresh.getByLabel('Number of Guests',{exact:true}).fill('2');await fresh.getByLabel('Name',{exact:true}).fill('Legacy Plus One');
     for(const width of [375,768,1440]) {
       await fresh.setViewportSize({width,height:1000});
       await fresh.locator('form[aria-label="RSVP"]').scrollIntoViewIfNeeded();
@@ -91,7 +91,7 @@ export async function improvementBrowserChecks({browser,origin,db}) {
       const axe=await new AxeBuilder({page:fresh}).include('[aria-label="RSVP"]').analyze();
       assert.deepEqual(axe.violations.filter(v=>['serious','critical'].includes(v.impact)),[],`legacy form accessibility at ${width}px`);
     }
-    await fresh.getByRole('button',{name:'Submit RSVP',exact:true}).click();await fresh.getByText('Your response has been recorded.',{exact:true}).waitFor();const legacy=(await db.query("SELECT status,headcount FROM rsvp_responses WHERE event_id=$1 AND respondent_name='Legacy Template Guest'",[eventId])).rows[0];assert.equal(legacy.status,'not_attending');assert.equal(legacy.headcount,2);
+    await fresh.getByRole('button',{name:'Submit RSVP',exact:true}).click();await fresh.getByText('Your response has been recorded.',{exact:true}).waitFor();const legacy=(await db.query("SELECT status,headcount FROM rsvp_responses WHERE event_id=$1 AND respondent_name='Legacy Template Guest'",[eventId])).rows[0];assert.equal(legacy.status,'attending');assert.equal(legacy.headcount,2);
     console.log('PASS actual Community Night publication, canonical/default/legacy RSVP status and headcount, one-name form, saved confirmation, timezone, public manual check-in/reload, event isolation, deadline UI/API and responsive accessibility');
   }finally{await Promise.all(contexts.map(ctx=>ctx.close()));await host.close();if(eventId)await db.query('DELETE FROM events WHERE id=$1 AND user_id=$2',[eventId,owner]);await db.query('DELETE FROM user_sessions WHERE user_id=$1',[owner]);await db.query('DELETE FROM activation_events WHERE user_id=$1',[owner]);await db.query('DELETE FROM organizations WHERE created_by=$1',[owner]);await db.query('DELETE FROM admin_users WHERE id=$1',[owner]);}
 }

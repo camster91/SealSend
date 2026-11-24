@@ -10,7 +10,6 @@ test.skip(!email || !password || !eventId || !guestId, 'Disposable check-in-only
 test('check-in-only staff can check in guests and nothing more', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Password' }).click();
   await page.getByLabel('Email Address').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();
@@ -38,13 +37,14 @@ test('check-in-only staff can check in guests and nothing more', async ({ page }
 
   await page.goto(`/events/${eventId}/check-in`);
   await expect(page.getByRole('heading', { name: 'Guest check-in' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /QA Check-in Guest/ })).toContainText('Checked in');
+  await expect(page.getByRole('button', { name: 'Undo check-in for QA Check-in Guest' })).toBeVisible();
 
   const checkOut = await page.context().request.patch(`/api/events/${eventId}/check-in`, {
     data: { guestId, checkedIn: false },
   });
   expect(checkOut.status()).toBe(200);
   expect((await checkOut.json()).checked_in_at).toBeNull();
+  await page.getByText('More', { exact: true }).click();
   await page.getByRole('button', { name: 'Refresh guest list' }).click();
   await expect(page.getByRole('button', { name: /QA Check-in Guest/ })).toContainText('Check in');
 

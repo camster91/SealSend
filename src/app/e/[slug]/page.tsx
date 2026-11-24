@@ -3,11 +3,10 @@ import { notFound } from "next/navigation";
 import { EventHero } from "@/components/public-event/EventHero";
 import { EventDetails } from "@/components/public-event/EventDetails";
 import { RSVPForm } from "@/components/public-event/RSVPForm";
-import { LocationMap } from "@/components/public-event/LocationMap";
+import Link from "next/link";
 import { CommentsSection } from "@/components/public-event/CommentsSection";
 import { GuestSocial } from '@/components/social/GuestSocial';
 import { SignupBoard } from "@/components/public-event/SignupBoard";
-import { ConfettiEffect } from "@/components/public-event/ConfettiEffect";
 import { AudioPlayer } from "@/components/public-event/AudioPlayer";
 import { AnimatedEventLayout, AnimatedSection } from "@/components/public-event/AnimatedEventLayout";
 import {
@@ -96,6 +95,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     );
     if (guest) inviteGuest = guest;
   }
+  const unknownLink = rawToken !== null && !inviteGuest;
 
   // Sanitize all customization values
   const customization = sanitizeCustomization(event.customization as unknown as Record<string, unknown>);
@@ -120,48 +120,25 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen pb-12 overflow-x-hidden" style={pageStyle}>
-      <ConfettiEffect />
-
       <AnimatedEventLayout>
         {/* Hero — full width */}
         <AnimatedSection className="mx-auto max-w-4xl px-4 pt-8 md:pt-12">
           <EventHero event={event} />
         </AnimatedSection>
 
-        {/* Two-column layout on desktop */}
-        <div className="mx-auto max-w-4xl px-4 py-8">
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
-            {/* Left column: Details + Map */}
-            <div className="space-y-8 lg:col-span-3">
-              <AnimatedSection className="rounded-xl border border-border bg-white/95 backdrop-blur-sm p-6 shadow-sm transition-all hover:shadow-md">
-                <EventDetails event={event} />
-              </AnimatedSection>
+        {/* One column on phones: details, reply, then everything else */}
+        <div className="mx-auto max-w-4xl px-4 py-6">
+          {unknownLink && (
+            <p role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              We didn&apos;t recognize your personal link, so your reply won&apos;t be matched to your invitation. You can still reply below, or ask your host for a new link.
+            </p>
+          )}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:items-start">
+            <AnimatedSection className="rounded-xl border border-border bg-white p-5 shadow-sm sm:p-6 lg:col-span-3">
+              <EventDetails event={event} showTitle={Boolean(event.design_url)} />
+            </AnimatedSection>
 
-              {event.location_address && (
-                <AnimatedSection>
-                  <LocationMap
-                    address={event.location_address as string}
-                    name={(event.location_name as string) || undefined}
-                  />
-                </AnimatedSection>
-              )}
-
-              {/* Sign-up board */}
-              <AnimatedSection>
-                <SignupBoard eventSlug={slug} />
-              </AnimatedSection>
-
-              <AnimatedSection><GuestSocial slug={slug} token={inviteGuest && token ? token : undefined} /></AnimatedSection>
-
-              {/* Comments / Message Board */}
-              <AnimatedSection>
-                <CommentsSection eventSlug={slug} />
-              </AnimatedSection>
-            </div>
-
-            {/* Right column: RSVP Form */}
-            <div className="lg:col-span-2">
-              <AnimatedSection className="sticky top-8 rounded-xl border border-border bg-white/95 backdrop-blur-sm p-6 shadow-sm transition-all hover:shadow-md">
+            <AnimatedSection className="rounded-xl border border-border bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-8 lg:col-span-2 lg:row-span-2">
                 <RSVPForm
                   eventSlug={slug}
                   fields={rsvpFields || []}
@@ -175,22 +152,29 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
                   inviteGuestName={inviteGuest?.name}
                   inviteGuestEmail={inviteGuest?.email}
                 />
+            </AnimatedSection>
+
+            <div className="space-y-6 lg:col-span-3">
+              <AnimatedSection>
+                <SignupBoard eventSlug={slug} />
+              </AnimatedSection>
+              <AnimatedSection>
+                <GuestSocial slug={slug} token={inviteGuest && token ? token : undefined} />
+              </AnimatedSection>
+              <AnimatedSection>
+                <CommentsSection eventSlug={slug} />
               </AnimatedSection>
             </div>
           </div>
         </div>
 
-        {/* Footer branding (free events; removed by the removeBranding entitlement) */}
-        {showBadge && (
-          <AnimatedSection className="pb-8 text-center">
-            <p className="text-xs text-muted-foreground bg-white/80 inline-block px-3 py-1 rounded-full backdrop-blur-sm shadow-sm">
-              Powered by{" "}
-              <span className="font-semibold">
-                Seal and Send
-              </span>
-            </p>
-          </AnimatedSection>
-        )}
+        <footer className="px-4 pb-8 text-center">
+          <nav aria-label="Help and privacy" className="inline-flex flex-wrap items-center justify-center gap-x-5 rounded-full bg-white px-5 text-sm text-ink shadow-sm">
+            {showBadge && <Link href="/" className="inline-flex min-h-11 items-center">Powered by SealSend</Link>}
+            <Link href="/privacy" className="inline-flex min-h-11 items-center underline underline-offset-4">Privacy</Link>
+            <Link href="/support" className="inline-flex min-h-11 items-center underline underline-offset-4">Help</Link>
+          </nav>
+        </footer>
       </AnimatedEventLayout>
 
       {/* Audio player */}

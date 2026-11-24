@@ -1,3 +1,4 @@
+import { isDefaultInvitationCopy } from "@/lib/invitation-defaults";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
@@ -25,6 +26,8 @@ type SourceEvent = {
   description: string | null;
   invitation_headline: string | null;
   invitation_body: string | null;
+  title: string;
+  event_date: string | null;
   reminder_sequence: unknown;
   event_timezone: string;
   location_name: string | null;
@@ -74,7 +77,7 @@ export async function POST(request: Request, { params }: RouteParams) {
                      ELSE (SELECT em.role FROM event_members em WHERE em.event_id = e.id AND em.user_id = $2 LIMIT 1)
                 END AS role,
                 (SELECT om.role FROM organization_members om WHERE om.organization_id = e.organization_id AND om.user_id = $2 LIMIT 1) AS organization_role,
-                e.status, e.description, e.invitation_headline, e.invitation_body, e.reminder_sequence, e.event_timezone,
+                e.status, e.title, e.event_date, e.description, e.invitation_headline, e.invitation_body, e.reminder_sequence, e.event_timezone,
                 location_name, location_address, location_lat, location_lng, host_name, dress_code,
                 registry_links, max_attendees, allow_plus_ones, max_guests_per_rsvp,
                 design_url, design_type, customization, event_brief
@@ -143,6 +146,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         );
       }
 
+      const generated = isDefaultInvitationCopy(original);
       const newEventId = randomUUID();
       const statements: Statement[] = [
         guard("EXISTS (SELECT 1 FROM events WHERE id = $1)", [eventId], "not_found"),
@@ -172,7 +176,8 @@ export async function POST(request: Request, { params }: RouteParams) {
          ) RETURNING id, title`,
         params: [
           original.user_id, repeatRequest.title, generateSlug(repeatRequest.title), original.description,
-          original.invitation_headline, original.invitation_body, original.reminder_sequence,
+          // Wording SealSend wrote names the old date and title; leave it blank so publishing rewrites it.
+          generated.headline ? null : original.invitation_headline, generated.body ? null : original.invitation_body, original.reminder_sequence,
           toTimestamp(repeatRequest.eventDate), toTimestamp(repeatRequest.eventEndDate), original.event_timezone,
           original.location_name, original.location_address, original.location_lat, original.location_lng,
           original.host_name, original.dress_code, toTimestamp(repeatRequest.rsvpDeadline), JSON.stringify(original.registry_links ?? []),

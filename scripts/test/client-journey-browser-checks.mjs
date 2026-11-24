@@ -155,6 +155,7 @@ export async function clientJourneyBrowserChecks({ browser, origin, db, host }) 
     // Assign the created client from the event's client panel, exercising the
     // same control a host uses instead of only checking the assignment API.
     await page.goto(`${origin}/events/${IDS.event}`);
+    await page.getByText("More", { exact: true }).click();
     await page.getByRole("heading", { name: "Client", exact: true }).waitFor();
     const clientPicker = page.getByLabel("Client for this event", { exact: true });
     await clientPicker.selectOption(clientId);
@@ -246,6 +247,7 @@ export async function clientJourneyBrowserChecks({ browser, origin, db, host }) 
 
     // The host sees approval on the event panel after its own readback.
     await page.goto(`${origin}/events/${IDS.event}`);
+    await page.getByText("More", { exact: true }).click();
     await page.getByText("Approved by Client Journey Reviewer", { exact: false }).waitFor();
 
     const history = await host.request.get(`${origin}/api/organizations/${IDS.organization}/clients/${clientId}`, {
