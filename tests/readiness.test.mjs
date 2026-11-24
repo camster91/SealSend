@@ -1501,12 +1501,12 @@ test('communication review exposes resolved recipients, cost status, controls, a
   assert.match(announcementRoute, /verifyAnnouncementApprovalProof/);
   assert.match(announcementRoute, /approval expired/);
   for (const control of ['tone', 'length', 'urgency', 'channel']) assert.match(draft, new RegExp(control));
-  assert.match(modal, /Review resolved recipients/);
+  assert.match(modal, /See who gets it/);
   assert.match(modal, /Estimated provider charge/);
   assert.match(modal, /billed SMS segment/);
   assert.match(modal, /subject: subject\.trim\(\), message: message\.trim\(\)/);
-  assert.match(modal, /approvalProof: preview\?\.approvalProof/);
-  assert.match(modal, /approve this external send/);
+  assert.match(modal, /approvalProof: preview\.approvalProof/);
+  assert.match(modal, /checked this message and who gets it/);
   assert.doesNotMatch(draft, /dispatchAnnouncement|sendEmail|\.messages\.create/);
 });
 
