@@ -1,6 +1,8 @@
 # Running SealSend on Cloudflare Workers
 
-SealSend can build as a Cloudflare Worker (vinext) next to the Docker image. Both builds come from the same code. Production is still the Docker image on the VPS until the cutover below is done.
+> **Status:** production runs on Cloudflare Workers. The old VPS is retired, so the cutover and rollback steps below are history; rolling back means redeploying an earlier Worker version. Deploys are described in the README.
+
+SealSend can build as a Cloudflare Worker (vinext) next to the Docker image. Both builds come from the same code.
 
 ## How it works
 
@@ -9,7 +11,7 @@ SealSend can build as a Cloudflare Worker (vinext) next to the Docker image. Bot
 | Build | `npm run build` | `npm run build:vinext` |
 | Uploads | `uploads/` folder | R2 bucket `sealsend-uploads` (binding `UPLOADS`) |
 | Image resizing | sharp | Cloudflare Images (binding `IMAGES`) |
-| Database | PostgreSQL (`main` today) | D1 (binding `DB`); local dev and tests use a SQLite file (`SQLITE_PATH`). See `docs/d1-port.md` |
+| Database | PostgreSQL (before the move) | D1 (binding `DB`); local dev and tests use a SQLite file (`SQLITE_PATH`). See `docs/d1-port.md` |
 | Webhook delivery safety check | DNS lookup that refuses private addresses | DNS-over-HTTPS check, no redirects |
 | Cron jobs | VPS crontab (`ops/sealsend-maintenance.cron`) | Cron Triggers (`cloudflare.config.ts` + `worker/index.ts`) |
 | Mailgun / Twilio | `fetch` clients (same code on both) | same |
@@ -32,11 +34,11 @@ Sign in with `cf auth`, then:
 cf r2 buckets create --name sealsend-uploads
 cf d1 create --name sealsend-db      # note the database id
 export D1_DATABASE_ID=<id from above>
-cf d1 query "$D1_DATABASE_ID" --sql "$(cat src/lib/db/schema.sql)"   # idempotent; re-run after schema changes
+cf d1 query "$D1_DATABASE_ID" --sql "$(cat src/lib/db/schema.sql)"   # idempotent; new columns on existing tables need a file from src/lib/db/migrations/
 ```
 
 Set every secret listed in `cloudflare.config.ts` (`SECRET_NAMES`) with `cf workers secrets update <NAME>`.
-Use `cf workers secrets bulk` for many at once. The list matches `.env.example`; copy the values from Coolify.
+Use `cf workers secrets bulk` for many at once. The list matches `.env.example`.
 A declared secret that is not set is only a warning locally; check what your deploy does before the cutover.
 
 Not exposed yet (code defaults apply): `REMINDER_*`, `STALE_DRAFT_*`, `EMAIL_DAILY_LIMIT_PER_ACCOUNT`, `*_ESTIMATED_COST_MICROS`, `DEFAULT_COUNTRY`, `ALERT_DELIVERY_*`, `STRIPE_ORGANIZER_*_PRICE_ID`. Add a name to `SECRET_NAMES` (or `PLAIN_VALUES`) to expose it.

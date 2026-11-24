@@ -25,7 +25,7 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 - Signed webhooks for RSVPs, check-ins, publishing and client approvals, for Zapier, Make or your own CRM ([docs](docs/webhooks.md))
 
 **Accounts, billing and safety**
-- Passwordless sign-in with 6-digit email or SMS codes (password sign-in also supported), database-backed sessions
+- Passwordless sign-in with 6-digit email or SMS codes, or password sign-in, with database-backed sessions. Which is offered depends on the configured providers (see Deploying)
 - Stripe billing for a free tier, one-time Event Pass, annual Pro and SMS top-ups. During the controlled beta (`BETA_MODE` in `src/lib/constants.ts`) paid checkout is turned off and every account gets the beta plan
 - Test-only switches for payments and outbound messages, plus opt-out and suppression handling for SMS and email
 - Account data export and deletion, rate limiting, upload quotas, and a Content Security Policy with HSTS and `frame-ancestors 'none'`
@@ -39,15 +39,15 @@ SealSend lets a host design an invitation, send it by email or SMS, and watch re
 | Database | SQLite with raw SQL: Cloudflare D1 in production, `node:sqlite` locally |
 | Styling and UI | Tailwind CSS 4, Radix UI Tooltip, Framer Motion, Lucide icons |
 | Forms and validation | React Hook Form, Zod |
-| Email / SMS | Mailgun, Twilio |
+| Email / SMS | Mailgun or Cloudflare Email Service; Twilio |
 | Payments | Stripe |
 | AI drafts | OpenAI Responses API (structured JSON output) |
 | Testing | Node test runner with `tsx`, Playwright, axe-core |
-| Packaging | Docker (multi-stage `Dockerfile`) |
+| Hosting | Cloudflare Workers (vinext build) |
 
 ## Getting started
 
-Prerequisites: Node.js 22.13+, and Mailgun, Twilio and Stripe accounts (test credentials are fine for local work).
+Prerequisites: Node.js 22.13+. Mailgun, Twilio and Stripe are optional locally; features that need them stay off.
 
 ```bash
 git clone https://github.com/camster91/SealSend.git
@@ -72,7 +72,7 @@ npm run build
 npm run start
 ```
 
-`docker-compose.yml` builds the old VPS container (Postgres). Production now runs on Cloudflare (see below), so it is no longer used.
+`Dockerfile` and `docker-compose.yml` are left over from the old VPS hosting and are not used in production.
 
 ## Deploying (Cloudflare)
 
@@ -96,9 +96,9 @@ node scripts/cloudflare/deploy.mjs  # deploy: turns the build output into a wran
 
 Watch builds in the Cloudflare dashboard: Workers & Pages → `sealsend` → Deployments. Changes only to `*.md`, `docs/` or `apps/mobile/` don't trigger a build.
 
-**Config.** Bindings and plain settings live in `cloudflare.config.ts`. Secrets are set on the Worker (dashboard → Settings → Variables and Secrets, or `cf workers secrets update <NAME>`). Set now: `SESSION_SECRET`, `CRON_SECRET`, `OPERATIONS_SECRET`, `UNSUBSCRIBE_SECRET`, `MONITORING_TEST_SECRET`. Not set yet: Stripe, Mailgun, Twilio, OpenAI and `FROM_EMAIL`, so those features are off.
+**Config.** Bindings and plain settings live in `cloudflare.config.ts`. Secrets are set on the Worker (dashboard → Settings → Variables and Secrets, or `cf workers secrets update <NAME>`). The names are in `SECRET_NAMES`; a feature whose provider secrets are missing stays off.
 
-**Email.** With no email provider, hosts sign up and sign in with an email and password (`/api/auth/signup-password`, `/api/auth/login-password`), and invitations/reminders can't be emailed. To turn email on with Cloudflare: onboard `sealsend.app` in Email Service (dashboard → Compute → Email Service → Email Sending), then set the `FROM_EMAIL` secret (for example `SealSend <hello@sealsend.app>`). Sign-up then switches back to email codes. While `COMMUNICATIONS_TEST_ONLY` is `"true"`, only addresses in `COMMUNICATIONS_ALLOWED_RECIPIENTS` get email.
+**Email.** With no email provider, hosts sign up and sign in with an email and password (`/api/auth/signup-password`, `/api/auth/login-password`), and invitations/reminders can't be emailed. To turn email on with Cloudflare: onboard `sealsend.app` in Email Service (dashboard → Compute → Email Service → Email Sending), then set the `FROM_EMAIL` secret (for example `SealSend <hello@sealsend.app>`). Sign-up then switches back to email codes. Decide on `COMMUNICATIONS_TEST_ONLY` first: while it is `"true"`, only addresses in `COMMUNICATIONS_ALLOWED_RECIPIENTS` can get a code, so turning email on would stop everyone else signing up.
 
 **Database changes.** D1 has no automatic migrations here. Apply new SQL with `npx wrangler d1 execute sealsend-db --remote --file <file.sql>` (or the D1 console in the dashboard). `schema.sql` is idempotent. It does not add columns to existing tables: before deploying, run any new file in `src/lib/db/migrations/` once.
 
@@ -132,12 +132,17 @@ src/
   components/      UI, wizard, dashboard and public-event components
   lib/             auth, db, email/SMS, billing, AI, webhooks, validation
 tests/             unit tests and Playwright specs (tests/e2e)
-scripts/           admin, beta and test utilities
+scripts/           admin, beta and test utilities, Cloudflare deploy script
+worker/            Cloudflare Worker entry and Cron Trigger routing
+ops/               scripts for the retired VPS
+apps/mobile/       native app (see apps/mobile and docs/mobile)
 docs/              feature and operations docs
 ```
 
 ## Documentation
 
+- [docs/cloudflare-migration.md](docs/cloudflare-migration.md): Cloudflare hosting runbook
+- [docs/d1-port.md](docs/d1-port.md): the SQLite/D1 database
 - [docs/webhooks.md](docs/webhooks.md): webhook events and signature verification
 - [docs/AUTOMATIC_REMINDERS.md](docs/AUTOMATIC_REMINDERS.md): reminder scheduling
 - [docs/product-strategy-organizer-platform.md](docs/product-strategy-organizer-platform.md): product direction for one-off hosts and organizers

@@ -1,5 +1,7 @@
 # SealSend deployment readiness
 
+> **Hosting changed.** Production now runs on Cloudflare Workers and D1 (see the README). VPS, Coolify, PostgreSQL, container and backup details below are history and do not describe the live site. The launch gates still apply.
+
 Date: 2026-08-28
 
 ## Release decision
@@ -125,7 +127,7 @@ For a real deployment, the Stripe webhook endpoint must send `checkout.session.c
 > Add them here from the operator's deploy report. Until then, the image, commit and backup fields below describe the previous (2026-08-27) release.
 
 - Public origin: `https://sealsend.app`
-- Host: Hostinger VPS `vps.ashbi.ca` (`187.77.26.99`)
+- Host: Hostinger VPS `vps.ashbi.ca`
 - Application container: `x8okwogw0so8s08oss04s088-011248616962`
 - Database container: `sealsend-postgres` (`postgres:16-alpine`)
 - Current verified image: `sealsend:20260827T213741Z`
