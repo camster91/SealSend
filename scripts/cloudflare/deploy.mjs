@@ -15,12 +15,20 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "../..");
-const out = path.join(root, ".cloudflare/output/v0/workers/default");
-const configPath = path.join(out, "worker.config.json");
-if (!existsSync(configPath)) {
+// @cloudflare/vite-plugin writes v0 up to 2.0.0-beta and v1 from 2.0.0-rc.
+const outputs = ["v1", "v0"]
+  .map((version) => path.join(root, ".cloudflare/output", version, "workers/default"))
+  .filter((dir) => existsSync(path.join(dir, "worker.config.json")));
+if (outputs.length === 0) {
   console.error("No build output found. Run `npm run build:vinext` first.");
   process.exit(1);
 }
+if (outputs.length > 1) {
+  console.error("Found build output from two plugin versions. Delete .cloudflare/output and build again.");
+  process.exit(1);
+}
+const out = outputs[0];
+const configPath = path.join(out, "worker.config.json");
 
 const built = JSON.parse(readFileSync(configPath, "utf8"));
 const env = built.env ?? {};
