@@ -41,7 +41,11 @@ export function SignupForm({ passwordSignup = false }: { passwordSignup?: boolea
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          channel: normalizeMarketingChannel(searchParams.get("source") ?? "direct"),
+        }),
       });
       const result = await response.json().catch(() => ({}));
       if (response.ok && result.success) {

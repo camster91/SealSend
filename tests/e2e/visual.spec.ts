@@ -18,7 +18,7 @@ test('captures the homepage and login experience for visual review', async ({ pa
   await page.screenshot({ path: path.join(output, `${prefix}-pricing.png`), fullPage: true, scale: 'css' });
 
   await page.goto('/login');
-  await expect(page.getByRole('button', { name: 'Send Code' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(output, `${prefix}-login.png`), fullPage: true, scale: 'css' });
 });

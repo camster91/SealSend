@@ -5,6 +5,7 @@ import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { hashPassword } from '@/lib/password';
 import { isPasswordSignupEnabled } from '@/lib/email';
+import { MARKETING_CHANNELS, measurementOptedOut } from '@/lib/analytics/marketing-attribution';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 
 /**
@@ -18,6 +19,7 @@ const signupPasswordSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address').max(254),
   password: z.string().min(8, 'Use at least 8 characters').max(200),
   name: z.string().trim().max(100).optional(),
+  channel: z.enum(MARKETING_CHANNELS).optional().catch(undefined),
 });
 
 export async function POST(request: NextRequest) {
@@ -80,10 +82,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const channel = measurementOptedOut(request.headers) ? undefined : parsed.data.channel;
     await recordActivationEventSafely({
       name: 'account_created',
       userId: created.id,
-      metadata: { method: 'password' },
+      metadata: { method: 'password', ...(channel ? { channel } : {}) },
     });
 
     const sessionToken = crypto.randomUUID();

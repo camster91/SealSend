@@ -5,7 +5,9 @@ test.describe('Authentication', () => {
     await page.goto('/login');
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByLabel('Email Address')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Send Code' })).toBeVisible();
+    // The QA server has no email provider, so sign-in opens on the password form.
+    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
   });
 
   test('redirects unauthenticated users from dashboard', async ({ page }) => {
