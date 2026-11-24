@@ -25,7 +25,6 @@ test('future announcements remain queued, can be cancelled, and calendars are us
   await expect(page.getByRole('link', { name: 'Outlook' })).toHaveAttribute('href', /outlook\.live\.com/);
 
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Password' }).click();
   await page.getByLabel('Email Address').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();

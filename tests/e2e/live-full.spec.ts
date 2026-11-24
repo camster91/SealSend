@@ -34,14 +34,13 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
   let betaJoined = false;
   try {
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Password' }).click();
     await page.getByLabel('Email Address').fill(qaEmail!);
     await page.getByLabel('Password').fill(qaPassword!);
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/dashboard/);
     const origin = new URL(page.url()).origin;
     await page.context().setExtraHTTPHeaders({ Origin: origin });
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your events' })).toBeVisible();
     await page.screenshot({ path: path.join(output, '01-dashboard-desktop.png'), fullPage: true });
 
     const betaEnrollment = await page.context().request.post('/api/beta/participation', { data: {

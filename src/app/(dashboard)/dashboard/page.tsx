@@ -9,11 +9,10 @@ import { EventSearchFilter } from '@/components/dashboard/EventSearchFilter';
 import { getUserTier } from '@/lib/subscription';
 import { BetaFeedback } from '@/components/dashboard/BetaFeedback';
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist';
-import { WelcomeTour } from '@/components/onboarding/WelcomeTour';
 import { queryOne } from '@/lib/db/client';
 import { BETA_MODE } from '@/lib/constants';
 import { SealMark } from '@/components/layout/Logo';
-import { Calendar, CalendarCheck, MapPin, Plus, Users } from 'lucide-react';
+import { Calendar, MapPin, Plus } from 'lucide-react';
 
 interface DashboardPageProps {
   searchParams: Promise<{ upgraded?: string; plan?: string }>;
@@ -67,9 +66,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const activeOwnedEvents = myEvents.filter((event) => event.status !== 'archived');
   const firstOwnedEvent = activeOwnedEvents[0];
   const [onboarding, guestUsage] = await Promise.all([
-    firstOwnedEvent ? queryOne<{ guest_count: number; sent_count: number }>(
-      `SELECT COUNT(*) AS guest_count,
-              COUNT(*) FILTER (WHERE invite_status IN ('sent','delivered','accepted')) AS sent_count
+    firstOwnedEvent ? queryOne<{ guest_count: number }>(
+      `SELECT COUNT(*) AS guest_count
          FROM guests WHERE event_id = $1`,
       [firstOwnedEvent.id],
     ) : null,
@@ -106,10 +104,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <div className="mb-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="font-display text-4xl text-ink">Dashboard</h1>
-              <p className="mt-2 truncate text-neutral-600">
-                Welcome back, {user?.email || user?.phone || 'User'}
-              </p>
+              <h1 className="font-display text-4xl text-ink">Your events</h1>
             </div>
             {allEvents.length > 0 && (
               <Link
@@ -123,59 +118,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
 
-        <WelcomeTour userId={user.id} show={user.role === 'admin' && myEvents.length === 0 && collaboratingEvents.length === 0} />
-        <OnboardingChecklist
-          event={firstOwnedEvent ? {
-            id: firstOwnedEvent.id,
-            eventDate: firstOwnedEvent.event_date,
-            locationName: firstOwnedEvent.location_name,
-            maxAttendees: firstOwnedEvent.max_attendees,
-            invitationHeadline: firstOwnedEvent.invitation_headline,
-            invitationBody: firstOwnedEvent.invitation_body,
-            status: firstOwnedEvent.status,
-          } : null}
-          hasGuest={Number(onboarding?.guest_count ?? 0) > 0}
-          hasInvitation={Number(onboarding?.sent_count ?? 0) > 0}
-        />
-
-        {/* Usage Stats */}
-        <div className="mb-8">
-          <UsageStats
-            tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : accountPlan === 'beta' ? 'Controlled Beta' : 'free'}
-            eventsUsed={activeOwnedEvents.length}
-            eventsLimit={accountPlan === 'pro_annual' ? -1 : 1}
-            guestsUsed={Number(guestUsage?.largest_event_guest_count ?? 0)}
-            guestsLimit={accountPlan === 'beta' ? 100 : accountPlan === 'pro_annual' ? 2500 : 15}
-          />
-        </div>
-
-        {/* Stats */}
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
-          {[
-            { label: 'My events', value: myEvents.length, Icon: Calendar },
-            { label: 'Invited to', value: invitedEvents.length, Icon: Users },
-            { label: 'Total events', value: allEvents.length, Icon: CalendarCheck },
-          ].map(({ label, value, Icon }) => (
-            <div key={label} className="flex items-center gap-4 rounded-2xl border border-border bg-white p-5">
-              <Icon className="h-5 w-5 shrink-0 text-neutral-500" strokeWidth={1.75} aria-hidden />
-              <div className="min-w-0 flex-1">
-                <dt className="truncate text-sm font-medium text-neutral-600">{label}</dt>
-                <dd className="text-2xl font-semibold tabular-nums text-ink">{value}</dd>
-              </div>
-            </div>
-          ))}
-        </dl>
-
         {/* My Events Section */}
         {myEvents.length > 0 && (
           <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-white">
             <div className="border-b border-border px-4 py-5 sm:px-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-ink">My events</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-neutral-600">
-                    Events you created and manage
-                  </p>
+                  <h2 className="text-lg font-semibold text-ink">Hosting</h2>
                 </div>
                 {myEvents.length > 3 && <EventSearchFilter />}
               </div>
@@ -191,9 +140,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                             <p className="truncate text-sm font-semibold text-ink">
                               {event.title}
                             </p>
-                            <span className="ml-2 inline-flex items-center rounded-md border border-border bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700">
-                              Owner
-                            </span>
                           </div>
                           <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
                             <div className="flex items-center text-sm text-neutral-600">
@@ -358,6 +304,26 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           </div>
         )}
+        {firstOwnedEvent && <OnboardingChecklist
+          event={{
+            id: firstOwnedEvent.id,
+            eventDate: firstOwnedEvent.event_date,
+            locationName: firstOwnedEvent.location_name,
+            status: firstOwnedEvent.status,
+          }}
+          hasGuest={Number(onboarding?.guest_count ?? 0) > 0}
+        />}
+
+        <details className="mb-8 rounded-2xl border border-border bg-white">
+          <summary className="flex min-h-11 cursor-pointer items-center px-5 text-sm font-medium text-ink">Plan and limits</summary>
+          <UsageStats
+            tier={accountPlan === 'pro_annual' ? 'SealSend Pro' : accountPlan === 'beta' ? 'Free beta' : 'free'}
+            eventsUsed={activeOwnedEvents.length}
+            eventsLimit={accountPlan === 'pro_annual' ? -1 : 1}
+            guestsUsed={Number(guestUsage?.largest_event_guest_count ?? 0)}
+            guestsLimit={accountPlan === 'beta' ? 100 : accountPlan === 'pro_annual' ? 2500 : 15}
+          />
+        </details>
         <BetaFeedback />
         {upgraded === 'true' && <UpgradeSuccessToast />}
       </div>

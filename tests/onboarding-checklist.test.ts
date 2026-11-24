@@ -3,74 +3,29 @@ import test from "node:test";
 
 import { buildFirstEventChecklist } from "../src/lib/onboarding-checklist";
 
-test("an event draft is not guest-ready until its schedule, location, and invitation copy exist", () => {
-  const steps = buildFirstEventChecklist({
-    event: {
-      id: "event-1",
-      eventDate: null,
-      locationName: "  ",
-      maxAttendees: null,
-      invitationHeadline: "Welcome",
-      invitationBody: " ",
-      status: "draft",
-    },
-    hasGuest: false,
-    hasInvitation: false,
-  });
+const event = { id: "event-1", eventDate: "2026-09-18T22:00:00.000Z", locationName: "Community Hall", status: "draft" as const };
 
-  assert.deepEqual(
-    steps.map(({ label, complete, href }) => ({ label, complete, href })),
-    [
-      { label: "Create an event", complete: true, href: "/events/event-1/edit" },
-      { label: "Confirm schedule, location, and capacity", complete: false, href: "/events/event-1/edit" },
-      { label: "Review invitation copy", complete: false, href: "/events/event-1/edit" },
-      { label: "Add your first guest", complete: false, href: "/events/event-1/guests" },
-      { label: "Publish the event", complete: false, href: "/events/event-1" },
-      { label: "Send the first invitation", complete: false, href: "/events/event-1/guests" },
-    ],
-  );
+test("a draft shows the four steps left, with links to finish them", () => {
+  const steps = buildFirstEventChecklist({ event: { ...event, eventDate: null, locationName: "  " }, hasGuest: false });
+  assert.deepEqual(steps.map(({ label, complete, href }) => ({ label, complete, href })), [
+    { label: "Create an event", complete: true, href: "/events/event-1/edit" },
+    { label: "Set the date and place", complete: false, href: "/events/event-1/edit" },
+    { label: "Add your first guest", complete: false, href: "/events/event-1/guests" },
+    { label: "Publish the event", complete: false, href: "/events/event-1" },
+  ]);
 });
 
-test("the checklist reports the complete first-event workflow only from real state", () => {
-  const steps = buildFirstEventChecklist({
-    event: {
-      id: "event-2",
-      eventDate: "2026-09-18T22:00:00.000Z",
-      locationName: "Community Hall",
-      maxAttendees: 60,
-      invitationHeadline: "September gathering",
-      invitationBody: "Please review the details and RSVP.",
-      status: "published",
-    },
-    hasGuest: true,
-    hasInvitation: true,
-  });
-
-  assert.equal(steps.length, 6);
-  assert.equal(steps.every((step) => step.complete), true);
+test("a published event with guests is complete without a capacity limit", () => {
+  assert.ok(buildFirstEventChecklist({ event: { ...event, status: "published" }, hasGuest: true }).every((step) => step.complete));
 });
 
-test("the schedule step remains incomplete until the host sets capacity", () => {
-  const steps = buildFirstEventChecklist({
-    event: {
-      id: "event-3",
-      eventDate: "2026-09-18T22:00:00.000Z",
-      locationName: "Community Hall",
-      maxAttendees: null,
-      invitationHeadline: "September gathering",
-      invitationBody: "Please review the details and RSVP.",
-      status: "draft",
-    },
-    hasGuest: false,
-    hasInvitation: false,
-  });
-
-  assert.equal(steps.find((step) => step.label === "Confirm schedule, location, and capacity")?.complete, false);
+test("a date without a place is not complete", () => {
+  const steps = buildFirstEventChecklist({ event: { ...event, locationName: null }, hasGuest: false });
+  assert.equal(steps.find((step) => step.label === "Set the date and place")?.complete, false);
 });
 
-test("a new host gets actionable create-event links without fabricated progress", () => {
-  const steps = buildFirstEventChecklist({ event: null, hasGuest: false, hasInvitation: false });
-
+test("a new host gets create-event links without fabricated progress", () => {
+  const steps = buildFirstEventChecklist({ event: null, hasGuest: false });
   assert.equal(steps.filter((step) => step.complete).length, 0);
   assert.equal(steps.every((step) => step.href === "/events/new"), true);
 });

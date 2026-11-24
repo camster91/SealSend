@@ -10,7 +10,6 @@ test.skip(!email || !password, 'Disposable template QA account is required');
 
 async function signIn(page: Page) {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Password' }).click();
   await page.getByLabel('Email Address').fill(email!);
   await page.getByLabel('Password').fill(password!);
   await page.getByRole('button', { name: 'Sign In' }).click();
