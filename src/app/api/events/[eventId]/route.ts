@@ -5,7 +5,7 @@ import { toTimestamp } from '@/lib/events';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { eventUpdateSchema } from '@/lib/validations';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
-import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
+import { refreshDefaultInvitationCopy, withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -121,8 +121,8 @@ export async function PATCH(
     const updates = { ...parsed.data } as Record<string, unknown>;
     if (targetStatus === 'published') {
       // Fill blank invitation copy from the merged row so host text is never overwritten.
-      const merged = { ...existing, ...parsed.data };
-      const filled = withDefaultInvitationCopy(merged);
+      const merged = { ...existing, ...parsed.data } as typeof existing & Record<string, unknown>;
+      const filled = withDefaultInvitationCopy(refreshDefaultInvitationCopy(existing, merged));
       if (filled.invitation_headline !== merged.invitation_headline) updates.invitation_headline = filled.invitation_headline;
       if (filled.invitation_body !== merged.invitation_body) updates.invitation_body = filled.invitation_body;
     }

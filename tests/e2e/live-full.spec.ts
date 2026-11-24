@@ -331,7 +331,13 @@ test('authenticated host and guest lifecycle', async ({ browser, page }, testInf
     await repeatDialog.getByLabel('New event title').fill('SealSend Production QA Repeat');
     const repeatStart = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
     await repeatDialog.getByLabel('New start date and time').fill(repeatStart);
-    await expect(repeatDialog.getByLabel('Archive the current event')).toBeChecked();
+    // Taking the live event offline must be the host's choice.
+    const archiveCurrent = repeatDialog.getByLabel('Archive the current event');
+    const createDraft = repeatDialog.getByRole('button', { name: 'Create next event draft' });
+    await expect(archiveCurrent).not.toBeChecked();
+    await expect(createDraft).toBeDisabled();
+    await archiveCurrent.check();
+    await expect(createDraft).toBeEnabled();
     await repeatDialog.getByLabel('Copy reusable guest contacts and tags').check();
     await repeatDialog.getByRole('button', { name: 'Create next event draft' }).click();
     await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain(`/events/${eventId}`);

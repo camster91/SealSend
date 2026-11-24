@@ -70,7 +70,7 @@ export function GuestTable({ guests, eventId, onEdit, onRefresh }: GuestTablePro
         header: "Invite",
         render: (item) => {
           const guest = item as Guest;
-          if (!guest.email && !guest.phone) return <span className="text-muted-foreground">\u2014</span>;
+          if (!guest.email && !guest.phone) return <span className="text-muted-foreground">—</span>;
           const badge = inviteBadge[guest.invite_status] || inviteBadge.not_sent;
           return <Badge variant={badge.variant}>{badge.label}</Badge>;
         },
