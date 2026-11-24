@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { LEGACY_USE_CASE_REDIRECTS, USE_CASES, USE_CASE_SLUGS } from "@/lib/use-case-content";
+import { notFound } from "next/navigation";
+import { USE_CASES, USE_CASE_SLUGS } from "@/lib/use-case-content";
 import { BETA_MODE } from "@/lib/constants";
 import { createMetadata } from "@/lib/metadata";
 import { breadcrumbJsonLd } from "@/lib/structured-data";
@@ -23,8 +23,7 @@ export async function generateMetadata({
   params: Promise<{ useCase: string }>;
 }) {
   const { useCase } = await params;
-  const canonicalUseCase = LEGACY_USE_CASE_REDIRECTS[useCase] ?? useCase;
-  const data = USE_CASES[canonicalUseCase];
+  const data = USE_CASES[useCase];
   if (!data) notFound();
 
   return createMetadata({
@@ -41,9 +40,7 @@ export default async function UseCasePage({
   params: Promise<{ useCase: string }>;
 }) {
   const { useCase } = await params;
-  const canonicalUseCase = LEGACY_USE_CASE_REDIRECTS[useCase] ?? useCase;
-  if (canonicalUseCase !== useCase) redirect(`/use-cases/${canonicalUseCase}`);
-  const data = USE_CASES[canonicalUseCase];
+  const data = USE_CASES[useCase];
   if (!data) notFound();
 
   return (

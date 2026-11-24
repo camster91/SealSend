@@ -7,17 +7,11 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const route of [
-      "/rsvp-tracking",
-      "/qr-event-check-in",
       "/",
       "/pricing",
       "/how-it-works",
       "/use-cases",
-      "/use-cases/community-events",
-      "/use-cases/nonprofit-events",
       "/use-cases/clubs-associations",
-      "/use-cases/professional-gatherings",
-      "/use-cases/event-planners",
       "/use-cases/weddings",
       "/use-cases/birthday-parties",
       "/signup",

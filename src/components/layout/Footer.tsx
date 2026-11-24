@@ -8,8 +8,6 @@ const columns = [
     title: "Product",
     links: [
       { label: "How it works", href: "/how-it-works" },
-      { label: "RSVP tracking", href: "/rsvp-tracking" },
-      { label: "Guest check-in", href: "/qr-event-check-in" },
       { label: "Add to your phone", href: "/install" },
       { label: "Pricing", href: "/pricing" },
       { label: "Log in", href: "/login" },
@@ -19,13 +17,10 @@ const columns = [
   {
     title: "Use cases",
     links: [
-      { label: "Event planners", href: "/use-cases/event-planners" },
-      { label: "Weddings", href: "/use-cases/weddings" },
       { label: "Birthday parties", href: "/use-cases/birthday-parties" },
-      { label: "Community events", href: "/use-cases/community-events" },
-      { label: "Clubs and associations", href: "/use-cases/clubs-associations" },
-      { label: "Local nonprofits", href: "/use-cases/nonprofit-events" },
-      { label: "Professional gatherings", href: "/use-cases/professional-gatherings" },
+      { label: "Clubs and community", href: "/use-cases/clubs-associations" },
+      { label: "Weddings", href: "/use-cases/weddings" },
+      { label: "Planning for clients", href: "/use-cases" },
     ],
   },
   {

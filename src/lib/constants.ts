@@ -212,9 +212,9 @@ export const CONTROLLED_BETA_PRICING_PLAN = {
   events: "1 active",
   guests: "100",
   features: [
-    "Invitation, RSVP, and guest workflow",
-    "Host-approved email communications",
-    "Guest tags, co-hosts, analytics, and check-in",
+    "Invitation, replies and guest list",
+    "A link to share anywhere",
+    "Co-hosts and check-in at the door",
   ],
 } as const;
 
@@ -389,45 +389,3 @@ export const DEFAULT_RSVP_FIELDS = [
     placeholder: "Leave a nice message for the host...",
   },
 ];
-
-// ========================================
-// USE CASES
-// ========================================
-
-export const USE_CASES = [
-  {
-    slug: "community-events",
-    title: "Community Events",
-    description: "Connect invitations, guest decisions, approved updates, and check-in for recurring gatherings.",
-    features: ["Guest tags", "Co-host roles", "Approved updates", "Mobile check-in"],
-  },
-  {
-    slug: "nonprofit-events",
-    title: "Local Nonprofits",
-    description: "Coordinate local nonprofit and volunteer events with operational RSVP details.",
-    features: ["Custom RSVP fields", "Sign-up board", "Guest export", "Co-host access"],
-  },
-  {
-    slug: "clubs-associations",
-    title: "Clubs & Associations",
-    description: "Reuse a proven event workflow for chapters, meetings, and member gatherings.",
-    features: ["Next-event setup", "Guest tags", "RSVP status", "Calendar links"],
-  },
-  {
-    slug: "professional-gatherings",
-    title: "Professional Gatherings",
-    description: "Run workshops and networking events without enterprise event-software overhead.",
-    features: ["Uploaded artwork", "Custom questions", "Guest segments", "Check-in and export"],
-  },
-] as const;
-
-// ========================================
-// NAVIGATION
-// ========================================
-
-export const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "/how-it-works" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Use Cases", href: "#use-cases", children: USE_CASES.map(u => ({ label: u.title, href: `/use-cases/${u.slug}` })) },
-] as const;

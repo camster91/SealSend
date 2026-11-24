@@ -2,19 +2,13 @@ import { expect, test } from "@playwright/test";
 import { openReadyPage } from "./page-ready";
 
 const publicRoutes = [
-  "/rsvp-tracking",
-  "/qr-event-check-in",
   "/",
   "/how-it-works",
   "/pricing",
   "/use-cases",
-  "/use-cases/event-planners",
   "/use-cases/weddings",
   "/use-cases/birthday-parties",
-  "/use-cases/community-events",
-  "/use-cases/nonprofit-events",
   "/use-cases/clubs-associations",
-  "/use-cases/professional-gatherings",
   "/support",
   "/install",
   "/terms",
@@ -148,9 +142,9 @@ test("marketing navigation reaches the beta entry and organizer pages", async ({
   await menu.focus();
   await page.keyboard.press("Enter");
   await expect(menu).toHaveAttribute("aria-expanded", "true");
-  const planner = page.locator("#desktop-use-cases-menu").getByRole("link", { name: "Event planners", exact: true });
-  await planner.click();
-  await expect(page).toHaveURL(/\/use-cases\/event-planners$/);
+  const clubs = page.locator("#desktop-use-cases-menu").getByRole("link", { name: "Clubs and community", exact: true });
+  await clubs.click();
+  await expect(page).toHaveURL(/\/use-cases\/clubs-associations$/);
   await expect(page.locator("main h1")).toBeVisible();
   await page.locator("main").getByRole("link", { name: "Create a free event" }).first().click();
   await expect(page).toHaveURL(/\/signup$/);

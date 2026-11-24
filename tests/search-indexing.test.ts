@@ -22,7 +22,7 @@ test('crawlers can read noindex and sitemap only advertises marketing content', 
   for (const path of paths) {
     assert.doesNotMatch(path, /^\/(e|events|guest|client|team|invite|unsubscribe|api|uploads|login|signup|dashboard|settings)(\/|$)/);
   }
-  assert.ok(paths.includes('/rsvp-tracking'));
+  assert.ok(paths.includes('/how-it-works'));
 });
 
 test('only the marketing layout opts into indexing, including future application pages', async () => {

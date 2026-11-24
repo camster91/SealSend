@@ -12,18 +12,17 @@ export default function PricingTeaser() {
       <section aria-labelledby="pricing-teaser-title" className="border-y border-border bg-white px-4 py-12 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[3fr_2fr] lg:gap-16">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-widest text-ink">A real event. A free first step.</p>
-            <h2 id="pricing-teaser-title" className="mt-4 font-display text-4xl text-ink sm:text-5xl">Your next gathering, free during the beta.</h2>
-            <p className="mt-5 text-lg leading-relaxed text-neutral-700">Create one active event for up to 100 guests. Bring the invitation, the replies and the guest list together, with no payment card needed.</p>
+            <p className="text-sm font-semibold uppercase tracking-widest text-ink">Free during the beta</p>
+            <h2 id="pricing-teaser-title" className="mt-4 font-display text-4xl text-ink sm:text-5xl">One event at a time, up to 100 guests.</h2>
+            <p className="mt-5 text-lg leading-relaxed text-neutral-700">No payment card needed. When your event is over, archive it and start the next one.</p>
             <div className="mt-7 flex flex-wrap gap-3"><PrimaryCta /><SecondaryCta href="/pricing">What&apos;s included?</SecondaryCta></div>
-            <p className="mt-4 text-sm text-neutral-600">Paid checkout is disabled during the beta. SMS is not available yet.</p>
+            <p className="mt-4 text-sm text-neutral-600">Paid checkout is disabled during the beta.</p>
           </div>
           <ul className="self-center space-y-4 rounded-2xl bg-cotton p-6 text-ink sm:p-8">
             {[
-              "Your own digital invitation and shareable link",
-              "Guest replies, plus-ones and dietary notes",
-              "Email updates you review before sending",
-              "QR check-in with a manual guest-list option",
+              "An invitation with its own link",
+              "Replies, plus-ones and allergies in one list",
+              "Check-in at the door from your phone",
             ].map(item => <li key={item} className="flex gap-3"><span aria-hidden="true" className="font-semibold">✓</span><span>{item}</span></li>)}
           </ul>
         </div>

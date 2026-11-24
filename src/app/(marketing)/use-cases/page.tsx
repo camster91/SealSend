@@ -2,19 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { createMetadata } from "@/lib/metadata";
 import { USE_CASES } from "@/lib/use-case-content";
-import OrganizerFit from "@/components/marketing/OrganizerFit";
+import OrganizersSection from "@/components/marketing/OrganizersSection";
 import CTASection from "@/components/marketing/CTASection";
 
 export const metadata = createMetadata({
-  title: "Use Cases: Weddings, Parties, Community Events and Planners",
+  title: "Invitations for Birthdays, Clubs and Weddings",
   description:
-    "See how SealSend handles invitations, RSVPs, guest updates and check-in for event planners, weddings, birthday parties, community groups, clubs and nonprofits.",
+    "See how SealSend handles invitations, replies and check-in for birthdays, clubs, community groups and weddings.",
   path: "/use-cases",
   keywords: [
     "wedding RSVP website",
     "community event RSVP",
-    "event planner client approval",
-    "nonprofit event invitations",
     "club event management",
   ],
 });
@@ -28,7 +26,7 @@ export default function UseCasesIndexPage() {
             One link for every kind of gathering.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-neutral-700">
-            Whether you plan events for clients, run the club calendar or host one big day, SealSend keeps the invitation, the replies and the door in one place.
+            The invitation, the replies and the door, all in one place.
           </p>
         </div>
       </section>
@@ -69,7 +67,7 @@ export default function UseCasesIndexPage() {
         </ul>
       </section>
 
-      <OrganizerFit />
+      <OrganizersSection />
       <CTASection />
     </>
   );
