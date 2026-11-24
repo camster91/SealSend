@@ -72,7 +72,7 @@ src/
   proxy.ts        Next 16 proxy (formerly middleware): CSRF origin check + route protection
 tests/            Unit/readiness tests (node:test), e2e/ (Playwright), fixtures/
 scripts/          Admin/beta CLIs, release/ (launch decision, scorecard), load/, test/
-ops/              Backup, health, maintenance and release-rehearsal scripts for the VPS
+ops/              Scripts for the retired VPS (kept for reference)
 config/           Launch evidence, quality scorecard, beta acceptance policy
 docs/             Launch operations, evidence register, policy decisions
 ```
@@ -80,7 +80,7 @@ docs/             Launch operations, evidence register, policy decisions
 ## Key Patterns
 
 ### Authentication and authorization
-- Hosts sign in with a 6-digit email/SMS code (`/api/auth/send-code` → `/api/auth/verify-code`). Admins use `/api/auth/login-password` (`admin_users` table).
+- With an email provider configured, hosts sign in with a 6-digit email/SMS code (`/api/auth/send-code` → `/api/auth/verify-code`). Password sign-in is `/api/auth/login-password` (`admin_users` table); password sign-up (`signup-password`) is open only while no email provider is configured. `admin_users.email_verified_at` is set only by a one-time code or the operator CLI; never trust an account's email before that (`src/lib/auth/verified-account.ts`).
 - Cookies: `sealsend_session` (httpOnly, authoritative) and `sealsend_user` (client-readable display data only — never trust it for authorization).
 - In API routes:
   - `requireApiHost()` from `@/lib/auth/api-auth` for any signed-in host.
@@ -138,7 +138,7 @@ The same code also builds as a Cloudflare Worker (vinext): `npm run build:vinext
 
 ## Deployment
 
-Production today: Docker image (`Dockerfile`, Next standalone output) on a Hostinger VPS behind Coolify, with PostgreSQL 16 in its own container, built from `main`. The D1 port (`docs/d1-port.md`) moves it to Cloudflare Workers + D1; the Docker build can't reach D1 and is retired at cutover. Current production details, release steps and rollback targets are in `DEPLOYMENT_READINESS.md`; operational scripts are in `ops/`. An external scheduler calls the `/api/cron/*` endpoints.
+Production runs on Cloudflare Workers with D1, R2 and Cloudflare Images. Every push to `main` deploys through Workers Builds (`npm run build:vinext`, then `scripts/cloudflare/deploy.mjs`), except changes only to `*.md`, `docs/` or `apps/mobile/`. `schema.sql` does not alter existing tables: run new files in `src/lib/db/migrations/` on D1 before merging code that needs them. Cron Triggers (`cloudflare.config.ts`, `worker/index.ts`) call the `/api/cron/*` endpoints. The Docker build and `ops/` belong to the retired VPS. `DEPLOYMENT_READINESS.md` is a historical record apart from its launch gates.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
