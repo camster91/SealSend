@@ -8,6 +8,12 @@ export const checkInSchema = z.object({
   checkedIn: z.boolean(),
 }).strict().refine((value) => [value.guestId, value.inviteToken, value.rsvpResponseId].filter(Boolean).length === 1, 'Provide exactly one attendee identifier');
 
+export const walkInSchema = z.object({
+  // Made by the device, so a repeated tap or lost response can't add someone twice.
+  walkInId: z.string().uuid(),
+  name: z.string().trim().min(1).max(200),
+}).strict();
+
 export type CheckInGuest = {
   id: string; name: string; rsvp_status: string; checked_in_at: string | null;
   source: 'guest' | 'public_rsvp'; headcount: number;
