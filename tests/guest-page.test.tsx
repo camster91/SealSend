@@ -1,3 +1,4 @@
+import { needsSignIn } from '../src/lib/marketing-routes';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -77,7 +78,7 @@ test('a broken invitation link lands on a guest page with no sign-in form', () =
     assert.match(readFileSync(file, 'utf8'), /\/invite\/problem/);
     assert.doesNotMatch(readFileSync(file, 'utf8'), /\/login\?error/);
   }
-  assert.match(readFileSync('src/proxy.ts', 'utf8'), /'\/invite\/problem'/);
+  assert.equal(needsSignIn('/invite/problem'), false);
 });
 
 test('the default border colour never overrides a chosen one', () => {

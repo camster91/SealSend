@@ -9,9 +9,10 @@ test.describe('Public marketing experience', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText("Send the invitation. Know who's coming.");
     await expect(page.getByText(/all features free/i)).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 2, name: 'How it works' })).toBeVisible();
-    const offer = page.locator('section', { has: page.getByRole('heading', { level: 2, name: 'Your next gathering, free during the beta.', exact: true }) });
+    const offer = page.locator('section', { has: page.getByRole('heading', { level: 2, name: 'One event at a time, up to 100 guests.', exact: true }) });
     await expect(offer).toBeVisible();
-    await expect(offer).toContainText('Create one active event for up to 100 guests.');
+    await expect(offer).toContainText('Free during the beta');
+    await expect(offer).toContainText('When your event is over, archive it and start the next one.');
     await expect(offer.getByRole('link', { name: 'Create a free event', exact: true })).toHaveAttribute('href', '/signup');
     await expect(page.getByRole('heading', { level: 2, name: /One flat price per event, never per guest/i })).toHaveCount(0);
     expect(errors).toEqual([]);

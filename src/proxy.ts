@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { marketingMeasurement } from '@/lib/analytics/marketing-attribution';
+import { movedPage, needsSignIn } from '@/lib/marketing-routes';
 import { recordMarketingViewSafely } from '@/lib/analytics/marketing-views';
 
 /**
@@ -55,43 +56,17 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const publicPaths = [
-    '/',
-    '/login',
-    '/signup',
-    '/forgot-password',
-    '/callback',
-    '/how-it-works',
-    '/rsvp-tracking',
-    '/qr-event-check-in',
-    '/pricing',
-    '/use-cases',
-    '/terms',
-    '/privacy',
-    '/support',
-    '/install',
-    '/sw.js',
-    '/offline.html',
-    '/robots.txt',
-    '/sitemap.xml',
-    '/invite/accept',
-    '/invite/problem',
-    '/client',
-    '/guest/update',
-    '/unsubscribe',
-  ];
-
-  const isPublicRoute =
-    publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/')) ||
-    pathname.startsWith('/e/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/uploads/') ||
-    /^\/events\/[^\/]+\/(guest|public)$/.test(pathname);
+  const movedTo = movedPage(pathname);
+  if (movedTo) {
+    const url = request.nextUrl.clone();
+    url.pathname = movedTo;
+    return NextResponse.redirect(url, 308);
+  }
 
   const customSession = request.cookies.get('sealsend_session')?.value;
   const isAuthenticated = !!customSession;
 
-  if (!isPublicRoute && !isAuthenticated) {
+  if (!isAuthenticated && needsSignIn(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     // Preserve full path + query (needed for invite tokens)

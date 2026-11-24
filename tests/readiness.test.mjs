@@ -243,14 +243,13 @@ test('text-muted-foreground is a registered theme colour and touch targets reach
 });
 
 test('public marketing pages linked from the footer do not require a login', async () => {
-  const proxy = await read('src/proxy.ts');
+  const { needsSignIn } = await import('../src/lib/marketing-routes.ts');
   const footer = await read('src/components/layout/Footer.tsx');
-  const publicList = proxy.slice(proxy.indexOf('const publicPaths = ['), proxy.indexOf('];', proxy.indexOf('const publicPaths = [')));
   // Footer links are data (href: "/path") or JSX (href="/path"); both forms are checked.
   const hrefs = [...footer.matchAll(/href(?:=|:\s*)"(\/[a-z-]+)(?:\/[a-z-]+)?"/g)];
   assert.ok(hrefs.length >= 10, 'expected the footer links to be found');
   for (const href of hrefs) {
-    assert.match(publicList, new RegExp(`'${href[1]}'`), `${href[1]} is linked from the footer but not public`);
+    assert.equal(needsSignIn(href[1]), false, `${href[1]} is linked from the footer but not public`);
   }
 });
 
@@ -391,10 +390,8 @@ test('recurring-organizer marketing describes the explicit next-event workflow',
   assert.doesNotMatch(useCases, /\bclone(?:d|s)?\b/i);
   assert.doesNotMatch(constants, /\bclone(?:d|s)?\b/i);
   assert.match(useCases, /Next-event setup/);
-  assert.match(constants, /Next-event setup/);
   assert.match(useCases, /choose a new schedule/i);
-  assert.match(useCases, /guest contact details/i);
-  assert.match(useCases, /explicitly decide/i);
+  assert.match(useCases, /decide whether to keep the guest list/i);
 });
 
 test('Next.js uses the repository as its build root and the current proxy convention', async () => {
@@ -591,7 +588,6 @@ test('public marketing does not ship invented social proof', async () => {
   const hero = await read('src/components/marketing/Hero.tsx');
   const pricingCta = await read('src/components/pricing/PricingCTA.tsx');
   const cta = await read('src/components/marketing/CTASection.tsx');
-  const factStrip = await read('src/components/marketing/FactStrip.tsx');
   const marketingDirectory = new URL('../src/components/marketing/', import.meta.url);
   const marketingComponents = await Promise.all(
     (await readdir(marketingDirectory))
@@ -601,16 +597,13 @@ test('public marketing does not ship invented social proof', async () => {
 
   assert.doesNotMatch(marketingPage, /<Testimonials\s*\/>/);
   assert.doesNotMatch(useCasePage, /<UseCaseTestimonial\b/);
-  for (const source of [hero, pricingCta, cta, factStrip]) {
+  for (const source of [hero, pricingCta, cta]) {
     assert.doesNotMatch(source, /\d[\d,.]*\+|thousands of|4\.9\/5|99%|trusted by|loved by/i);
   }
   for (const source of marketingComponents) {
     assert.doesNotMatch(source, /10,000\+|200,000\+|500K\+|4\.9\/5|99% satisfaction/i);
     assert.doesNotMatch(source, /Sarah Mitchell|David Chen|Emily Rodriguez/);
   }
-  // The fact strip states product facts; the guest limit is read from the plan constants.
-  assert.match(factStrip, /PUBLIC_PRICING_PLANS/);
-  assert.match(factStrip, /Guests never need an account/);
 });
 
 test('public offer is a bounded controlled beta with BETA_MODE-aware calls to action', async () => {
@@ -686,8 +679,7 @@ test('public feature marketing stays inside the shipped approval-controlled work
   // QR check-in, workspace roles, brand kit, client review links, repeat events and webhooks.
   for (const shippedClaim of [
     'Pick a design',
-    'only to guests who said yes',
-    'Scan guests in from any phone',
+    'Some phones can scan QR codes',
     'owner, admin, planner and check-in roles',
     'Client review links with live RSVP totals and recorded approvals',
     'Repeat an event and keep the guest list',
@@ -846,15 +838,9 @@ test('organizer use cases and comparison stay inside the shipped product scope',
   const navbar = await read('src/components/layout/Navbar.tsx');
   const footer = await read('src/components/layout/Footer.tsx');
   const sitemap = await read('src/app/sitemap.ts');
-  const home = await read('src/app/(marketing)/page.tsx');
-  const organizerFit = await read('src/components/marketing/OrganizerFit.tsx');
 
   for (const slug of [
-    'community-events',
-    'nonprofit-events',
     'clubs-associations',
-    'professional-gatherings',
-    'event-planners',
     'weddings',
     'birthday-parties',
   ]) {
@@ -868,27 +854,14 @@ test('organizer use cases and comparison stay inside the shipped product scope',
   assert.match(indexPage, /USE_CASES/);
   assert.doesNotMatch(indexPage, /const useCases =/);
   assert.match(detailPage, /one active event with up to 100 guests/i);
-  assert.match(content, /LEGACY_USE_CASE_REDIRECTS/);
-  assert.match(detailPage, /redirect\(`\/use-cases\/\$\{canonicalUseCase\}`\)/);
   assert.doesNotMatch(content, /testimonial\s*:|Twyla Tyler|Monica W|Ashley Corbett|Brian Stuart/);
   assert.doesNotMatch(content, /music\s*(?:&|and)\s*video|photo sharing|gift tracking|1,200 replies/i);
 
-  assert.match(home, /<OrganizersSection\s*\/>/);
-  assert.match(indexPage, /<OrganizerFit\s*\/>/);
+  assert.match(indexPage, /<OrganizersSection\s*\/>/);
   // New use-case pages have real hero photos, breadcrumbs and no legacy redirect shadowing them.
   assert.match(detailPage, /breadcrumbJsonLd/);
   assert.match(content, /image: "\/brand\/photos\/weddings\.webp"/);
   assert.match(content, /image: "\/brand\/photos\/birthdays\.webp"/);
-  assert.doesNotMatch(content.slice(content.indexOf('LEGACY_USE_CASE_REDIRECTS')), /weddings|birthday-parties/);
-  for (const alternative of [
-    'Spreadsheets and group chats',
-    'Invitation-first tools',
-    'Enterprise event platforms',
-  ]) {
-    assert.match(organizerFit, new RegExp(alternative, 'i'));
-  }
-  assert.match(organizerFit, /product-scope comparison/i);
-  assert.match(organizerFit, /not a claim about every competitor/i);
 });
 
 test('activation analytics has a privacy-limited schema with first-time uniqueness', async () => {

@@ -2,15 +2,15 @@
 export const HOW_IT_WORKS_STEPS = [
   {
     title: "Describe your event.",
-    text: "Paste the details or start from a template, and SealSend drafts the invitation.",
+    text: "Add the name, date and place, and pick a design.",
   },
   {
     title: "Send it your way.",
-    text: "By email, or as a link you share anywhere.",
+    text: "Share one link in the group chat, or anywhere else.",
   },
   {
     title: "Watch replies arrive, then check guests in.",
-    text: "Live counts, dietary notes and plus-ones, and a QR scan at the door.",
+    text: "See who's coming, plus-ones and allergies. Tap names off at the door.",
   },
 ];
 

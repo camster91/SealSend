@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('marketing remains indexable while signup pages are excluded', async ({ page }) => {
-  for (const path of ['/', '/rsvp-tracking', '/qr-event-check-in']) {
+  for (const path of ['/', '/how-it-works', '/use-cases']) {
     const response = await page.goto(path);
     expect(response?.headers()['x-robots-tag']).toBeUndefined();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');

@@ -168,8 +168,8 @@ test("every guest email send path passes the unsubscribe footer, headers and hos
 
 test("signed-out visitors and mail providers can reach unsubscribe", async () => {
   const proxy = await readFile("src/proxy.ts", "utf8");
-  const publicList = proxy.slice(proxy.indexOf("const publicPaths = ["), proxy.indexOf("];", proxy.indexOf("const publicPaths = [")));
-  assert.match(publicList, /'\/unsubscribe'/);
+  const { needsSignIn } = await import("../src/lib/marketing-routes");
+  assert.equal(needsSignIn("/unsubscribe/token"), false);
   assert.match(proxy, /!pathname\.startsWith\('\/api\/unsubscribe\/'\)/);
   const route = await readFile("src/app/api/unsubscribe/[token]/route.ts", "utf8");
   assert.match(route, /export async function POST/);

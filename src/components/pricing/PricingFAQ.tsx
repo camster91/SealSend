@@ -5,22 +5,27 @@ const betaFaqs = [
   {
     question: "What is included in the free beta?",
     answer:
-      "A free beta account can run one active event for up to 100 guests, including the shipped invitation, RSVP, guest-management, communications, co-host, analytics, and check-in tools.",
+      "One active event for up to 100 guests: the invitation, replies, guest list, co-hosts and check-in.",
+  },
+  {
+    question: "What about my second event?",
+    answer:
+      "You can have one active event at a time. When it's over, archive it and start the next one for free.",
   },
   {
     question: "Will I be charged during the beta?",
     answer:
-      "No. Paid checkout is disabled during the free beta, and SealSend does not ask for a payment card.",
+      "No. Paid checkout is disabled, and SealSend does not ask for a payment card.",
   },
   {
-    question: "Are guest communications sent automatically?",
+    question: "How do guests get the invitation?",
     answer:
-      "No. The host reviews and deliberately starts every email to guests.",
+      "You share your event link. SealSend doesn't send text messages or emails to guests for you yet.",
   },
   {
     question: "Do guests need an account or app?",
     answer:
-      "No. Guests use the published event link in a browser to review details and submit their RSVP.",
+      "No. They open the link and reply.",
   },
 ];
 

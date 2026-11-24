@@ -4,7 +4,6 @@ import { BETA_MODE } from '@/lib/constants';
 
 const points = [
   "Workspaces with owner, admin, planner and check-in roles.",
-  "Your logo, colours and sender name on every event.",
   "Client review links with live RSVP totals and recorded approvals.",
   "Repeat an event and keep the guest list.",
   "Signed webhooks for Zapier, Make or your CRM.",
@@ -20,10 +19,10 @@ export default function OrganizersSection() {
             <Image src="/brand/icons/repeat.svg" alt="" width={56} height={56} className="h-11 w-11 sm:h-14 sm:w-14" />
           </div>
           <h2 id="organizers-title" className="mt-5 font-display sm:mt-6 text-4xl text-ink sm:text-5xl">
-            Built for people who host often.
+            Planning events for other people?
           </h2>
           <p className="mt-4 max-w-md text-lg leading-relaxed text-neutral-600">
-            For planners, studios, clubs and community groups who run event after event.
+            These tools are there when you need them, and out of the way when you don&apos;t.
           </p>
           <SecondaryCta href="/pricing" className="mt-8">
             {BETA_MODE ? 'See what the beta includes' : 'See plans for organizers'}

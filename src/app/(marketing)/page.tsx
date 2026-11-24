@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import InvitationPlayground from "@/components/marketing/InvitationPlayground";
-import GoodCompany from "@/components/marketing/GoodCompany";
 import Hero from "@/components/marketing/Hero";
-import FactStrip from "@/components/marketing/FactStrip";
 import HowItWorks from "@/components/marketing/HowItWorks";
-import FeatureRows from "@/components/marketing/FeatureRows";
 import UseCaseGrid from "@/components/marketing/UseCaseGrid";
-import OrganizersSection from "@/components/marketing/OrganizersSection";
 import PricingTeaser from "@/components/marketing/PricingTeaser";
 import FaqList, { faqJsonLd, type Faq } from "@/components/marketing/FaqList";
-import CTASection from "@/components/marketing/CTASection";
 import { JsonLd } from "@/components/marketing/JsonLd";
 import { DEFAULT_DESCRIPTION, DEFAULT_TITLE } from "@/lib/metadata";
 import { softwareApplicationJsonLd } from "@/lib/structured-data";
@@ -23,19 +18,19 @@ export const metadata: Metadata = {
 const homeFaqs: Faq[] = [
   {
     question: "Do my guests need to download anything?",
-    answer: "No. They open a link and reply in seconds.",
+    answer: "No. They open a link and reply, with no account or app.",
   },
   {
-    question: "Can I import my guest list?",
-    answer: "Yes. Upload a CSV with names, emails and phone numbers, or add guests one at a time.",
+    question: "How do I send the invitation?",
+    answer: "Share your event link wherever you already talk: a group chat, a message or your own email. SealSend doesn't send text messages or emails to guests for you yet.",
   },
   {
-    question: "Can I send text messages?",
-    answer: "Not yet. Invitations, reminders and updates go out by email, and you can share your event link anywhere.",
+    question: "What about my second event?",
+    answer: "You can have one active event at a time. When it's over, archive it and start the next one for free.",
   },
   {
     question: "Can I export or delete my data?",
-    answer: "Yes. You can export your guest list any time and delete your account and events from settings.",
+    answer: "Yes. Export your guest list any time, or delete your account and events from settings.",
   },
   {
     question: "What happens after the beta?",
@@ -48,16 +43,11 @@ export default function Home() {
     <>
       <JsonLd data={[softwareApplicationJsonLd(), faqJsonLd(homeFaqs)]} />
       <Hero />
-      <FactStrip />
       <InvitationPlayground />
       <HowItWorks />
-      <FeatureRows />
-      <GoodCompany />
       <UseCaseGrid />
-      <OrganizersSection />
       <PricingTeaser />
       <FaqList faqs={homeFaqs} />
-      <CTASection />
     </>
   );
 }

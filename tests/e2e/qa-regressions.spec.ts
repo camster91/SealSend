@@ -50,11 +50,7 @@ test('disabled placeholder features route to working product areas', async ({ pa
 test('organizer use cases are reachable and legacy links redirect', async ({ page }) => {
   await page.goto('/use-cases');
   for (const route of [
-    '/use-cases/community-events',
-    '/use-cases/nonprofit-events',
     '/use-cases/clubs-associations',
-    '/use-cases/professional-gatherings',
-    '/use-cases/event-planners',
     '/use-cases/weddings',
     '/use-cases/birthday-parties',
   ]) {
@@ -69,7 +65,7 @@ test('organizer use cases are reachable and legacy links redirect', async ({ pag
   expect([307, 308]).toContain(legacyResponse.status());
   const redirectLocation = legacyResponse.headers().location;
   expect(redirectLocation).toBeTruthy();
-  expect(new URL(redirectLocation, page.url()).pathname).toBe('/use-cases/professional-gatherings');
+  expect(new URL(redirectLocation, page.url()).pathname).toBe('/use-cases/clubs-associations');
 });
 
 test('unknown use-case slugs return the helpful 404 with a real 404 status', async ({ page }) => {
