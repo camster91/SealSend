@@ -42,11 +42,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
   
   // Optimized: Using Promise.all to fetch events in parallel reduces TTFB.
-  // Passing both email and phone to getInvitedEvents for accurate guest lookup.
+  // getInvitedEvents matches by email and phone, and only trusts a verified host email.
   const [myEvents, collaboratingEventsRaw, invitedEvents, accountPlan] = await Promise.all([
     getEventsByUser(user.id),
     getCollaboratingEvents(user.id),
-    getInvitedEvents(user.email, user.phone),
+    getInvitedEvents(user),
     getUserTier(user.id),
   ]);
 

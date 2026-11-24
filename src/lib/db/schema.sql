@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   email TEXT NOT NULL,
   password TEXT NOT NULL,
   name TEXT,
+  email_verified_at TIMESTAMP_TEXT,
   created_at TIMESTAMP_TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TIMESTAMP_TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE (email)

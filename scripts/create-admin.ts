@@ -7,6 +7,7 @@
  */
 
 import { query, queryOne } from '../src/lib/db/client';
+import { SQL_NOW } from '../src/lib/db/sqlite-dialect';
 import { checkPasswordStrength, hashPassword } from '../src/lib/password';
 import { DATABASE_TARGET_HELP, isoText, requireCliDatabase } from './lib/cli-database';
 
@@ -53,7 +54,7 @@ async function createAdmin() {
 
     const passwordHash = await hashPassword(verifiedAdminPassword);
     const [data] = await query<AdminUser>(
-      'INSERT INTO admin_users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, created_at',
+      `INSERT INTO admin_users (email, password, name, email_verified_at) VALUES ($1, $2, $3, ${SQL_NOW}) RETURNING id, email, created_at`,
       [email, passwordHash, adminName]
     );
 

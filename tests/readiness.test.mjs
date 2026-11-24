@@ -1909,7 +1909,7 @@ test('operator-created admin accounts require a hashed password and never print 
   const script = await read('scripts/create-admin.ts');
   assert.match(script, /SEALSEND_ADMIN_PASSWORD/);
   assert.match(script, /hashPassword/);
-  assert.match(script, /INSERT INTO admin_users \(email, password, name\)/);
+  assert.match(script, /INSERT INTO admin_users \(email, password, name, email_verified_at\)/);
   assert.doesNotMatch(script, /console\.log\([^\n]*password/i);
   assert.doesNotMatch(script, /INSERT INTO admin_users \(email\) VALUES/);
 });

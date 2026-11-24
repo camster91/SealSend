@@ -100,7 +100,7 @@ Watch builds in the Cloudflare dashboard: Workers & Pages → `sealsend` → Dep
 
 **Email.** With no email provider, hosts sign up and sign in with an email and password (`/api/auth/signup-password`, `/api/auth/login-password`), and invitations/reminders can't be emailed. To turn email on with Cloudflare: onboard `sealsend.app` in Email Service (dashboard → Compute → Email Service → Email Sending), then set the `FROM_EMAIL` secret (for example `SealSend <hello@sealsend.app>`). Sign-up then switches back to email codes. While `COMMUNICATIONS_TEST_ONLY` is `"true"`, only addresses in `COMMUNICATIONS_ALLOWED_RECIPIENTS` get email.
 
-**Database changes.** D1 has no automatic migrations here. Apply new SQL with `npx wrangler d1 execute sealsend-db --remote --file <file.sql>` (or the D1 console in the dashboard). `schema.sql` is idempotent.
+**Database changes.** D1 has no automatic migrations here. Apply new SQL with `npx wrangler d1 execute sealsend-db --remote --file <file.sql>` (or the D1 console in the dashboard). `schema.sql` is idempotent. It does not add columns to existing tables: before deploying, run any new file in `src/lib/db/migrations/` once.
 
 **Manual deploy** (with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set, or after `npx wrangler login`): `npm run build:vinext && node scripts/cloudflare/deploy.mjs`. (`cf deploy` refuses to update a Worker that was first created through the API, which is how this one started, so the script uses Wrangler.)
 

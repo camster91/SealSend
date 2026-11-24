@@ -1,5 +1,5 @@
 import { query, queryOne } from '@/lib/db/client';
-import { isPasswordSignupEnabled } from '@/lib/email';
+import type { AuthUser } from '@/lib/auth/types';
 import type { Event } from '@/types/database';
 
 /**
@@ -64,10 +64,14 @@ export async function getCollaboratingEvents(userId: string) {
   return data || [];
 }
 
-export async function getInvitedEvents(accountEmail: string | null, phone: string | null) {
-  // Password sign-up does not prove the address is theirs, so it must not reveal
-  // invitations sent to that address.
-  const email = isPasswordSignupEnabled() ? null : accountEmail;
+export async function getInvitedEvents(user: Pick<AuthUser, 'id' | 'role' | 'email' | 'phone'>) {
+  const phone = user.phone ?? null;
+  let email = user.email ?? null;
+  if (user.role === 'admin' && email) {
+    // A host who never proved the address must not see invitations sent to it.
+    const verified = await queryOne('SELECT 1 AS ok FROM admin_users WHERE id = $1 AND email_verified_at IS NOT NULL', [user.id]);
+    if (!verified) email = null;
+  }
   if (!email && !phone) {
     return [];
   }

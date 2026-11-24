@@ -21,7 +21,7 @@ export const BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
 
 export const TIMESTAMP_COLUMNS: ReadonlySet<string> = new Set([
   "accepted_at", "approved_at", "cancelled_at", "checked_in_at", "completed_at", "consented_at", "created_at",
-  "current_period_end", "delivered_at", "dispatched_at", "event_date", "event_end_date", "expires_at", "invite_sent_at",
+  "current_period_end", "delivered_at", "dispatched_at", "email_verified_at", "event_date", "event_end_date", "expires_at", "invite_sent_at",
   "last_attempted_at", "last_delivered_at", "last_failure_at", "last_login_at", "last_success_at", "magic_token_expires_at",
   "next_attempt_at", "phone_invalid_at", "queued_at", "reminder_sent_at", "requested_at", "revoked_at", "reviewed_at",
   "rsvp_deadline", "scheduled_at", "scheduled_for", "sent_at", "submitted_at", "updated_at", "used_at", "withdrawn_at",

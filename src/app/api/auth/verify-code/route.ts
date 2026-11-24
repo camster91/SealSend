@@ -11,6 +11,7 @@ import { validateAndFormatPhone } from '@/lib/phone-validation';
 import { verifyCodeSchema } from '@/lib/validations';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { hashAuthCode } from '@/lib/auth/code-hash';
+import { RESERVED_ACCOUNT_DOMAIN, claimAccountByCode, isReservedAccountEmail } from '@/lib/auth/verified-account';
 
 async function upsertHostUser(email: string | null, phone: string | null, channel?: MarketingChannel): Promise<string | null> {
   // Hosts are stored in admin_users. OTP-only accounts get an unusable random password.
@@ -23,8 +24,8 @@ async function upsertHostUser(email: string | null, phone: string | null, channe
 
     const unusablePassword = await hashPassword(crypto.randomBytes(32).toString('hex'));
     const created = await queryOne<{ id: string }>(
-      `INSERT INTO admin_users (email, password, name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO admin_users (email, password, name, email_verified_at)
+       VALUES ($1, $2, $3, ${SQL_NOW})
        ON CONFLICT (email) DO UPDATE SET updated_at = ${SQL_NOW}
        RETURNING id`,
       [email.toLowerCase(), unusablePassword, email.split('@')[0] || null]
@@ -41,7 +42,7 @@ async function upsertHostUser(email: string | null, phone: string | null, channe
 
   // Phone-only hosts: synthesize a stable email key so we can reuse admin_users.
   if (phone) {
-    const syntheticEmail = `phone+${phone.replace(/\D/g, '')}@users.sealsend.local`;
+    const syntheticEmail = `phone+${phone.replace(/\D/g, '')}@${RESERVED_ACCOUNT_DOMAIN}`;
     const existing = await queryOne<{ id: string }>(
       'SELECT id FROM admin_users WHERE email = $1',
       [syntheticEmail]
@@ -50,8 +51,8 @@ async function upsertHostUser(email: string | null, phone: string | null, channe
 
     const unusablePassword = await hashPassword(crypto.randomBytes(32).toString('hex'));
     const created = await queryOne<{ id: string }>(
-      `INSERT INTO admin_users (email, password, name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO admin_users (email, password, name, email_verified_at)
+       VALUES ($1, $2, $3, ${SQL_NOW})
        ON CONFLICT (email) DO UPDATE SET updated_at = ${SQL_NOW}
        RETURNING id`,
       [syntheticEmail, unusablePassword, phone]
@@ -104,6 +105,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 });
       }
       lookupValue = phoneValidation.formatted;
+    }
+
+    if (method === 'email' && lookupValue && isReservedAccountEmail(lookupValue)) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
     if (!lookupValue) {
@@ -179,6 +184,7 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
+      await claimAccountByCode(userId);
     }
 
     // Create session

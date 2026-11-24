@@ -3,8 +3,9 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
-import { hashPassword } from '@/lib/password';
+import { checkPasswordStrength, hashPassword } from '@/lib/password';
 import { isPasswordSignupEnabled } from '@/lib/email';
+import { isReservedAccountEmail } from '@/lib/auth/verified-account';
 import { MARKETING_CHANNELS, measurementOptedOut } from '@/lib/analytics/marketing-attribution';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
     }
 
     const email = parsed.data.email.toLowerCase();
+    if (isReservedAccountEmail(email)) {
+      return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
+    }
+    const strength = checkPasswordStrength(parsed.data.password);
+    if (!strength.valid) {
+      return NextResponse.json({ error: `Password too weak. ${strength.feedback.join('. ')}.` }, { status: 400 });
+    }
     const name = parsed.data.name || email.split('@')[0] || null;
 
     const existing = await queryOne<{ id: string }>(
