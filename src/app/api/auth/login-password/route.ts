@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db/client';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { verifyPassword } from '@/lib/password';
 import { isEmailConfigured } from '@/lib/email';
+import { getMobileContext } from '@/lib/auth/mobile-context';
 import { cookies } from 'next/headers';
 
 const DUMMY_PASSWORD_HASH = '$2b$14$EmYXdS/qveDgpqxhzH3PZuw.EJjyipeQQnabiAxhvSttfmLAFUGGu';
@@ -90,6 +91,14 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create session' },
         { status: 500 }
       );
+    }
+
+    // The app gets the revocable token itself; no cookie is set outside the browser.
+    if (getMobileContext()) {
+      return NextResponse.json({
+        success: true, sessionToken, expiresAt: expiresAt.toISOString(),
+        user: { id: adminUser.id, email: adminUser.email, phone: null, role: 'admin', eventId: null },
+      }, { headers: { 'Cache-Control': 'private, no-store' } });
     }
 
     // Set session cookie

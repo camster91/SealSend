@@ -60,8 +60,8 @@ export async function improvementBrowserChecks({browser,origin,db}) {
     await builder.getByText('More',{exact:true}).click();await builder.getByRole('link',{name:'Check-in',exact:true}).click();
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('Template Guest');
     await builder.getByRole('button',{name:/Template Guest.*Check in/}).click();
-    await builder.getByRole('button',{name:/Template Guest.*Checked in/}).waitFor();
-    await builder.reload();await builder.getByRole('button',{name:/Template Guest.*Checked in/}).waitFor();
+    await builder.getByRole('button',{name:'Undo check-in for Template Guest'}).waitFor();
+    await builder.reload();await builder.getByRole('button',{name:'Undo check-in for Template Guest'}).waitFor();
     assert.ok((await db.query('SELECT checked_in_at FROM rsvp_responses WHERE id=$1',[rid])).rows[0].checked_in_at);
     await builder.getByRole('textbox',{name:'Search guests',exact:true}).fill('No such guest');await builder.getByText('No guests match your search. Try another name or clear the search.',{exact:true}).waitFor();
     assert.equal((await host.request.patch(`${origin}/api/events/00000000-0000-4000-8000-000000000011/check-in`,{headers:{Origin:origin},data:{rsvpResponseId:rid,checkedIn:false}})).status(),404);
