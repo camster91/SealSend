@@ -92,5 +92,5 @@ writeFileSync(target, JSON.stringify(wrangler, null, 2));
 console.log(`Wrote ${path.relative(root, target)}`);
 
 const extra = process.argv.slice(2);
-const wranglerVersion = process.env.WRANGLER_VERSION || "4.14.0";
+const wranglerVersion = process.env.WRANGLER_VERSION || "4.168.0";
 execFileSync("npx", ["--yes", `wrangler@${wranglerVersion}`, "deploy", "--config", target, ...extra], { stdio: "inherit", cwd: root });
