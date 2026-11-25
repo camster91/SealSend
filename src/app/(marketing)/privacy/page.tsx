@@ -65,9 +65,8 @@ export default function PrivacyPage() {
           <h2 className={h2Class}>4. Who we share it with</h2>
           <p>We use these service providers to run SealSend:</p>
           <ul className={listClass}>
-            <li><strong>Mailgun</strong> sends our emails (based in the United States).</li>
-            <li><strong>Hostinger</strong> hosts our servers.</li>
-            <li><strong>Cloudflare</strong> handles our domain name (DNS).</li>
+            <li><strong>Cloudflare</strong> hosts the web app, database (D1), uploaded media (R2), image processing, and DNS.</li>
+            <li><strong>Mailgun</strong> and <strong>Cloudflare Email Service</strong> send our emails (based in the United States).</li>
             <li><strong>OpenAI</strong> is used only when you use AI drafting or chat, and AI cover images (event title, description, chosen style and your note). We send the event details you enter. They are not used to train OpenAI&apos;s models.</li>
             <li><strong>Twilio</strong> would send text messages. SMS is turned off for now.</li>
             <li><strong>Stripe</strong> would handle payments. Payments are turned off for now.</li>

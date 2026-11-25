@@ -50,7 +50,7 @@ src/
   app/
     (marketing)/  (auth)/  (dashboard)/   # Route groups
     e/[slug]/  invite/  guest/  team/      # Public event, invite, guest and co-host pages
-    api/                                  # ~64 route handlers
+    api/                                  # 96 route handlers
       auth/        send-code, verify-code, login-password, logout, change-password
       events/      CRUD plus guests, responses, announcements, members, check-in, publish, clone, ...
       rsvp/ comments/ signups/ calendar/ guest-qr/   # Public, slug/token-scoped endpoints
@@ -116,8 +116,8 @@ docs/             Launch operations, evidence register, policy decisions
 - Resolve limits and features through `src/lib/entitlements.ts` (`getEffectiveEventLimits`, `canUseFeature`, `getTeamMemberLimit`), passing the account plan from `getUserTier()` in `src/lib/subscription.ts`. That returns `"beta"` while `BETA_MODE` is on, so don't read tier constants directly.
 - `FeatureGate` (`src/components/features/FeatureGate.tsx`) gates UI by tier.
 
-### Feature flags (`FEATURE_FLAGS` in `constants.ts`)
-`subscriptions`, `teams` (co-host roles), `templates`, `analytics` are on; `aiAssistant` is off. AI event/announcement drafting lives in `src/lib/ai` and `/api/ai/*`, configured by `AI_PROVIDER`/`AI_MODEL`.
+### AI drafting & runtime switches
+AI event/announcement drafting lives in `src/lib/ai` and `/api/ai/*`, configured by `AI_PROVIDER`/`AI_MODEL`. Runtime switches (`BETA_MODE`, `COMMUNICATIONS_TEST_ONLY`, `PAYMENTS_TEST_ONLY`, `ENABLE_NATIVE_MOBILE_API`) live in `src/lib/constants.ts` and `cloudflare.config.ts`.
 
 ## Conventions
 

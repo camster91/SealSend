@@ -190,7 +190,7 @@ export function BuilderShell({
       </header>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <main className="min-w-0">
+        <div className="min-w-0">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={screen}
@@ -203,7 +203,7 @@ export function BuilderShell({
               <ScreenSlot render={screens[screen]} ctx={ctx} />
             </motion.div>
           </AnimatePresence>
-        </main>
+        </div>
 
         <aside aria-label="Invite preview" className="hidden lg:block">
           <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">

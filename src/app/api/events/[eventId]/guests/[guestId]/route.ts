@@ -1,7 +1,7 @@
 import { captureSocialPhotoPaths, purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { query, queryOne } from "@/lib/db/client";
+import { batch, queryOne } from "@/lib/db/client";
 import { guestSchema } from "@/lib/validations";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import type { CountryCode } from "libphonenumber-js";
@@ -63,10 +63,18 @@ export async function DELETE(
     if (auth.error) return auth.error;
 
     const photoPaths = await captureSocialPhotoPaths(eventId,guestId);
-    await query(
-      'DELETE FROM guests WHERE id = $1 AND event_id = $2',
-      [guestId, eventId]
-    );
+    // Delete linked RSVP responses in the same batch so ON DELETE SET NULL
+    // never turns a removed guest's reply into a phantom public RSVP.
+    await batch([
+      {
+        text: 'DELETE FROM rsvp_responses WHERE event_id = $1 AND guest_id = $2',
+        params: [eventId, guestId],
+      },
+      {
+        text: 'DELETE FROM guests WHERE id = $1 AND event_id = $2',
+        params: [guestId, eventId],
+      },
+    ]);
     await purgeQueuedSocialPhotos(photoPaths).catch(()=>undefined);
 
     return NextResponse.json({ success: true });

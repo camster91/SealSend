@@ -247,7 +247,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <ul className="divide-y divide-border">
               {invitedEvents.map((event) => (
                 <li key={event.id}>
-                  <Link href={`/events/${event.id}/guest`} className="block hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink">
+                  <Link href={`/e/${event.slug}`} className="block hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink">
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">

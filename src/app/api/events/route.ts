@@ -11,7 +11,8 @@ import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy } from '@/lib/invitation-defaults';
 import { getMobileContext } from '@/lib/auth/mobile-context';
-import { toTimestamp } from '@/lib/events';
+import { getCollaboratingEvents, toTimestamp } from '@/lib/events';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
 import { createHash } from 'node:crypto';
 
 export async function GET() {
@@ -20,12 +21,24 @@ export async function GET() {
     if (auth.error) return auth.error;
     const user = auth.user;
 
-    const events = await query(
-      'SELECT * FROM events WHERE user_id = $1 ORDER BY created_at DESC',
-      [user.id]
-    );
+    const [owned, shared] = await Promise.all([
+      query<Record<string, unknown>>(
+        'SELECT * FROM events WHERE user_id = $1 ORDER BY created_at DESC',
+        [user.id]
+      ),
+      getCollaboratingEvents(user.id),
+    ]);
 
-    return NextResponse.json(events);
+    const seen = new Set(owned.map((event) => String(event.id)));
+    const combined = [...owned];
+    for (const event of shared) {
+      if (seen.has(event.id)) continue;
+      seen.add(event.id);
+      const { repeated_from_event_id: _ownerOnlyLineage, access_role: _role, ...collaboratorEvent } = event as unknown as Record<string, unknown>;
+      combined.push(collaboratorEvent);
+    }
+
+    return NextResponse.json(combined);
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -258,6 +271,16 @@ export async function POST(request: NextRequest) {
       eventId: event.id as string,
       metadata: { source: ai_generation_id ? 'ai_assisted' : 'manual', plan: accountPlan },
     });
+
+    if (event.status === 'published') {
+      await enqueueWebhookEvent(event.id as string, 'event.published', {});
+      await recordActivationEventSafely({
+        name: 'event_published',
+        userId: user.id,
+        eventId: event.id as string,
+        metadata: { source: 'create' },
+      });
+    }
 
     return NextResponse.json(event, { status: 201 });
   } catch (error) {

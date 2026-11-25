@@ -96,7 +96,7 @@ node scripts/cloudflare/deploy.mjs  # deploy: turns the build output into a wran
 
 Watch builds in the Cloudflare dashboard: Workers & Pages → `sealsend` → Deployments. Changes only to `*.md`, `docs/` or `apps/mobile/` don't trigger a build.
 
-**Config.** Bindings and plain settings live in `cloudflare.config.ts`. Secrets are set on the Worker (dashboard → Settings → Variables and Secrets, or `cf workers secrets update <NAME>`). The names are in `SECRET_NAMES`; a feature whose provider secrets are missing stays off.
+**Config.** Bindings and plain settings live in `cloudflare.config.ts`. Secrets are set on the Worker (dashboard → Settings → Variables and Secrets, or `cf secret put <NAME>`). The names are in `SECRET_NAMES`; a feature whose provider secrets are missing stays off.
 
 **Email.** With no email provider, hosts sign up and sign in with an email and password (`/api/auth/signup-password`, `/api/auth/login-password`), and invitations/reminders can't be emailed. To turn email on with Cloudflare: onboard `sealsend.app` in Email Service (dashboard → Compute → Email Service → Email Sending), then set the `FROM_EMAIL` secret (for example `SealSend <hello@sealsend.app>`). Sign-up then switches back to email codes. Decide on `COMMUNICATIONS_TEST_ONLY` first: while it is `"true"`, only addresses in `COMMUNICATIONS_ALLOWED_RECIPIENTS` can get a code, so turning email on would stop everyone else signing up.
 

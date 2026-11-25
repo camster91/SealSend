@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const guest = await queryOne<{ id: string; name: string; email: string | null; phone: string | null; event_id: string }>(
       `SELECT g.id, g.name, g.email, g.phone, g.event_id
          FROM guests g JOIN events e ON e.id = g.event_id
-        WHERE g.invite_token = $1 AND e.slug = $2`,
+        WHERE g.invite_token = $1 AND e.slug = $2 AND e.status = 'published'`,
       [token, eventSlug],
     );
     if (!guest) return invalid();
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       { text: `UPDATE guests SET invite_status = 'accepted', updated_at = ${SQL_NOW} WHERE id = $1`, params: [guest.id] },
     ]);
 
-    const response = redirectTo(request, `/e/${encodeURIComponent(eventSlug)}?t=${encodeURIComponent(token)}`);
+    const response = redirectTo(request, `/e/${encodeURIComponent(eventSlug)}`);
     const cookie = { secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/", expires };
     response.cookies.set("sealsend_session", sessionToken, { ...cookie, httpOnly: true });
     response.cookies.set(

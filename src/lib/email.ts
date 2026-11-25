@@ -13,7 +13,7 @@
 
 import { sendEmail as sendMailgunEmail, isMailgunConfigured } from './mailgun';
 import { assertApprovedRecipient } from './communications-safety';
-import { getBinding } from './runtime-bindings';
+import { getBinding } from '@/lib/runtime-bindings';
 
 export { isMailgunConfigured };
 

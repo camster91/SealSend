@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
+import { isAuthorizedCron } from "@/lib/auth/cron-auth";
 import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { sendEmail } from "@/lib/email";
 import { reserveEmailQuota } from "@/lib/email-quota";
@@ -13,7 +14,8 @@ import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
-import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
+import { randomUUID } from "node:crypto";
+import { isSmsMetered, releaseSmsReservation, reserveSmsSegments } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
 import { REMINDER_TARGET_SQL } from "@/lib/reminder-targets";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
@@ -61,8 +63,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dryRun = searchParams.get("dryRun") === "true";
 
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) {
+    if (!process.env.CRON_SECRET) {
       console.error("[CRON] CRON_SECRET environment variable not set");
       return NextResponse.json(
         { error: "Cron secret not configured" },
@@ -70,10 +71,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const authHeader = request.headers.get("authorization");
-    const isAuthorized = authHeader === `Bearer ${cronSecret}`;
-
-    if (!isAuthorized) {
+    if (!isAuthorizedCron(request)) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -91,8 +89,8 @@ export async function GET(request: NextRequest) {
     console.log(`[CRON] Checking for events between ${windowStart.toISOString()} and ${windowEnd.toISOString()}`);
 
     // Find published events with auto_reminders enabled happening in the window
-    const events = await query<EventRow>(
-      `SELECT id, title, event_date, location_name, slug, tier, user_id, host_name
+    const events = await query<EventRow & { event_timezone: string }>(
+      `SELECT id, title, event_date, event_timezone, location_name, slug, tier, user_id, host_name
        FROM events
        WHERE status = $1 AND auto_reminders = 1
          AND event_date >= $2 AND event_date <= $3
@@ -155,10 +153,8 @@ export async function GET(request: NextRequest) {
       const suppressions = await getCommunicationSuppressions(event.user_id);
       const branding = await getEventBranding(event.id);
       const sender = await getGuestEmailSender(event, branding);
-      // Event Pass events have a finite SMS allowance. Segments are reserved
-      // synchronously before each send so parallel batches cannot overspend.
+      // Event Pass events have a finite SMS allowance; segments are reserved atomically in D1 per send.
       const smsMetered = smsEnabled && isSmsMetered(await getUserTier(event.user_id), event.tier);
-      let smsBalance = smsMetered ? await getSmsBalance(event.id) : Number.POSITIVE_INFINITY;
       const guests = rawGuests.map((guest) => {
         const email = guest.email && !isCommunicationSuppressed(suppressions, "email", guest.email)
           ? guest.email
@@ -219,6 +215,17 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Atomically claim target guests before sending so overlapping cron runs cannot double-remind.
+      const claimedRows = await query<{ id: string }>(
+        `UPDATE guests SET reminder_sent_at = ${SQL_NOW}, updated_at = ${SQL_NOW}
+          WHERE event_id = $1 AND reminder_sent_at IS NULL
+            AND id IN (SELECT value FROM json_each($2))
+          RETURNING id`,
+        [event.id, guestsToNotify.map((g) => g.id)],
+      );
+      const claimedSet = new Set(claimedRows.map((r) => r.id));
+      const claimedToNotify = guestsToNotify.filter((g) => claimedSet.has(g.id));
+
       // Send reminders in batches
       const BATCH_SIZE = 10;
       let emailsSent = 0;
@@ -226,8 +233,9 @@ export async function GET(request: NextRequest) {
       const successIds: string[] = [];
       const errors: string[] = [];
 
-      for (let i = 0; i < guestsToNotify.length; i += BATCH_SIZE) {
-        const batch = guestsToNotify.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < claimedToNotify.length; i += BATCH_SIZE) {
+        const batch = claimedToNotify.slice(i, i + BATCH_SIZE);
+        const batchFailedIds: string[] = [];
 
         const batchResults = await Promise.allSettled(
           batch.map(async (guest) => {
@@ -245,6 +253,7 @@ export async function GET(request: NextRequest) {
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
+                eventTimezone: event.event_timezone,
                 locationName: event.location_name,
                 rsvpUrl,
               });
@@ -284,17 +293,24 @@ export async function GET(request: NextRequest) {
                   guestName: guest.name,
                   eventTitle: event.title,
                   eventDate: event.event_date,
+                  eventTimezone: event.event_timezone,
                   rsvpUrl,
                 });
                 const smsSegments = countSmsSegments(smsBody);
+                const reservationRef = smsMetered ? `reserve:cron-reminder:${guest.id}:${randomUUID()}` : null;
 
-                if (smsSegments > smsBalance) {
+                let allowed = true;
+                if (smsMetered && reservationRef) {
+                  const reserved = await reserveSmsSegments(event.id, smsSegments, reservationRef);
+                  allowed = reserved.allowed;
+                }
+
+                if (!allowed) {
                   await logSendFailure(event.id, "sms", guest.phone, "SMS allowance used up for this event", {
                     guestId: guest.id,
                     provider: "twilio",
                   });
                 } else {
-                  smsBalance -= smsSegments;
                   try {
                     assertApprovedRecipient(phoneValidation.formatted);
                     const twilioClient = getTwilioClient();
@@ -304,7 +320,12 @@ export async function GET(request: NextRequest) {
                       ...getTwilioSendOptions(),
                     });
                     smsOk = true;
-                    if (smsMetered) await recordSmsUsage(event.id, smsSegments, `twilio:${result.sid}`);
+                    if (smsMetered && reservationRef) {
+                      await query(
+                        "UPDATE event_sms_ledger SET reference = $1 WHERE event_id = $2 AND reference = $3",
+                        [`twilio:${result.sid}`, event.id, reservationRef],
+                      );
+                    }
 
                     await logSendSuccess(event.id, "sms", phoneValidation.formatted, {
                       guestId: guest.id,
@@ -312,7 +333,9 @@ export async function GET(request: NextRequest) {
                       providerMessageId: result.sid,
                     });
                   } catch (error) {
-                    smsBalance += smsSegments;
+                    if (smsMetered && reservationRef) {
+                      await releaseSmsReservation(event.id, reservationRef).catch(() => undefined);
+                    }
                     const message = error instanceof Error ? error.message : "SMS send failed";
                     console.error(`[CRON] SMS failed for guest=${guest.id}:`, message);
                     await logSendFailure(event.id, "sms", guest.phone, message, {
@@ -343,23 +366,20 @@ export async function GET(request: NextRequest) {
               successIds.push(guestId);
               if (emailOk) emailsSent++;
               if (smsOk) smsSent++;
+            } else {
+              batchFailedIds.push(guestId);
             }
           } else {
             errors.push(result.reason?.message || "Unknown error");
           }
         }
-      }
 
-      // Update reminder_sent_at for successful sends
-      if (successIds.length > 0) {
-        try {
+        if (batchFailedIds.length > 0) {
           await query(
-            'UPDATE guests SET reminder_sent_at = $1 WHERE id IN (SELECT value FROM json_each($2))',
-            [new Date(), successIds]
+            `UPDATE guests SET reminder_sent_at = NULL, updated_at = ${SQL_NOW}
+              WHERE id IN (SELECT value FROM json_each($1))`,
+            [batchFailedIds],
           );
-        } catch (updateError: unknown) {
-          console.error(`[CRON] Error updating reminder_sent_at for event ${event.id}:`, updateError);
-          errors.push(updateError instanceof Error ? updateError.message : String(updateError));
         }
       }
 

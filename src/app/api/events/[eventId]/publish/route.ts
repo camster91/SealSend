@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
@@ -59,11 +60,11 @@ export async function POST(
       filled.invitation_body !== event.invitation_body;
     const updatedEvent = copyChanged
       ? await queryOne(
-          'UPDATE events SET status = $1, invitation_headline = $3, invitation_body = $4 WHERE id = $2 RETURNING *',
+          `UPDATE events SET status = $1, invitation_headline = $3, invitation_body = $4, updated_at = ${SQL_NOW} WHERE id = $2 RETURNING *`,
           [newStatus, eventId, filled.invitation_headline, filled.invitation_body]
         )
       : await queryOne(
-          'UPDATE events SET status = $1 WHERE id = $2 RETURNING *',
+          `UPDATE events SET status = $1, updated_at = ${SQL_NOW} WHERE id = $2 RETURNING *`,
           [newStatus, eventId]
         );
 

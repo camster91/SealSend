@@ -16,6 +16,7 @@ interface InviteSmsParams {
   guestName: string;
   eventTitle: string;
   eventDate: string | null;
+  eventTimezone?: string;
   locationName: string | null;
   hostName?: string;
   rsvpUrl: string;
@@ -25,13 +26,13 @@ interface InviteSmsParams {
 export function buildInviteSms(params: InviteSmsParams): string {
   const guestName = sanitize(params.guestName);
   const eventTitle = sanitize(params.eventTitle);
-  const { eventDate, locationName, hostName, rsvpUrl } = params;
+  const { eventDate, eventTimezone, locationName, hostName, rsvpUrl } = params;
 
   const lines: string[] = [];
   lines.push(`Hi ${guestName}! You're invited to ${eventTitle}.`);
 
   if (eventDate) {
-    lines.push(`When: ${formatDateTime(eventDate)}`);
+    lines.push(`When: ${formatDateTime(eventDate, eventTimezone)}`);
   }
   if (locationName) {
     lines.push(`Where: ${sanitize(locationName)}`);
@@ -50,6 +51,7 @@ interface ReminderSmsParams {
   guestName: string;
   eventTitle: string;
   eventDate: string | null;
+  eventTimezone?: string;
   rsvpUrl: string;
   signature?: string;
 }
@@ -57,13 +59,13 @@ interface ReminderSmsParams {
 export function buildReminderSms(params: ReminderSmsParams): string {
   const guestName = sanitize(params.guestName);
   const eventTitle = sanitize(params.eventTitle);
-  const { eventDate, rsvpUrl } = params;
+  const { eventDate, eventTimezone, rsvpUrl } = params;
 
   const lines: string[] = [];
   lines.push(`Hi ${guestName}, reminder about ${eventTitle}!`);
 
   if (eventDate) {
-    lines.push(`Date: ${formatDateTime(eventDate)}`);
+    lines.push(`Date: ${formatDateTime(eventDate, eventTimezone)}`);
   }
 
   lines.push(`\nView event: ${rsvpUrl}`);

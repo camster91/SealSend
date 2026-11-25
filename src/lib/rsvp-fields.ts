@@ -54,6 +54,30 @@ export function serializeRsvpResponseValue(value: unknown): string {
 }
 
 /**
+ * Strip unconfigured keys from untrusted RSVP submissions while preserving
+ * historical keys already present on an existing response.
+ */
+export function sanitizeRsvpResponseData(
+  fields: RSVPField[],
+  responseData: Record<string, unknown>,
+  priorResponseData: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const allowedKeys = new Set<string>(Object.keys(priorResponseData));
+  for (const field of normalizeRsvpFields(fields)) {
+    if (rsvpFieldRole(field) === 'custom') {
+      allowedKeys.add(field.field_name);
+    }
+  }
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(responseData)) {
+    if (allowedKeys.has(key)) {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
+/**
  * Validate custom answers against the fields currently configured for an event.
  * Reserved defaults are submitted through the top-level RSVP payload, while
  * unknown response keys remain valid so historical answers survive field edits.

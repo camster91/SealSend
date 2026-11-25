@@ -19,6 +19,7 @@ const METHOD_LABELS: Record<AuthMethod, string> = {
 interface EnhancedLoginFormProps {
   defaultMethod?: AuthMethod;
   eventId?: string; // For guest login
+  eventSlug?: string;
   isGuestMode?: boolean;
   emailEnabled?: boolean; // Pass isEmailConfigured() from the server
   smsEnabled?: boolean; // Pass isTwilioConfigured() from the server; SMS options are hidden otherwise
@@ -27,6 +28,7 @@ interface EnhancedLoginFormProps {
 export function EnhancedLoginForm({
   defaultMethod = 'email',
   eventId,
+  eventSlug,
   isGuestMode = false,
   emailEnabled = true,
   smsEnabled = false,
@@ -45,7 +47,7 @@ export function EnhancedLoginForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
-  const rawRedirect = searchParams.get("redirect") || (isGuestMode ? `/events/${eventId}` : "/dashboard");
+  const rawRedirect = searchParams.get("redirect") || (isGuestMode ? (eventSlug ? `/e/${encodeURIComponent(eventSlug)}` : "/guest") : "/dashboard");
   const baseRedirect = isValidRelativePath(rawRedirect) ? rawRedirect : "/dashboard";
   const redirect = plan && baseRedirect === "/dashboard" ? `/dashboard?plan=${plan}` : baseRedirect;
 

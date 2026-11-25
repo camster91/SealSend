@@ -1,5 +1,7 @@
 import type { Session } from './model';
-export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public blockers?: string[]) { super(message); }
+}
 export function apiOrigin(value: string, development: boolean): string {
   const url = new URL(value);
   const local = ['localhost', '127.0.0.1', '10.0.2.2'].includes(url.hostname);
@@ -13,14 +15,20 @@ export class Api {
     if (!/^[a-z0-9/-]+$/.test(path) || path.includes('..')) throw new Error('Invalid API path');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
+    const isUnauthLogin = path.startsWith('auth/');
     try {
       const result = await this.fetcher(`${this.origin}/api/mobile/v1/${path}`, {
         method, credentials: 'omit', redirect: 'error', signal: controller.signal,
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Origin: this.origin, DNT: '1', ...(mutationKey ? { 'Idempotency-Key': mutationKey } : {}), ...(this.session ? { Authorization: `Bearer ${this.session.sessionToken}` } : {}) },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Origin: this.origin, DNT: '1', ...(mutationKey ? { 'Idempotency-Key': mutationKey } : {}), ...(this.session && !isUnauthLogin ? { Authorization: `Bearer ${this.session.sessionToken}` } : {}) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       const data = await result.json().catch(() => null);
-      if (!result.ok) throw new ApiError(data?.error || 'Please try again.', result.status);
+      if (!result.ok) {
+        const blockers = Array.isArray(data?.blockers) ? data.blockers.filter((b: unknown): b is string => typeof b === 'string') : undefined;
+        const base = data?.error || 'Please try again.';
+        const message = blockers?.length ? `${base}: ${blockers.join(' ')}` : base;
+        throw new ApiError(message, result.status, blockers);
+      }
       if (!data) throw new ApiError('The server returned an unexpected response.', 502);
       return data as T;
     } catch (error) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import QRCode from 'qrcode';
 import { queryOne } from '@/lib/db/client';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 
@@ -26,13 +27,12 @@ export async function GET(
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://sealsend.app';
     const url = `${siteUrl}/e/${event.slug}`;
 
-    const QRCode = require('qrcode');
     const buffer = await QRCode.toBuffer(url, { type: 'png', width: 400 });
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'private, max-age=3600',
       },
     });
   } catch {

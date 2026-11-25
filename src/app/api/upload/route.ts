@@ -6,6 +6,14 @@ import { saveImageForUser, storeBufferForUser, validateMagicBytes, type StoreRes
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4'];
+const MEDIA_EXT_BY_MIME: Record<string, string> = {
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+};
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;  // 10MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024;  // 50MB
@@ -95,8 +103,8 @@ export async function POST(request: NextRequest) {
       }
       result = saved as StoreResult;
     } else {
-      // Video and audio are stored as uploaded (no compression)
-      const finalExt = file.name.split('.').pop() || 'bin';
+      // Video and audio are stored as uploaded (no compression); extension comes strictly from validated MIME type.
+      const finalExt = MEDIA_EXT_BY_MIME[file.type] || 'bin';
       const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const nameWithoutExt = `${Date.now()}-${randomUUID()}-${originalName}`.replace(/\.[^.]+$/, '');
       result = await storeBufferForUser(user.id, buffer, `${nameWithoutExt}.${finalExt}`, uploadType as 'video' | 'audio');

@@ -1,8 +1,11 @@
 import { captureSocialPhotoPaths, purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db/client';
+import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { toTimestamp } from '@/lib/events';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
+import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
 import { eventUpdateSchema } from '@/lib/validations';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 import { refreshDefaultInvitationCopy, withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
@@ -133,6 +136,7 @@ export async function PATCH(
     }
 
     const setClauses = keys.map((key, i) => `${key} = $${i + 1}`);
+    setClauses.push(`updated_at = ${SQL_NOW}`);
     const values = keys.map((key) => {
       const val = updates[key];
       // Timestamps are stored as ISO-8601 UTC text, so normalize request strings.
@@ -159,6 +163,16 @@ export async function PATCH(
         { error: 'Failed to update event' },
         { status: 500 }
       );
+    }
+
+    if (existing.status !== 'published' && targetStatus === 'published') {
+      await enqueueWebhookEvent(eventId, 'event.published', {});
+      await recordActivationEventSafely({
+        name: 'event_published',
+        userId: auth.user.id,
+        eventId,
+        metadata: { source: 'patch' },
+      });
     }
 
     return NextResponse.json(eventForAccess(event, auth.access.role));

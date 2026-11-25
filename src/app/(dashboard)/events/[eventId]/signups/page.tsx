@@ -19,16 +19,25 @@ export default function SignupsPage() {
   const [category, setCategory] = useState('');
   const [slots, setSlots] = useState('1');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/events/${eventId}/signups`);
-    if (res.ok) {
-      const data = await res.json();
-      setItems(data);
+    setError(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/signups`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data);
+      } else {
+        setError('Could not load sign-up items.');
+      }
+    } catch {
+      setError('Could not load sign-up items. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [eventId]);
 
   useEffect(() => {
@@ -39,39 +48,54 @@ export default function SignupsPage() {
     e.preventDefault();
     if (!title.trim()) return;
     setSubmitting(true);
+    setError(null);
 
-    const res = await fetch(`/api/events/${eventId}/signups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        category: category.trim() || undefined,
-        slots: parseInt(slots, 10) || 1,
-      }),
-    });
+    try {
+      const res = await fetch(`/api/events/${eventId}/signups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category: category.trim() || undefined,
+          slots: parseInt(slots, 10) || 1,
+        }),
+      });
 
-    if (res.ok) {
-      setTitle('');
-      setDescription('');
-      setCategory('');
-      setSlots('1');
-      setShowForm(false);
-      fetchItems();
+      if (res.ok) {
+        setTitle('');
+        setDescription('');
+        setCategory('');
+        setSlots('1');
+        setShowForm(false);
+        fetchItems();
+      } else {
+        const body = await res.json().catch(() => null);
+        setError(body?.error || 'Could not add sign-up item.');
+      }
+    } catch {
+      setError('Network error while adding sign-up item.');
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   async function handleDelete(itemId: string) {
     if (!(await confirm({ title: 'Delete this sign-up item?', description: 'Everyone who signed up for it will be removed from it too.', confirmLabel: 'Delete item' }))) return;
+    setError(null);
 
-    const res = await fetch(`/api/events/${eventId}/signups`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId }),
-    });
+    try {
+      const res = await fetch(`/api/events/${eventId}/signups`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId }),
+      });
 
-    if (res.ok) fetchItems();
+      if (res.ok) fetchItems();
+      else setError('Could not delete sign-up item.');
+    } catch {
+      setError('Network error while deleting sign-up item.');
+    }
   }
 
   const totalItems = items.length;
@@ -99,13 +123,20 @@ export default function SignupsPage() {
         </Button>
       </div>
 
+      {error && (
+        <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Add form */}
       {showForm && (
         <form onSubmit={handleAdd} className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Title *</label>
+              <label htmlFor="signup-title" className="block text-sm font-medium text-gray-700">Title *</label>
               <input
+                id="signup-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -115,8 +146,9 @@ export default function SignupsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
+              <label htmlFor="signup-category" className="block text-sm font-medium text-gray-700">Category</label>
               <input
+                id="signup-category"
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -127,8 +159,9 @@ export default function SignupsPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <label htmlFor="signup-description" className="block text-sm font-medium text-gray-700">Description</label>
               <input
+                id="signup-description"
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -137,8 +170,9 @@ export default function SignupsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Slots needed</label>
+              <label htmlFor="signup-slots" className="block text-sm font-medium text-gray-700">Slots needed</label>
               <input
+                id="signup-slots"
                 type="number"
                 min="1"
                 max="100"

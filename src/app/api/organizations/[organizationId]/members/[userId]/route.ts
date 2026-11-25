@@ -21,6 +21,7 @@ function manageableRoles(actorRole: string): string[] {
 async function changeMembership(
   input: { organizationId: string; userId: string; actorId: string; actorRole: string; leavingSelf: boolean },
   change: Statement,
+  postStatements: Statement[] = [],
 ): Promise<"ok" | "forbidden" | "no_owner"> {
   const { organizationId, userId, actorId, actorRole, leavingSelf } = input;
   const permissionGuards = [
@@ -47,6 +48,7 @@ async function changeMembership(
         [organizationId],
         "no_owner",
       ),
+      ...postStatements,
     ]);
     return "ok";
   } catch (error) {
@@ -107,6 +109,26 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   const result = await changeMembership(
     { organizationId, userId, actorId: auth.user.id, actorRole: auth.role, leavingSelf },
     { text: "DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2", params: [organizationId, userId] },
+    [
+      // Hand off any workspace events the removed member created to a remaining owner,
+      // and revoke any direct event_members rows on this workspace's events.
+      {
+        text: `UPDATE events
+                  SET user_id = (
+                    SELECT user_id FROM organization_members
+                     WHERE organization_id = $1 AND role = 'owner'
+                     ORDER BY created_at ASC, user_id ASC LIMIT 1
+                  )
+                WHERE organization_id = $1 AND user_id = $2`,
+        params: [organizationId, userId],
+      },
+      {
+        text: `DELETE FROM event_members
+                WHERE user_id = $2
+                  AND event_id IN (SELECT id FROM events WHERE organization_id = $1)`,
+        params: [organizationId, userId],
+      },
+    ],
   );
   if (result === "forbidden") return NextResponse.json({ error: "You can't remove this member." }, { status: 403 });
   if (result === "no_owner") {

@@ -166,7 +166,7 @@ test('fresh schema creates clients and hashed client review links', async () => 
   assert.match(tableDefinition(schema, 'events'), /FOREIGN KEY \(client_id\) REFERENCES clients\(id\) ON DELETE SET NULL/);
   const shares = tableDefinition(schema, 'event_client_shares');
   assert.ok(shares, 'event_client_shares table definition is missing');
-  assert.match(shares, /token_hash TEXT NOT NULL,\n  token_preview TEXT NOT NULL,\n  created_by TEXT/);
+  assert.match(shares, /token_hash TEXT NOT NULL,\r?\n  token_preview TEXT NOT NULL,\r?\n  created_by TEXT/);
   assert.match(shares, /UNIQUE \(token_hash\)/);
 });
 
@@ -174,9 +174,9 @@ test('fresh schema creates workspace webhooks and their delivery queue', async (
   const schema = await read('src/lib/db/schema.sql');
   const webhooks = tableDefinition(schema, 'organization_webhooks');
   const deliveries = tableDefinition(schema, 'webhook_deliveries');
-  assert.match(webhooks, /CREATE TABLE IF NOT EXISTS organization_webhooks \(\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\n  organization_id TEXT NOT NULL,/);
+  assert.match(webhooks, /CREATE TABLE IF NOT EXISTS organization_webhooks \(\r?\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\r?\n  organization_id TEXT NOT NULL,/);
   assert.match(webhooks, /FOREIGN KEY \(organization_id\) REFERENCES organizations\(id\) ON DELETE CASCADE/);
-  assert.match(deliveries, /CREATE TABLE IF NOT EXISTS webhook_deliveries \(\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\n  webhook_id TEXT NOT NULL,/);
+  assert.match(deliveries, /CREATE TABLE IF NOT EXISTS webhook_deliveries \(\r?\n  id TEXT PRIMARY KEY DEFAULT [^\n]+\r?\n  webhook_id TEXT NOT NULL,/);
   assert.match(deliveries, /FOREIGN KEY \(webhook_id\) REFERENCES organization_webhooks\(id\) ON DELETE CASCADE/);
   assert.match(deliveries, /status TEXT NOT NULL DEFAULT 'pending'/);
   assert.match(deliveries, /CHECK \(\(status IN \('pending', 'delivered', 'failed'\)\)\)/);
@@ -195,7 +195,9 @@ test('webhook delivery runs from a CRON_SECRET-protected cron route with a DNS-c
   const lib = await read('src/lib/webhooks.ts');
   const nodeTransport = await read('src/lib/webhook-transport.ts');
   const workerTransport = await read('src/lib/webhook-transport.cloudflare.ts');
-  assert.match(route, /Bearer \$\{cronSecret\}/);
+  const cronAuth = await read('src/lib/auth/cron-auth.ts');
+  assert.match(route, /isAuthorizedCron\(request\)/);
+  assert.match(cronAuth, /timingSafeEqual/);
   assert.match(route, /deliverDueWebhooks/);
   assert.match(nodeTransport, /lookup: publicOnlyLookup/);
   assert.doesNotMatch(nodeTransport, /\bfetch\(/);
@@ -1066,8 +1068,8 @@ test('event owners can download a privacy-limited check-in fallback', async () =
 
   assert.match(route, /format\s*===\s*["']check-in-csv["']/);
   assert.match(route, /format\s*===\s*["']check-in-csv["']\s*\?\s*["']export_responses["']\s*:\s*["']view_guest_contacts["']/);
-  assert.match(route, /SELECT name, rsvp_status, invite_status, checked_in_at/);
-  assert.doesNotMatch(route, /SELECT name, rsvp_status, invite_status, checked_in_at[^;]*email/i);
+  assert.match(route, /listCheckInGuests\(\{ query \}, eventId\)/);
+  assert.doesNotMatch(route, /check-in-fallback[\s\S]*guest\.email|guest\.phone/);
   assert.match(route, /guest_check_in_fallback_exported/);
   assert.match(route, /Content-Disposition[\s\S]*check-in-fallback/);
   assert.match(route, /Cache-Control["']?:\s*["']no-store["']/);
@@ -1088,7 +1090,7 @@ test('scheduled announcements are approved, cancellable, and idempotently dispat
   assert.match(tableDefinition(schema, 'announcement_deliveries'), /UNIQUE \(announcement_id, guest_id, channel\)/);
   assert.match(route, /approved[\s\S]*audience[\s\S]*scheduledAt/);
   assert.match(cancel, /status = 'cancelled'[\s\S]*status = 'queued'/);
-  assert.match(cron, /Bearer \$\{cronSecret\}/);
+  assert.match(cron, /isAuthorizedCron\(request\)/);
   assert.match(cron, /dispatchAnnouncement/);
   assert.match(cron, /WHERE status = 'queued' AND approved_at IS NOT NULL AND scheduled_at <= \$\{SQL_NOW\}/);
   // Formerly FOR UPDATE SKIP LOCKED in the cron: each announcement is claimed by a batch whose guard
@@ -1517,7 +1519,7 @@ test('RSVP field options are valid JSON and replacement is transactional', async
 
 test('event checkout verifies ownership before exposing billing configuration', async () => {
   const route = await read('src/app/api/checkout/route.ts');
-  const ownershipIndex = route.indexOf("SELECT id, title, tier FROM events WHERE id = $1 AND user_id = $2");
+  const ownershipIndex = route.indexOf("requireEventPermission(eventId, 'manage_billing')");
   const billingIndex = route.indexOf('if (!isStripeKeyAllowed())');
   assert.ok(ownershipIndex >= 0);
   assert.ok(billingIndex > ownershipIndex);
@@ -1596,7 +1598,7 @@ test('storage is quota-backed and destructive retention jobs default off', async
   assert.match(drafts, /ENABLE_STALE_DRAFT_CLEANUP/);
   assert.match(drafts, /updated_at < \$2/);
   assert.match(uploads, /ENABLE_ORPHAN_UPLOAD_CLEANUP/);
-  assert.match(uploads, /NOT EXISTS \(SELECT 1 FROM events/);
+  assert.match(uploads, /NOT EXISTS \(\s*SELECT 1 FROM events/);
 });
 
 test('operations metrics are secret-gated and exclude guest content', async () => {
@@ -1922,10 +1924,10 @@ test('organizer plan changes and cancellations are owner-only, beta-gated, and a
   assert.match(webhook, /subscriptionPeriodEnd\(subscription\)/);
   assert.match(webhook, /invoiceSubscriptionId\(invoice\)/);
   assert.doesNotMatch(webhook, /as unknown as \{ current_period_end/);
-  // A late event for an older subscription can't overwrite the current one.
-  assert.match(webhook, /WHERE organization_subscriptions\.stripe_subscription_id = EXCLUDED\.stripe_subscription_id\s+OR organization_subscriptions\.status = 'canceled'/);
+  // A late event for an older or already-canceled subscription can't overwrite the current one.
+  assert.match(webhook, /organization_subscriptions\.stripe_subscription_id = EXCLUDED\.stripe_subscription_id\s+AND organization_subscriptions\.status <> 'canceled'/);
   // The plan changes only when the upsert stored this subscription, checked in the same batch.
-  assert.match(webhook, /AND EXISTS \(SELECT 1 FROM organization_subscriptions WHERE organization_id = \$2 AND stripe_subscription_id = \$3\)/);
+  assert.match(webhook, /AND EXISTS \(SELECT 1 FROM organization_subscriptions WHERE organization_id = \$2 AND stripe_subscription_id = \$3 AND status = \$4\)/);
 
   // Formerly the upgrade migration's ADD COLUMN; now part of the one schema.
   assert.match(tableDefinition(schema, 'organization_subscriptions'), /cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0,/);

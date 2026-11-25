@@ -72,12 +72,12 @@ export function communicationSuppressionStatement(input: CommunicationSuppressio
   };
 }
 
-/** Deletes every host's suppression of this recipient, as a statement for the caller's batch. */
+/** Deletes opt-out suppressions for this recipient (preserving manual/bounced/complained blocks). */
 export function removeCommunicationSuppressionsStatement(input: CommunicationSuppressionRemoval): Statement {
   const [, recipientHash] = communicationSuppressionKey(input.channel, input.recipient).split(":");
   return {
     text: `DELETE FROM communication_suppressions
-     WHERE channel = $1 AND recipient_hash = $2`,
+     WHERE channel = $1 AND recipient_hash = $2 AND reason = 'unsubscribed'`,
     params: [input.channel, recipientHash],
   };
 }

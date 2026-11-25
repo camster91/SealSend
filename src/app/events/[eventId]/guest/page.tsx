@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { EnhancedLoginForm } from "@/components/auth/EnhancedLoginForm";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getEvent } from "@/lib/events";
 import { isTwilioConfigured } from "@/lib/twilio";
 import { Logo } from "@/components/layout/Logo";
@@ -38,6 +40,11 @@ export default async function GuestLoginPage({ params }: GuestLoginPageProps) {
     );
   }
 
+  const currentUser = await getCurrentUser().catch(() => null);
+  if (currentUser) {
+    redirect(`/e/${encodeURIComponent(event.slug)}`);
+  }
+
   return (
     <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-cotton px-4 py-12">
       <div className="mb-8">
@@ -65,6 +72,7 @@ export default async function GuestLoginPage({ params }: GuestLoginPageProps) {
           <EnhancedLoginForm
             defaultMethod="email"
             eventId={eventId}
+            eventSlug={event.slug}
             isGuestMode={true}
             smsEnabled={isTwilioConfigured()}
           />

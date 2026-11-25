@@ -24,7 +24,7 @@ const app = handler as unknown as FetchHandler;
  */
 function rewriteUploads(request: Request): Request {
   const url = new URL(request.url);
-  if (request.method !== "GET" || !url.pathname.startsWith("/uploads/")) return request;
+  if ((request.method !== "GET" && request.method !== "HEAD") || !url.pathname.startsWith("/uploads/")) return request;
   url.pathname = `/api${url.pathname}`;
   return new Request(url, request);
 }

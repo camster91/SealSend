@@ -87,5 +87,14 @@ export function isValidHexColor(color: string): boolean {
 }
 
 export function isValidRelativePath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//") && !path.includes(":");
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") || path.includes(":")) {
+    return false;
+  }
+  if (/[\u0000-\u001f\u007f]/.test(path)) return false;
+  try {
+    const parsed = new URL(path, "https://sealsend.invalid");
+    return parsed.origin === "https://sealsend.invalid" && parsed.pathname.startsWith("/");
+  } catch {
+    return false;
+  }
 }

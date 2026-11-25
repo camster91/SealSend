@@ -58,7 +58,8 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id) AS response_count,
       (SELECT COUNT(*) FROM guests WHERE event_id = events.id) AS guest_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND guest_id IS NULL) AS public_response_count,
-      (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'attending') AS going_count,
+      (COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = events.id AND status = 'attending'), 0)
+        + (SELECT COUNT(*) FROM guests g WHERE g.event_id = events.id AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = events.id AND r.guest_id = g.id))) AS going_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'maybe') AS maybe_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'not_attending') AS not_going_count,
       ${noReplyCountSql} AS no_reply_count,

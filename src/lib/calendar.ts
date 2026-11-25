@@ -26,7 +26,7 @@ function formatUtc(date: Date): string {
 function escapeIcs(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
-    .replace(/\r?\n/g, "\\n")
+    .replace(/\r\n|\r|\n/g, "\\n")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,");
 }

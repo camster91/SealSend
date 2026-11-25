@@ -93,7 +93,8 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
        tier = EXCLUDED.tier,
        billing_cycle = EXCLUDED.billing_cycle,
        status = EXCLUDED.status,
-       updated_at = EXCLUDED.updated_at`,
+       updated_at = EXCLUDED.updated_at
+     WHERE user_subscriptions.status <> 'canceled'`,
     [userId, stripeCustomerId, stripeSubscriptionId, tier, billing ?? null, "active", new Date().toISOString()]
   );
   await recordActivationEventSafely({ name: "checkout_completed", userId, metadata: { plan: tier } });
@@ -132,15 +133,17 @@ async function syncOrganizationSubscription(input: {
          current_period_end = COALESCE(EXCLUDED.current_period_end, organization_subscriptions.current_period_end),
          cancel_at_period_end = EXCLUDED.cancel_at_period_end,
          updated_at = ${SQL_NOW}
-       WHERE organization_subscriptions.stripe_subscription_id = EXCLUDED.stripe_subscription_id
-          OR organization_subscriptions.status = 'canceled'`,
+        WHERE (organization_subscriptions.stripe_subscription_id = EXCLUDED.stripe_subscription_id
+                AND organization_subscriptions.status <> 'canceled')
+           OR (organization_subscriptions.stripe_subscription_id <> EXCLUDED.stripe_subscription_id
+                AND organization_subscriptions.status = 'canceled')`,
       params: [input.organizationId, input.stripeCustomerId, input.stripeSubscriptionId, input.plan, input.status, input.currentPeriodEnd ? new Date(input.currentPeriodEnd) : null, input.cancelAtPeriodEnd],
     },
     {
       text: `UPDATE organizations SET plan = $1, updated_at = ${SQL_NOW}
        WHERE id = $2 AND is_personal = 0
-         AND EXISTS (SELECT 1 FROM organization_subscriptions WHERE organization_id = $2 AND stripe_subscription_id = $3)`,
-      params: [organizationPlanForSubscription(input.plan, input.status), input.organizationId, input.stripeSubscriptionId],
+         AND EXISTS (SELECT 1 FROM organization_subscriptions WHERE organization_id = $2 AND stripe_subscription_id = $3 AND status = $4)`,
+      params: [organizationPlanForSubscription(input.plan, input.status), input.organizationId, input.stripeSubscriptionId, input.status],
     },
   ]);
 }
@@ -221,13 +224,13 @@ async function handleSubscriptionUpdated(
   if (tier && VALID_SUBSCRIPTION_TIERS.includes(tier)) {
     await query(
       `UPDATE user_subscriptions SET status = $1, current_period_end = $2, updated_at = $3, tier = $4, stripe_subscription_id = $5
-       WHERE stripe_subscription_id = $5`,
+       WHERE stripe_subscription_id = $5 AND status <> 'canceled'`,
       [status, currentPeriodEnd, updatedAt, tier, subscription.id]
     );
   } else {
     await query(
       `UPDATE user_subscriptions SET status = $1, current_period_end = $2, updated_at = $3, stripe_subscription_id = $4
-       WHERE stripe_subscription_id = $4`,
+       WHERE stripe_subscription_id = $4 AND status <> 'canceled'`,
       [status, currentPeriodEnd, updatedAt, subscription.id]
     );
   }
@@ -250,10 +253,37 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
   await query(
     `UPDATE user_subscriptions SET status = $1, updated_at = $2
-     WHERE stripe_subscription_id = $3`,
+     WHERE stripe_subscription_id = $3 AND status <> 'canceled'`,
     ["past_due", new Date().toISOString(), subscriptionId]
   );
   await handleOrganizerInvoice(subscriptionId, "past_due");
+}
+
+async function handleChargeRevoked(chargeId: string, eventId: string | undefined, sessionId: string | undefined, reason: "refund" | "dispute") {
+  const targetEvent = eventId && UUID_PATTERN.test(eventId)
+    ? eventId
+    : sessionId
+      ? (await query<{ id: string }>("SELECT id FROM events WHERE payment_id = $1 LIMIT 1", [sessionId]))[0]?.id
+      : undefined;
+  if (!targetEvent) return;
+
+  await batch([
+    {
+      text: `UPDATE events SET tier = 'free', max_responses = $1, updated_at = ${SQL_NOW}
+              WHERE id = $2 AND tier = 'event_pass'`,
+      params: [TIERS.free.maxResponses, targetEvent],
+    },
+    {
+      // Claw back any remaining unused SMS segments idempotently per charge/dispute.
+      text: `INSERT INTO event_sms_ledger (event_id, delta_segments, reason, reference)
+             SELECT $1, -COALESCE(SUM(delta_segments), 0), 'event_pass', $2
+               FROM event_sms_ledger
+              WHERE event_id = $1
+             HAVING COALESCE(SUM(delta_segments), 0) > 0
+             ON CONFLICT (reference) DO NOTHING`,
+      params: [targetEvent, `stripe:revoke:${reason}:${chargeId}`],
+    },
+  ]);
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
@@ -339,6 +369,19 @@ export async function POST(request: NextRequest) {
       }
       case "invoice.paid": {
         await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+        break;
+      }
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        if (charge.refunded) {
+          await handleChargeRevoked(charge.id, charge.metadata?.eventId, charge.metadata?.checkoutSessionId, "refund");
+        }
+        break;
+      }
+      case "charge.dispute.created": {
+        const dispute = event.data.object as Stripe.Dispute;
+        const chargeId = idOf(dispute.charge as string | Stripe.Charge | null) ?? dispute.id;
+        await handleChargeRevoked(chargeId, dispute.metadata?.eventId, dispute.metadata?.checkoutSessionId, "dispute");
         break;
       }
     }

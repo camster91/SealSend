@@ -27,7 +27,8 @@ export async function findRsvp(db: RsvpDb, eventId: string, guestId: string | nu
   return row ?? null;
 }
 
-const attendingTotalSql = "SELECT COALESCE(SUM(headcount), 0) FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)";
+const walkInCountSql = `(SELECT COUNT(*) FROM guests g WHERE g.event_id = $1 AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = $1 AND r.guest_id = g.id))`;
+const attendingTotalSql = `SELECT (COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)), 0) + ${walkInCountSql})`;
 
 async function attendingTotal(db: RsvpDb, eventId: string, excludeId: string | null): Promise<number> {
   return Number((await db.query<{ total: number }>(`SELECT (${attendingTotalSql}) AS total`, [eventId, excludeId]))[0]?.total ?? 0);

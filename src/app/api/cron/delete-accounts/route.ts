@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { abortCode, guard, SQL_NOW, type Statement } from "@/lib/db/sqlite-dialect";
+import { abortCode, guard, SQL_NOW, sqlNowPlus, type Statement } from "@/lib/db/sqlite-dialect";
 import { batch, query } from "@/lib/db/client";
-import { getBlobStore } from "@/lib/blob-store";
+import { isAuthorizedCron } from "@/lib/auth/cron-auth";
+import { blobKeyFromUploadPath, getBlobStore } from "@/lib/blob-store";
 
-const BLOCKING_SUBSCRIPTION_SQL = `EXISTS (SELECT 1 FROM user_subscriptions
-  WHERE user_id = $1 AND status IN ('active', 'past_due', 'trialing') AND tier <> 'free')`;
+const BLOCKING_SUBSCRIPTION_SQL = `(
+  EXISTS (SELECT 1 FROM user_subscriptions
+   WHERE user_id = $1 AND status IN ('active', 'past_due', 'trialing') AND tier <> 'free')
+  OR EXISTS (
+    SELECT 1 FROM organization_subscriptions os
+      JOIN organization_members m ON m.organization_id = os.organization_id AND m.user_id = $1 AND m.role = 'owner'
+      JOIN organizations o ON o.id = os.organization_id AND o.is_personal = 0
+     WHERE os.status IN ('active', 'past_due', 'trialing')
+       AND NOT EXISTS (
+         SELECT 1 FROM organization_members other
+          WHERE other.organization_id = os.organization_id AND other.role = 'owner' AND other.user_id <> $1
+       )
+  )
+)`;
 
 // Team workspaces the user owns with no other owner.
 const SOLE_OWNED_SQL = `SELECT m.organization_id FROM organization_members m
@@ -90,6 +103,29 @@ async function deletionStatements(userId: string): Promise<Statement[]> {
                                AND m.role = 'owner' AND m.user_id <> $1)`,
       params: [userId],
     },
+    // Remove guest sessions for events about to be deleted, and scrub personal auth/waitlist/rate-limit records.
+    {
+      text: `DELETE FROM user_sessions
+              WHERE user_role = 'guest'
+                AND user_id IN (SELECT g.id FROM guests g JOIN events e ON e.id = g.event_id WHERE e.user_id = $1)`,
+      params: [userId],
+    },
+    {
+      text: `DELETE FROM auth_codes
+              WHERE LOWER(email) IN (SELECT LOWER(email) FROM admin_users WHERE id = $1)`,
+      params: [userId],
+    },
+    {
+      text: `DELETE FROM waitlist_signups
+              WHERE LOWER(email) IN (SELECT LOWER(email) FROM admin_users WHERE id = $1)`,
+      params: [userId],
+    },
+    {
+      text: `DELETE FROM rate_limit_attempts
+              WHERE key LIKE '%' || $1 || '%'
+                 OR LOWER(key) LIKE '%' || COALESCE((SELECT LOWER(email) FROM admin_users WHERE id = $1), '__none__') || '%'`,
+      params: [userId],
+    },
     { text: "DELETE FROM events WHERE user_id = $1", params: [userId] },
     { text: "DELETE FROM organizations WHERE is_personal = 1 AND created_by = $1", params: [userId] },
     { text: "DELETE FROM user_subscriptions WHERE user_id = $1", params: [userId] },
@@ -98,9 +134,26 @@ async function deletionStatements(userId: string): Promise<Statement[]> {
   ];
 }
 
+async function hasSurvivingTeamMedia(userId: string): Promise<boolean> {
+  const prefixPattern = `/uploads/${userId}/%`;
+  const found = await query<{ ok: number }>(
+    `SELECT 1 AS ok FROM events
+      WHERE design_url LIKE $1
+         OR json_extract(customization, '$.logoUrl') LIKE $1
+         OR json_extract(customization, '$.backgroundImage') LIKE $1
+         OR json_extract(customization, '$.audioUrl') LIKE $1
+     UNION ALL
+     SELECT 1 AS ok FROM brands WHERE logo_url LIKE $1
+     UNION ALL
+     SELECT 1 AS ok FROM event_social_photos WHERE storage_path LIKE $1
+     LIMIT 1`,
+    [prefixPattern],
+  );
+  return found.length > 0;
+}
+
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -133,13 +186,46 @@ export async function GET(request: NextRequest) {
     let uploadsDeleted = 0;
     for (const { user_directory: userId } of cleanup) {
       try {
-        await getBlobStore().deletePrefix(userId);
+        if (await hasSurvivingTeamMedia(userId)) {
+          // Surviving reassigned team events still reference assets under this prefix;
+          // delete only unreferenced upload_assets instead of wiping the whole folder.
+          const unreferenced = await query<{ id: string; path: string }>(
+            `SELECT a.id, a.path FROM upload_assets a
+              WHERE a.path LIKE $1
+                AND NOT EXISTS (
+                  SELECT 1 FROM events e
+                   WHERE e.design_url = a.path
+                      OR json_extract(e.customization, '$.logoUrl') = a.path
+                      OR json_extract(e.customization, '$.backgroundImage') = a.path
+                      OR json_extract(e.customization, '$.audioUrl') = a.path
+                )
+                AND NOT EXISTS (SELECT 1 FROM brands b WHERE b.logo_url = a.path)
+                AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path = a.path)`,
+            [`/uploads/${userId}/%`],
+          );
+          for (const asset of unreferenced) {
+            const key = blobKeyFromUploadPath(asset.path);
+            if (key) await getBlobStore().delete(key);
+            await query("DELETE FROM upload_assets WHERE id = $1", [asset.id]);
+          }
+        } else {
+          await getBlobStore().deletePrefix(userId);
+        }
         await query("DELETE FROM deleted_account_upload_cleanup WHERE user_directory = $1", [userId]);
         uploadsDeleted += 1;
       } catch (error) {
         console.error("[delete-accounts] Upload cleanup will retry", error);
       }
     }
+
+    // Sweep expired short-lived auth/security records so PII does not accumulate indefinitely.
+    await batch([
+      { text: `DELETE FROM auth_codes WHERE expires_at < ${sqlNowPlus("-1 days")}` },
+      { text: `DELETE FROM user_sessions WHERE expires_at < ${sqlNowPlus("-1 days")}` },
+      { text: `DELETE FROM rate_limit_attempts WHERE created_at < ${sqlNowPlus("-2 days")}` },
+      { text: `DELETE FROM webhook_receipts WHERE created_at < ${sqlNowPlus("-30 days")}` },
+    ]);
+
     return NextResponse.json({ examined: due.length, deleted, blocked, uploadsDeleted, uploadCleanupPending: cleanup.length - uploadsDeleted });
   } catch (error) {
     console.error("[delete-accounts] Failed to process deletion requests", error);

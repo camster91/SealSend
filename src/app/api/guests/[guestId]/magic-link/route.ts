@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { query, queryOne } from "@/lib/db/client";
 import { rateLimit } from "@/lib/rate-limit";
 import { generateMagicToken, hashMagicToken, previewMagicToken } from '@/lib/magic-token';
@@ -28,31 +29,19 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Get guest and verify ownership through event
+    // Get guest and verify host permission on the event (return 404 consistently to avoid leaking foreign guest IDs)
     const guest = await queryOne<{ id: string; event_id: string; name: string; email: string | null; invite_token: string | null }>(
       'SELECT id, event_id, name, email, invite_token FROM guests WHERE id = $1',
       [guestId]
     );
 
     if (!guest) {
-      return NextResponse.json({ error: "Guest not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Verify user owns the event
-    const event = await queryOne<{ id: string; user_id: string; slug: string }>(
-      'SELECT id, user_id, slug FROM events WHERE id = $1',
-      [guest.event_id]
-    );
-
-    if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-
-    if (event.user_id !== user.id) {
-      return NextResponse.json(
-        { error: "You do not have permission to generate magic links for this guest" },
-        { status: 403 }
-      );
+    const eventAuth = await requireEventPermission(guest.event_id, 'send_messages');
+    if (eventAuth.error) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     // Generate secure token
@@ -109,7 +98,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const auth = await requireApiHost();
     if (auth.error) return auth.error;
-    const user = auth.user;
 
     // Get guest and verify ownership
     const guest = await queryOne<{ id: string; event_id: string }>(
@@ -118,16 +106,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     );
 
     if (!guest) {
-      return NextResponse.json({ error: "Guest not found" }, { status: 404 });
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Verify user owns the event
-    const event = await queryOne<{ user_id: string }>(
-      'SELECT user_id FROM events WHERE id = $1',
-      [guest.event_id]
-    );
-
-    if (!event || event.user_id !== user.id) {
+    const eventAuth = await requireEventPermission(guest.event_id, 'manage_guests');
+    if (eventAuth.error) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

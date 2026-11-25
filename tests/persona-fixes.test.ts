@@ -77,7 +77,7 @@ test("a personal invite link signs the guest in and opens their invitation", asy
   const guest = (await queryOne<{ id: string }>("INSERT INTO guests (event_id, name, email, invite_token) VALUES ($1, 'Ana', 'ana@example.test', 'tok-ana') RETURNING id", [id]))!.id;
   const response = await GET(new NextRequest("https://sealsend.test/invite/accept?token=tok-ana&event=invite"));
   assert.equal(response.status, 307);
-  assert.equal(response.headers.get("location"), "https://sealsend.test/e/invite?t=tok-ana");
+  assert.equal(response.headers.get("location"), "https://sealsend.test/e/invite");
   const session = await queryOne<{ session_token: string }>("SELECT session_token FROM user_sessions WHERE user_id = $1 AND user_role = 'guest'", [guest]);
   assert.equal(response.cookies.get("sealsend_session")?.value, session!.session_token);
   assert.equal(response.cookies.get("sealsend_session")?.httpOnly, true);

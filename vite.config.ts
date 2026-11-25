@@ -13,8 +13,26 @@ const PLATFORM_MODULES = [
   "lib/webhook-transport",
 ];
 
+const PLATFORM_TWIN_MAP = new Map(
+  PLATFORM_MODULES.map((name) => [
+    path.resolve(import.meta.dirname, `src/${name}.ts`),
+    path.resolve(import.meta.dirname, `src/${name}.cloudflare.ts`),
+  ]),
+);
+
 export default defineConfig({
   plugins: [
+    // Catch both `@/lib/...` and relative `./...` imports of platform modules.
+    {
+      name: "sealsend-cloudflare-twins",
+      enforce: "pre",
+      resolveId(source, importer) {
+        if (!importer || !source.startsWith(".")) return null;
+        const candidate = path.resolve(path.dirname(importer), source);
+        const withExt = candidate.endsWith(".ts") ? candidate : `${candidate}.ts`;
+        return PLATFORM_TWIN_MAP.get(withExt) ?? null;
+      },
+    },
     vinext(),
     cloudflare({
       viteEnvironment: {

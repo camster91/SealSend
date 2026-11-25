@@ -10,7 +10,7 @@ import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { reserveEmailQuota } from "@/lib/email-quota";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
-import { getSmsBalance, isSmsMetered, recordSmsUsage } from "@/lib/sms-allowance";
+import { isSmsMetered, releaseSmsReservation, reserveSmsSegments } from "@/lib/sms-allowance";
 import { getUserTier } from "@/lib/subscription";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
@@ -89,7 +89,6 @@ export async function dispatchAnnouncement(announcementId: string) {
   let failed = 0;
   const smsMetered = deliveries.some((delivery) => delivery.channel === "sms")
     && isSmsMetered(await getUserTier(announcement.user_id), announcement.tier);
-  let smsBalance = smsMetered ? await getSmsBalance(announcement.event_id) : Number.POSITIVE_INFINITY;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app";
   const branding = await getEventBranding(announcement.event_id);
   const sender = await getGuestEmailSender({ id: announcement.event_id, user_id: announcement.user_id, host_name: announcement.host_name }, branding);
@@ -124,15 +123,25 @@ export async function dispatchAnnouncement(announcementId: string) {
         assertApprovedRecipient(phone.formatted);
         const body = buildAnnouncementSms({ signature: smsSignature(branding), guestName: delivery.name, eventTitle: announcement.title, subject: announcement.subject, message: announcement.message, rsvpUrl });
         const segments = countSmsSegments(body);
-        if (segments > smsBalance) throw new Error("SMS allowance used up for this event");
-        smsBalance -= segments;
+        const reservationRef = smsMetered ? `reserve:announcement:${delivery.id}` : null;
+        if (smsMetered && reservationRef) {
+          const reserved = await reserveSmsSegments(announcement.event_id, segments, reservationRef);
+          if (!reserved.allowed) throw new Error("SMS allowance used up for this event");
+        }
         try {
           providerMessageId = (await getTwilioClient().messages.create({ body, to: phone.formatted, ...getTwilioSendOptions() })).sid;
         } catch (error) {
-          smsBalance += segments;
+          if (smsMetered && reservationRef) {
+            await releaseSmsReservation(announcement.event_id, reservationRef).catch(() => undefined);
+          }
           throw error;
         }
-        if (smsMetered) await recordSmsUsage(announcement.event_id, segments, `twilio:${providerMessageId}`);
+        if (smsMetered && reservationRef) {
+          await query(
+            "UPDATE event_sms_ledger SET reference = $1 WHERE event_id = $2 AND reference = $3",
+            [`twilio:${providerMessageId}`, announcement.event_id, reservationRef],
+          );
+        }
       }
       await query(`UPDATE announcement_deliveries SET status = 'accepted', provider_message_id = $2, error = NULL, updated_at = ${SQL_NOW} WHERE id = $1`, [delivery.id, providerMessageId]);
       sent++;

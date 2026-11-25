@@ -30,7 +30,7 @@ export default function TermsPage() {
             <li>It is offered &quot;as is&quot;, with no promise that it will always work or be available.</li>
             <li>Features, limits and the way it works may change or be removed.</li>
             <li>Every account is on the beta plan: one active event and up to 100 guests.</li>
-            <li>Email works today. Text messages (SMS) are turned off for now.</li>
+            <li>Shareable invitation links work today. Automated guest email and text messages (SMS) are limited or turned off during the beta.</li>
           </ul>
         </section>
 

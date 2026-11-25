@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db/client";
+import { isAuthorizedCron } from "@/lib/auth/cron-auth";
 import { resolveStaleDraftPolicy } from "@/lib/retention";
 
 export async function GET(request: NextRequest) {
   try {
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) {
+    if (!process.env.CRON_SECRET) {
       console.error("[cleanup-drafts] CRON_SECRET is not configured");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (!isAuthorizedCron(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

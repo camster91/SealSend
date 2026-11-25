@@ -77,6 +77,13 @@ export async function GET(
       const dataKeysList = Array.from(dataKeys);
       headers.push(...dataKeysList);
 
+      const escapeCsvCell = (v: unknown) => {
+        let s = String(v).replace(/"/g, '""');
+        // Prevent CSV formula injection
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s}"`;
+      };
+
       const rows = responsesWithPlusOnes.map((r) => {
         const rd = (r.response_data || {}) as Record<string, unknown>;
         const plusOnesList = r.plus_ones || [];
@@ -94,16 +101,11 @@ export async function GET(
           plusOneEmails,
           ...dataKeysList.map((k) => serializeRsvpResponseValue(rd[k])),
         ]
-          .map((v) => {
-            let s = String(v).replace(/"/g, '""');
-            // Prevent CSV formula injection
-            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-            return `"${s}"`;
-          })
+          .map(escapeCsvCell)
           .join(",");
       });
 
-      const csv = [headers.join(","), ...rows].join("\n");
+      const csv = [headers.map(escapeCsvCell).join(","), ...rows].join("\n");
 
       await query(
         `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
@@ -113,8 +115,9 @@ export async function GET(
 
       return new NextResponse(csv, {
         headers: {
-          "Content-Type": "text/csv",
+          "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="responses-${eventId}.csv"`,
+          "Cache-Control": "private, no-store",
         },
       });
     }

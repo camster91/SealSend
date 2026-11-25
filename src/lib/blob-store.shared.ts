@@ -1,7 +1,17 @@
+export interface BlobStreamResult {
+  body: ReadableStream<Uint8Array>;
+  size: number;
+  range?: { start: number; end: number };
+}
+
 /** Stores uploaded files by key (`<userId>/[social-private/]<file>`). */
 export interface BlobStore {
   put(key: string, data: Uint8Array): Promise<void>;
   get(key: string): Promise<Uint8Array | null>;
+  /** Streams a file (optionally a byte range) without buffering the full payload into RAM. */
+  getStream?(key: string, range?: { start: number; end?: number }): Promise<BlobStreamResult | null>;
+  /** Returns byte size without reading file contents (used for HEAD requests). */
+  head?(key: string): Promise<{ size: number } | null>;
   /** Removes one file; a missing file is not an error. */
   delete(key: string): Promise<void>;
   /** Removes every file whose key starts with `prefix` (a directory such as `<userId>/`). */

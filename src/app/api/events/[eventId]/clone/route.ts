@@ -5,7 +5,7 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
 import { resolveEventAccessRole, roleCan } from "@/lib/auth/event-access";
 import { batch, query, queryOne } from "@/lib/db/client";
-import { abortCode, guard, type Statement } from "@/lib/db/sqlite-dialect";
+import { abortCode, guard, SQL_NOW, type Statement } from "@/lib/db/sqlite-dialect";
 import { canCreateEvent, getEffectiveEventLimits } from "@/lib/entitlements";
 import { toTimestamp } from "@/lib/events";
 import { buildRepeatedEventBrief, parseRepeatEventRequest } from "@/lib/repeat-event";
@@ -159,7 +159,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         ),
       ];
       if (sourceArchived) {
-        statements.push({ text: "UPDATE events SET status = 'archived' WHERE id = $1", params: [eventId] });
+        statements.push({ text: `UPDATE events SET status = 'archived', updated_at = ${SQL_NOW} WHERE id = $1`, params: [eventId] });
       }
       const insertEventIndex = statements.length;
       statements.push({

@@ -14,7 +14,7 @@ import { enqueueWebhookEvent } from "@/lib/webhooks";
 import { getApiUser } from "@/lib/auth/api-auth";
 import { generateMagicToken, isValidMagicToken } from "@/lib/magic-token";
 import { findRsvp, saveRsvp, RsvpError, RSVP_CHANGED } from "@/lib/rsvp-store";
-import { validateRsvpResponseData } from '@/lib/rsvp-fields';
+import { sanitizeRsvpResponseData, validateRsvpResponseData } from '@/lib/rsvp-fields';
 import type { RSVPField } from '@/types/database';
 
 const privateHeaders = { "Cache-Control": "private, no-store", Vary: "Cookie, X-Guest-Token, X-Rsvp-Edit-Token" };
@@ -67,7 +67,13 @@ export async function GET(request: Request, { params }: Context) {
     const response = await findRsvp({ query, batch }, event.id, guestId, token);
     let spotsRemaining: number | null = null;
     if (event.max_attendees) {
-      const total = await queryOne<{ total: number }>("SELECT COALESCE(SUM(headcount), 0) AS total FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)", [event.id, response?.id ?? null]);
+      const total = await queryOne<{ total: number }>(
+        `SELECT (
+           COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)), 0)
+           + (SELECT COUNT(*) FROM guests g WHERE g.event_id = $1 AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = $1 AND r.guest_id = g.id))
+         ) AS total`,
+        [event.id, response?.id ?? null],
+      );
       spotsRemaining = Math.max(0, event.max_attendees - (total?.total ?? 0));
     }
     const deadlinePassed = Boolean(event.rsvp_deadline && new Date(event.rsvp_deadline).getTime() <= Date.now());
@@ -103,10 +109,12 @@ export async function POST(request: Request, { params }: Context) {
           ),
           query<{ fingerprint: string }>(`SELECT (${rsvpFieldsFingerprintSql}) AS fingerprint`, [event.id]),
         ]);
-        const responseDataValidation = validateRsvpResponseData(fields, parsed.data.response_data, previous?.response_data);
+        const sanitizedData = sanitizeRsvpResponseData(fields, parsed.data.response_data, previous?.response_data);
+        const responseDataValidation = validateRsvpResponseData(fields, sanitizedData, previous?.response_data);
         if (!responseDataValidation.valid) {
           throw new RsvpError('Please complete the required RSVP fields.', 400);
         }
+        parsed.data.response_data = sanitizedData;
         return [guard(`(${rsvpFieldsFingerprintSql}) = $2`, [event.id, fingerprint], RSVP_CHANGED)];
       },
     });

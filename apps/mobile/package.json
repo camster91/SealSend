@@ -42,7 +42,7 @@
     "prebuild": "expo prebuild",
     "build:ios:local": "expo run:ios --configuration Release",
     "build:android:local": "expo run:android --variant release",
-    "lint": "../../node_modules/.bin/eslint --max-warnings=0 ."
+    "lint": "node ../../node_modules/eslint/bin/eslint.js --max-warnings=0 ."
   },
   "private": true,
   "overrides": {

@@ -17,10 +17,14 @@ interface ModalProps {
 function Modal({ open, onClose, title, children, className, sheet }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
 
       // Focus trap
       if (e.key === "Tab" && contentRef.current) {
@@ -42,7 +46,7 @@ function Modal({ open, onClose, title, children, className, sheet }: ModalProps)
     if (open) {
       document.addEventListener("keydown", onKeyDown);
       document.body.style.overflow = "hidden";
-      // Auto-focus first focusable element
+      // Auto-focus first focusable element only when opening
       const timer = setTimeout(() => {
         const el = contentRef.current?.querySelector<HTMLElement>(
           'a[href], button:not([disabled]), textarea, input, select'
@@ -59,7 +63,7 @@ function Modal({ open, onClose, title, children, className, sheet }: ModalProps)
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

@@ -9,6 +9,7 @@ import { generateMagicToken, hashMagicToken, previewMagicToken } from "@/lib/mag
 import { getTeamMemberLimit, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { sendEmail } from "@/lib/email";
+import { rateLimit } from "@/lib/rate-limit";
 import { escapeHtml } from "@/lib/utils";
 
 type Params = { params: Promise<{ eventId: string }> };
@@ -51,6 +52,14 @@ export async function POST(request: Request, { params }: Params) {
   const access = await getEventAccess(auth.user.id, eventId);
   if (!access || !roleCan(access.role, "manage_members")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { success: rateLimitOk } = await rateLimit(`event-member-invite:${auth.user.id}`, {
+    max: 20,
+    windowSeconds: 3600,
+  });
+  if (!rateLimitOk) {
+    return NextResponse.json({ error: "Too many invitations sent. Please try again later." }, { status: 429 });
   }
 
   const parsed = eventMemberInviteSchema.safeParse(await request.json());

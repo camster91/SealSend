@@ -38,7 +38,7 @@ type ShareRow = {
   share_id: string; event_id: string; title: string; event_date: string | null; event_timezone: string;
   location_name: string | null; host_name: string | null; invitation_headline: string | null; invitation_body: string | null;
   design_url: string | null; status: string; client_name: string | null; approved_at: string | null; approver_name: string | null;
-  expires_at: string; invited: number | string; attending: number | string; maybe: number | string; declined: number | string; headcount: number | string;
+  expires_at: string; invited: number | string; attending: number | string; maybe: number | string; declined: number | string; awaiting?: number | string; headcount: number | string;
 };
 
 /** Summarizes RSVP totals only: a client link never exposes guest names or contact details. */
@@ -47,6 +47,7 @@ export function toClientShareView(row: ShareRow): ClientShareView {
   const attending = Number(row.attending);
   const maybe = Number(row.maybe);
   const declined = Number(row.declined);
+  const awaiting = row.awaiting !== undefined ? Number(row.awaiting) : Math.max(0, invited - attending - maybe - declined);
   return {
     shareId: row.share_id,
     eventId: row.event_id,
@@ -63,7 +64,7 @@ export function toClientShareView(row: ShareRow): ClientShareView {
     approvedAt: row.approved_at,
     approverName: row.approver_name,
     expiresAt: row.expires_at,
-    rsvp: { invited, attending, maybe, declined, awaiting: Math.max(0, invited - attending - maybe - declined), headcount: Number(row.headcount) },
+    rsvp: { invited, attending, maybe, declined, awaiting, headcount: Number(row.headcount) },
   };
 }
 
@@ -77,7 +78,12 @@ export async function getClientShareView(token: string): Promise<ClientShareView
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS attending,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'maybe') AS maybe,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'not_attending') AS declined,
-            (SELECT COALESCE(SUM(r.headcount), 0) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS headcount
+            (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.parent_guest_id IS NULL
+               AND COALESCE(g.rsvp_status, 'pending') = 'pending'
+               AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id)) AS awaiting,
+            (COALESCE((SELECT SUM(r.headcount) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending'), 0)
+              + (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.rsvp_status = 'attending'
+                  AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id))) AS headcount
        FROM event_client_shares s
        JOIN events e ON e.id = s.event_id
        LEFT JOIN clients c ON c.id = e.client_id
@@ -99,7 +105,7 @@ export type ClientEventHistoryItem = {
 
 type HistoryRow = {
   id: string; title: string; event_date: string | Date | null; status: string;
-  invited: number | string; attending: number | string; maybe: number | string; declined: number | string; headcount: number | string;
+  invited: number | string; attending: number | string; maybe: number | string; declined: number | string; awaiting?: number | string; headcount: number | string;
   approved_at: string | Date | null; approver_name: string | null;
 };
 
@@ -114,12 +120,13 @@ export function toClientEventHistoryItem(row: HistoryRow): ClientEventHistoryIte
   const attending = Number(row.attending);
   const maybe = Number(row.maybe);
   const declined = Number(row.declined);
+  const awaiting = row.awaiting !== undefined ? Number(row.awaiting) : Math.max(0, invited - attending - maybe - declined);
   return {
     id: row.id,
     title: row.title,
     eventDate: isoOrNull(row.event_date),
     status: row.status,
-    rsvp: { invited, attending, maybe, declined, awaiting: Math.max(0, invited - attending - maybe - declined), headcount: Number(row.headcount) },
+    rsvp: { invited, attending, maybe, declined, awaiting, headcount: Number(row.headcount) },
     approvedAt: isoOrNull(row.approved_at),
     approverName: row.approver_name,
   };
@@ -133,7 +140,12 @@ export async function getClientEventHistory(organizationId: string, clientId: st
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS attending,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'maybe') AS maybe,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'not_attending') AS declined,
-            (SELECT COALESCE(SUM(r.headcount), 0) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS headcount,
+            (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.parent_guest_id IS NULL
+               AND COALESCE(g.rsvp_status, 'pending') = 'pending'
+               AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id)) AS awaiting,
+            (COALESCE((SELECT SUM(r.headcount) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending'), 0)
+              + (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.rsvp_status = 'attending'
+                  AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id))) AS headcount,
             approval.approved_at, approval.approver_name
        FROM events e
        LEFT JOIN (

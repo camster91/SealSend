@@ -56,7 +56,10 @@ export function WebhookSettings() {
 
   useEffect(() => { if (organizationId) void load(organizationId); }, [organizationId, load]);
 
-  async function run(action: () => Promise<Response>, success: (body: Record<string, unknown>) => string) {
+  async function run(
+    action: () => Promise<Response>,
+    onSuccess: (body: Record<string, unknown>) => string | { type: "success" | "error"; text: string },
+  ) {
     if (!organizationId) return;
     setBusy(true);
     setMessage(null);
@@ -67,8 +70,11 @@ export function WebhookSettings() {
         setMessage({ type: "error", text: body.error || "Something went wrong. Please try again." });
         return;
       }
-      setMessage({ type: "success", text: success(body) });
+      const outcome = onSuccess(body);
+      setMessage(typeof outcome === "string" ? { type: "success", text: outcome } : outcome);
       await load(organizationId);
+    } catch {
+      setMessage({ type: "error", text: "Network error. Please check your connection and try again." });
     } finally {
       setBusy(false);
     }
@@ -131,7 +137,9 @@ export function WebhookSettings() {
                 <div className="flex flex-wrap gap-1">
                   <Button type="button" variant="outline" disabled={busy} onClick={() => void run(
                     () => fetch(`/api/organizations/${organizationId}/webhooks/${webhook.id}/test`, json("POST")),
-                    (body) => body.ok ? `Test event delivered (HTTP ${body.statusCode}).` : `Test failed: ${body.error ?? "no response"}.`,
+                    (body) => body.ok
+                      ? { type: "success", text: `Test event delivered (HTTP ${body.statusCode}).` }
+                      : { type: "error", text: `Test failed: ${body.error ?? "no response"}.` },
                   )}>Send test</Button>
                   <Button type="button" variant="ghost" disabled={busy} onClick={() => void run(
                     () => fetch(`/api/organizations/${organizationId}/webhooks/${webhook.id}`, json("PATCH", { active: !webhook.active })),

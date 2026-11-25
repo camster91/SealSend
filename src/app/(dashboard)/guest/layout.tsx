@@ -35,9 +35,9 @@ export default function GuestLayout({
         </div>
       </header>
       
-      <main>
+      <div>
         {children}
-      </main>
+      </div>
     </div>
   );
 }

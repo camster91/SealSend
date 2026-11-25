@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { exec } from './client';
+import { exec } from '@/lib/db/client';
 
 export async function runMigrations() {
   const schema = readFileSync(join(process.cwd(), 'src/lib/db/schema.sql'), 'utf-8');

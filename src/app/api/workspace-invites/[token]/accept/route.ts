@@ -12,6 +12,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ to
     return NextResponse.json({ error: "Invalid invitation" }, { status: 400 });
   }
 
+  const verifiedHost = await queryOne<{ id: string }>(
+    "SELECT id FROM admin_users WHERE id = $1 AND email_verified_at IS NOT NULL",
+    [auth.user.id],
+  );
+  if (!verifiedHost) {
+    return NextResponse.json({ error: "Verify your email address before accepting a workspace invitation." }, { status: 403 });
+  }
+
   const invalid = () => NextResponse.json({ error: "Invitation is invalid, expired, or belongs to another account." }, { status: 404 });
   const invite = await queryOne<{ id: string; organization_id: string; role: string }>(
     `SELECT id, organization_id, role FROM organization_invites

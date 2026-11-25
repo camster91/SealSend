@@ -17,6 +17,7 @@ import type { Event, RSVPField } from "@/types/database";
 import { getUserTier } from "@/lib/subscription";
 import { showsPoweredByBadge } from "@/lib/entitlements";
 import { getEventBranding, mergeBrandIntoCustomization } from "@/lib/brands";
+import { getCurrentUser } from "@/lib/auth/session";
 import type { Metadata } from "next";
 import { eventFontFamily } from '@/lib/event-font';
 
@@ -75,15 +76,17 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   const maxAttendees = (event.max_attendees as number) || null;
   if (maxAttendees) {
     const sumResult = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(headcount), 0) AS total
-       FROM rsvp_responses WHERE event_id = $1 AND status = $2`,
+      `SELECT (
+         COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = $1 AND status = $2), 0)
+         + (SELECT COUNT(*) FROM guests g WHERE g.event_id = $1 AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = $1 AND r.guest_id = g.id))
+       ) AS total`,
       [event.id, 'attending']
     );
     const currentTotal = Number(sumResult?.total ?? 0);
     spotsRemaining = Math.max(0, maxAttendees - currentTotal);
   }
 
-  // Resolve invite token for magic link pre-filling
+  // Resolve invite token or active guest session for pre-filling
   let inviteGuest: { id: string; name: string; email: string | null } | null = null;
   const rawToken = typeof resolvedSearchParams.t === "string" ? resolvedSearchParams.t : null;
   const token = sanitizeInviteToken(rawToken);
@@ -94,6 +97,15 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
       [token, event.id]
     );
     if (guest) inviteGuest = guest;
+  } else {
+    const currentUser = await getCurrentUser().catch(() => null);
+    if (currentUser?.role === "guest") {
+      const guest = await queryOne<{ id: string; name: string; email: string | null }>(
+        'SELECT id, name, email FROM guests WHERE id = $1 AND event_id = $2',
+        [currentUser.id, event.id]
+      );
+      if (guest) inviteGuest = guest;
+    }
   }
   const unknownLink = rawToken !== null && !inviteGuest;
 
@@ -127,7 +139,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
         </AnimatedSection>
 
         {/* One column on phones: details, reply, then everything else */}
-        <div className="mx-auto max-w-4xl px-4 py-6">
+        <main className="mx-auto max-w-4xl px-4 py-6">
           {unknownLink && (
             <p role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
               We didn&apos;t recognize your personal link, so your reply won&apos;t be matched to your invitation. You can still reply below, or ask your host for a new link.
@@ -166,7 +178,7 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
               </AnimatedSection>
             </div>
           </div>
-        </div>
+        </main>
 
         <footer className="px-4 pb-8 text-center">
           <nav aria-label="Help and privacy" className="inline-flex flex-wrap items-center justify-center gap-x-5 rounded-full bg-white px-5 text-sm text-ink shadow-sm">

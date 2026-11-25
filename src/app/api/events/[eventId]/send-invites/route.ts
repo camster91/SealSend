@@ -18,7 +18,8 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { assertApprovedRecipient } from "@/lib/communications-safety";
 import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/communication-suppressions";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
-import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
+import { randomUUID } from "node:crypto";
+import { decideSmsSend, getSmsBalance, isSmsMetered, releaseSmsReservation, reserveSmsSegments, smsAllowanceMessage } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
 import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             guestName: guest.name,
             eventTitle: event.title,
             eventDate: event.event_date,
+            eventTimezone: event.event_timezone,
             locationName: event.location_name,
             hostName: event.host_name || undefined,
             rsvpUrl: sampleUrl(guest.invite_token),
@@ -123,29 +125,51 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // Atomically claim target guests as 'pending' before sending so concurrent requests cannot double-send.
+    const claimedRows = await query<{ id: string }>(
+      `UPDATE guests SET invite_status = 'pending', updated_at = ${SQL_NOW}
+        WHERE event_id = $1 AND invite_status IN ('not_sent', 'failed')
+          AND id IN (SELECT value FROM json_each($2))
+        RETURNING id`,
+      [eventId, sendableGuests.map((g) => g.id)],
+    );
+    const claimedSet = new Set(claimedRows.map((r) => r.id));
+    const claimedGuests = sendableGuests.filter((g) => claimedSet.has(g.id));
+    if (claimedGuests.length === 0) {
+      return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
+    }
+
     // Count against the owner's daily email allowance before anything is sent.
-    const emailCount = sendableGuests.filter((guest) => guest.email).length;
+    const emailCount = claimedGuests.filter((guest) => guest.email).length;
     const emailQuota = await reserveEmailQuota(event.user_id, emailCount);
     if (!emailQuota.success) {
+      // Release claimed rows back to not_sent/failed on quota rejection.
+      await query(
+        `UPDATE guests SET invite_status = 'not_sent', updated_at = ${SQL_NOW}
+          WHERE event_id = $1 AND invite_status = 'pending' AND id IN (SELECT value FROM json_each($2))`,
+        [eventId, claimedGuests.map((g) => g.id)],
+      );
       return NextResponse.json(
         { error: emailQuotaMessage(emailCount, emailQuota.remaining, emailQuota.limit), code: "EMAIL_DAILY_LIMIT" },
         { status: 429 }
       );
     }
 
-    await recordGuestContactConfirmation(eventId, user.id, "invites", sendableGuests.length);
+    await recordGuestContactConfirmation(eventId, user.id, "invites", claimedGuests.length);
 
-    // Process all guests in parallel (batches of 10 to avoid overwhelming APIs)
+    // Process all guests in parallel (batches of 10), persisting statuses per batch
+    // so mid-loop timeouts or subrequest limits never leave sent guests unrecorded.
     const BATCH_SIZE = 10;
     let sent = 0;
     let failed = 0;
     let smsSent = 0;
     let smsFailed = 0;
     const successIds: string[] = [];
-    const failedGuests: Array<{ id: string; error: string }> = [];
 
-    for (let i = 0; i < sendableGuests.length; i += BATCH_SIZE) {
-      const batch = sendableGuests.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < claimedGuests.length; i += BATCH_SIZE) {
+      const batch = claimedGuests.slice(i, i + BATCH_SIZE);
+      const batchSuccessIds: string[] = [];
+      const batchFailedIds: string[] = [];
 
       const results = await Promise.allSettled(
         batch.map(async (guest) => {
@@ -230,13 +254,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
+                eventTimezone: event.event_timezone,
                 locationName: event.location_name,
                 hostName: event.host_name || undefined,
                 rsvpUrl,
               });
+              const smsSegments = countSmsSegments(smsBody);
+              const reservationRef = smsMetered ? `reserve:invite:${guest.id}:${randomUUID()}` : null;
 
               try {
                 assertApprovedRecipient(formattedPhone);
+                if (smsMetered && reservationRef) {
+                  const reserved = await reserveSmsSegments(eventId, smsSegments, reservationRef);
+                  if (!reserved.allowed) throw new Error("SMS allowance used up for this event");
+                }
                 const twilioClient = getTwilioClient();
                 const result = await withRetry(() => twilioClient.messages.create({
                   body: smsBody,
@@ -244,7 +275,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 }));
                 smsOk = true;
-                if (smsMetered) await recordSmsUsage(eventId, countSmsSegments(smsBody), `twilio:${result.sid}`);
+                if (smsMetered && reservationRef) {
+                  await query(
+                    "UPDATE event_sms_ledger SET reference = $1 WHERE event_id = $2 AND reference = $3",
+                    [`twilio:${result.sid}`, eventId, reservationRef],
+                  );
+                }
 
                 // Log successful SMS
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
@@ -253,6 +289,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                   providerMessageId: result.sid,
                 });
               } catch (error) {
+                if (smsMetered && reservationRef) {
+                  await releaseSmsReservation(eventId, reservationRef).catch(() => undefined);
+                }
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
                 console.error(`[SMS FAILED] guest=${guest.id}:`, message);
@@ -295,33 +334,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
           if (emailOk || smsOk) {
             successIds.push(guestId);
+            batchSuccessIds.push(guestId);
           } else {
-            const errorMsg = errors.map(e => `${e.type}: ${e.message}`).join('; ');
-            failedGuests.push({ id: guestId, error: errorMsg || 'Send failed' });
+            batchFailedIds.push(guestId);
           }
         } else {
           // Promise was rejected (shouldn't happen with our try/catch, but handle just in case)
           console.error('[BATCH ERROR] Promise rejected:', result.reason);
         }
       }
-    }
 
-    // Batch update statuses
-    if (successIds.length > 0) {
-      // One JSON array parameter: D1 allows 100 bound parameters per statement.
-      await query(
-        'UPDATE guests SET invite_status = $1, invite_sent_at = $2 WHERE id IN (SELECT value FROM json_each($3))',
-        ['sent', new Date(), successIds]
-      );
-    }
-    if (failedGuests.length > 0) {
-      // Store sanitized error only — never persist raw provider messages
-      await Promise.all(failedGuests.map(({ id }) =>
-        query(
-          'UPDATE guests SET invite_status = $1, invite_error = $2 WHERE id = $3',
-          ['failed', 'Delivery failed', id]
-        )
-      ));
+      // Persist batch statuses immediately so partial progress survives timeouts.
+      if (batchSuccessIds.length > 0) {
+        await query(
+          `UPDATE guests SET invite_status = 'sent', invite_sent_at = $1, invite_error = NULL, updated_at = ${SQL_NOW}
+            WHERE id IN (SELECT value FROM json_each($2))`,
+          [new Date(), batchSuccessIds],
+        );
+      }
+      if (batchFailedIds.length > 0) {
+        await query(
+          `UPDATE guests SET invite_status = 'failed', invite_error = 'Delivery failed', updated_at = ${SQL_NOW}
+            WHERE id IN (SELECT value FROM json_each($1))`,
+          [batchFailedIds],
+        );
+      }
     }
 
     if (successIds.length > 0) {

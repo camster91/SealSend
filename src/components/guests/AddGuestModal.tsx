@@ -29,6 +29,7 @@ export function AddGuestModal({
 }: AddGuestModalProps) {
   const isEdit = !!guest;
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -52,6 +53,28 @@ export function AddGuestModal({
           notes: "",
         },
   });
+
+  // Sync form fields whenever the modal opens or switches between add/edit guests.
+  useEffect(() => {
+    if (!open) return;
+    setSubmitError(null);
+    setDuplicateError(null);
+    reset(
+      guest
+        ? {
+            name: guest.name,
+            email: guest.email || "",
+            phone: guest.phone || "",
+            notes: guest.notes || "",
+          }
+        : {
+            name: "",
+            email: "",
+            phone: "",
+            notes: "",
+          }
+    );
+  }, [open, guest, reset]);
 
   const phoneValue = useWatch({ control, name: "phone" });
   const emailValue = useWatch({ control, name: "email" });
@@ -81,21 +104,30 @@ export function AddGuestModal({
 
   async function onSubmit(data: GuestInput) {
     if (duplicateError && !isEdit) return;
+    setSubmitError(null);
 
     const url = isEdit
       ? `/api/events/${eventId}/guests/${guest!.id}`
       : `/api/events/${eventId}/guests`;
 
-    const res = await fetch(url, {
-      method: isEdit ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    try {
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-    if (res.ok) {
-      reset();
-      onSuccess();
-      onClose();
+      if (res.ok) {
+        reset();
+        onSuccess();
+        onClose();
+        return;
+      }
+
+      const body = await res.json().catch(() => null);
+      setSubmitError(body?.error || "Could not save guest. Please try again.");
+    } catch {
+      setSubmitError("Network error. Please check your connection and try again.");
     }
   }
 
@@ -161,6 +193,12 @@ export function AddGuestModal({
             </p>
           )}
         </div>
+
+        {submitError && (
+          <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {submitError}
+          </div>
+        )}
 
         {duplicateError && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">

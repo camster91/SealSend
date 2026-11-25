@@ -74,14 +74,13 @@ export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVM
     return guests;
   }, []);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const loadSelectedFile = useCallback((selectedFile: File | undefined) => {
     if (!selectedFile) return;
-    
+
     setFile(selectedFile);
     setError(null);
     setResult(null);
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
@@ -98,6 +97,15 @@ export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVM
     };
     reader.readAsText(selectedFile);
   }, [parseCSV]);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    loadSelectedFile(e.target.files?.[0]);
+  }, [loadSelectedFile]);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    loadSelectedFile(e.dataTransfer.files?.[0]);
+  }, [loadSelectedFile]);
 
   const handleImport = useCallback(async () => {
     if (!file) return;
@@ -177,12 +185,16 @@ export function ImportCSVModal({ open, onClose, eventId, onSuccess }: ImportCSVM
               </button>
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/20 transition-colors"
+            >
               <input
                 type="file"
                 accept=".csv,.txt"
                 onChange={handleFileChange}
-                className="hidden"
+                className="sr-only"
                 id="csv-upload"
               />
               <label

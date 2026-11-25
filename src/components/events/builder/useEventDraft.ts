@@ -51,6 +51,8 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   // True while a change waits out the debounce and has not gone to the queue yet.
   const [waiting, setWaiting] = useState(false);
+  // True when the user has typed into a new event before the first draft POST succeeds.
+  const [dirtyBeforeCreate, setDirtyBeforeCreate] = useState(false);
 
   const dataRef = useRef(data);
   const eventIdRef = useRef(initialEventId);
@@ -103,7 +105,10 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
     const next = { ...dataRef.current, ...patch };
     dataRef.current = next;
     setData(next);
-    if (!eventIdRef.current) return;
+    if (!eventIdRef.current) {
+      setDirtyBeforeCreate(true);
+      return;
+    }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(enqueueNow, AUTOSAVE_DEBOUNCE_MS);
     setWaiting(true);
@@ -134,6 +139,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
         // If the host already left, don't rewrite the URL of the page they're on now.
         if (!mountedRef.current) return;
         setEventId(id);
+        setDirtyBeforeCreate(false);
         // Update the URL without a navigation so the builder keeps its state (no remount).
         window.history.replaceState(null, "", draftPathRef.current?.(id) ?? `/events/${id}/build`);
       },
@@ -159,7 +165,7 @@ export function useEventDraft({ eventId: initialEventId, initial, organizationId
   // Never drop a debounced change when the builder unmounts.
   useEffect(() => () => enqueueNow(), [enqueueNow]);
 
-  const unsaved = waiting || UNSAVED_KINDS.has(status.kind);
+  const unsaved = dirtyBeforeCreate || waiting || UNSAVED_KINDS.has(status.kind);
   useEffect(() => {
     if (!unsaved) return;
     const warn = (event: BeforeUnloadEvent) => {

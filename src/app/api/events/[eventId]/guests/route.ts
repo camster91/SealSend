@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { query, queryOne } from "@/lib/db/client";
+import { batch, query, queryOne } from "@/lib/db/client";
+import { abortCode, guard, type Statement } from "@/lib/db/sqlite-dialect";
 import { guestSchema } from "@/lib/validations";
 import { getEffectiveEventLimits, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
@@ -8,6 +9,7 @@ import { recordActivationEventSafely } from "@/lib/analytics/activation-events";
 import { validateAndFormatPhone } from "@/lib/phone-validation";
 import type { CountryCode } from "libphonenumber-js";
 import { deduplicateGuestImport } from "@/lib/guest-import";
+import { listCheckInGuests } from "@/lib/check-in-store";
 
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 500;
@@ -37,39 +39,28 @@ export async function GET(
     if (auth.error) return auth.error;
 
     if (format === "check-in-csv") {
-      const guests = await query<{
-        name: string;
-        rsvp_status: string;
-        invite_status: string;
-        checked_in_at: string | null;
-      }>(
-        `SELECT name, rsvp_status, invite_status, checked_in_at
-         FROM guests
-         WHERE event_id = $1
-         ORDER BY name ASC
-         LIMIT 10000`,
-        [eventId],
-      );
+      const attendees = await listCheckInGuests({ query }, eventId);
       const escapeCell = (value: string) => {
         let safe = value.replace(/"/g, '""');
         if (/^[=+\-@\t\r]/.test(safe)) safe = `'${safe}`;
         return `"${safe}"`;
       };
-      const rows = guests.map((guest) => [
+      const rows = attendees.map((guest) => [
         guest.name,
         guest.rsvp_status,
-        guest.invite_status,
+        String(guest.headcount),
+        guest.source === "public_rsvp" ? "Shared link" : "Invited / walk-in",
         guest.checked_in_at ? "Checked in" : "Not checked in",
       ].map(escapeCell).join(","));
       const csv = [
-        "Name,RSVP Status,Invitation Status,Check-in Status",
+        "Name,RSVP Status,Headcount,Source,Check-in Status",
         ...rows,
       ].join("\n");
 
       await query(
         `INSERT INTO event_audit_log (event_id, actor_user_id, action, metadata)
          VALUES ($1, $2, 'guest_check_in_fallback_exported', $3)`,
-        [eventId, auth.user.id, JSON.stringify({ count: guests.length, format: "check-in-csv" })],
+        [eventId, auth.user.id, JSON.stringify({ count: attendees.length, format: "check-in-csv" })],
       );
 
       return new NextResponse(csv, {
@@ -84,12 +75,17 @@ export async function GET(
 
     const { limit, offset } = parsePagination(request);
 
-    // Exclude sensitive token/error fields from list payloads
+    // Exclude sensitive token/error fields from list payloads.
+    // Walk-ins have rsvp_status = 'attending' with no rsvp_responses row;
+    // NULLIF(guests.rsvp_status, 'pending') keeps pending invited guests NULL.
     const guests = await query(
       `SELECT id, event_id, name, email, phone, notes, invite_status, invite_sent_at,
               reminder_sent_at, tags, created_at, updated_at,
-              (SELECT r.status FROM rsvp_responses r WHERE r.guest_id = guests.id
-               ORDER BY r.updated_at DESC NULLS LAST, r.created_at DESC LIMIT 1) AS reply_status
+              COALESCE(
+                (SELECT r.status FROM rsvp_responses r WHERE r.event_id = guests.event_id AND r.guest_id = guests.id
+                 ORDER BY r.updated_at DESC NULLS LAST, r.created_at DESC LIMIT 1),
+                NULLIF(guests.rsvp_status, 'pending')
+              ) AS reply_status
        FROM guests
        WHERE event_id = $1
        ORDER BY created_at DESC
@@ -173,10 +169,50 @@ export async function POST(
       );
     }
 
-    const guest = await queryOne(
-      'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
-      [eventId, prepared.accepted[0].name, prepared.accepted[0].email, prepared.accepted[0].phone, prepared.accepted[0].notes]
-    );
+    const candidate = prepared.accepted[0];
+    const statements: Statement[] = [
+      guard("(SELECT COUNT(*) FROM guests WHERE event_id = $1) < $2", [eventId, guestLimit], "guest_limit"),
+    ];
+    if (candidate.email) {
+      statements.push(
+        guard(
+          "NOT EXISTS (SELECT 1 FROM guests WHERE event_id = $1 AND email IS NOT NULL AND LOWER(TRIM(email)) = LOWER($2))",
+          [eventId, candidate.email],
+          "duplicate_email",
+        ),
+      );
+    }
+    if (candidate.phone) {
+      statements.push(
+        guard(
+          "NOT EXISTS (SELECT 1 FROM guests WHERE event_id = $1 AND phone IS NOT NULL AND phone = $2)",
+          [eventId, candidate.phone],
+          "duplicate_phone",
+        ),
+      );
+    }
+    statements.push({
+      text: 'INSERT INTO guests (event_id, name, email, phone, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, event_id, name, email, phone, notes, invite_status, created_at',
+      params: [eventId, candidate.name, candidate.email, candidate.phone, candidate.notes],
+    });
+
+    let guest: unknown;
+    try {
+      const results = await batch(statements);
+      guest = results[results.length - 1][0];
+    } catch (error) {
+      const code = abortCode(error);
+      if (code === "guest_limit") {
+        return NextResponse.json({ error: `This event is limited to ${guestLimit} guests.` }, { status: 403 });
+      }
+      if (code === "duplicate_email") {
+        return NextResponse.json({ error: "A guest with this email is already on the list." }, { status: 409 });
+      }
+      if (code === "duplicate_phone") {
+        return NextResponse.json({ error: "A guest with this phone number is already on the list." }, { status: 409 });
+      }
+      throw error;
+    }
 
     await recordActivationEventSafely({
       name: "first_guest_added",

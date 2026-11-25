@@ -212,10 +212,19 @@ async function updateSmsStatus(
         ],
       },
     ];
-    if (status === 'failed' || status === 'bounced') {
+    // Only mark a phone number invalid on permanent number/carrier failures,
+    // scoped to the guest(s) on the matching send log (never globally on transient errors like 30001).
+    const PERMANENT_INVALID_PHONE_CODES = new Set(['21211', '21614', '30003', '30005', '30006', '30014']);
+    if ((status === 'failed' || status === 'bounced') && metadata.errorCode && PERMANENT_INVALID_PHONE_CODES.has(metadata.errorCode)) {
       statements.push({
-        text: 'UPDATE guests SET phone_invalid_at = $1, updated_at = $2 WHERE phone = $3',
-        params: [new Date(), new Date(), metadata.to],
+        text: `UPDATE guests SET phone_invalid_at = $1, updated_at = $2
+                WHERE phone = $3
+                  AND event_id IN (SELECT event_id FROM send_logs WHERE provider_message_id = $4)
+                  AND (
+                    NOT EXISTS (SELECT 1 FROM send_logs WHERE provider_message_id = $4 AND guest_id IS NOT NULL)
+                    OR id IN (SELECT guest_id FROM send_logs WHERE provider_message_id = $4 AND guest_id IS NOT NULL)
+                  )`,
+        params: [new Date(), new Date(), metadata.to, messageSid],
       });
     }
     const [, sendLogs] = await batch(statements);

@@ -2,9 +2,9 @@ import { rsvpFieldRole, rsvpResponseValues } from './rsvp-fields';
 export type SummaryResponse = { id: string; status: string; headcount: number; response_data: Record<string, unknown> | null; respondent_name?: string; respondent_email?: string | null };
 export type SummaryField = { field_name: string; field_label: string; field_type: string; is_required: boolean; options?: string[] | null };
 
-export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryField[], maxAttendees: number | null) {
+export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryField[], maxAttendees: number | null, walkInCount = 0) {
   const statusCounts = { attending: 0, not_attending: 0, maybe: 0, pending: 0 };
-  let attendingHeadcount = 0;
+  let attendingHeadcount = Math.max(0, Number(walkInCount) || 0);
   for (const response of responses) {
     if (response.status in statusCounts) statusCounts[response.status as keyof typeof statusCounts]++;
     if (response.status === "attending") attendingHeadcount += Math.max(0, Number(response.headcount) || 0);

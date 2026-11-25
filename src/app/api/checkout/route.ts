@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiHost } from '@/lib/auth/api-auth';
+import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from "@/lib/db/client";
 import { createCheckoutSession } from "@/lib/stripe";
 import { z } from "zod";
+import { BETA_MODE } from '@/lib/constants';
 import { isStripeKeyAllowed } from '@/lib/billing';
 import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { isEventTierUpgrade } from '@/lib/entitlements';
@@ -14,6 +16,10 @@ const checkoutSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    if (BETA_MODE) {
+      return NextResponse.json({ error: "Paid checkout is disabled during the beta." }, { status: 403 });
+    }
+
     const auth = await requireApiHost();
     if (auth.error) return auth.error;
     const user = auth.user;
@@ -41,10 +47,12 @@ export async function POST(request: NextRequest) {
 
     const { eventId, tier } = parsed.data;
 
-    // Verify user owns the event
+    const eventAuth = await requireEventPermission(eventId, 'manage_billing');
+    if (eventAuth.error) return eventAuth.error;
+
     const event = await queryOne<{ id: string; title: string; tier: string }>(
-      'SELECT id, title, tier FROM events WHERE id = $1 AND user_id = $2',
-      [eventId, user.id]
+      'SELECT id, title, tier FROM events WHERE id = $1',
+      [eventId]
     );
 
     if (!event) {

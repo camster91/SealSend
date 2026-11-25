@@ -36,9 +36,20 @@ export function buildEmailFooter(brand?: EmailBrand | null, compliance?: EmailCo
   return buildBrandFooter(brand) + complianceHtml;
 }
 
+function absolutizeEmailImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const safe = sanitizeUrl(url);
+  if (!safe) return null;
+  if (safe.startsWith("/")) {
+    const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://sealsend.app").replace(/\/$/, "");
+    return `${base}${safe}`;
+  }
+  return safe;
+}
+
 function buildBrandFooter(brand?: EmailBrand | null): string {
   if (!brand) return SEALSEND_FOOTER;
-  const logo = brand.logoUrl ? sanitizeUrl(brand.logoUrl) : null;
+  const logo = absolutizeEmailImageUrl(brand.logoUrl);
   const logoHtml = logo ? `<img src="${escapeHtml(logo)}" alt="" height="32" style="display:inline-block;max-height:32px;border:0;margin:0 0 6px;" /><br />` : "";
   const nameHtml = `<p style="margin:0;font-size:13px;font-weight:600;color:#374151;">${escapeHtml(brand.name)}</p>`;
   const poweredBy = brand.whiteLabel ? "" : `\n              <p style="margin:6px 0 0;font-size:11px;color:#9ca3af;">Sent with SealSend</p>`;
@@ -165,7 +176,7 @@ export function buildInvitationEmail(params: InvitationEmailParams): {
       </td></tr>`
     : '';
 
-  const safeDesignUrl = designUrl ? sanitizeUrl(designUrl) : null;
+  const safeDesignUrl = absolutizeEmailImageUrl(designUrl);
   const designBlock = safeDesignUrl
     ? `<tr>
         <td style="padding:0;">
@@ -250,6 +261,7 @@ interface ReminderEmailParams {
   guestName: string;
   eventTitle: string;
   eventDate: string | null;
+  eventTimezone?: string;
   locationName: string | null;
   rsvpUrl: string;
   brand?: EmailBrand | null;
@@ -260,7 +272,7 @@ export function buildReminderEmail(params: ReminderEmailParams): {
   subject: string;
   html: string;
 } {
-  const { guestName, eventTitle, eventDate, locationName, rsvpUrl } = params;
+  const { guestName, eventTitle, eventDate, eventTimezone, locationName, rsvpUrl } = params;
 
   const safeGuestName = escapeHtml(guestName);
   const safeEventTitle = escapeHtml(eventTitle);
@@ -278,7 +290,7 @@ export function buildReminderEmail(params: ReminderEmailParams): {
             </td>
             <td style="padding-left:12px;">
               <p style="margin:0;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">When</p>
-              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(eventDate))}</p>
+              <p style="margin:2px 0 0;font-size:14px;color:#1f2937;font-weight:500;">${escapeHtml(formatDateTime(eventDate, eventTimezone))}</p>
             </td>
           </tr></table>
         </td>

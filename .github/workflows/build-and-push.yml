@@ -57,24 +57,29 @@ jobs:
 
       - name: Resolve image metadata
         id: meta
+        env:
+          REPO_NAME_DEFAULT: ${{ github.event.repository.name }}
+          INPUT_IMAGE_NAME: ${{ inputs.image_name }}
+          GITHUB_REF_VALUE: ${{ github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA_VALUE: ${{ github.sha }}
         run: |
-          REPO_NAME="${{ github.event.repository.name }}"
-          if [ -n "${{ inputs.image_name }}" ]; then REPO_NAME="${{ inputs.image_name }}"; fi
-          REF="${{ github.ref }}"
+          REPO_NAME="$REPO_NAME_DEFAULT"
+          if [ -n "$INPUT_IMAGE_NAME" ]; then REPO_NAME="$INPUT_IMAGE_NAME"; fi
+          REF="$GITHUB_REF_VALUE"
           if [[ "$REF" == refs/tags/* ]]; then
             TAG="${REF#refs/tags/}"
           elif [[ "$REF" == refs/heads/main || "$REF" == refs/heads/master ]]; then
             TAG="main"
           elif [[ "$REF" == refs/pull/* ]]; then
-            TAG="pr-${{ github.event.pull_request.number }}"
+            TAG="pr-${PR_NUMBER}"
           else
             TAG="${REF#refs/heads/}"
           fi
-          SHA_SHORT="${{ github.event.pull_request.head.sha || github.sha }}" | head -c 7
-          SHA_SHORT=$(echo "${{ github.sha }}" | head -c 7)
-          echo "image=ghcr.io/camster91/${REPO_NAME}" >> $GITHUB_OUTPUT
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "sha=${SHA_SHORT}" >> $GITHUB_OUTPUT
+          SHA_SHORT="${GITHUB_SHA_VALUE:0:7}"
+          printf 'image=ghcr.io/camster91/%s\n' "$REPO_NAME" >> "$GITHUB_OUTPUT"
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'sha=%s\n' "$SHA_SHORT" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -120,12 +125,20 @@ jobs:
             org.opencontainers.image.created=${{ github.event.repository.updated_at }}
 
       - name: Image summary
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PLATFORMS: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
+          SHA: ${{ steps.meta.outputs.sha }}
         run: |
-          echo "## Image published" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Pull:** \`docker pull ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Run:** \`docker run -d -p 3000:3000 --name ${{ github.event.repository.name }} ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Platforms:** ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**SHA:** ${{ steps.meta.outputs.sha }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Image published"
+            echo ""
+            printf '**Image:** `%s:%s`\n' "$IMAGE" "$TAG"
+            printf '**Pull:** `docker pull %s:%s`\n' "$IMAGE" "$TAG"
+            printf '**Run:** `docker run -d -p 3000:3000 --name %s %s:%s`\n' "$REPO_NAME" "$IMAGE" "$TAG"
+            echo ""
+            printf '**Platforms:** %s\n' "$PLATFORMS"
+            printf '**SHA:** %s\n' "$SHA"
+          } >> "$GITHUB_STEP_SUMMARY"

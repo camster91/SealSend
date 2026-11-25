@@ -20,11 +20,22 @@ export async function POST() {
   if (auth.error) return auth.error;
   const activeSubscription = await queryOne(
     `SELECT id FROM user_subscriptions
-      WHERE user_id = $1 AND status IN ('active', 'past_due', 'trialing') AND tier <> 'free'`,
+      WHERE user_id = $1 AND status IN ('active', 'past_due', 'trialing') AND tier <> 'free'
+     UNION ALL
+     SELECT os.organization_id AS id
+       FROM organization_subscriptions os
+       JOIN organization_members m ON m.organization_id = os.organization_id AND m.user_id = $1 AND m.role = 'owner'
+       JOIN organizations o ON o.id = os.organization_id AND o.is_personal = 0
+      WHERE os.status IN ('active', 'past_due', 'trialing')
+        AND NOT EXISTS (
+          SELECT 1 FROM organization_members other
+           WHERE other.organization_id = os.organization_id AND other.role = 'owner' AND other.user_id <> $1
+        )
+      LIMIT 1`,
     [auth.user.id],
   );
   if (activeSubscription) {
-    return NextResponse.json({ error: "Cancel the active subscription before scheduling account deletion." }, { status: 409 });
+    return NextResponse.json({ error: "Cancel the active subscription (or transfer workspace ownership) before scheduling account deletion." }, { status: 409 });
   }
   const request = await queryOne<DeletionRequest>(
     `INSERT INTO account_deletion_requests (user_id, status, requested_at, scheduled_for, cancelled_at, completed_at)

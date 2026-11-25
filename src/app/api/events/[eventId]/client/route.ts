@@ -3,9 +3,19 @@ import { z } from "zod";
 import { query, queryOne } from "@/lib/db/client";
 import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { requireEventPermission } from "@/lib/auth/event-api-access";
+import { organizationRoleCan } from "@/lib/auth/organization-access";
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 const assignSchema = z.object({ clientId: z.string().uuid().nullable() }).strict();
+
+async function canManageEventWorkspaceClients(organizationId: string | null, userId: string): Promise<boolean> {
+  if (!organizationId) return false;
+  const membership = await queryOne<{ role: string }>(
+    "SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+    [organizationId, userId],
+  );
+  return Boolean(membership && organizationRoleCan(membership.role, "manage_clients"));
+}
 
 /** Event client, the workspace's clients to choose from, and active review links. */
 export async function GET(_request: Request, { params }: RouteParams) {
@@ -16,7 +26,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
     "SELECT client_id, organization_id FROM events WHERE id = $1",
     [eventId],
   );
-  const clients = event?.organization_id
+  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await canManageEventWorkspaceClients(event.organization_id, auth.user.id))) {
+    return NextResponse.json({ error: "Only workspace members can manage clients for this event." }, { status: 403 });
+  }
+  const clients = event.organization_id
     ? await query<{ id: string; name: string }>("SELECT id, name FROM clients WHERE organization_id = $1 ORDER BY LOWER(name)", [event.organization_id])
     : [];
   const shares = await query(
@@ -26,7 +40,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     [eventId],
   );
   return NextResponse.json(
-    { clientId: event?.client_id ?? null, organizationId: event?.organization_id ?? null, clients, shares },
+    { clientId: event.client_id ?? null, organizationId: event.organization_id ?? null, clients, shares },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -35,6 +49,14 @@ export async function PUT(request: Request, { params }: RouteParams) {
   const { eventId } = await params;
   const auth = await requireEventPermission(eventId, "edit_event");
   if (auth.error) return auth.error;
+  const event = await queryOne<{ organization_id: string | null }>(
+    "SELECT organization_id FROM events WHERE id = $1",
+    [eventId],
+  );
+  if (!event) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!(await canManageEventWorkspaceClients(event.organization_id, auth.user.id))) {
+    return NextResponse.json({ error: "Only workspace members can manage clients for this event." }, { status: 403 });
+  }
   const parsed = assignSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Choose a client" }, { status: 400 });
 

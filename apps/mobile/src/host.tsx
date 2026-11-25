@@ -34,7 +34,7 @@ function useHostState() {
   const [codeSent, setCodeSent] = useState(false);
   const [password, setPassword] = useState('');
   const [useCode, setUseCode] = useState(false);
-  const walkIn = useRef<WalkIn | null>(null);
+  const walkIn = useRef<{ eventId: string; item: WalkIn } | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
@@ -68,14 +68,14 @@ function useHostState() {
     locked.current = true; setBusy(true); setNotice('');
     try { await action(); }
     catch (error) {
-      // A wrong password is also a 401; only a signed-in host is being signed out.
-      if (error instanceof ApiError && error.status === 401 && api.session) {
+      // A wrong password is also a 401; only an already-signed-in host is being signed out.
+      if (error instanceof ApiError && error.status === 401 && host) {
         clearHostView(); setScreen('login');
         await saveSession(null).catch(() => {});
       }
       setNotice(error instanceof Error ? error.message : 'Please try again.');
     } finally { locked.current = false; setBusy(false); }
-  }, [clearHostView, setScreen]);
+  }, [clearHostView, host, setScreen]);
   const loadEvents = useCallback(async () => { const saved = await api.request<Event[]>('events'); setEvents(saved); setEventsLoaded(true); }, []);
   const enterHost = useCallback(async (user: Host) => {
     setHost(user);
@@ -137,8 +137,16 @@ function useHostState() {
   }
   async function addWalkIn(name: string) {
     if (!selected) return;
-    walkIn.current = walkInFor(walkIn.current, name, () => Crypto.randomUUID());
-    const added = await api.request<Attendee>(`events/${selected.id}/check-in`, 'POST', walkIn.current);
+    const current = walkIn.current?.eventId === selected.id ? walkIn.current.item : null;
+    const next = walkInFor(current, name, () => Crypto.randomUUID());
+    walkIn.current = { eventId: selected.id, item: next };
+    let added: Attendee;
+    try {
+      added = await api.request<Attendee>(`events/${selected.id}/check-in`, 'POST', next);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) walkIn.current = null;
+      throw error;
+    }
     walkIn.current = null;
     setAttendees(rows => [...rows.filter(g => g.id !== added.id), added]); setFilter('');
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -203,7 +211,7 @@ export function HostScreen() {
         {!eventsLoaded && <Button label="Try again" secondary disabled={busy} onPress={() => void run(loadEvents)} />}
         {!eventsLoaded && <Notice message="Your events haven’t loaded yet." />}
         {events.map(event => <Pressable key={event.id} accessibilityRole="button" accessibilityLabel={`${event.title}, ${statusLabel(event.status)}, ${eventTime(event)}`} disabled={busy} onPress={() => void run(() => openEvent(event))} style={({ pressed }) => [styles.card, { opacity: pressed ? .75 : 1 }]}><View style={styles.row}><Text style={[styles.label, { fontSize: 18, flexShrink: 1 }]}>{event.title}</Text><View style={styles.tag}><Text style={styles.tagText}>{statusLabel(event.status)}</Text></View></View><Text style={styles.body}>{eventTime(event)}{'\n'}{event.location_name || 'No place yet'}</Text></Pressable>)}
-        <Button label="Account" secondary disabled={busy} onPress={() => void run(async () => { const result = await api.request<{ request: Deletion | null }>('account/deletion'); setDeletion(result.request); go('account'); })} />
+        <Button label="Account" secondary disabled={busy} onPress={() => { go('account'); void api.request<{ request: Deletion | null }>('account/deletion').then(result => setDeletion(result.request)).catch(() => {}); }} />
       </>}
       {(screen === 'create' || screen === 'edit') && <>
         <Heading title={screen === 'edit' ? 'Edit event' : 'Create event'} subtitle="Saving doesn’t message anyone." />
@@ -212,7 +220,10 @@ export function HostScreen() {
         <Field label="Place" value={location} onChangeText={setLocation} maxLength={200} editable={!busy} />
         <Text style={styles.label}>When</Text><Text style={styles.body}>{date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>{screen === 'edit' && selected?.event_timezone !== timezone && <Notice message={`You’re choosing a time in ${timezone}. Guests see the same moment in ${selected?.event_timezone}.`} />}
         <View style={styles.row}><View style={{ flex: 1 }}><Button label="Change date" secondary disabled={busy} onPress={() => setPicker('date')} /></View><View style={{ flex: 1 }}><Button label="Change time" secondary disabled={busy} onPress={() => setPicker('time')} /></View></View>
-        {picker && Platform.OS !== 'web' && <DateTimePicker value={date} timeZoneName={timezone} mode={picker} onChange={(_event, value) => { setPicker(null); if (value) setDate(value); }} />}
+        {picker && Platform.OS !== 'web' && <>
+          <DateTimePicker value={date} timeZoneName={timezone} mode={picker} onChange={(_event, value) => { if (Platform.OS !== 'ios') setPicker(null); if (value) setDate(value); }} />
+          {Platform.OS === 'ios' && <Button label="Done" secondary onPress={() => setPicker(null)} />}
+        </>}
         {picker && Platform.OS === 'web' && <Notice message="Native date and time picking is available in the iOS and Android builds." />}
         {uncertainCreate && screen === 'create' && <Notice message="We lost the connection before knowing if this saved. Trying again can’t make a second copy." />}
         <Button label={screen === 'edit' ? 'Save changes' : 'Save draft'} disabled={busy || !title.trim() || (screen === 'create' && uncertainCreate)} onPress={() => void run(async () => {
@@ -248,7 +259,7 @@ export function HostScreen() {
 
         {!needsGuestRefresh && <View style={styles.card} accessible accessibilityLabel={`${totals.yes} coming, ${totals.no} can’t come, ${totals.maybe} maybe, ${totals.waiting} waiting`}><View style={styles.row}>{([['Yes', totals.yes], ['No', totals.no], ['Maybe', totals.maybe], ['Waiting', totals.waiting]] as const).map(([label, value]) => <View key={label} style={{ alignItems: 'center', minWidth: 56 }}><Text style={{ fontFamily: fonts.medium, fontSize: 26, color: colors.ink }}>{value}</Text><Text style={styles.body}>{label}</Text></View>)}</View></View>}
         <Button label="Check-in" secondary disabled={busy} onPress={() => void run(async () => { setFilter(''); await refreshGuests(); go('check-in'); })} />
-        {selected.event_date && (Platform.OS !== 'ios' || Number(Platform.Version) >= 17) && <Button label="Add to my calendar" secondary disabled={busy} onPress={() => void run(async () => { if (Platform.OS === 'web') throw new Error('Calendar integration is available in the native builds.'); const start = new Date(selected.event_date!); await Calendar.createEventInCalendarAsync({ title: selected.title, startDate: start, endDate: selected.event_end_date ? new Date(selected.event_end_date) : new Date(start.getTime() + 2 * 3600000), location: selected.location_name ?? '', timeZone: selected.event_timezone }); })} />}
+        {selected.event_date && (Platform.OS !== 'ios' || parseInt(String(Platform.Version), 10) >= 17) && <Button label="Add to my calendar" secondary disabled={busy} onPress={() => void run(async () => { if (Platform.OS === 'web') throw new Error('Calendar integration is available in the native builds.'); const start = new Date(selected.event_date!); await Calendar.createEventInCalendarAsync({ title: selected.title, startDate: start, endDate: selected.event_end_date ? new Date(selected.event_end_date) : new Date(start.getTime() + 2 * 3600000), location: selected.location_name ?? '', timeZone: selected.event_timezone }); })} />}
         {selected.status !== 'archived' && <Button label="Archive event" secondary disabled={busy} onPress={() => Alert.alert('Archive this event?', 'The invitation will close to new replies. You can create a new event afterwards. Archiving cannot be undone.', [{ text: 'Keep event', style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: () => void run(async () => { setSelected(await api.request<Event>(`events/${selected.id}`, 'PATCH', { status: 'archived' })); await loadEvents(); setNotice('Archived. You can now create your next gathering.'); }) }])} />}
       </>}
       {screen === 'check-in' && selected && <>

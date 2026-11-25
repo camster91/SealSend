@@ -1,10 +1,12 @@
-import { mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { resolveUploadPath } from "@/lib/upload-path";
 import { blobKeySegments, type BlobStore } from "@/lib/blob-store.shared";
 
 export { blobKeyFromUploadPath, blobKeySegments } from "@/lib/blob-store.shared";
-export type { BlobStore } from "@/lib/blob-store.shared";
+export type { BlobStore, BlobStreamResult } from "@/lib/blob-store.shared";
 
 
 /** Filesystem store used by Docker/Node deployments. */
@@ -25,6 +27,41 @@ export function getBlobStore(options: { uploadsDir?: string } = {}): BlobStore {
     async get(key) {
       try {
         return new Uint8Array(await readFile(resolve(key)));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      }
+    },
+    async getStream(key, range) {
+      const file = resolve(key);
+      try {
+        const info = await stat(file);
+        const size = info.size;
+        if (range) {
+          const start = Math.max(0, range.start);
+          const end = range.end !== undefined ? Math.min(size - 1, range.end) : size - 1;
+          if (start >= size || end < start) return null;
+          const nodeStream = createReadStream(file, { start, end });
+          return {
+            body: Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>,
+            size,
+            range: { start, end },
+          };
+        }
+        const nodeStream = createReadStream(file);
+        return {
+          body: Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>,
+          size,
+        };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      }
+    },
+    async head(key) {
+      try {
+        const info = await stat(resolve(key));
+        return { size: info.size };
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
         throw error;

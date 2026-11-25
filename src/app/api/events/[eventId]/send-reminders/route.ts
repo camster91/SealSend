@@ -16,13 +16,14 @@ import { getCommunicationSuppressions, isCommunicationSuppressed } from "@/lib/c
 import { canUseFeature, type EventTier } from "@/lib/entitlements";
 import { getUserTier } from "@/lib/subscription";
 import { countSmsSegments } from "@/lib/messages/cost-estimate";
-import { decideSmsSend, getSmsBalance, isSmsMetered, recordSmsUsage, smsAllowanceMessage } from "@/lib/sms-allowance";
+import { randomUUID } from "node:crypto";
+import { decideSmsSend, getSmsBalance, isSmsMetered, releaseSmsReservation, reserveSmsSegments, smsAllowanceMessage } from "@/lib/sms-allowance";
 import { emailBrand, getEventBranding, smsSignature } from "@/lib/brands";
 import { contactConfirmationError, CONTACT_CONFIRMATION_MESSAGE, recordGuestContactConfirmation } from "@/lib/guest-contact-confirmation";
 import { isReminderTarget } from "@/lib/reminder-targets";
 import { getGuestEmailSender, guestEmailCompliance, guestEmailSendOptions } from "@/lib/guest-email";
 
-type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "location_name" | "slug" | "status" | "tier" | "host_name">;
+type ReminderEvent = Pick<Event, "id" | "title" | "event_date" | "event_timezone" | "location_name" | "slug" | "status" | "tier" | "host_name">;
 type ReminderGuest = Pick<Guest, "id" | "name" | "email" | "phone" | "invite_status" | "invite_token" | "reminder_sent_at" | "phone_invalid_at">;
 
 type RouteParams = { params: Promise<{ eventId: string }> };
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Ownership + status check
     const event = await queryOne<ReminderEvent & { user_id: string }>(
-      'SELECT id, user_id, title, event_date, location_name, slug, status, tier, host_name FROM events WHERE id = $1',
+      'SELECT id, user_id, title, event_date, event_timezone, location_name, slug, status, tier, host_name FROM events WHERE id = $1',
       [eventId]
     );
 
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const smsMetered = smsEnabled && isSmsMetered(accountPlan, event.tier as string);
     if (smsMetered) {
       const requiredSegments = sendableGuests.reduce((total, guest) => total + (guest.phone
-        ? countSmsSegments(buildReminderSms({ signature: smsSignature(branding), guestName: guest.name, eventTitle: event.title, eventDate: event.event_date, rsvpUrl: reminderUrl(guest) }))
+        ? countSmsSegments(buildReminderSms({ signature: smsSignature(branding), guestName: guest.name, eventTitle: event.title, eventDate: event.event_date, eventTimezone: event.event_timezone, rsvpUrl: reminderUrl(guest) }))
         : 0), 0);
       const decision = decideSmsSend(true, await getSmsBalance(eventId), requiredSegments);
       if (!decision.allowed) {
@@ -109,27 +110,46 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // Atomically claim target guests before sending so concurrent requests cannot double-remind.
+    const claimedRows = await query<{ id: string }>(
+      `UPDATE guests SET reminder_sent_at = ${SQL_NOW}, updated_at = ${SQL_NOW}
+        WHERE event_id = $1 AND invite_status = 'sent' AND reminder_sent_at IS NULL
+          AND id IN (SELECT value FROM json_each($2))
+        RETURNING id`,
+      [eventId, sendableGuests.map((g) => g.id)],
+    );
+    const claimedSet = new Set(claimedRows.map((r) => r.id));
+    const claimedGuests = sendableGuests.filter((g) => claimedSet.has(g.id));
+    if (claimedGuests.length === 0) {
+      return NextResponse.json({ sent: 0, failed: 0, sms_sent: 0, sms_failed: 0 });
+    }
+
     // Count against the owner's daily email allowance before anything is sent.
-    const emailCount = sendableGuests.filter((guest) => guest.email).length;
+    const emailCount = claimedGuests.filter((guest) => guest.email).length;
     const emailQuota = await reserveEmailQuota(event.user_id, emailCount);
     if (!emailQuota.success) {
+      await query(
+        `UPDATE guests SET reminder_sent_at = NULL, updated_at = ${SQL_NOW}
+          WHERE event_id = $1 AND id IN (SELECT value FROM json_each($2))`,
+        [eventId, claimedGuests.map((g) => g.id)],
+      );
       return NextResponse.json(
         { error: emailQuotaMessage(emailCount, emailQuota.remaining, emailQuota.limit), code: "EMAIL_DAILY_LIMIT" },
         { status: 429 }
       );
     }
 
-    await recordGuestContactConfirmation(eventId, user.id, "reminders", sendableGuests.length);
+    await recordGuestContactConfirmation(eventId, user.id, "reminders", claimedGuests.length);
 
     const BATCH_SIZE = 10;
     let sent = 0;
     let failed = 0;
     let smsSent = 0;
     let smsFailed = 0;
-    const successIds: string[] = [];
 
-    for (let i = 0; i < sendableGuests.length; i += BATCH_SIZE) {
-      const batch = sendableGuests.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < claimedGuests.length; i += BATCH_SIZE) {
+      const batch = claimedGuests.slice(i, i + BATCH_SIZE);
+      const batchFailedIds: string[] = [];
 
       const results = await Promise.allSettled(
         batch.map(async (guest) => {
@@ -145,6 +165,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               guestName: guest.name,
               eventTitle: event.title,
               eventDate: event.event_date,
+              eventTimezone: event.event_timezone,
               locationName: event.location_name,
               rsvpUrl,
             });
@@ -194,11 +215,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                 guestName: guest.name,
                 eventTitle: event.title,
                 eventDate: event.event_date,
+                eventTimezone: event.event_timezone,
                 rsvpUrl,
               });
+              const smsSegments = countSmsSegments(smsBody);
+              const reservationRef = smsMetered ? `reserve:reminder:${guest.id}:${randomUUID()}` : null;
 
               try {
                 assertApprovedRecipient(formattedPhone);
+                if (smsMetered && reservationRef) {
+                  const reserved = await reserveSmsSegments(eventId, smsSegments, reservationRef);
+                  if (!reserved.allowed) throw new Error("SMS allowance used up for this event");
+                }
                 const twilioClient = getTwilioClient();
                 const result = await twilioClient.messages.create({
                   body: smsBody,
@@ -206,7 +234,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                   ...getTwilioSendOptions(),
                 });
                 smsOk = true;
-                if (smsMetered) await recordSmsUsage(eventId, countSmsSegments(smsBody), `twilio:${result.sid}`);
+                if (smsMetered && reservationRef) {
+                  await query(
+                    "UPDATE event_sms_ledger SET reference = $1 WHERE event_id = $2 AND reference = $3",
+                    [`twilio:${result.sid}`, eventId, reservationRef],
+                  );
+                }
 
                 await logSendSuccess(eventId, 'sms', formattedPhone, {
                   guestId: guest.id,
@@ -214,6 +247,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                   providerMessageId: result.sid,
                 });
               } catch (error) {
+                if (smsMetered && reservationRef) {
+                  await releaseSmsReservation(eventId, reservationRef).catch(() => undefined);
+                }
                 const message = error instanceof Error ? error.message : 'SMS send failed';
                 errors.push({ type: 'sms', message });
                 console.error(`[REMINDER SMS FAILED] guest=${guest.id}:`, message);
@@ -252,19 +288,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             }
           }
 
-          if (emailOk || smsOk) successIds.push(guestId);
+          if (!emailOk && !smsOk) batchFailedIds.push(guestId);
         } else {
           console.error('[REMINDER BATCH ERROR] Promise rejected:', result.reason);
         }
       }
-    }
 
-    if (successIds.length > 0) {
-      // One JSON array parameter: D1 allows 100 bound parameters per statement.
-      await query(
-        'UPDATE guests SET reminder_sent_at = $1 WHERE id IN (SELECT value FROM json_each($2))',
-        [new Date(), successIds]
-      );
+      // Release reminder_sent_at only for guests where every attempted channel failed.
+      if (batchFailedIds.length > 0) {
+        await query(
+          `UPDATE guests SET reminder_sent_at = NULL, updated_at = ${SQL_NOW}
+            WHERE id IN (SELECT value FROM json_each($1))`,
+          [batchFailedIds],
+        );
+      }
     }
 
     await query(
