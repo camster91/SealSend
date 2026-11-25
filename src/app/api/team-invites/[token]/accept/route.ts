@@ -16,14 +16,6 @@ export async function POST(
     return NextResponse.json({ error: "Invalid invitation" }, { status: 400 });
   }
 
-  const verifiedHost = await queryOne<{ id: string }>(
-    "SELECT id FROM admin_users WHERE id = $1 AND email_verified_at IS NOT NULL",
-    [auth.user.id],
-  );
-  if (!verifiedHost) {
-    return NextResponse.json({ error: "Verify your email address before accepting a team invitation." }, { status: 403 });
-  }
-
   const invalid = () => NextResponse.json({ error: "Invitation is invalid, expired, or belongs to another account." }, { status: 404 });
   const invite = await queryOne<{
     id: string;
@@ -42,6 +34,14 @@ export async function POST(
     [hashMagicToken(token), auth.user.email, auth.user.id],
   );
   if (!invite) return invalid();
+
+  const verifiedHost = await queryOne<{ id: string }>(
+    "SELECT id FROM admin_users WHERE id = $1 AND email_verified_at IS NOT NULL",
+    [auth.user.id],
+  );
+  if (!verifiedHost) {
+    return NextResponse.json({ error: "Verify your email address before accepting a team invitation." }, { status: 403 });
+  }
 
   try {
     await batch([

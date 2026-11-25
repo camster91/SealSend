@@ -44,12 +44,12 @@ async function seed(db) {
   const statements = [];
   const add = (text, params) => statements.push({ text, params });
   add(
-    `INSERT INTO admin_users (id, email, name, password)
+    `INSERT INTO admin_users (id, email, name, password, email_verified_at)
      VALUES
-       ($1, 'invite-journey-owner@example.test', 'Invite Journey Owner', 'disabled-local-qa'),
-       ($2, 'workspace-invitee@example.test', 'Workspace Invitee', 'disabled-local-qa'),
-       ($3, 'event-invitee@example.test', 'Event Invitee', 'disabled-local-qa'),
-       ($4, 'wrong-invite-account@example.test', 'Wrong Invite Account', 'disabled-local-qa')`,
+       ($1, 'invite-journey-owner@example.test', 'Invite Journey Owner', 'disabled-local-qa', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+       ($2, 'workspace-invitee@example.test', 'Workspace Invitee', 'disabled-local-qa', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+       ($3, 'event-invitee@example.test', 'Event Invitee', 'disabled-local-qa', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+       ($4, 'wrong-invite-account@example.test', 'Wrong Invite Account', 'disabled-local-qa', strftime('%Y-%m-%dT%H:%M:%fZ','now'))`,
     [IDS.owner, IDS.workspaceMember, IDS.eventMember, IDS.wrongAccount],
   );
   add(
