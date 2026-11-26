@@ -36,6 +36,10 @@ function customizationFrom(source: Partial<EventCustomization> | null | undefine
     backgroundColor: source?.backgroundColor ?? "#ffffff",
     backgroundImage: upgradeHttp(source?.backgroundImage ?? ""),
     fontFamily: source?.fontFamily ?? "Inter",
+    displayFont: source?.displayFont ?? null,
+    layoutStyle: source?.layoutStyle ?? "classic",
+    motif: source?.motif ?? "none",
+    themeId: source?.themeId ?? null,
     buttonStyle: source?.buttonStyle ?? "rounded",
     showCountdown: source?.showCountdown ?? true,
     audioUrl: upgradeHttp(source?.audioUrl ?? ""),
@@ -101,6 +105,7 @@ export function fromEvent(event: Event, rsvpFields: RSVPField[]): BuilderData {
       field_label: f.field_label,
       is_required: f.is_required,
       is_enabled: f.is_enabled,
+      per_person: Boolean(f.per_person),
       options: f.options ?? null,
       placeholder: f.placeholder ?? null,
     })),
@@ -113,6 +118,7 @@ type RsvpFieldLike = {
   field_label: string;
   is_required: boolean;
   is_enabled: boolean;
+  per_person?: boolean;
   options?: string[] | null;
   placeholder?: string | null;
 };
@@ -125,6 +131,7 @@ export function toBuilderRsvpFields(fields: readonly RsvpFieldLike[]): BuilderRs
     field_label: f.field_label,
     is_required: f.is_required,
     is_enabled: f.is_enabled,
+    per_person: Boolean(f.per_person),
     options: f.options ?? null,
     placeholder: f.placeholder ?? null,
   }));

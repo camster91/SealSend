@@ -18,11 +18,13 @@ import { canUseFeature, type EventTier } from '@/lib/entitlements';
 import { getUserTier } from '@/lib/subscription';
 import { getEventAccess, roleCan } from '@/lib/auth/event-access';
 import { EventTeamPanel } from '@/components/dashboard/EventTeamPanel';
+import { EventSubEventsPanel } from '@/components/dashboard/EventSubEventsPanel';
 import { EventClientPanel } from '@/components/events/EventClientPanel';
 import { HostSocial } from '@/components/social/HostSocial';
 import { PublishEventButton } from '@/components/dashboard/PublishEventButton';
 import { formatDateTime } from '@/lib/utils';
 import { noReplyCountSql } from '@/lib/reply-counts';
+import { attendingPeopleSql } from '@/lib/event-stats';
 
 interface EventDetailPageProps {
   params: Promise<{ eventId: string }>;
@@ -58,8 +60,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id) AS response_count,
       (SELECT COUNT(*) FROM guests WHERE event_id = events.id) AS guest_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND guest_id IS NULL) AS public_response_count,
-      (COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = events.id AND status = 'attending'), 0)
-        + (SELECT COUNT(*) FROM guests g WHERE g.event_id = events.id AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = events.id AND r.guest_id = g.id))) AS going_count,
+      ${attendingPeopleSql("events.id")} AS going_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'maybe') AS maybe_count,
       (SELECT COUNT(*) FROM rsvp_responses WHERE event_id = events.id AND status = 'not_attending') AS not_going_count,
       ${noReplyCountSql} AS no_reply_count,
@@ -262,6 +263,7 @@ export default async function EventDetailPage({ params, searchParams }: EventDet
         </div>}
 
         {canManageMembers && <EventTeamPanel eventId={eventId} />}
+        {!isArchived && <EventSubEventsPanel eventId={eventId} timezone={event.event_timezone || 'UTC'} canEdit={canEdit} />}
         {canEdit && !isArchived && <div className="mt-6"><EventClientPanel eventId={eventId} /></div>}
 
             <div className="flex flex-wrap items-center gap-3">

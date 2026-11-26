@@ -892,6 +892,7 @@ test('the core activation funnel is recorded at successful lifecycle boundaries'
   const verifyCodeRoute = await read('src/app/api/auth/verify-code/route.ts');
   const eventsRoute = await read('src/app/api/events/route.ts');
   const publishRoute = await read('src/app/api/events/[eventId]/publish/route.ts');
+  const eventLifecycle = await read('src/lib/event-lifecycle.ts');
   const guestsRoute = await read('src/app/api/events/[eventId]/guests/route.ts');
   const invitesRoute = await read('src/app/api/events/[eventId]/send-invites/route.ts');
   const rsvpRoute = await read('src/app/api/rsvp/[slug]/route.ts');
@@ -899,7 +900,8 @@ test('the core activation funnel is recorded at successful lifecycle boundaries'
   assert.match(verifyCodeRoute, /created\?\.id[\s\S]*account_created/);
   assert.doesNotMatch(verifyCodeRoute, /if \(existing\)[^{]*\{?[^}]*account_created/);
   assert.match(eventsRoute, /recordActivationEventSafely[\s\S]*event_draft_started/);
-  assert.match(publishRoute, /newStatus === ['"]published['"][\s\S]*event_published/);
+  assert.match(publishRoute, /newStatus === ['"]published['"][\s\S]*afterEventPublished/);
+  assert.match(eventLifecycle, /recordActivationEventSafely[\s\S]*event_published/);
   assert.match(guestsRoute, /recordActivationEventSafely[\s\S]*first_guest_added/);
   assert.match(invitesRoute, /successIds\.length > 0[\s\S]*first_invitation_sent/);
   // Recorded only after the RSVP batch succeeded (saveRsvp throws on any guard failure).
@@ -1598,7 +1600,9 @@ test('storage is quota-backed and destructive retention jobs default off', async
   assert.match(drafts, /ENABLE_STALE_DRAFT_CLEANUP/);
   assert.match(drafts, /updated_at < \$2/);
   assert.match(uploads, /ENABLE_ORPHAN_UPLOAD_CLEANUP/);
-  assert.match(uploads, /NOT EXISTS \(\s*SELECT 1 FROM events/);
+  const assetRefs = await read('src/lib/asset-references.ts');
+  assert.match(uploads, /isUploadPathReferencedSql/);
+  assert.match(assetRefs, /SELECT 1 FROM events/);
 });
 
 test('operations metrics are secret-gated and exclude guest content', async () => {

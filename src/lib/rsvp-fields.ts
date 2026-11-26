@@ -148,3 +148,52 @@ export function validateRsvpResponseData(
   }
   return Object.keys(errors).length ? { valid: false, errors } : { valid: true };
 }
+
+/** Custom enabled fields configured to be answered individually for each plus-one. */
+export function perPersonRsvpFields(fields: RSVPField[]): RSVPField[] {
+  return normalizeRsvpFields(fields).filter(
+    (field) => field.is_enabled && Boolean(field.per_person) && rsvpFieldRole(field) === 'custom',
+  );
+}
+
+/** Strip unconfigured keys from a plus-one's per-person answers, preserving prior keys on edit. */
+export function sanitizePlusOneAnswers(
+  fields: RSVPField[],
+  answers: Record<string, unknown> | undefined,
+  priorAnswers: Record<string, unknown> = {},
+): Record<string, unknown> {
+  if (!answers || typeof answers !== 'object') return {};
+  const allowedKeys = new Set<string>(Object.keys(priorAnswers));
+  for (const field of perPersonRsvpFields(fields)) {
+    allowedKeys.add(field.field_name);
+  }
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(answers)) {
+    if (allowedKeys.has(key)) sanitized[key] = value;
+  }
+  return sanitized;
+}
+
+/** Validate per-person answers on each plus-one against enabled `per_person` fields. */
+export function validatePlusOneAnswers(
+  fields: RSVPField[],
+  plusOnes: Array<{ name: string; answers?: Record<string, unknown> }>,
+  priorPlusOnes: Array<{ name: string; answers?: Record<string, unknown> }> = [],
+): { valid: true } | { valid: false; errors: Record<string, string> } {
+  const perPerson = perPersonRsvpFields(fields);
+  if (perPerson.length === 0 || plusOnes.length === 0) return { valid: true };
+
+  const errors: Record<string, string> = {};
+  for (let i = 0; i < plusOnes.length; i++) {
+    const guest = plusOnes[i];
+    const prior = priorPlusOnes[i]?.answers ?? {};
+    const result = validateRsvpResponseData(perPerson, guest.answers ?? {}, prior);
+    if (!result.valid) {
+      const labelPrefix = guest.name.trim() ? `${guest.name.trim()}: ` : `Guest ${i + 1}: `;
+      for (const [key, message] of Object.entries(result.errors)) {
+        errors[`plus_ones.${i}.${key}`] = `${labelPrefix}${message}`;
+      }
+    }
+  }
+  return Object.keys(errors).length ? { valid: false, errors } : { valid: true };
+}

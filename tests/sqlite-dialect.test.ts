@@ -28,8 +28,8 @@ test("D1 schema loads twice, keeps every table and index, and has no foreign key
   db.exec(schema);
   const count = (type: string) =>
     (db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = ? AND name NOT LIKE 'sqlite_%'").get(type) as { n: number }).n;
-  assert.equal(count("table"), 59);
-  assert.equal(count("index"), 83);
+  assert.equal(count("table"), 62);
+  assert.equal(count("index"), 86);
   assert.equal(count("trigger"), 2);
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 });

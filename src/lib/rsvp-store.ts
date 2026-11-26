@@ -4,6 +4,7 @@ import { SQL_NOW, abortCode, guard, type Statement } from './db/sqlite-dialect';
 import type { batch, query } from './db/client';
 import type { RSVPSubmissionInput } from './validations';
 import type { RSVPResponse } from '@/types/database';
+import { attendingPeopleSql } from './event-stats';
 
 /** Routes pass `{ query, batch }` from @/lib/db/client; tests pass `openTestDb()`. */
 export type RsvpDb = { query: typeof query; batch: typeof batch };
@@ -27,8 +28,7 @@ export async function findRsvp(db: RsvpDb, eventId: string, guestId: string | nu
   return row ?? null;
 }
 
-const walkInCountSql = `(SELECT COUNT(*) FROM guests g WHERE g.event_id = $1 AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = $1 AND r.guest_id = g.id))`;
-const attendingTotalSql = `SELECT (COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = $1 AND status = 'attending' AND ($2 IS NULL OR id <> $2)), 0) + ${walkInCountSql})`;
+const attendingTotalSql = `SELECT ${attendingPeopleSql('$1', '$2')}`;
 
 async function attendingTotal(db: RsvpDb, eventId: string, excludeId: string | null): Promise<number> {
   return Number((await db.query<{ total: number }>(`SELECT (${attendingTotalSql}) AS total`, [eventId, excludeId]))[0]?.total ?? 0);
@@ -118,7 +118,10 @@ async function attemptSaveRsvp(db: RsvpDb, eventId: string, guestId: string | nu
     statements.push({ text: `INSERT INTO rsvp_responses (event_id, respondent_name, respondent_email, status, headcount, response_data, plus_ones_data, guest_id, edit_token_hash, id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${responseColumns}`, params: [...values, guestId, editTokenHash, responseId] });
   }
   for (const po of input.plus_ones) {
-    statements.push({ text: 'INSERT INTO plus_ones (event_id, rsvp_response_id, name, email, status) VALUES ($1,$2,$3,$4,$5)', params: [eventId, responseId, po.name, po.email || null, input.status] });
+    statements.push({
+      text: 'INSERT INTO plus_ones (event_id, rsvp_response_id, name, email, status, answers) VALUES ($1,$2,$3,$4,$5,$6)',
+      params: [eventId, responseId, po.name, po.email || null, input.status, po.answers ?? {}],
+    });
   }
   const replyGuestId = guestId ?? previous?.guest_id ?? null;
   if (replyGuestId) statements.push({ text: `UPDATE guests SET rsvp_status = $1, updated_at = ${SQL_NOW} WHERE id = $2 AND event_id = $3`, params: [input.status, replyGuestId, eventId] });

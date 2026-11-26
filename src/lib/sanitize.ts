@@ -8,8 +8,14 @@ import { isValidHexColor } from './utils';
 export const ALLOWED_FONTS = [
   'Inter',
   'Poppins',
+  'DM Sans',
+  'Cormorant Garamond',
+  'Playfair Display',
+  'Fraunces',
+  'Libre Caslon Display',
   'Georgia',
   'Times New Roman',
+  'Courier',
   'Arial',
   'Helvetica',
   'serif',
@@ -24,6 +30,8 @@ export const ALLOWED_FONTS = [
 
 // Allowed button styles
 const ALLOWED_BUTTON_STYLES = ['rounded', 'pill', 'square'] as const;
+const ALLOWED_LAYOUT_STYLES = ['classic', 'editorial', 'arch', 'minimal'] as const;
+const ALLOWED_MOTIFS = ['none', 'botanical', 'monogram', 'celestial', 'frame'] as const;
 
 // Maximum lengths for string fields
 const MAX_LENGTHS = {
@@ -197,6 +205,20 @@ export function sanitizeText(text: string | null | undefined, maxLength: number 
   return sanitized;
 }
 
+export function sanitizeLayoutStyle(style: string | null | undefined): 'classic' | 'editorial' | 'arch' | 'minimal' {
+  if (style && ALLOWED_LAYOUT_STYLES.includes(style as typeof ALLOWED_LAYOUT_STYLES[number])) {
+    return style as 'classic' | 'editorial' | 'arch' | 'minimal';
+  }
+  return 'classic';
+}
+
+export function sanitizeMotif(motif: string | null | undefined): 'none' | 'botanical' | 'monogram' | 'celestial' | 'frame' {
+  if (motif && ALLOWED_MOTIFS.includes(motif as typeof ALLOWED_MOTIFS[number])) {
+    return motif as 'none' | 'botanical' | 'monogram' | 'celestial' | 'frame';
+  }
+  return 'none';
+}
+
 /**
  * Sanitize event customization object
  */
@@ -207,6 +229,10 @@ export function sanitizeCustomization(customization: Record<string, unknown> | n
       backgroundColor: '#ffffff',
       backgroundImage: null,
       fontFamily: 'Inter',
+      displayFont: null as string | null,
+      layoutStyle: 'classic' as const,
+      motif: 'none' as const,
+      themeId: null as string | null,
       buttonStyle: 'rounded' as const,
       showCountdown: true,
       audioUrl: null,
@@ -219,6 +245,10 @@ export function sanitizeCustomization(customization: Record<string, unknown> | n
     backgroundColor: sanitizeColor(customization.backgroundColor as string, '#ffffff'),
     backgroundImage: sanitizeBackgroundImage(customization.backgroundImage as string),
     fontFamily: sanitizeFontFamily(customization.fontFamily as string),
+    displayFont: customization.displayFont ? sanitizeFontFamily(customization.displayFont as string) : null,
+    layoutStyle: sanitizeLayoutStyle(customization.layoutStyle as string),
+    motif: sanitizeMotif(customization.motif as string),
+    themeId: typeof customization.themeId === 'string' && /^[a-z0-9-]{1,64}$/.test(customization.themeId) ? customization.themeId : null,
     buttonStyle: sanitizeButtonStyle(customization.buttonStyle as string),
     showCountdown: Boolean(customization.showCountdown),
     audioUrl: sanitizeAudioUrl(customization.audioUrl as string),

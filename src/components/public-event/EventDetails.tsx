@@ -3,6 +3,7 @@ import { formatDateTime, formatEventDay, formatEventTime } from "@/lib/utils";
 import { isDefaultInvitationCopy } from "@/lib/invitation-defaults";
 import { AddToCalendar } from "@/components/public-event/AddToCalendar";
 import { sanitizeUrl } from "@/lib/sanitize";
+import { eventDisplayFontFamily } from "@/lib/event-font";
 import type { Event } from "@/types/database";
 
 interface EventDetailsProps {
@@ -15,9 +16,17 @@ export function EventDetails({ event, showTitle = true }: EventDetailsProps) {
   // Wording SealSend wrote only repeats the details below.
   const generated = isDefaultInvitationCopy(event);
   const mapsQuery = [event.location_name, event.location_address].filter(Boolean).join(", ");
+  const displayFont = eventDisplayFontFamily(
+    event.customization?.displayFont,
+    event.customization?.fontFamily,
+  );
   return (
     <div className="space-y-4">
-      {showTitle && <h1 className="text-2xl font-bold">{event.title}</h1>}
+      {showTitle && (
+        <h1 className="text-2xl font-bold sm:text-3xl" style={{ fontFamily: displayFont }}>
+          {event.title}
+        </h1>
+      )}
 
       {event.invitation_headline && !generated.headline && event.invitation_headline !== event.title && (
         <h2 className="text-lg font-semibold text-gray-800">{event.invitation_headline}</h2>

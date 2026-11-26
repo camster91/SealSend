@@ -6,15 +6,39 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
 import { EVENT_TEMPLATES } from "@/lib/event-templates";
+import { eventDisplayFontFamily } from "@/lib/event-font";
 import { checkLink, normalizeLink, storedLinkProblem } from "@/lib/event-builder/field-checks";
 import { applyStyle, uploadFailureMessage } from "@/lib/event-builder/look";
-import type { EventCustomization } from "@/types/database";
+import type { EventCustomization, EventLayoutStyle, EventMotif } from "@/types/database";
 import type { ScreenContext } from "../BuilderShell";
 import { AiCoverPanel } from "./AiCoverPanel";
 import { Field } from "./Field";
 import { LookMoreOptions } from "./LookMoreOptions";
 
-const FONTS = ["Inter", "Poppins", "Georgia", "Courier"].map((f) => ({ value: f, label: f }));
+const FONTS = [
+  "Inter",
+  "DM Sans",
+  "Poppins",
+  "Cormorant Garamond",
+  "Playfair Display",
+  "Fraunces",
+  "Libre Caslon Display",
+  "Georgia",
+  "Courier",
+].map((f) => ({ value: f, label: f }));
+const LAYOUTS: { value: EventLayoutStyle; label: string }[] = [
+  { value: "classic", label: "Classic stationery" },
+  { value: "editorial", label: "Editorial" },
+  { value: "arch", label: "Arched frame" },
+  { value: "minimal", label: "Minimal" },
+];
+const MOTIFS: { value: EventMotif; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "botanical", label: "Botanical" },
+  { value: "monogram", label: "Monogram crest" },
+  { value: "celestial", label: "Celestial star" },
+  { value: "frame", label: "Diamond hairline" },
+];
 const LIMITS = "max 10 MB for images, 50 MB for video";
 const MODES = [
   { mode: "upload", label: "Upload image", Icon: ImageIcon },
@@ -99,22 +123,42 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
       <section aria-labelledby="look-styles" className="space-y-3">
         <h2 id="look-styles" className="text-sm font-semibold text-ink">Start from a style</h2>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {EVENT_TEMPLATES.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => ctx.update({ customization: applyStyle(custom, t.customization) })}
-                aria-pressed={custom.primaryColor === t.customization.primaryColor && custom.backgroundColor === t.customization.backgroundColor}
-                className="flex min-h-11 w-full flex-col gap-2 rounded-2xl border border-border bg-white p-3 text-left aria-pressed:border-ink aria-pressed:ring-2 aria-pressed:ring-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-              >
-                <span aria-hidden="true" className="flex h-8 overflow-hidden rounded-[10px] border border-border">
-                  <span className="flex-1" style={{ backgroundColor: t.customization.backgroundColor }} />
-                  <span className="w-1/3" style={{ backgroundColor: t.customization.primaryColor }} />
-                </span>
-                <span className="text-sm font-medium text-ink">{t.name}</span>
-              </button>
-            </li>
-          ))}
+          {EVENT_TEMPLATES.map((t) => {
+            const isSelected = custom.themeId
+              ? custom.themeId === t.id
+              : custom.primaryColor === t.customization.primaryColor && custom.backgroundColor === t.customization.backgroundColor;
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => ctx.update({ customization: applyStyle(custom, t.customization) })}
+                  aria-pressed={isSelected}
+                  className="flex min-h-11 w-full flex-col gap-2 rounded-2xl border border-border bg-white p-3 text-left aria-pressed:border-ink aria-pressed:ring-2 aria-pressed:ring-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-12 items-center justify-between overflow-hidden rounded-[10px] border border-border px-3"
+                    style={{ backgroundColor: t.customization.backgroundColor }}
+                  >
+                    <span
+                      className="text-lg font-semibold leading-none"
+                      style={{
+                        color: t.customization.primaryColor,
+                        fontFamily: eventDisplayFontFamily(t.customization.displayFont, t.customization.fontFamily),
+                      }}
+                    >
+                      Aa
+                    </span>
+                    <span
+                      className="h-5 w-5 rounded-full border border-black/10"
+                      style={{ backgroundColor: t.customization.primaryColor }}
+                    />
+                  </span>
+                  <span className="text-sm font-medium text-ink">{t.name}</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </section>
 
@@ -125,7 +169,7 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
             <Field key={key} id={key} label={key === "primaryColor" ? "Main colour" : "Background colour"}>
               {(aria) => (
                 <div className="flex items-center gap-3">
-                  <input {...aria} type="color" value={custom[key]} onChange={(e) => change({ [key]: e.target.value })}
+                  <input {...aria} type="color" value={custom[key]} onChange={(e) => change({ [key]: e.target.value, themeId: undefined })}
                     className="h-11 w-14 cursor-pointer rounded-[10px] border border-border bg-white p-1" />
                   <span className="text-sm text-muted-foreground">{custom[key].toUpperCase()}</span>
                 </div>
@@ -133,9 +177,44 @@ export function LookScreen({ ctx }: { ctx: ScreenContext }) {
             </Field>
           ))}
         </div>
-        <Field id="fontFamily" label="Font">
-          {(aria) => <Select {...aria} className={SELECT} value={custom.fontFamily} options={FONTS} onChange={(e) => change({ fontFamily: e.target.value })} />}
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field id="displayFont" label="Heading font">
+            {(aria) => (
+              <Select
+                {...aria}
+                className={SELECT}
+                value={custom.displayFont ?? custom.fontFamily}
+                options={FONTS}
+                onChange={(e) => change({ displayFont: e.target.value })}
+              />
+            )}
+          </Field>
+          <Field id="fontFamily" label="Body font">
+            {(aria) => <Select {...aria} className={SELECT} value={custom.fontFamily} options={FONTS} onChange={(e) => change({ fontFamily: e.target.value })} />}
+          </Field>
+          <Field id="layoutStyle" label="Layout style">
+            {(aria) => (
+              <Select
+                {...aria}
+                className={SELECT}
+                value={custom.layoutStyle ?? "classic"}
+                options={LAYOUTS}
+                onChange={(e) => change({ layoutStyle: e.target.value as EventLayoutStyle })}
+              />
+            )}
+          </Field>
+          <Field id="motif" label="Stationery accent">
+            {(aria) => (
+              <Select
+                {...aria}
+                className={SELECT}
+                value={custom.motif ?? "none"}
+                options={MOTIFS}
+                onChange={(e) => change({ motif: e.target.value as EventMotif })}
+              />
+            )}
+          </Field>
+        </div>
       </section>
 
       <section aria-labelledby="look-cover" className="space-y-4 rounded-2xl border border-border bg-white p-5">

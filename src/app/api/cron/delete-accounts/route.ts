@@ -3,6 +3,7 @@ import { abortCode, guard, SQL_NOW, sqlNowPlus, type Statement } from "@/lib/db/
 import { batch, query } from "@/lib/db/client";
 import { isAuthorizedCron } from "@/lib/auth/cron-auth";
 import { blobKeyFromUploadPath, getBlobStore } from "@/lib/blob-store";
+import { hasUploadPrefixReferenceSql, isUploadPathReferencedSql } from "@/lib/asset-references";
 
 const BLOCKING_SUBSCRIPTION_SQL = `(
   EXISTS (SELECT 1 FROM user_subscriptions
@@ -136,19 +137,7 @@ async function deletionStatements(userId: string): Promise<Statement[]> {
 
 async function hasSurvivingTeamMedia(userId: string): Promise<boolean> {
   const prefixPattern = `/uploads/${userId}/%`;
-  const found = await query<{ ok: number }>(
-    `SELECT 1 AS ok FROM events
-      WHERE design_url LIKE $1
-         OR json_extract(customization, '$.logoUrl') LIKE $1
-         OR json_extract(customization, '$.backgroundImage') LIKE $1
-         OR json_extract(customization, '$.audioUrl') LIKE $1
-     UNION ALL
-     SELECT 1 AS ok FROM brands WHERE logo_url LIKE $1
-     UNION ALL
-     SELECT 1 AS ok FROM event_social_photos WHERE storage_path LIKE $1
-     LIMIT 1`,
-    [prefixPattern],
-  );
+  const found = await query<{ ok: number }>(hasUploadPrefixReferenceSql("$1"), [prefixPattern]);
   return found.length > 0;
 }
 
@@ -192,15 +181,7 @@ export async function GET(request: NextRequest) {
           const unreferenced = await query<{ id: string; path: string }>(
             `SELECT a.id, a.path FROM upload_assets a
               WHERE a.path LIKE $1
-                AND NOT EXISTS (
-                  SELECT 1 FROM events e
-                   WHERE e.design_url = a.path
-                      OR json_extract(e.customization, '$.logoUrl') = a.path
-                      OR json_extract(e.customization, '$.backgroundImage') = a.path
-                      OR json_extract(e.customization, '$.audioUrl') = a.path
-                )
-                AND NOT EXISTS (SELECT 1 FROM brands b WHERE b.logo_url = a.path)
-                AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path = a.path)`,
+                AND NOT ${isUploadPathReferencedSql("a.path")}`,
             [`/uploads/${userId}/%`],
           );
           for (const asset of unreferenced) {

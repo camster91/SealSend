@@ -2,6 +2,7 @@ import { z } from "zod";
 import { query, queryOne } from "@/lib/db/client";
 import { SQL_NOW } from "@/lib/db/sqlite-dialect";
 import { hashMagicToken, isValidMagicToken } from "@/lib/magic-token";
+import { attendingPeopleSql, awaitingReplyCountSql } from "@/lib/event-stats";
 
 const optionalTrimmed = (max: number) => z.string().trim().max(max).transform((value) => value || null).nullable().optional();
 
@@ -78,12 +79,8 @@ export async function getClientShareView(token: string): Promise<ClientShareView
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS attending,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'maybe') AS maybe,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'not_attending') AS declined,
-            (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.parent_guest_id IS NULL
-               AND COALESCE(g.rsvp_status, 'pending') = 'pending'
-               AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id)) AS awaiting,
-            (COALESCE((SELECT SUM(r.headcount) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending'), 0)
-              + (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.rsvp_status = 'attending'
-                  AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id))) AS headcount
+            ${awaitingReplyCountSql("e.id")} AS awaiting,
+            ${attendingPeopleSql("e.id")} AS headcount
        FROM event_client_shares s
        JOIN events e ON e.id = s.event_id
        LEFT JOIN clients c ON c.id = e.client_id
@@ -140,12 +137,8 @@ export async function getClientEventHistory(organizationId: string, clientId: st
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending') AS attending,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'maybe') AS maybe,
             (SELECT COUNT(*) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'not_attending') AS declined,
-            (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.parent_guest_id IS NULL
-               AND COALESCE(g.rsvp_status, 'pending') = 'pending'
-               AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id)) AS awaiting,
-            (COALESCE((SELECT SUM(r.headcount) FROM rsvp_responses r WHERE r.event_id = e.id AND r.status = 'attending'), 0)
-              + (SELECT COUNT(*) FROM guests g WHERE g.event_id = e.id AND g.rsvp_status = 'attending'
-                  AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = e.id AND r.guest_id = g.id))) AS headcount,
+            ${awaitingReplyCountSql("e.id")} AS awaiting,
+            ${attendingPeopleSql("e.id")} AS headcount,
             approval.approved_at, approval.approver_name
        FROM events e
        LEFT JOIN (

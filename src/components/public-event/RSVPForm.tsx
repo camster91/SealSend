@@ -9,7 +9,7 @@ import { getClientUser } from "@/lib/auth/client-auth";
 import type { RSVPField, PlusOneData, RSVPResponse } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { UserPlus, X } from "lucide-react";
-import { normalizeRsvpFields, validateRsvpResponseData } from "@/lib/rsvp-fields";
+import { normalizeRsvpFields, perPersonRsvpFields, validatePlusOneAnswers, validateRsvpResponseData } from "@/lib/rsvp-fields";
 import { rsvpSubmission, showsField, withAttendanceQuestion } from "@/lib/rsvp-form";
 
 type RsvpFormValue = string | string[];
@@ -124,6 +124,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
   const enabledFields = questions
     .filter((f) => f.is_enabled)
     .sort((a, b) => a.sort_order - b.sort_order);
+  const perPersonFields = useMemo(() => perPersonRsvpFields(enabledFields), [enabledFields]);
   const attendanceQuestion = enabledFields.find((f) => f.field_type === "attendance");
   const currentStatus = scalarValue(formData[attendanceQuestion?.field_name ?? ""]);
 
@@ -138,11 +139,30 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     });
   }
 
-  function updatePlusOne(index: number, field: keyof PlusOneData, value: string) {
+  function updatePlusOne(index: number, field: "name" | "email", value: string) {
     setPlusOnes((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
+    });
+  }
+
+  function updatePlusOneAnswer(index: number, fieldName: string, value: RsvpFormValue) {
+    setPlusOnes((prev) => {
+      const updated = [...prev];
+      const current = updated[index] ?? { name: "" };
+      updated[index] = {
+        ...current,
+        answers: { ...(current.answers || {}), [fieldName]: value },
+      };
+      return updated;
+    });
+    const errorKey = `plus_ones.${index}.${fieldName}`;
+    setCustomFieldErrors((prev) => {
+      if (!prev[errorKey]) return prev;
+      const next = { ...prev };
+      delete next[errorKey];
+      return next;
     });
   }
 
@@ -194,6 +214,20 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
     }
 
     const replyStatus = typeof status === "string" ? status : "attending";
+    const submission = rsvpSubmission(replyStatus, headcount, plusOnes);
+    if (replyStatus !== "not_attending" && submission.plus_ones.length > 0 && perPersonFields.length > 0) {
+      const plusOneValidation = validatePlusOneAnswers(
+        enabledFields,
+        submission.plus_ones,
+        savedResponse?.plus_ones_data,
+      );
+      if (!plusOneValidation.valid) {
+        setCustomFieldErrors(plusOneValidation.errors);
+        setError(Object.values(plusOneValidation.errors)[0] || "Please complete the required fields for each guest.");
+        setSubmitting(false);
+        return;
+      }
+    }
 
     try {
       const res = await fetch(`/api/rsvp/${eventSlug}`, {
@@ -203,7 +237,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
           respondent_name: scalarValue(formData["respondent_name"]) || "Guest",
           respondent_email: scalarValue(formData["email"]),
           status: replyStatus,
-          ...rsvpSubmission(replyStatus, headcount, plusOnes),
+          ...submission,
           response_data: responseData,
           ...(inviteGuestId && { guest_id: inviteGuestId }),
         }),
@@ -218,6 +252,7 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
       focusThanks.current = true;
       setSubmitted(true);
       setSavedResponse(data.response);
+      window.dispatchEvent(new Event("sealsend:rsvp-saved"));
       // A confirmed save stays successful even if the follow-up capacity read fails.
       try {
         const current = await fetch(`/api/rsvp/${eventSlug}`, { headers: inviteToken ? { "X-Guest-Token": inviteToken } : {}, cache: "no-store" });
@@ -556,6 +591,88 @@ export function RSVPForm({ eventSlug, fields, primaryColor, buttonStyle = "round
                 onChange={(e) => updatePlusOne(index, "email", e.target.value)}
                 className="text-sm"
               />
+              {perPersonFields.length > 0 && (
+                <div className="space-y-2 border-t border-neutral-100 pt-2">
+                  {perPersonFields.map((field) => {
+                    const rawAnswer = plusOne.answers?.[field.field_name];
+                    const currentAnswer = formValue(rawAnswer);
+                    const inputId = `rsvp-plus-one-${index}-${field.field_name}`;
+                    const fieldError = customFieldErrors[`plus_ones.${index}.${field.field_name}`];
+                    if (field.field_type === "select") {
+                      const selectedValue = scalarValue(currentAnswer);
+                      const configured = field.options || [];
+                      const options = selectedValue && !configured.includes(selectedValue)
+                        ? [selectedValue, ...configured]
+                        : configured;
+                      return (
+                        <div key={field.id}>
+                          <Select
+                            id={inputId}
+                            label={`${field.field_label}${field.is_required ? " *" : ""}`}
+                            placeholder="Select an option"
+                            options={options.map((opt) => ({ value: opt, label: opt }))}
+                            value={selectedValue}
+                            onChange={(e) => updatePlusOneAnswer(index, field.field_name, e.target.value)}
+                          />
+                          {fieldError && <p role="alert" className="mt-1 text-xs text-accent-red">{fieldError}</p>}
+                        </div>
+                      );
+                    }
+                    if (field.field_type === "multiselect") {
+                      const selected: string[] = Array.isArray(currentAnswer)
+                        ? currentAnswer
+                        : typeof currentAnswer === "string" && currentAnswer
+                          ? [currentAnswer]
+                          : [];
+                      const options = [...new Set([...(field.options || []), ...selected])];
+                      return (
+                        <fieldset key={field.id} className="space-y-1.5">
+                          <legend className="text-xs font-medium text-neutral-700">
+                            {field.field_label}{field.is_required ? " *" : ""}
+                          </legend>
+                          <div className="space-y-1 rounded-md border border-neutral-200 p-2">
+                            {options.map((option) => {
+                              const checked = selected.includes(option);
+                              return (
+                                <label key={option} className="flex items-center gap-2 text-xs text-neutral-800">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() =>
+                                      updatePlusOneAnswer(
+                                        index,
+                                        field.field_name,
+                                        checked ? selected.filter((v) => v !== option) : [...selected, option],
+                                      )
+                                    }
+                                    className="h-4 w-4 rounded border-neutral-300 text-ink"
+                                  />
+                                  <span>{option}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {fieldError && <p role="alert" className="text-xs text-accent-red">{fieldError}</p>}
+                        </fieldset>
+                      );
+                    }
+                    return (
+                      <div key={field.id}>
+                        <Input
+                          id={inputId}
+                          label={`${field.field_label}${field.is_required ? " *" : ""}`}
+                          type={field.field_type === "number" ? "number" : "text"}
+                          placeholder={field.placeholder || ""}
+                          value={scalarValue(currentAnswer)}
+                          onChange={(e) => updatePlusOneAnswer(index, field.field_name, e.target.value)}
+                          className="text-sm"
+                        />
+                        {fieldError && <p role="alert" className="mt-1 text-xs text-accent-red">{fieldError}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ))}
         </div>

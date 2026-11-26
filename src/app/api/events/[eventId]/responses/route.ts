@@ -66,6 +66,12 @@ export async function GET(
         "Plus One Names",
         "Plus One Emails",
       ];
+      const hasPlusOneAnswers = plusOnes.some(
+        (po) => po.answers && typeof po.answers === "object" && Object.keys(po.answers).length > 0,
+      );
+      if (hasPlusOneAnswers) {
+        headers.push("Plus One Details");
+      }
 
       // Get all unique response_data keys
       const dataKeys = new Set<string>();
@@ -89,6 +95,19 @@ export async function GET(
         const plusOnesList = r.plus_ones || [];
         const plusOneNames = plusOnesList.map((po: PlusOne) => po.name).join("; ");
         const plusOneEmails = plusOnesList.map((po: PlusOne) => po.email || "").filter(Boolean).join("; ");
+        const plusOneDetails = plusOnesList
+          .map((po: PlusOne) => {
+            const entries = po.answers && typeof po.answers === "object"
+              ? Object.entries(po.answers)
+                .map(([k, v]) => [k, serializeRsvpResponseValue(v)] as const)
+                .filter(([, text]) => text.length > 0)
+              : [];
+            return entries.length > 0
+              ? `${po.name} (${entries.map(([k, text]) => `${k}: ${text}`).join(", ")})`
+              : "";
+          })
+          .filter(Boolean)
+          .join("; ");
 
         return [
           r.respondent_name,
@@ -99,6 +118,7 @@ export async function GET(
           String(plusOnesList.length),
           plusOneNames,
           plusOneEmails,
+          ...(hasPlusOneAnswers ? [plusOneDetails] : []),
           ...dataKeysList.map((k) => serializeRsvpResponseValue(rd[k])),
         ]
           .map(escapeCsvCell)

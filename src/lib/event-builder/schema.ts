@@ -12,7 +12,7 @@ export type BuilderScreen = (typeof BUILDER_SCREENS)[number];
 /** The RSVP question fields the builder edits; ids and ordering belong to the server. */
 export type BuilderRsvpField = Pick<
   RSVPField,
-  "field_name" | "field_type" | "field_label" | "is_required" | "is_enabled" | "options" | "placeholder"
+  "field_name" | "field_type" | "field_label" | "is_required" | "is_enabled" | "per_person" | "options" | "placeholder"
 >;
 
 export interface BuilderData {
@@ -69,6 +69,10 @@ export const builderDataSchema: z.ZodType<BuilderData> = z.object({
     backgroundColor: z.string(),
     backgroundImage: nullableString,
     fontFamily: z.string(),
+    displayFont: nullableString.optional(),
+    layoutStyle: z.enum(["classic", "editorial", "arch", "minimal"]).optional(),
+    motif: z.enum(["none", "botanical", "monogram", "celestial", "frame"]).optional(),
+    themeId: nullableString.optional(),
     buttonStyle: z.enum(["rounded", "pill", "square"]),
     showCountdown: z.boolean(),
     audioUrl: nullableString,
@@ -82,6 +86,7 @@ export const builderDataSchema: z.ZodType<BuilderData> = z.object({
     field_label: z.string(),
     is_required: z.boolean(),
     is_enabled: z.boolean(),
+    per_person: z.boolean().optional(),
     options: z.array(z.string()).nullable(),
     placeholder: nullableString,
   })),

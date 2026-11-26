@@ -15,20 +15,20 @@ export type Statement = { text: string; params?: unknown[] };
 export const BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
   "active", "allow_plus_ones", "approved", "auto_reminders", "cancel_at_period_end", "closed", "countdown_enabled",
   "guests_enabled", "helpful", "invite_sent", "is_default", "is_enabled", "is_personal", "is_plus_one", "is_private",
-  "is_required", "may_contact", "photo_approval", "photos_enabled", "polls_enabled", "reactions_enabled", "show_name",
+  "is_required", "may_contact", "per_person", "photo_approval", "photos_enabled", "polls_enabled", "reactions_enabled", "show_name",
   "white_label",
 ]);
 
 export const TIMESTAMP_COLUMNS: ReadonlySet<string> = new Set([
   "accepted_at", "approved_at", "cancelled_at", "checked_in_at", "completed_at", "consented_at", "created_at",
-  "current_period_end", "delivered_at", "dispatched_at", "email_verified_at", "event_date", "event_end_date", "expires_at", "invite_sent_at",
+  "current_period_end", "delivered_at", "dispatched_at", "email_verified_at", "ends_at", "event_date", "event_end_date", "expires_at", "invite_sent_at",
   "last_attempted_at", "last_delivered_at", "last_failure_at", "last_login_at", "last_success_at", "magic_token_expires_at",
   "next_attempt_at", "phone_invalid_at", "queued_at", "reminder_sent_at", "requested_at", "revoked_at", "reviewed_at",
-  "rsvp_deadline", "scheduled_at", "scheduled_for", "sent_at", "submitted_at", "updated_at", "used_at", "withdrawn_at",
+  "rsvp_deadline", "scheduled_at", "scheduled_for", "sent_at", "starts_at", "submitted_at", "updated_at", "used_at", "withdrawn_at",
 ]);
 
 export const JSON_COLUMNS: ReadonlySet<string> = new Set([
-  "audience", "channels", "customization", "event_brief", "events", "metadata", "options", "payload", "plus_ones_data",
+  "answers", "audience", "channels", "customization", "event_brief", "events", "metadata", "options", "payload", "plus_ones_data",
   "registry_links", "reminder_sequence", "response_data", "tags",
 ]);
 

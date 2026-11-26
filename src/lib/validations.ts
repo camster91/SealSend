@@ -111,6 +111,10 @@ export const eventCreateSchema = z.object({
       backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#ffffff"),
       backgroundImage: optionalNullableSafeHttpUrl.default(null),
       fontFamily: z.string().max(50).default("Inter"),
+      displayFont: z.string().max(50).optional(),
+      layoutStyle: z.enum(["classic", "editorial", "arch", "minimal"]).optional(),
+      motif: z.enum(["none", "botanical", "monogram", "celestial", "frame"]).optional(),
+      themeId: z.string().max(64).optional(),
       buttonStyle: z.enum(["rounded", "pill", "square"]).default("rounded"),
       showCountdown: z.boolean().default(true),
       audioUrl: optionalNullableSafeHttpUrl.default(null),
@@ -150,6 +154,7 @@ export const rsvpFieldSchema = z.object({
   placeholder: z.string().nullable().optional(),
   is_required: z.boolean().default(false),
   is_enabled: z.boolean().default(true),
+  per_person: z.boolean().default(false),
   sort_order: z.number().default(0),
 });
 
@@ -197,6 +202,7 @@ export const eventMemberRoleSchema = z.object({
 export const plusOneDataSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email().optional().or(z.literal("")),
+  answers: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const rsvpSubmissionSchema = z.object({

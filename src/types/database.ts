@@ -19,11 +19,18 @@ export interface RegistryLink {
   url: string;
 }
 
+export type EventLayoutStyle = "classic" | "editorial" | "arch" | "minimal";
+export type EventMotif = "none" | "botanical" | "monogram" | "celestial" | "frame";
+
 export interface EventCustomization {
   primaryColor: string;
   backgroundColor: string;
   backgroundImage: string | null;
   fontFamily: string;
+  displayFont?: string | null;
+  layoutStyle?: EventLayoutStyle;
+  motif?: EventMotif;
+  themeId?: string | null;
   buttonStyle: "rounded" | "pill" | "square";
   showCountdown: boolean;
   audioUrl: string | null;
@@ -80,6 +87,7 @@ export interface RSVPField {
   placeholder: string | null;
   is_required: boolean;
   is_enabled: boolean;
+  per_person?: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -118,6 +126,7 @@ export interface GuestTagAssignment {
 export interface PlusOneData {
   name: string;
   email?: string;
+  answers?: Record<string, unknown>;
 }
 
 export interface PlusOne {
@@ -128,6 +137,7 @@ export interface PlusOne {
   name: string;
   email: string | null;
   status: RSVPStatus;
+  answers?: Record<string, unknown>;
   invite_token: string | null;
   invite_status: InviteStatus;
   invite_sent_at: string | null;

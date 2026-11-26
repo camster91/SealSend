@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Trash2, ChevronDown, ChevronRight, Mail, UserPlus } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import type { RSVPResponseWithPlusOnes, PlusOne } from "@/types/database";
+import { serializeRsvpResponseValue } from "@/lib/rsvp-fields";
 import { cn } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/ui/Feedback";
 
@@ -203,38 +204,56 @@ export function ResponseTable({ responses, eventId, onRefresh, filter }: Respons
               Plus Ones ({plusOnes.length})
             </div>
             <div className="space-y-2">
-              {plusOnes.map((plusOne: PlusOne, index: number) => (
+              {plusOnes.map((plusOne: PlusOne, index: number) => {
+                const answerEntries = plusOne.answers && typeof plusOne.answers === "object"
+                  ? Object.entries(plusOne.answers)
+                    .map(([k, v]) => [k, serializeRsvpResponseValue(v)] as const)
+                    .filter(([, text]) => text.length > 0)
+                  : [];
+                return (
                 <div
                   key={plusOne.id}
-                  className="flex items-center justify-between bg-white rounded-lg border border-neutral-200 px-4 py-2 text-sm"
+                  className="bg-white rounded-lg border border-neutral-200 px-4 py-2 text-sm space-y-1.5"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-neutral-400 text-xs w-6">{index + 1}.</span>
-                    <span className="font-medium">{plusOne.name}</span>
-                    {plusOne.email && (
-                      <span className="text-neutral-500 flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {plusOne.email}
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-neutral-400 text-xs w-6">{index + 1}.</span>
+                      <span className="font-medium">{plusOne.name}</span>
+                      {plusOne.email && (
+                        <span className="text-neutral-500 flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {plusOne.email}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={statusVariant[plusOne.status] || "secondary"} className="text-xs">
+                        {statusLabel[plusOne.status] || plusOne.status}
+                      </Badge>
+                      {plusOne.email && (
+                        <span
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full",
+                            inviteStatusBadge[plusOne.invite_status]?.className || inviteStatusBadge.not_sent.className
+                          )}
+                        >
+                          {inviteStatusBadge[plusOne.invite_status]?.label || "Not Sent"}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={statusVariant[plusOne.status] || "secondary"} className="text-xs">
-                      {statusLabel[plusOne.status] || plusOne.status}
-                    </Badge>
-                    {plusOne.email && (
-                      <span
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded-full",
-                          inviteStatusBadge[plusOne.invite_status]?.className || inviteStatusBadge.not_sent.className
-                        )}
-                      >
-                        {inviteStatusBadge[plusOne.invite_status]?.label || "Not Sent"}
-                      </span>
-                    )}
-                  </div>
+                  {answerEntries.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pl-9">
+                      {answerEntries.map(([key, text]) => (
+                        <span key={key} className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
+                          <span className="font-medium">{key}:</span> {text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </td>

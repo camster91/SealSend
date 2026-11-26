@@ -17,10 +17,17 @@ export function InvitePreview({ data }: { data: BuilderData }) {
   if (!mounted) return <div aria-label="Loading invite preview" className="min-h-64 rounded-xl border border-border bg-white" />;
   return (
     // Display only: inert keeps its links and buttons out of the tab order.
-    <div inert className="overflow-hidden rounded-xl border border-border bg-white" style={{ fontFamily: eventFontFamily(data.customization.fontFamily) }}>
+    <div
+      inert
+      className="overflow-hidden rounded-xl border border-border p-4"
+      style={{
+        fontFamily: eventFontFamily(data.customization.fontFamily),
+        backgroundColor: data.customization.backgroundColor || "#ffffff",
+      }}
+    >
       <EventHero event={event} />
-      <div className="p-5">
-        <EventDetails event={event} />
+      <div className="mt-4 rounded-xl border border-border bg-white p-5">
+        <EventDetails event={event} showTitle={Boolean(event.design_url)} />
       </div>
     </div>
   );

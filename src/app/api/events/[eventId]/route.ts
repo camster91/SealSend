@@ -4,8 +4,7 @@ import { query, queryOne } from '@/lib/db/client';
 import { SQL_NOW } from '@/lib/db/sqlite-dialect';
 import { toTimestamp } from '@/lib/events';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
-import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
-import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { afterEventPublished } from '@/lib/event-lifecycle';
 import { eventUpdateSchema } from '@/lib/validations';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 import { refreshDefaultInvitationCopy, withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
@@ -166,13 +165,7 @@ export async function PATCH(
     }
 
     if (existing.status !== 'published' && targetStatus === 'published') {
-      await enqueueWebhookEvent(eventId, 'event.published', {});
-      await recordActivationEventSafely({
-        name: 'event_published',
-        userId: auth.user.id,
-        eventId,
-        metadata: { source: 'patch' },
-      });
+      await afterEventPublished({ eventId, userId: auth.user.id, source: 'patch' });
     }
 
     return NextResponse.json(eventForAccess(event, auth.access.role));

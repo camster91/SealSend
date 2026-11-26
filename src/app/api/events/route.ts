@@ -12,7 +12,7 @@ import { getPublicationReadiness } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy } from '@/lib/invitation-defaults';
 import { getMobileContext } from '@/lib/auth/mobile-context';
 import { getCollaboratingEvents, toTimestamp } from '@/lib/events';
-import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { afterEventPublished } from '@/lib/event-lifecycle';
 import { createHash } from 'node:crypto';
 
 export async function GET() {
@@ -273,13 +273,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (event.status === 'published') {
-      await enqueueWebhookEvent(event.id as string, 'event.published', {});
-      await recordActivationEventSafely({
-        name: 'event_published',
-        userId: user.id,
-        eventId: event.id as string,
-        metadata: { source: 'create' },
-      });
+      await afterEventPublished({ eventId: event.id as string, userId: user.id, source: 'create' });
     }
 
     return NextResponse.json(event, { status: 201 });

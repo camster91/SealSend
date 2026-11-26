@@ -8,6 +8,7 @@ import { defaultInvitationCopy } from "@/lib/invitation-defaults";
 import { getPublicationReadiness, type PublicationBlocker } from "@/lib/publication-readiness";
 import { builderDataToPreviewEvent } from "@/lib/event-builder/mapping";
 import { buildReadinessCandidate, createRsvpSaver, describePublishError, prepareRsvpFields, primaryAction, RSVP_SAVE_FAILED, saveThenAct, type RsvpSaver } from "@/lib/event-builder/review";
+import { rsvpFieldRole } from "@/lib/rsvp-fields";
 import { TEXT_LIMITS } from "@/lib/event-builder/field-checks";
 import type { BuilderRsvpField } from "@/lib/event-builder/schema";
 import type { ScreenContext } from "../BuilderShell";
@@ -152,22 +153,38 @@ export function ReviewScreen({ ctx }: { ctx: ScreenContext }) {
           <p className="text-sm text-muted-foreground">Guests will be asked if they can come.</p>
         ) : (
           <ul className="space-y-4">
-            {data.rsvp_fields.map((f, i) => (
-              <li key={`${f.field_name}-${i}`} className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
-                <div className="min-w-0 flex-1">
-                  <Field id={`review-q-${i}`} label="Question">
-                    {(aria) => <Input {...aria} className={CONTROL} value={f.field_label} onChange={(e) => setField(i, { field_label: e.target.value })} />}
-                  </Field>
-                </div>
-                <Toggle
-                  className="min-h-11"
-                  checked={f.is_enabled}
-                  disabled={f.field_type === "attendance"}
-                  label={f.field_type === "attendance" ? "Always asked" : f.is_enabled ? "Asked" : "Not asked"}
-                  onChange={(checked) => setField(i, { is_enabled: checked })}
-                />
-              </li>
-            ))}
+            {data.rsvp_fields.map((f, i) => {
+              const isCustom = rsvpFieldRole(f) === "custom";
+              return (
+                <li key={`${f.field_name}-${i}`} className="space-y-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                      <Field id={`review-q-${i}`} label="Question">
+                        {(aria) => <Input {...aria} className={CONTROL} value={f.field_label} onChange={(e) => setField(i, { field_label: e.target.value })} />}
+                      </Field>
+                    </div>
+                    <Toggle
+                      className="min-h-11"
+                      checked={f.is_enabled}
+                      disabled={f.field_type === "attendance"}
+                      label={f.field_type === "attendance" ? "Always asked" : f.is_enabled ? "Asked" : "Not asked"}
+                      onChange={(checked) => setField(i, { is_enabled: checked })}
+                    />
+                  </div>
+                  {data.allow_plus_ones && isCustom && f.is_enabled && (
+                    <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(f.per_person)}
+                        onChange={(e) => setField(i, { per_person: e.target.checked })}
+                        className="h-4 w-4 rounded border-neutral-300 text-ink focus:ring-2 focus:ring-ink"
+                      />
+                      Ask separately for each additional guest (+1)
+                    </label>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

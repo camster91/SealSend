@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireEventPermission } from '@/lib/auth/event-api-access';
 import { queryOne } from '@/lib/db/client';
 import { SQL_NOW } from '@/lib/db/sqlite-dialect';
-import { recordActivationEventSafely } from '@/lib/analytics/activation-events';
 import { getPublicationReadiness, type PublicationCandidate } from '@/lib/publication-readiness';
 import { withDefaultInvitationCopy, type InvitationCopyInput } from '@/lib/invitation-defaults';
-import { enqueueWebhookEvent } from "@/lib/webhooks";
+import { afterEventPublished } from '@/lib/event-lifecycle';
 
 type RouteParams = { params: Promise<{ eventId: string }> };
 
@@ -76,13 +75,7 @@ export async function POST(
     }
 
     if (newStatus === 'published') {
-      await enqueueWebhookEvent(eventId, 'event.published', {});
-      await recordActivationEventSafely({
-        name: 'event_published',
-        userId: user.id,
-        eventId,
-        metadata: { source: 'dashboard' },
-      });
+      await afterEventPublished({ eventId, userId: user.id, source: 'dashboard' });
     }
 
     return NextResponse.json(updatedEvent);

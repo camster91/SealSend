@@ -18,8 +18,11 @@ import { getUserTier } from "@/lib/subscription";
 import { showsPoweredByBadge } from "@/lib/entitlements";
 import { getEventBranding, mergeBrandIntoCustomization } from "@/lib/brands";
 import { getCurrentUser } from "@/lib/auth/session";
+import { attendingPeopleSql } from "@/lib/event-stats";
 import type { Metadata } from "next";
 import { eventFontFamily } from '@/lib/event-font';
+import { listVisibleSubEvents } from "@/lib/sub-events";
+import { SubEventsSection } from "@/components/public-event/SubEventsSection";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -76,11 +79,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
   const maxAttendees = (event.max_attendees as number) || null;
   if (maxAttendees) {
     const sumResult = await queryOne<{ total: number }>(
-      `SELECT (
-         COALESCE((SELECT SUM(headcount) FROM rsvp_responses WHERE event_id = $1 AND status = $2), 0)
-         + (SELECT COUNT(*) FROM guests g WHERE g.event_id = $1 AND g.rsvp_status = 'attending' AND NOT EXISTS (SELECT 1 FROM rsvp_responses r WHERE r.event_id = $1 AND r.guest_id = g.id))
-       ) AS total`,
-      [event.id, 'attending']
+      `SELECT ${attendingPeopleSql('$1')} AS total`,
+      [event.id]
     );
     const currentTotal = Number(sumResult?.total ?? 0);
     spotsRemaining = Math.max(0, maxAttendees - currentTotal);
@@ -108,6 +108,8 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
     }
   }
   const unknownLink = rawToken !== null && !inviteGuest;
+  // Optional schedule: only parts open to everyone, plus parts this guest was invited to.
+  const visibleSubEvents = await listVisibleSubEvents({ query }, event.id, inviteGuest?.id ?? null, null);
 
   // Sanitize all customization values
   const customization = sanitizeCustomization(event.customization as unknown as Record<string, unknown>);
@@ -167,6 +169,17 @@ export default async function PublicEventPage({ params, searchParams }: Props) {
             </AnimatedSection>
 
             <div className="space-y-6 lg:col-span-3">
+              {visibleSubEvents.length > 0 && (
+                <AnimatedSection>
+                  <SubEventsSection
+                    eventSlug={slug}
+                    timezone={event.event_timezone || "UTC"}
+                    primaryColor={safePrimaryColor}
+                    inviteToken={inviteGuest && token ? token : undefined}
+                    initialSubEvents={visibleSubEvents}
+                  />
+                </AnimatedSection>
+              )}
               <AnimatedSection>
                 <SignupBoard eventSlug={slug} />
               </AnimatedSection>

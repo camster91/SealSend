@@ -64,6 +64,7 @@ export async function PUT(
         field_label: parsed.data.field_label,
         is_required: parsed.data.is_required,
         is_enabled: parsed.data.is_enabled,
+        per_person: parsed.data.per_person,
         sort_order: index,
         options: parsed.data.options ?? null,
         placeholder: parsed.data.placeholder ?? null,
@@ -76,27 +77,27 @@ export async function PUT(
       { text: 'DELETE FROM rsvp_fields WHERE event_id = $1', params: [eventId] },
     ];
 
-    // D1 allows 100 bound parameters per statement: 11 rows of 9 per INSERT.
-    for (let start = 0; start < fields.length; start += 11) {
+    // D1 allows 100 bound parameters per statement: 10 rows of 10 per INSERT.
+    for (let start = 0; start < fields.length; start += 10) {
       const valueClauses: string[] = [];
       const allParams: unknown[] = [];
       let paramIndex = 1;
 
-      for (const f of fields.slice(start, start + 11)) {
+      for (const f of fields.slice(start, start + 10)) {
         valueClauses.push(
-          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8})`
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9})`
         );
         allParams.push(
           f.event_id, f.field_name, f.field_type, f.field_label,
-          f.is_required, f.is_enabled, f.sort_order,
+          f.is_required, f.is_enabled, f.per_person, f.sort_order,
           f.options ? JSON.stringify(f.options) : null,
           f.placeholder
         );
-        paramIndex += 9;
+        paramIndex += 10;
       }
 
       statements.push({
-        text: `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, sort_order, options, placeholder)
+        text: `INSERT INTO rsvp_fields (event_id, field_name, field_type, field_label, is_required, is_enabled, per_person, sort_order, options, placeholder)
          VALUES ${valueClauses.join(', ')}`,
         params: allParams,
       });

@@ -1,6 +1,21 @@
 import { rsvpFieldRole, rsvpResponseValues } from './rsvp-fields';
-export type SummaryResponse = { id: string; status: string; headcount: number; response_data: Record<string, unknown> | null; respondent_name?: string; respondent_email?: string | null };
-export type SummaryField = { field_name: string; field_label: string; field_type: string; is_required: boolean; options?: string[] | null };
+export type SummaryResponse = {
+  id: string;
+  status: string;
+  headcount: number;
+  response_data: Record<string, unknown> | null;
+  plus_ones_data?: Array<{ name?: string; answers?: Record<string, unknown> | null }> | null;
+  respondent_name?: string;
+  respondent_email?: string | null;
+};
+export type SummaryField = {
+  field_name: string;
+  field_label: string;
+  field_type: string;
+  is_required: boolean;
+  per_person?: boolean;
+  options?: string[] | null;
+};
 
 export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryField[], maxAttendees: number | null, walkInCount = 0) {
   const statusCounts = { attending: 0, not_attending: 0, maybe: 0, pending: 0 };
@@ -13,14 +28,24 @@ export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryFi
     const role = rsvpFieldRole(field);
     let answered = 0;
     const counts = new Map<string, number>();
-    for (const response of responses) {
-      const value = role === 'name' ? response.respondent_name : role === 'email' ? response.respondent_email : role === 'headcount' ? response.headcount : role === 'attendance' ? response.status : response.response_data?.[field.field_name];
-      const values = rsvpResponseValues(value);
-      if (values.length) answered++;
+    const tallyValues = (values: string[]) => {
       if (role === 'attendance' || ["select", "multiselect", "number"].includes(field.field_type)) {
         for (const item of values) {
           const normalized = item.trim().slice(0, 100);
           if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+        }
+      }
+    };
+    for (const response of responses) {
+      const value = role === 'name' ? response.respondent_name : role === 'email' ? response.respondent_email : role === 'headcount' ? response.headcount : role === 'attendance' ? response.status : response.response_data?.[field.field_name];
+      const values = rsvpResponseValues(value);
+      if (values.length) answered++;
+      tallyValues(values);
+      // Include per-person plus-one answers in option tallies (e.g. meal choices for every guest).
+      if (role === 'custom' && field.per_person && response.status !== 'not_attending' && Array.isArray(response.plus_ones_data)) {
+        for (const plusOne of response.plus_ones_data) {
+          const poValues = rsvpResponseValues(plusOne?.answers?.[field.field_name]);
+          tallyValues(poValues);
         }
       }
     }
@@ -29,6 +54,7 @@ export function buildRsvpSummary(responses: SummaryResponse[], fields: SummaryFi
       label: field.field_label,
       type: field.field_type,
       required: field.is_required,
+      perPerson: Boolean(field.per_person),
       answered,
       incomplete: responses.length - answered,
       counts: [...counts.entries()].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),

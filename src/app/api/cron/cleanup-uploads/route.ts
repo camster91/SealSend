@@ -4,6 +4,7 @@ import { isAuthorizedCron } from "@/lib/auth/cron-auth";
 import { sqlNowPlus } from "@/lib/db/sqlite-dialect";
 import { purgeQueuedSocialPhotos } from '@/lib/social/photos';
 import { blobKeyFromUploadPath, getBlobStore } from "@/lib/blob-store";
+import { isUploadPathReferencedSql } from "@/lib/asset-references";
 
 type Asset = { id: string; path: string };
 
@@ -16,15 +17,7 @@ export async function GET(request: NextRequest) {
   const assets = await query<Asset>(
     `SELECT a.id, a.path FROM upload_assets a
       WHERE a.created_at < ${sqlNowPlus("-7 days")}
-        AND NOT EXISTS (
-          SELECT 1 FROM events e
-           WHERE e.design_url = a.path
-              OR json_extract(e.customization, '$.logoUrl') = a.path
-              OR json_extract(e.customization, '$.backgroundImage') = a.path
-              OR json_extract(e.customization, '$.audioUrl') = a.path
-        )
-        AND NOT EXISTS (SELECT 1 FROM brands b WHERE b.logo_url = a.path)
-        AND NOT EXISTS (SELECT 1 FROM event_social_photos p WHERE p.storage_path = a.path)
+        AND NOT ${isUploadPathReferencedSql("a.path")}
       ORDER BY a.created_at LIMIT 100`,
   );
   if (!enabled) return NextResponse.json({ enabled: false, candidates: assets.length, deleted: 0, socialPhotosDeleted });
