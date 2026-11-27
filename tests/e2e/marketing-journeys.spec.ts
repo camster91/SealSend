@@ -3,6 +3,7 @@ import { openReadyPage } from "./page-ready";
 
 const publicRoutes = [
   "/",
+  "/templates",
   "/how-it-works",
   "/pricing",
   "/use-cases",
@@ -109,9 +110,9 @@ test("the invitation example changes theme and resets its response state", async
   await expect(demo).toBeVisible();
 
   const examples = [
-    ["Birthday", "A birthday worth celebrating"],
-    ["Potluck", "A little potluck, a lot of good company"],
-    ["Book club", "One more chapter, together"],
+    ["Wedding", "Maya & Lucas"],
+    ["Birthday", "Nora's 30th"],
+    ["Dinner party", "Autumn Supper Club"],
   ] as const;
 
   for (const [label, title] of examples) {
@@ -121,13 +122,13 @@ test("the invitation example changes theme and resets its response state", async
     await expect(demo.getByRole("status")).toHaveText("");
 
     await demo.getByRole("button", { name: "Try an RSVP", exact: true }).click();
-    await expect(demo.getByRole("status")).toHaveText("You’re on the example guest list. No RSVP was sent.");
+    await expect(demo.getByRole("status")).toContainText("No RSVP was sent.");
 
     await demo.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(demo.getByRole("status")).toHaveText("");
   }
   await demo.getByRole("button", { name: "Try an RSVP", exact: true }).click();
-  await demo.getByRole("button", { name: "Birthday", exact: true }).click();
+  await demo.getByRole("button", { name: "Wedding", exact: true }).click();
   await expect(demo.getByRole("status")).toHaveText("");
   await expect(demo.getByRole("button", { name: "Try an RSVP", exact: true })).toBeVisible();
 });

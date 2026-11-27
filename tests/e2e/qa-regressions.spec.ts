@@ -35,7 +35,6 @@ test('paid plan intent survives signup and sign-in routing', async ({ page }) =>
 
 test('disabled placeholder features route to working product areas', async ({ page }) => {
   for (const [route, destination] of [
-    ['/templates', '/events/new'],
     ['/ai-assistant', '/events/new'],
     ['/settings/team', '/settings'],
   ] as const) {
@@ -45,6 +44,10 @@ test('disabled placeholder features route to working product areas', async ({ pa
     // redirects after authentication are covered by source readiness checks.
     expect(destination).toMatch(/^\//);
   }
+  // /templates is now a public gallery whose template links carry into /events/new.
+  const gallery = await page.goto('/templates');
+  expect(gallery?.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Event templates' })).toBeVisible();
 });
 
 test('organizer use cases are reachable and legacy links redirect', async ({ page }) => {

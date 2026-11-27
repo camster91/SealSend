@@ -135,11 +135,14 @@ export default function InvitationPlayground() {
             ))}
           </div>
           <p className="mt-4 text-sm text-neutral-600">An interactive example. Nothing is saved or sent.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <PrimaryCta label="Make your own invitation" />
             <SecondaryCta href="/templates">
               Browse 16 styles <ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" />
             </SecondaryCta>
+            <Link href="/how-it-works" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-ink underline underline-offset-4 hover:text-wax">
+              See how it works
+            </Link>
           </div>
         </div>
 
@@ -207,7 +210,7 @@ export default function InvitationPlayground() {
                           ? "Marked as maybe"
                           : "Marked as can't go"}
                     </p>
-                    <p className="text-xs text-neutral-600">Example only — no RSVP was saved or sent.</p>
+                    <p className="text-xs text-neutral-600">No RSVP was sent.</p>
                   </div>
                 )}
               </div>
