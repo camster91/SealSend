@@ -5,7 +5,8 @@ import { openSqliteDb } from "../src/lib/db/sqlite-local";
 import { sanitizeCustomization } from "../src/lib/sanitize";
 import { eventDisplayFontFamily, eventFontFamily } from "../src/lib/event-font";
 import { EVENT_TEMPLATES } from "../src/lib/event-templates";
-import { eventCreateSchema, rsvpFieldSchema, rsvpSubmissionSchema } from "../src/lib/validations";
+import { eventCreateSchema, eventUpdateSchema, rsvpFieldSchema, rsvpSubmissionSchema } from "../src/lib/validations";
+import { emptyBuilderData } from "../src/lib/event-builder/mapping";
 import { perPersonRsvpFields, sanitizePlusOneAnswers, validatePlusOneAnswers } from "../src/lib/rsvp-fields";
 import { buildRsvpSummary } from "../src/lib/rsvp-summary";
 import { summarizeDietary } from "../src/lib/dietary-summary";
@@ -72,9 +73,12 @@ test("themes: every template pairs fonts, a layout and a motif that survive sani
   assert.equal(eventDisplayFontFamily(null, "Inter"), eventFontFamily("Inter"));
 });
 
-test("themes: event schema accepts new look fields and rejects unknown layouts", () => {
+test("themes: event schema accepts new look fields, builder defaults (nullable), and rejects unknown layouts", () => {
   const ok = eventCreateSchema.safeParse({ title: "x", customization: { layoutStyle: "arch", motif: "botanical", displayFont: "Fraunces", themeId: "garden" } });
   assert.ok(ok.success);
+  const fromBuilder = emptyBuilderData("UTC");
+  assert.ok(eventCreateSchema.safeParse({ title: "Builder draft", customization: fromBuilder.customization }).success);
+  assert.ok(eventUpdateSchema.safeParse({ customization: fromBuilder.customization }).success);
   assert.equal(eventCreateSchema.safeParse({ title: "x", customization: { layoutStyle: "carousel" } }).success, false);
 });
 
