@@ -103,6 +103,9 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
 
         {/* Desktop nav */}
         <div className="hidden items-center gap-1 lg:flex">
+          <Link href="/templates" className={navLink}>
+            Templates
+          </Link>
           <Link href="/how-it-works" className={navLink}>
             How it works
           </Link>
@@ -203,6 +206,13 @@ export function Navbar({ user }: { user?: NavbarUser | null }) {
       {/* Mobile nav */}
       {mobileOpen && <div id="mobile-navigation" className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border bg-cotton lg:hidden">
         <div className="space-y-1 px-4 pb-6 pt-3">
+          <Link
+            href="/templates"
+            className="flex min-h-11 items-center rounded-lg px-3 text-base font-medium text-ink hover:bg-white"
+            onClick={() => setMobileOpen(false)}
+          >
+            Templates
+          </Link>
           <Link
             href="/how-it-works"
             className="flex min-h-11 items-center rounded-lg px-3 text-base font-medium text-ink hover:bg-white"

@@ -40,12 +40,12 @@ test('wrong addresses reach the 404 page instead of asking for a sign-in', async
 
 test('private pages still ask for a sign-in, however the address is written', async () => {
   for (const path of ['/dashboard', '/settings/team', '/events/new', '/events/abc/check-in', '/guest', '/team/workspace/x',
-    '/templates', '/ai-assistant', '/dashboard.rsc', '/%64ashboard', '/Dashboard', '/events.rsc']) {
+    '/ai-assistant', '/dashboard.rsc', '/%64ashboard', '/Dashboard', '/events.rsc']) {
     assert.equal(needsSignIn(path), true, path);
     const response = await proxy(new NextRequest(`https://sealsend.app${path}`));
     assert.match(response.headers.get('location') ?? '', /\/login\?redirect=/, path);
   }
-  for (const path of ['/', '/e/party', '/events/abc/guest', '/events/abc/public', '/guest/update/token', '/client/x', '/api/health']) {
+  for (const path of ['/', '/templates', '/e/party', '/events/abc/guest', '/events/abc/public', '/guest/update/token', '/client/x', '/api/health']) {
     assert.equal(needsSignIn(path), false, path);
   }
 });
@@ -58,7 +58,7 @@ test('every page folder is deliberately public or private', async () => {
     for (const child of await readdir(`src/app/${entry.name}`, { withFileTypes: true })) if (child.isDirectory()) top.add(child.name);
   }
   const open = ['api', 'callback', 'client', 'e', 'forgot-password', 'how-it-works', 'install', 'invite', 'login', 'pricing',
-    'privacy', 'signup', 'support', 'terms', 'unsubscribe', 'uploads', 'use-cases'];
+    'privacy', 'signup', 'support', 'templates', 'terms', 'unsubscribe', 'uploads', 'use-cases'];
   for (const name of top) assert.ok(open.includes(name) !== needsSignIn(`/${name}`), `${name}: add it to the private list or this open list`);
 });
 

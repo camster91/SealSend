@@ -29,11 +29,12 @@ export default function UseCaseGrid() {
                   href={`/use-cases/${slug}`}
                   className="group block overflow-hidden rounded-2xl border border-border bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-[#efeae0]">
                     <Image
                       src={useCase.image}
                       alt={useCase.imageAlt}
                       fill
+                      priority
                       sizes="(min-width: 640px) 33vw, 100vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.02] motion-reduce:transition-none"
                     />

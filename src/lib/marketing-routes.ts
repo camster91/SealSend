@@ -16,7 +16,7 @@ export function movedPage(pathname: string): string | null {
 
 // A new app section must be listed here: tests/simple-marketing.test.ts fails until every
 // folder in src/app is either on this list or deliberately open.
-const PRIVATE_SECTIONS = new Set(['dashboard', 'settings', 'templates', 'ai-assistant', 'events', 'guest', 'team']);
+const PRIVATE_SECTIONS = new Set(['dashboard', 'settings', 'ai-assistant', 'events', 'guest', 'team']);
 
 /** Wrong addresses are not private, so they reach the 404 page instead of the sign-in page. */
 export function needsSignIn(pathname: string): boolean {
